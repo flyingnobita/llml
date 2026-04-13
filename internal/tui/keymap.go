@@ -10,6 +10,7 @@ type KeyMap struct {
 	ScrollLeft  key.Binding
 	ScrollRight key.Binding
 	CopyPath    key.Binding
+	ConfigPort  key.Binding
 }
 
 // DefaultKeyMap returns the default global shortcuts.
@@ -39,17 +40,21 @@ func DefaultKeyMap() KeyMap {
 			key.WithKeys("enter"),
 			key.WithHelp("enter", "copy path"),
 		),
+		ConfigPort: key.NewBinding(
+			key.WithKeys("c"),
+			key.WithHelp("c", "listen port"),
+		),
 	}
 }
 
 // ShortHelp satisfies key.KeyMap (optional; use for help overlay later).
 func (k KeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Refresh, k.RunServer, k.ScrollLeft, k.Quit}
+	return []key.Binding{k.Refresh, k.RunServer, k.ConfigPort, k.ScrollLeft, k.Quit}
 }
 
 // FullHelp satisfies key.KeyMap.
 func (k KeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
-		{k.Refresh, k.RunServer, k.Quit},
+		{k.Refresh, k.RunServer, k.ConfigPort, k.Quit},
 	}
 }

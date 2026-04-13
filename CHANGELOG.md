@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
+- Apr-13, 2026 - [TUI: c opens listen-port editor for LLAMA_SERVER_PORT; s save, esc cancel; sets process env for R / llama-server]
 - Apr-13, 2026 - [Docs: backlog lives under gitignored dev-docs/BACKLOG.md; AGENTS notes local-only dev-docs]
 - Apr-13, 2026 - [Docs: README setup matches env-only config; dev-docs SPECS/PLANS/PRD aligned; .gitignore drops exceptions for removed template files]
 - Apr-13, 2026 - [Refactor: remove stale template files; update dev-docs/AGENTS.md; extract constants, innerWidth(), styles; simplify FormatModelFolderDisplay; consolidate mouse wheel cases; add package doc comments]

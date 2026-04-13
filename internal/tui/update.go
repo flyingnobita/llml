@@ -46,8 +46,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		if m.portConfigOpen {
+			return m.updatePortConfigKey(msg)
+		}
 		if key.Matches(msg, m.keys.Quit) {
 			return m, tea.Quit
+		}
+		if key.Matches(msg, m.keys.ConfigPort) {
+			return m.openPortConfig()
 		}
 		if key.Matches(msg, m.keys.Refresh) {
 			m.loading = true
@@ -88,6 +94,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	case tea.MouseMsg:
+		if m.portConfigOpen {
+			return m, nil
+		}
 		// Vertical wheel moves the table cursor (row selection). Shift+vertical
 		// wheel and horizontal wheel pan the outer viewport (same as
 		// bubbles/viewport defaults).
@@ -114,6 +123,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	var cmd tea.Cmd
+	if m.portConfigOpen {
+		m.portInput, cmd = m.portInput.Update(msg)
+		return m, cmd
+	}
 	m.tbl, cmd = m.tbl.Update(msg)
 	return m, cmd
 }

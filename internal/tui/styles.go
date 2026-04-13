@@ -57,4 +57,14 @@ var (
 				Foreground(lipgloss.Color("246")).
 				Padding(1, 0).
 				MarginTop(1)
+
+	portConfigTitleStyle = lipgloss.NewStyle().
+				Bold(true).
+				Foreground(lipgloss.Color("99"))
+
+	portConfigBoxStyle = lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(lipgloss.Color("240")).
+				Padding(1, 2).
+				Foreground(lipgloss.Color("252"))
 )

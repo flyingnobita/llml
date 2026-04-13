@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/flyingnobita/llm-launch/internal/llamacpp"
 )
 
 // runtimePanelView renders the bottom llama.cpp binary path section.
@@ -32,6 +33,9 @@ const appTitle = "llm-launch"
 func (m Model) View() string {
 	if m.width == 0 {
 		return "\n  Initializing…\n"
+	}
+	if m.portConfigOpen {
+		return m.portConfigView()
 	}
 
 	title := titleStyle.Render(appTitle)
@@ -64,9 +68,10 @@ func (m Model) View() string {
 	}
 
 	help := fmt.Sprintf(
-		"%s %s · %s %s · %s %s · ↑/↓ select · wheel scroll · %s %s · %s %s · %d×%d",
+		"%s %s · %s %s · %s %s · %s %s · ↑/↓ select · wheel scroll · %s %s · %s %s · %d×%d",
 		m.keys.Refresh.Help().Key, m.keys.Refresh.Help().Desc,
 		m.keys.RunServer.Help().Key, m.keys.RunServer.Help().Desc,
+		m.keys.ConfigPort.Help().Key, m.keys.ConfigPort.Help().Desc,
 		m.keys.Quit.Help().Key, m.keys.Quit.Help().Desc,
 		m.keys.CopyPath.Help().Key, m.keys.CopyPath.Help().Desc,
 		m.keys.ScrollLeft.Help().Key, m.keys.ScrollLeft.Help().Desc,
@@ -90,6 +95,25 @@ func (m Model) View() string {
 	block := lipgloss.JoinVertical(lipgloss.Left, rows...)
 	framed := app.Render(block)
 
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, framed)
+}
+
+func (m Model) portConfigView() string {
+	keyLine := fmt.Sprintf("%s  (llama-server --port)", llamacpp.EnvLlamaServerPort)
+	block := lipgloss.JoinVertical(
+		lipgloss.Left,
+		portConfigTitleStyle.Render("Listen port"),
+		"",
+		bodyStyle.Render(keyLine),
+		"",
+		m.portInput.View(),
+		"",
+		footerStyle.Render("⏎ save · esc cancel · ctrl+c quit"),
+	)
+	if m.lastRunNote != "" {
+		block = lipgloss.JoinVertical(lipgloss.Left, block, "", errorStyle.Render(m.lastRunNote))
+	}
+	framed := portConfigBoxStyle.Render(block)
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, framed)
 }
 

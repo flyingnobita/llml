@@ -3,6 +3,7 @@ package tui
 import (
 	"strings"
 
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -26,6 +27,8 @@ type Model struct {
 	lastRunNote    string
 	loading        bool
 	loadErr        error
+	portConfigOpen bool
+	portInput      textinput.Model
 }
 
 // New returns a model with default key bindings and an empty table; Init triggers discovery.
@@ -42,10 +45,11 @@ func New() Model {
 	hv.SetHorizontalStep(hScrollStep)
 	hv.MouseWheelEnabled = true
 	return Model{
-		keys:    DefaultKeyMap(),
-		tbl:     t,
-		hscroll: hv,
-		loading: true,
+		keys:      DefaultKeyMap(),
+		tbl:       t,
+		hscroll:   hv,
+		portInput: newPortTextInput(),
+		loading:   true,
 	}
 }
 
