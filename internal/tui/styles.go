@@ -29,7 +29,7 @@ func DefaultTableStyles() btable.Styles {
 
 // Central place for Lip Gloss styles. Adjust palette as your design evolves.
 var (
-	app = lipgloss.NewStyle().Padding(1, 2)
+	app = lipgloss.NewStyle().Padding(1, appPaddingH)
 
 	titleStyle = lipgloss.NewStyle().
 			Bold(true).
@@ -46,6 +46,9 @@ var (
 	footerStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("240")).
 			MarginTop(1)
+
+	// errorStyle is used for load errors and server run notes (ANSI red #203).
+	errorStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("203"))
 
 	// Bottom panel: detected llama-cli / llama-server paths (border separates from table body).
 	runtimePanelStyle = lipgloss.NewStyle().

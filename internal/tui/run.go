@@ -1,3 +1,5 @@
+// Package tui implements the Bubble Tea terminal UI for llm-launch:
+// model discovery, runtime detection, table rendering, and llama-server launch.
 package tui
 
 import (

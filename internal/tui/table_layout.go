@@ -7,11 +7,14 @@ import (
 	btable "github.com/flyingnobita/llm-launch/internal/tui/btable"
 )
 
+// tableColumns computes per-column widths from the terminal width and the
+// current file list. Name expands to fit content (capped at maxNameColW);
+// Path takes remaining space after fixed columns.
 func tableColumns(totalWidth int, files []llamacpp.ModelFile) []btable.Column {
-	if totalWidth < 56 {
-		totalWidth = 56
+	if totalWidth < minTerminalWidth {
+		totalWidth = minTerminalWidth
 	}
-	nameW, sizeW, modW, paramW := 36, 9, 17, 18
+	nameW := defaultNameColW
 	longestName := 0
 	longestPath := 0
 	for _, f := range files {
@@ -24,32 +27,33 @@ func tableColumns(totalWidth int, files []llamacpp.ModelFile) []btable.Column {
 	}
 	if longestName > nameW {
 		nameW = longestName
-		if nameW > 72 {
-			nameW = 72
+		if nameW > maxNameColW {
+			nameW = maxNameColW
 		}
 	}
-	fixed := nameW + sizeW + modW + paramW + 8
+	fixed := nameW + sizeColW + modTimeColW + paramColW + colPaddingExtra
 	pathW := totalWidth - fixed
-	if pathW < 14 {
-		pathW = 14
+	if pathW < minPathColW {
+		pathW = minPathColW
 	}
 	if longestPath+2 > pathW {
 		pathW = longestPath + 2
 	}
-	if pathW > 400 {
-		pathW = 400
+	if pathW > maxPathColW {
+		pathW = maxPathColW
 	}
 
 	return []btable.Column{
 		{Title: "Name", Width: nameW},
 		{Title: "Path", Width: pathW},
-		{Title: "Size", Width: sizeW},
-		{Title: "Last modified", Width: modW},
-		{Title: "Parameters", Width: paramW},
+		{Title: "Size", Width: sizeColW},
+		{Title: "Last modified", Width: modTimeColW},
+		{Title: "Parameters", Width: paramColW},
 	}
 }
 
-// tableContentMinWidth approximates one row width (bubbles table pads cells) for setting table viewport width.
+// tableContentMinWidth approximates the minimum row width so the outer
+// viewport knows how wide to make the table (bubbles/table pads each cell).
 func tableContentMinWidth(cols []btable.Column) int {
 	sum := 0
 	for _, c := range cols {
@@ -58,6 +62,8 @@ func tableContentMinWidth(cols []btable.Column) int {
 	return sum + 4*len(cols)
 }
 
+// buildTableRows converts ModelFile entries into display rows using the
+// column widths computed by tableColumns. Cells are truncated to fit.
 func buildTableRows(files []llamacpp.ModelFile, cols []btable.Column) []btable.Row {
 	if len(cols) < 5 {
 		return nil

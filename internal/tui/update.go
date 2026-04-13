@@ -70,11 +70,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, runLlamaServerCmd(p, m.runtime)
 		}
 		if key.Matches(msg, m.keys.ScrollLeft) {
-			m.hscroll.ScrollLeft(4)
+			m.hscroll.ScrollLeft(hScrollStep)
 			return m, nil
 		}
 		if key.Matches(msg, m.keys.ScrollRight) {
-			m.hscroll.ScrollRight(4)
+			m.hscroll.ScrollRight(hScrollStep)
 			return m, nil
 		}
 		if key.Matches(msg, m.keys.CopyPath) {
@@ -88,16 +88,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	case tea.MouseMsg:
-		// Vertical wheel moves the table cursor (row selection). Shift+vertical wheel and
-		// horizontal wheel pan the outer viewport (same as bubbles/viewport defaults).
+		// Vertical wheel moves the table cursor (row selection). Shift+vertical
+		// wheel and horizontal wheel pan the outer viewport (same as
+		// bubbles/viewport defaults).
 		me := tea.MouseEvent(msg)
 		if me.IsWheel() {
 			switch {
-			case me.Button == tea.MouseButtonWheelLeft, me.Button == tea.MouseButtonWheelRight:
-				var cmd tea.Cmd
-				m.hscroll, cmd = m.hscroll.Update(msg)
-				return m, cmd
-			case me.Shift && (me.Button == tea.MouseButtonWheelUp || me.Button == tea.MouseButtonWheelDown):
+			case me.Button == tea.MouseButtonWheelLeft,
+				me.Button == tea.MouseButtonWheelRight,
+				me.Shift && (me.Button == tea.MouseButtonWheelUp || me.Button == tea.MouseButtonWheelDown):
 				var cmd tea.Cmd
 				m.hscroll, cmd = m.hscroll.Update(msg)
 				return m, cmd

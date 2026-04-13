@@ -58,19 +58,19 @@ const hfHubRepoDirPrefix = "models--"
 // layouts it stops at the models--* repo directory (omits snapshots/<revision>/). Otherwise it
 // uses the direct parent directory of the GGUF file.
 func FormatModelFolderDisplay(filePath string) string {
-	dir := filepath.Dir(filepath.Clean(filePath))
+	parent := filepath.Dir(filepath.Clean(filePath))
+	dir := parent
 	for {
-		base := filepath.Base(dir)
-		if strings.HasPrefix(base, hfHubRepoDirPrefix) {
+		if strings.HasPrefix(filepath.Base(dir), hfHubRepoDirPrefix) {
 			return FormatPathDisplay(dir)
 		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
+		up := filepath.Dir(dir)
+		if up == dir {
 			break
 		}
-		dir = parent
+		dir = up
 	}
-	return FormatPathDisplay(filepath.Dir(filepath.Clean(filePath)))
+	return FormatPathDisplay(parent)
 }
 
 // FormatModTime renders local filesystem modification time (not inference "last run").

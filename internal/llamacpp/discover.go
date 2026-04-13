@@ -1,3 +1,5 @@
+// Package llamacpp provides GGUF model discovery, metadata extraction, llama.cpp
+// binary detection, and display-formatting helpers for the llm-launch TUI.
 package llamacpp
 
 import (

@@ -1,95 +1,104 @@
-# AGENTS.md
+# AGENTS.md — llm-launch
 
-> **This is a template repository.** Before using it for development, complete
-> the setup steps below. An AI agent or user should follow this guide to adapt
-> the template for a new project.
+AI coding instructions for this project.
 
 ---
 
-## Setup: Adapt This Template
+## Project Overview
 
-When helping a user set up a new project from this template, run through the
-following steps. Ask the user the questions; then apply their answers.
+**llm-launch** is a terminal UI (TUI) for discovering GGUF model files on the
+local filesystem and launching `llama-server` for a selected model.
 
----
-
-### Step 1: Project Identity
-
-Ask the user:
-
-1. **Project name** — Display name for the project (e.g. "My Awesome API")
-2. **Folder/repo name** — Directory and repo name (e.g. `my-awesome-api`)
-3. **Brief description** — One sentence describing the project
-
-**Action:** Rename the project folder from `project-template` to the chosen
-folder name (e.g. `mv project-template my-awesome-api`). Update:
-
-- `README.md` — Replace "Project Name" and "Brief description"
-- `LICENSE` — Replace `<year>` and `<copyright holders>` if applicable
+- Language: **Go 1.26+**
+- UI framework: **Bubble Tea** (Elm-style TUI) + **Lip Gloss** (styling)
+- GGUF metadata: `abrander/gguf`
+- Tooling: `mise` (tool versions + tasks), `npm` (Prettier + markdownlint only)
 
 ---
 
-### Step 2: Tech Stack
+## Source Layout
 
-Ask the user:
-
-1. **Runtime/language** — Python, Node, Rust, Go, or other?
-2. **Version** — Specific version (e.g. Python 3.12, Node 20 LTS)
-3. **Framework** — If any (e.g. FastAPI, Next.js, Actix)
-4. **Database** — If any (e.g. PostgreSQL, SQLite)
-5. **Package manager** — uv, npm/pnpm, cargo, go mod, etc.
-
-**Action:** Update `dev-docs/SPECS.md` Tech Stack table. Update `mise.toml` with
-`[tools]` and `[tasks]` for the chosen stack.
+```text
+cmd/llm-launch/      # Binary entrypoint (main.go)
+internal/
+  llamacpp/          # GGUF discovery, metadata, runtime detection, formatting
+  tui/               # Bubble Tea model, update, view, styles, keymaps
+  tui/btable/        # Vendored fork of charmbracelet/bubbles/table (per-cell Selected)
+scripts/             # gofmt-check.sh, precommit-docs-fix.sh
+```
 
 ---
 
-### Step 3: Config & Environment
+## Key Conventions
 
-Ask the user:
+### Go
 
-1. **Environment variables** — What API keys, tokens, or secrets are needed?
-2. **Config needs** — Paths, log levels, or other config beyond env vars?
+- Follow standard Go project layout (`cmd/`, `internal/`).
+- All exported types and functions must have doc comments.
+- Use `go fmt` / `gofmt` for formatting; CI enforces via `scripts/gofmt-check.sh`.
+- Run `go vet ./...` before committing.
+- Tests live alongside source (`_test.go`) and run with `go test -race ./...`.
 
-**Action:** Update `.env.example` with actual variable names (remove
-placeholders). Adjust `config.toml.example` if the project needs different
-config (or remove if not needed). Update `dev-docs/SPECS.md` Config section.
+### Bubble Tea pattern
+
+- `Model` in `model.go` holds all state. `New()` returns an initialized model.
+- `Init()`, `Update()`, `View()` implement `tea.Model`.
+- Messages are defined in `messages.go`; commands in `cmd.go`.
+- Layout recalculation lives in `layoutTable()` on `Model`.
+- Styles are centralized in `styles.go`. Do not call `lipgloss.NewStyle()` inline
+  inside `View()` — add named vars to `styles.go` instead.
+- Magic numbers belong in `constants.go` (package `tui`).
+
+### Configuration
+
+Config is entirely **environment-variable-driven** (no config.toml at runtime):
+
+| Variable                            | Purpose                                         |
+| ----------------------------------- | ----------------------------------------------- |
+| `LLAMA_CPP_PATH`                    | Directory containing `llama-cli`/`llama-server` |
+| `LLAMA_SERVER_PORT`                 | TCP port for `llama-server` (default 8080)      |
+| `LLM_LAUNCH_LLAMACPP_PATHS`         | Extra GGUF search roots (comma-separated)       |
+| `HUGGINGFACE_HUB_CACHE` / `HF_HOME` | Hugging Face hub cache location                 |
+
+Set development defaults in `mise.toml` under `[env]`.
+
+### Tasks (mise)
+
+| Task         | Command           |
+| ------------ | ----------------- |
+| Run          | `mise run run`    |
+| Build        | `mise run build`  |
+| Format (all) | `mise run format` |
+| Lint (all)   | `mise run lint`   |
+| Test         | `mise run test`   |
+| Full check   | `mise run check`  |
+
+### Docs formatting
+
+Markdown, YAML, and JSON are formatted with **Prettier** and linted with
+**markdownlint-cli2**. Run `mise run format` before committing docs changes.
+The pre-commit hook handles staged files automatically.
 
 ---
 
-### Step 4: CI & Pre-commit
+## Testing
 
-**Action:** Replace the placeholder `check` job in `.github/workflows/ci.yml`
-with stack-specific setup and commands (test, lint). Uncomment or add
-stack-specific hooks in `.pre-commit-config.yaml` (e.g. ruff, eslint, cargo
-fmt).
-
----
-
-### Step 5: Source Layout
-
-Ask the user:
-
-1. **Source layout** — Does the project use `src/`, `cmd/`, `app/`, or something
-   else? (See `dev-docs/SPECS.md` Project Structure for examples.)
-
-**Action:** Create the source directory structure. Update `dev-docs/SPECS.md` if
-the example structure does not fit.
+- Unit tests for `internal/llamacpp` cover discovery, formatting, paths, and
+  runtime detection.
+- Unit tests for `internal/tui` cover model initialization and server command
+  construction.
+- `btable` has no separate tests (it is a minimal fork; behavior is covered by
+  the TUI tests).
+- Do not mark a feature complete until `mise run check` passes.
 
 ---
 
-### Step 6: Final Checks
+## Local-only docs (`dev-docs/`)
 
-- [ ] Run `npm install` (or `pnpm install`) to install Prettier and other deps
-- [ ] Run `mise run format` — formats md, yaml, yml, json
-- [ ] Run `mise run check` (or equivalent) to verify setup
-- [ ] Remove or update this AGENTS.md section if project-specific agent rules
-      are needed
+The `dev-docs/` directory is gitignored. Use it for notes that should not be
+committed (e.g. `dev-docs/BACKLOG.md` for a personal backlog).
 
----
+## Architecture Decision Records
 
-## After Setup
-
-Once setup is complete, replace this setup guide with project-specific AI
-instructions (e.g. coding standards, stack conventions, where to find key
-modules). See `TEMPLATE.md` for the full list of customizable items.
+ADRs live in `dev-docs/adr/YYYYMMDD-short-title.md`; index in
+`dev-docs/DECISIONS.md`. Add an ADR for any significant design choice.

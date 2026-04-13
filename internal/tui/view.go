@@ -7,7 +7,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// runtimePanelView renders the bottom llama.cpp binary path section. contentWidth is the inner width for wrapping.
+// runtimePanelView renders the bottom llama.cpp binary path section.
 func runtimePanelView(m Model, contentWidth int) string {
 	if m.width == 0 {
 		return ""
@@ -35,25 +35,22 @@ func (m Model) View() string {
 	}
 
 	title := titleStyle.Render(appTitle)
-	sub := subtitleStyle.Render("llama.cpp · GGUF models (filesystem scan · Last modified = file mtime, not inference)")
+	sub := subtitleStyle.Render(appSubtitle)
+	iw := m.innerWidth()
 
 	var body string
 	switch {
 	case m.loading:
 		body = bodyStyle.Render("Scanning for models…")
 	case m.loadErr != nil:
-		body = lipgloss.NewStyle().Foreground(lipgloss.Color("203")).Render("Error: " + m.loadErr.Error())
+		body = errorStyle.Render("Error: " + m.loadErr.Error())
 	case len(m.files) == 0:
 		body = bodyStyle.Render("No GGUF files found. Set HUGGINGFACE_HUB_CACHE or HF_HOME if your Hub cache is non-default; add paths via LLM_LAUNCH_LLAMACPP_PATHS or place models under ~/models, ~/.cache/huggingface/hub, etc.")
 	default:
 		m.hscroll.SetContent(m.tbl.View())
-		iw := m.bodyInnerW
-		if iw < 1 && m.width > 0 {
-			iw = max(m.width-4, 40)
-		}
 		th := m.tableBodyH
 		if th < 1 {
-			th = 18
+			th = defaultTableHeight
 		}
 		m.hscroll.Width = iw
 		m.hscroll.Height = th
@@ -61,31 +58,22 @@ func (m Model) View() string {
 	}
 
 	var hBar string
-	if len(m.files) > 0 && m.tableLineWidth > 0 {
-		iw := m.bodyInnerW
-		if iw < 1 && m.width > 0 {
-			iw = max(m.width-4, 40)
-		}
-		if m.tableLineWidth > iw {
-			pct := m.hscroll.HorizontalScrollPercent()
-			hBar = footerStyle.Render(horizontalScrollBarLine(pct, iw))
-		}
+	if len(m.files) > 0 && m.tableLineWidth > 0 && m.tableLineWidth > iw {
+		pct := m.hscroll.HorizontalScrollPercent()
+		hBar = footerStyle.Render(horizontalScrollBarLine(pct, iw))
 	}
 
 	help := fmt.Sprintf(
-		"%s · %s · %s · ↑/↓ select · wheel · enter copy · ←/→ · %d×%d",
-		m.keys.Refresh.Help().Key,
-		m.keys.RunServer.Help().Key,
-		m.keys.Quit.Help().Key,
-		m.width,
-		m.height,
+		"%s %s · %s %s · %s %s · ↑/↓ select · wheel scroll · %s %s · %s %s · %d×%d",
+		m.keys.Refresh.Help().Key, m.keys.Refresh.Help().Desc,
+		m.keys.RunServer.Help().Key, m.keys.RunServer.Help().Desc,
+		m.keys.Quit.Help().Key, m.keys.Quit.Help().Desc,
+		m.keys.CopyPath.Help().Key, m.keys.CopyPath.Help().Desc,
+		m.keys.ScrollLeft.Help().Key, m.keys.ScrollLeft.Help().Desc,
+		m.width, m.height,
 	)
 	footer := footerStyle.Render(help)
 
-	iw := m.bodyInnerW
-	if iw < 1 && m.width > 0 {
-		iw = max(m.width-4, 40)
-	}
 	runtimePanel := runtimePanelView(m, iw)
 
 	rows := []string{title, sub, "", body}
@@ -97,8 +85,7 @@ func (m Model) View() string {
 	}
 	rows = append(rows, "", footer)
 	if m.lastRunNote != "" {
-		noteStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("203"))
-		rows = append(rows, noteStyle.Render(m.lastRunNote))
+		rows = append(rows, errorStyle.Render(m.lastRunNote))
 	}
 	block := lipgloss.JoinVertical(lipgloss.Left, rows...)
 	framed := app.Render(block)

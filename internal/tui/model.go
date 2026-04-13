@@ -36,10 +36,10 @@ func New() Model {
 		btable.WithFocused(true),
 		btable.WithStyles(DefaultTableStyles()),
 		btable.WithWidth(96),
-		btable.WithHeight(18),
+		btable.WithHeight(defaultTableHeight),
 	)
-	hv := viewport.New(96, 18)
-	hv.SetHorizontalStep(4)
+	hv := viewport.New(96, defaultTableHeight)
+	hv.SetHorizontalStep(hScrollStep)
 	hv.MouseWheelEnabled = true
 	return Model{
 		keys:    DefaultKeyMap(),
@@ -54,26 +54,36 @@ func (m Model) Init() tea.Cmd {
 	return startupCmd()
 }
 
+// innerWidth returns the usable inner body width for rendering. It falls back
+// to a computed value when bodyInnerW has not yet been set by layoutTable.
+func (m Model) innerWidth() int {
+	if m.bodyInnerW >= 1 {
+		return m.bodyInnerW
+	}
+	if m.width > 0 {
+		return max(m.width-appPaddingH*2, minInnerWidth)
+	}
+	return minInnerWidth
+}
+
 func (m Model) layoutTable() Model {
 	w := m.width
-	if w < 56 {
-		w = 56
+	if w < minTerminalWidth {
+		w = minTerminalWidth
 	}
 	cols := tableColumns(w, m.files)
 	m.tbl.SetColumns(cols)
 	m.tbl.SetStyles(DefaultTableStyles())
-	innerW := m.width - 4
-	if innerW < 40 {
-		innerW = w - 4
+	innerW := m.width - appPaddingH*2
+	if innerW < minInnerWidth {
+		innerW = w - appPaddingH*2
 	}
 	m.bodyInnerW = innerW
 	minW := tableContentMinWidth(cols)
 	m.tbl.SetWidth(max(minW, innerW))
-	// Reserve space for header, bottom llama.cpp path panel, and footer (see view.go).
-	const layoutVerticalReserve = 16
 	h := m.height - layoutVerticalReserve
 	if m.height <= 0 {
-		h = 18
+		h = defaultTableHeight
 	} else if h < 6 {
 		h = 6
 	}

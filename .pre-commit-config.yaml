@@ -1,6 +1,5 @@
-# Pre-commit hooks. Add stack-specific hooks for your project.
-# See https://pre-commit.com/hooks.html
-# Python: ruff, mypy. Node: eslint. Rust: cargo fmt. Go: gofmt.
+# Pre-commit hooks for llm-launch (Go + Prettier/markdownlint for docs).
+# See https://pre-commit.com for more information.
 
 repos:
   - repo: local
@@ -17,15 +16,5 @@ repos:
         pass_filenames: false
         always_run: true
         stages: [pre-commit, pre-push]
-  # Add your stack's hooks. Examples:
-  # - repo: https://github.com/astral-sh/ruff-pre-commit
-  #   rev: v0.8.0
-  #   hooks:
-  #     - id: ruff
-  #       args: [--fix]
-  # - repo: https://github.com/pre-commit/mirrors-eslint
-  #   rev: v9.0.0
-  #   hooks:
-  #     - id: eslint
 
 default_install_hook_types: [pre-commit, pre-push]
