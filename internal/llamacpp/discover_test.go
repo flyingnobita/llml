@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -20,6 +21,69 @@ func TestMergeSearchRoots_dedupes(t *testing.T) {
 		if seen[p] > 1 {
 			t.Fatalf("duplicate path %q", p)
 		}
+	}
+}
+
+func TestDiscover_findsSafetensorsModelDir(t *testing.T) {
+	tmp := t.TempDir()
+	modelDir := filepath.Join(tmp, "snapshots", "abc123")
+	if err := os.MkdirAll(modelDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cfg := `{"model_type":"llama","architectures":["LlamaForCausalLM"]}`
+	if err := os.WriteFile(filepath.Join(modelDir, "config.json"), []byte(cfg), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	w := filepath.Join(modelDir, "model.safetensors")
+	if err := os.WriteFile(w, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := Discover(Options{ExtraRoots: []string{tmp}, MaxDepth: 8, SkipDefaultRoots: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("want 1 model, got %d", len(got))
+	}
+	if got[0].Backend != BackendVLLM {
+		t.Fatalf("Backend: got %v want BackendVLLM", got[0].Backend)
+	}
+	if got[0].Path != filepath.Clean(modelDir) {
+		t.Fatalf("Path: got %q want %q", got[0].Path, filepath.Clean(modelDir))
+	}
+	if !strings.Contains(got[0].Parameters, "vllm") {
+		t.Fatalf("Parameters: got %q", got[0].Parameters)
+	}
+	if got[0].Name != "abc123" {
+		t.Fatalf("Name (non-Hub): got %q want abc123", got[0].Name)
+	}
+}
+
+func TestDiscover_vllmNameUsesHFRepoID(t *testing.T) {
+	tmp := t.TempDir()
+	modelDir := filepath.Join(tmp, "hub", "models--opendatalab--MinerU2.5-2509-1.2B", "snapshots", "879e58bdd9566632b27a88a81f0e2961873311f")
+	if err := os.MkdirAll(modelDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cfg := `{"model_type":"llama","architectures":["LlamaForCausalLM"]}`
+	if err := os.WriteFile(filepath.Join(modelDir, "config.json"), []byte(cfg), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(modelDir, "m.safetensors"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := Discover(Options{ExtraRoots: []string{tmp}, MaxDepth: 12, SkipDefaultRoots: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("want 1 model, got %d", len(got))
+	}
+	want := "opendatalab/MinerU2.5-2509-1.2B"
+	if got[0].Name != want {
+		t.Fatalf("Name: got %q want %q", got[0].Name, want)
 	}
 }
 

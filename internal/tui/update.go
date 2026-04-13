@@ -4,6 +4,8 @@ import (
 	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/flyingnobita/llm-launch/internal/llamacpp"
 )
 
 // Update implements tea.Model.
@@ -13,6 +15,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m = m.layoutTable()
+		if m.paramPanelOpen {
+			w := m.innerWidth() - 8
+			if w < 32 {
+				w = 32
+			}
+			m.paramEditInput.Width = w
+		}
 		return m, nil
 
 	case runtimeReadyMsg:
@@ -46,14 +55,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
-		if m.portConfigOpen {
-			return m.updatePortConfigKey(msg)
+		if m.paramPanelOpen {
+			return m.updateParamPanelKey(msg)
+		}
+		if m.runtimeConfigOpen {
+			return m.updateRuntimeConfigKey(msg)
 		}
 		if key.Matches(msg, m.keys.Quit) {
 			return m, tea.Quit
 		}
 		if key.Matches(msg, m.keys.ConfigPort) {
-			return m.openPortConfig()
+			return m.openRuntimeConfig()
+		}
+		if key.Matches(msg, m.keys.Parameters) {
+			if m.loading {
+				m.lastRunNote = "Wait for the model scan to finish."
+				return m, nil
+			}
+			return m.openParamPanel()
 		}
 		if key.Matches(msg, m.keys.Refresh) {
 			m.loading = true
@@ -67,13 +86,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.lastRunNote = "Wait for the model scan to finish."
 				return m, nil
 			}
-			p := m.SelectedPath()
+			p, be := m.SelectedModel()
 			if p == "" {
 				m.lastRunNote = "Select a model row first."
 				return m, nil
 			}
 			m.lastRunNote = ""
-			return m, runLlamaServerCmd(p, m.runtime)
+			params, _ := loadModelParamsForRun(p)
+			if be == llamacpp.BackendVLLM {
+				return m, runVLLMServerCmd(p, m.runtime, params)
+			}
+			return m, runLlamaServerCmd(p, m.runtime, params)
 		}
 		if key.Matches(msg, m.keys.ScrollLeft) {
 			m.hscroll.ScrollLeft(hScrollStep)
@@ -92,39 +115,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.tbl, cmd = m.tbl.Update(msg)
 		return m, cmd
-
-	case tea.MouseMsg:
-		if m.portConfigOpen {
-			return m, nil
-		}
-		// Vertical wheel moves the table cursor (row selection). Shift+vertical
-		// wheel and horizontal wheel pan the outer viewport (same as
-		// bubbles/viewport defaults).
-		me := tea.MouseEvent(msg)
-		if me.IsWheel() {
-			switch {
-			case me.Button == tea.MouseButtonWheelLeft,
-				me.Button == tea.MouseButtonWheelRight,
-				me.Shift && (me.Button == tea.MouseButtonWheelUp || me.Button == tea.MouseButtonWheelDown):
-				var cmd tea.Cmd
-				m.hscroll, cmd = m.hscroll.Update(msg)
-				return m, cmd
-			case me.Button == tea.MouseButtonWheelUp:
-				m.tbl.MoveUp(1)
-				return m, nil
-			case me.Button == tea.MouseButtonWheelDown:
-				m.tbl.MoveDown(1)
-				return m, nil
-			}
-		}
-		var cmd tea.Cmd
-		m.hscroll, cmd = m.hscroll.Update(msg)
-		return m, cmd
 	}
 
 	var cmd tea.Cmd
-	if m.portConfigOpen {
-		m.portInput, cmd = m.portInput.Update(msg)
+	if m.paramPanelOpen && m.paramEditKind != paramEditNone {
+		m.paramEditInput, cmd = m.paramEditInput.Update(msg)
+		return m, cmd
+	}
+	if m.runtimeConfigOpen {
+		m.runtimeInputs[m.runtimeFocus], cmd = m.runtimeInputs[m.runtimeFocus].Update(msg)
 		return m, cmd
 	}
 	m.tbl, cmd = m.tbl.Update(msg)

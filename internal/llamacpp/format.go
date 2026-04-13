@@ -54,11 +54,41 @@ func FormatPathDisplay(absPath string) string {
 // hfHubRepoDirPrefix marks Hugging Face hub cache repo directories under .../hub/.
 const hfHubRepoDirPrefix = "models--"
 
+// FormatVLLMModelName returns a short label for a safetensors checkpoint directory.
+// For Hugging Face hub layouts it decodes the nearest `models--*` folder: the cache encodes
+// repo ids by replacing "/" with "--", so we invert that for a readable `org/model` name.
+// Otherwise it falls back to the directory basename (e.g. a non-Hub layout).
+func FormatVLLMModelName(absDir string) string {
+	clean := filepath.Clean(absDir)
+	for d := clean; ; d = filepath.Dir(d) {
+		base := filepath.Base(d)
+		if strings.HasPrefix(base, hfHubRepoDirPrefix) {
+			rest := strings.TrimPrefix(base, hfHubRepoDirPrefix)
+			if rest == "" {
+				break
+			}
+			return strings.ReplaceAll(rest, "--", "/")
+		}
+		up := filepath.Dir(d)
+		if up == d {
+			break
+		}
+	}
+	return filepath.Base(clean)
+}
+
 // FormatModelFolderDisplay returns a display path for the "model folder": for Hugging Face hub
-// layouts it stops at the models--* repo directory (omits snapshots/<revision>/). Otherwise it
-// uses the direct parent directory of the GGUF file.
+// layouts it stops at the models--* repo directory (omits snapshots/<revision>/). For a GGUF file
+// it uses the parent directory of the file; for a directory path (safetensors / vLLM rows) it
+// uses that path directly.
 func FormatModelFolderDisplay(filePath string) string {
-	parent := filepath.Dir(filepath.Clean(filePath))
+	clean := filepath.Clean(filePath)
+	var parent string
+	if st, err := os.Stat(clean); err == nil && st.IsDir() {
+		parent = clean
+	} else {
+		parent = filepath.Dir(clean)
+	}
 	dir := parent
 	for {
 		if strings.HasPrefix(filepath.Base(dir), hfHubRepoDirPrefix) {

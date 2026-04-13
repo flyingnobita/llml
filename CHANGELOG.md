@@ -4,7 +4,15 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
-- Apr-13, 2026 - [TUI: c opens listen-port editor for LLAMA_SERVER_PORT; s save, esc cancel; sets process env for R / llama-server]
+- Apr-14, 2026 - [Parameter profiles (`p`): named env+argv sets in UserConfigDir/llm-launch/model-params.json; active profile for `R`; `--flag value` line split; TUI merges flag+value rows on load; minimal quoting in echoed command; README/AGENTS]
+- Apr-14, 2026 - [After `R`: pause reads from `/dev/tty` when stdin breaks after vLLM (EIO)]
+- Apr-13, 2026 - [vLLM discovery: VLLM_PATH/.venv/bin/vllm and VLLM_VENV/bin/vllm; activate next to binary]
+- Apr-13, 2026 - [vLLM R: optional VLLM_VENV + auto .venv; source activate before vllm serve on Unix; README/AGENTS]
+- Apr-13, 2026 - [Bottom panel: env var names left, values right (LLAMA_CPP_PATH, VLLM_PATH, ports); RuntimePanelLines]
+- Apr-13, 2026 - [Default VLLM_SERVER_PORT 8000 (vLLM convention); llama stays 8080; README/AGENTS]
+- Apr-13, 2026 - [TUI: c opens unified runtime env editor (LLAMA_CPP_PATH, VLLM_PATH, both ports); tab between fields; removed v]
+- Apr-13, 2026 - [vLLM Name column: decode HF hub `models--*` to org/model instead of snapshot hash]
+- Apr-13, 2026 - [vLLM: discover HF dirs (config.json + safetensors); R runs vllm serve; VLLM_PATH + footer line; README/AGENTS]
 - Apr-13, 2026 - [Docs: backlog lives under gitignored dev-docs/BACKLOG.md; AGENTS notes local-only dev-docs]
 - Apr-13, 2026 - [Docs: README setup matches env-only config; dev-docs SPECS/PLANS/PRD aligned; .gitignore drops exceptions for removed template files]
 - Apr-13, 2026 - [Refactor: remove stale template files; update dev-docs/AGENTS.md; extract constants, innerWidth(), styles; simplify FormatModelFolderDisplay; consolidate mouse wheel cases; add package doc comments]

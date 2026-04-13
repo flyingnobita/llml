@@ -6,8 +6,9 @@ AI coding instructions for this project.
 
 ## Project Overview
 
-**llm-launch** is a terminal UI (TUI) for discovering GGUF model files on the
-local filesystem and launching `llama-server` for a selected model.
+**llm-launch** is a terminal UI (TUI) for discovering GGUF and Hugging Face-style
+safetensors models on the local filesystem and launching `llama-server` or
+`vllm serve` for a selected row.
 
 - Language: **Go 1.26+**
 - UI framework: **Bubble Tea** (Elm-style TUI) + **Lip Gloss** (styling)
@@ -21,7 +22,7 @@ local filesystem and launching `llama-server` for a selected model.
 ```text
 cmd/llm-launch/      # Binary entrypoint (main.go)
 internal/
-  llamacpp/          # GGUF discovery, metadata, runtime detection, formatting
+  llamacpp/          # GGUF + safetensors discovery, metadata, runtime detection, formatting
   tui/               # Bubble Tea model, update, view, styles, keymaps
   tui/btable/        # Vendored fork of charmbracelet/bubbles/table (per-cell Selected)
 scripts/             # gofmt-check.sh, precommit-docs-fix.sh
@@ -51,14 +52,19 @@ scripts/             # gofmt-check.sh, precommit-docs-fix.sh
 
 ### Configuration
 
-Config is entirely **environment-variable-driven** (no config.toml at runtime):
+**Runtime** config is **environment-variable-driven** (no `config.toml` at runtime):
 
-| Variable                            | Purpose                                         |
-| ----------------------------------- | ----------------------------------------------- |
-| `LLAMA_CPP_PATH`                    | Directory containing `llama-cli`/`llama-server` |
-| `LLAMA_SERVER_PORT`                 | TCP port for `llama-server` (default 8080)      |
-| `LLM_LAUNCH_LLAMACPP_PATHS`         | Extra GGUF search roots (comma-separated)       |
-| `HUGGINGFACE_HUB_CACHE` / `HF_HOME` | Hugging Face hub cache location                 |
+| Variable                            | Purpose                                                                    |
+| ----------------------------------- | -------------------------------------------------------------------------- |
+| `LLAMA_CPP_PATH`                    | Directory containing `llama-cli`/`llama-server`                            |
+| `VLLM_PATH`                         | Directory containing the `vllm` executable                                 |
+| `VLLM_VENV`                         | Optional Python venv root; `R` sources `bin/activate` before `vllm` (Unix) |
+| `LLAMA_SERVER_PORT`                 | TCP port for `llama-server` and `/health` probe (default 8080)             |
+| `VLLM_SERVER_PORT`                  | TCP port for `vllm serve` (default 8000)                                   |
+| `LLM_LAUNCH_LLAMACPP_PATHS`         | Extra model search roots (comma-separated)                                 |
+| `HUGGINGFACE_HUB_CACHE` / `HF_HOME` | Hugging Face hub cache location                                            |
+
+**Parameter profiles** (per-model extra env + argv for `llama-server` / `vllm`, edited with **`p`**) are **not** env vars: they are stored in **`{UserConfigDir}/llm-launch/model-params.json`** (see `internal/tui/model_params.go`). Keys are cleaned model paths; each entry has named profiles and `activeIndex` for which profile **`R`** uses.
 
 Set development defaults in `mise.toml` under `[env]`.
 
@@ -85,8 +91,8 @@ The pre-commit hook handles staged files automatically.
 
 - Unit tests for `internal/llamacpp` cover discovery, formatting, paths, and
   runtime detection.
-- Unit tests for `internal/tui` cover model initialization and server command
-  construction.
+- Unit tests for `internal/tui` cover model initialization, parameter-profile
+  persistence, and server command construction.
 - `btable` has no separate tests (it is a minimal fork; behavior is covered by
   the TUI tests).
 - Do not mark a feature complete until `mise run check` passes.

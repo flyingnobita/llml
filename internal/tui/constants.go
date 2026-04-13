@@ -14,7 +14,7 @@ const (
 
 	// layoutVerticalReserve is the number of terminal rows consumed by the title,
 	// subtitle, blank lines, runtime panel, footer, and outer padding.
-	layoutVerticalReserve = 16
+	layoutVerticalReserve = 17
 
 	// appPaddingH is the Lip Gloss horizontal padding per side (app style uses
 	// Padding(1, 2), so 2 on each side = 4 total consumed columns).
@@ -24,7 +24,7 @@ const (
 	hScrollStep = 4
 
 	// appSubtitle is the subtitle line shown below the app title.
-	appSubtitle = "llama.cpp · GGUF models (filesystem scan · Last modified = file mtime, not inference)"
+	appSubtitle = "llama.cpp (GGUF) · vLLM (config.json + safetensors) — filesystem scan · Last modified = file mtime"
 )
 
 // Column-width defaults for the model table.

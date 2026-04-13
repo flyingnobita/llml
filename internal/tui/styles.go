@@ -50,7 +50,7 @@ var (
 	// errorStyle is used for load errors and server run notes (ANSI red #203).
 	errorStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("203"))
 
-	// Bottom panel: detected llama-cli / llama-server paths (border separates from table body).
+	// Bottom panel: runtime env vars and values (border separates from table body).
 	runtimePanelStyle = lipgloss.NewStyle().
 				BorderTop(true).
 				BorderForeground(lipgloss.Color("240")).

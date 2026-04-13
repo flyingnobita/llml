@@ -13,22 +13,35 @@ import (
 
 // Model is the root Bubble Tea model.
 type Model struct {
-	width          int
-	height         int
-	bodyInnerW     int
-	tableBodyH     int
-	tableLineWidth int
-	keys           KeyMap
-	tbl            btable.Model
-	hscroll        viewport.Model
-	files          []llamacpp.ModelFile
-	runtime        llamacpp.RuntimeInfo
-	runtimeScanned bool
-	lastRunNote    string
-	loading        bool
-	loadErr        error
-	portConfigOpen bool
-	portInput      textinput.Model
+	width             int
+	height            int
+	bodyInnerW        int
+	tableBodyH        int
+	tableLineWidth    int
+	keys              KeyMap
+	tbl               btable.Model
+	hscroll           viewport.Model
+	files             []llamacpp.ModelFile
+	runtime           llamacpp.RuntimeInfo
+	runtimeScanned    bool
+	lastRunNote       string
+	loading           bool
+	loadErr           error
+	runtimeConfigOpen bool
+	runtimeFocus      int
+	runtimeInputs     [runtimeFieldCount]textinput.Model
+
+	paramPanelOpen    bool
+	paramModelPath    string
+	paramFocus        int
+	paramProfileIndex int
+	paramProfiles     []ParameterProfile
+	paramEnvCursor    int
+	paramArgsCursor   int
+	paramEnv          []EnvVar
+	paramArgs         []string
+	paramEditKind     int
+	paramEditInput    textinput.Model
 }
 
 // New returns a model with default key bindings and an empty table; Init triggers discovery.
@@ -43,13 +56,19 @@ func New() Model {
 	)
 	hv := viewport.New(96, defaultTableHeight)
 	hv.SetHorizontalStep(hScrollStep)
-	hv.MouseWheelEnabled = true
 	return Model{
-		keys:      DefaultKeyMap(),
-		tbl:       t,
-		hscroll:   hv,
-		portInput: newPortTextInput(),
-		loading:   true,
+		keys:    DefaultKeyMap(),
+		tbl:     t,
+		hscroll: hv,
+		runtimeInputs: [runtimeFieldCount]textinput.Model{
+			newPathTextInput(),
+			newPathTextInput(),
+			newPathTextInput(),
+			newPortTextInput(),
+			newPortTextInput(),
+		},
+		paramEditInput: newParamLineTextInput(),
+		loading:        true,
 	}
 }
 

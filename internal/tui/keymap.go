@@ -11,6 +11,7 @@ type KeyMap struct {
 	ScrollRight key.Binding
 	CopyPath    key.Binding
 	ConfigPort  key.Binding
+	Parameters  key.Binding
 }
 
 // DefaultKeyMap returns the default global shortcuts.
@@ -26,7 +27,7 @@ func DefaultKeyMap() KeyMap {
 		),
 		RunServer: key.NewBinding(
 			key.WithKeys("R"),
-			key.WithHelp("R", "llama-server"),
+			key.WithHelp("R", "run server"),
 		),
 		ScrollLeft: key.NewBinding(
 			key.WithKeys("left", "h"),
@@ -42,19 +43,23 @@ func DefaultKeyMap() KeyMap {
 		),
 		ConfigPort: key.NewBinding(
 			key.WithKeys("c"),
-			key.WithHelp("c", "listen port"),
+			key.WithHelp("c", "runtime env"),
+		),
+		Parameters: key.NewBinding(
+			key.WithKeys("p"),
+			key.WithHelp("p", "param profiles"),
 		),
 	}
 }
 
 // ShortHelp satisfies key.KeyMap (optional; use for help overlay later).
 func (k KeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Refresh, k.RunServer, k.ConfigPort, k.ScrollLeft, k.Quit}
+	return []key.Binding{k.Refresh, k.RunServer, k.ConfigPort, k.Parameters, k.ScrollLeft, k.Quit}
 }
 
 // FullHelp satisfies key.KeyMap.
 func (k KeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
-		{k.Refresh, k.RunServer, k.ConfigPort, k.Quit},
+		{k.Refresh, k.RunServer, k.ConfigPort, k.Parameters, k.Quit},
 	}
 }

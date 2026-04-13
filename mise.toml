@@ -2,10 +2,10 @@
 # https://mise.jdx.dev/
 
 [env]
-# llm-launch: directory containing llama-cli and llama-server (see README). Adjust if your llama.cpp build lives elsewhere.
 LLAMA_CPP_PATH = "/home/omarchy/Applications/llama.cpp/build/bin"
-# Same port for `R`, /health probe, and the bottom panel (default 8080).
-LLAMA_SERVER_PORT = "9090"
+LLAMA_SERVER_PORT = "9001"
+VLLM_PATH = "/home/omarchy/Applications/vllm"
+VLLM_SERVER_PORT = "9002"
 
 [tools]
 go = "latest"

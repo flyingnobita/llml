@@ -1,5 +1,5 @@
-// Package llamacpp provides GGUF model discovery, metadata extraction, llama.cpp
-// binary detection, and display-formatting helpers for the llm-launch TUI.
+// Package llamacpp provides GGUF and safetensors model discovery, metadata extraction,
+// llama.cpp / vLLM binary detection, and display-formatting helpers for the llm-launch TUI.
 package llamacpp
 
 import (
@@ -25,12 +25,15 @@ var skipDirNames = map[string]struct{}{
 	".pytest_cache": {},
 }
 
-// ModelFile is one GGUF on disk plus parsed metadata for the Parameters column.
+// ModelFile is one local model (GGUF file or Hugging Face-style safetensors directory)
+// plus parsed metadata for the Parameters column.
 type ModelFile struct {
-	Path       string
-	Name       string
-	Size       int64
-	ModTime    time.Time
+	Backend ModelBackend
+	Path    string
+	Name    string
+	Size    int64
+	ModTime time.Time
+	// Parameters is GGUF metadata for BackendLlama; for BackendVLLM it summarizes config.json.
 	Parameters string
 }
 
@@ -41,7 +44,8 @@ type Options struct {
 	SkipDefaultRoots bool
 }
 
-// Discover scans configured paths for .gguf files, dedupes by path, sorts by path, and fills Parameters.
+// Discover scans configured paths for .gguf files and Hugging Face-style safetensors directories
+// (config.json + *.safetensors), dedupes, sorts by path, and fills Parameters.
 func Discover(opts Options) ([]ModelFile, error) {
 	maxD := opts.MaxDepth
 	if maxD <= 0 {
@@ -73,6 +77,16 @@ func Discover(opts Options) ([]ModelFile, error) {
 		}
 		filtered = append(filtered, out[i])
 	}
+
+	vllm, err := discoverVLLMModels(opts, maxD)
+	if err != nil {
+		return nil, err
+	}
+	filtered = append(filtered, vllm...)
+
+	sort.Slice(filtered, func(i, j int) bool {
+		return filtered[i].Path < filtered[j].Path
+	})
 
 	return filtered, nil
 }
@@ -132,6 +146,7 @@ func discoverWalkRoot(root string, maxD int, seen map[string]struct{}, out *[]Mo
 			}
 
 			*out = append(*out, ModelFile{
+				Backend: BackendLlama,
 				Path:    clean,
 				Name:    filepath.Base(clean),
 				Size:    size,
