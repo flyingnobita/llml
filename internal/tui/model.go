@@ -2,6 +2,7 @@ package tui
 
 import (
 	"os"
+	"os/exec"
 	"strings"
 
 	btable "charm.land/bubbles/v2/table"
@@ -10,6 +11,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"charm.land/lipgloss/v2/compat"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/flyingnobita/llml/internal/llamacpp"
 )
 
@@ -52,6 +54,15 @@ type Model struct {
 	paramEditInput        textinput.Model
 
 	homeDir string // from [os.UserHomeDir] at startup; used for path display (~/)
+
+	// Split-pane server (R): subprocess logs in lower half; see run_server.go.
+	serverRunning   bool
+	serverCmd       *exec.Cmd
+	serverMsgCh     chan tea.Msg
+	serverLog       []string
+	serverViewport  viewport.Model
+	serverViewportH int
+	splitLogFocused bool // true: keys scroll log; false: keys use model table (Tab toggles).
 }
 
 // New returns a model with default key bindings and an empty table; Init triggers discovery.
@@ -70,14 +81,18 @@ func New() Model {
 	)
 	hv := viewport.New(viewport.WithWidth(96), viewport.WithHeight(defaultTableHeight))
 	hv.SetHorizontalStep(hScrollStep)
+	sv := viewport.New(viewport.WithWidth(96), viewport.WithHeight(1))
+	sv.MouseWheelEnabled = true
+	sv.Style = st.serverLogViewport
 	return Model{
-		homeDir:   homeDir,
-		theme:     th,
-		themePick: pick,
-		styles:    st,
-		keys:      DefaultKeyMap(),
-		tbl:       t,
-		hscroll:   hv,
+		homeDir:        homeDir,
+		theme:          th,
+		themePick:      pick,
+		styles:         st,
+		keys:           DefaultKeyMap(),
+		tbl:            t,
+		hscroll:        hv,
+		serverViewport: sv,
 		runtimeInputs: [runtimeFieldCount]textinput.Model{
 			newPathTextInput(),
 			newPathTextInput(),
@@ -105,6 +120,47 @@ func (m Model) innerWidth() int {
 		return max(m.width-appPaddingH*2, minInnerWidth)
 	}
 	return minInnerWidth
+}
+
+func maxAnsiLineWidth(lines []string) int {
+	max := 0
+	for _, line := range lines {
+		if w := ansi.StringWidth(line); w > max {
+			max = w
+		}
+	}
+	return max
+}
+
+// serverLogNeedsHorizontalScroll reports whether any log line is wider than the
+// viewport's inner content width (after border and optional vertical track).
+func (m Model) serverLogNeedsHorizontalScroll() bool {
+	if !m.serverRunning || len(m.serverLog) == 0 {
+		return false
+	}
+	inner := m.serverViewport.Width() - m.serverViewport.Style.GetHorizontalFrameSize()
+	if inner < 1 {
+		return false
+	}
+	return maxAnsiLineWidth(m.serverLog) > inner
+}
+
+// splitServerBodyHeights divides total body rows between the model table (top) and server log viewport (bottom).
+func splitServerBodyHeights(total int) (tableH, logH int) {
+	sep := serverLogSeparatorLines
+	if total <= sep {
+		return 1, 1
+	}
+	rest := total - sep
+	tableH = rest / 2
+	logH = rest - tableH
+	if tableH < 1 {
+		tableH = 1
+	}
+	if logH < 1 {
+		logH = 1
+	}
+	return tableH, logH
 }
 
 func (m Model) layoutTable() Model {
@@ -137,15 +193,34 @@ func (m Model) layoutTable() Model {
 		if innerMax < 1 {
 			innerMax = 1
 		}
-		needsHBar := len(m.files) > 0 && minW > innerW
-		static := mainChromeLines(m, needsHBar)
+		needsHBarGuess := len(m.files) > 0 && minW > innerW
+		needsLogHBarGuess := m.serverRunning && maxAnsiLineWidth(m.serverLog) > max(1, innerW-8)
+		static := mainChromeLines(m, needsHBarGuess, needsLogHBarGuess)
 		h = innerMax - static
 		if h < 1 {
 			h = 1
 		}
 	}
 
-	m.tbl.SetHeight(h)
+	setHeights := func(bodyH int) {
+		if m.serverRunning {
+			tableH, logH := splitServerBodyHeights(bodyH)
+			m.tbl.SetHeight(tableH)
+			m.serverViewport.SetHeight(logH)
+			m.serverViewport.SetWidth(innerW)
+			if m.serverViewport.TotalLineCount() > m.serverViewport.VisibleLineCount() {
+				m.serverViewport.SetWidth(innerW - 1)
+			}
+			m.serverViewportH = logH
+		} else {
+			m.tbl.SetHeight(bodyH)
+			m.serverViewport.SetWidth(innerW)
+			m.serverViewport.SetHeight(1)
+			m.serverViewportH = 0
+		}
+	}
+	setHeights(h)
+
 	m.tbl.SetRows(buildTableRows(m.files, cols, m.homeDir))
 	tview := m.tbl.View()
 	m.tableBodyH = max(1, strings.Count(tview, "\n")+1)
@@ -160,20 +235,22 @@ func (m Model) layoutTable() Model {
 	if m.height > 0 {
 		needsHBar := len(m.files) > 0 && m.tableLineWidth > 0 && m.tableLineWidth > innerW
 		needsHBarGuess := len(m.files) > 0 && minW > innerW
-		if needsHBar != needsHBarGuess {
+		needsLogHBar := m.serverRunning && m.serverLogNeedsHorizontalScroll()
+		needsLogHBarGuess := m.serverRunning && maxAnsiLineWidth(m.serverLog) > max(1, innerW-8)
+		if needsHBar != needsHBarGuess || needsLogHBar != needsLogHBarGuess {
 			appPad := m.styles.app.GetVerticalFrameSize()
 			innerMax := m.height - appPad
 			if innerMax < 1 {
 				innerMax = 1
 			}
-			static := mainChromeLines(m, needsHBar)
+			static := mainChromeLines(m, needsHBar, needsLogHBar)
 			h2 := innerMax - static
 			if h2 < 1 {
 				h2 = 1
 			}
 			if h2 != h {
 				h = h2
-				m.tbl.SetHeight(h)
+				setHeights(h)
 				m.tbl.SetRows(buildTableRows(m.files, cols, m.homeDir))
 				tview = m.tbl.View()
 				m.tableBodyH = max(1, strings.Count(tview, "\n")+1)
@@ -185,9 +262,42 @@ func (m Model) layoutTable() Model {
 		}
 	}
 
+	m = m.applySplitPaneFocusStyles()
 	m.hscroll.SetContent(tview)
 	m.hscroll.SetWidth(innerW)
 	m.hscroll.SetHeight(m.tableBodyH)
+	return m
+}
+
+// applySplitPaneFocusStyles sets rounded borders on the table scroll viewport and
+// the server log viewport. When the server is not running, the table uses focused
+// chrome (single main pane); the idle log strip uses the default serverLogViewport
+// style. When the server is running, the keyboard-focused split pane uses
+// SplitPaneBorderFocused and the other SplitPaneBorderDim.
+func (m Model) applySplitPaneFocusStyles() Model {
+	if !m.serverRunning {
+		m.hscroll.Style = m.styles.splitPaneChromeFocused
+		m.serverViewport.Style = m.styles.serverLogViewport
+		return m
+	}
+	if m.splitLogFocused {
+		m.hscroll.Style = m.styles.splitPaneChromeDim
+		m.serverViewport.Style = m.styles.splitPaneChromeFocused
+	} else {
+		m.hscroll.Style = m.styles.splitPaneChromeFocused
+		m.serverViewport.Style = m.styles.splitPaneChromeDim
+	}
+	return m
+}
+
+// appendServerLogLine appends a log line for split-pane server output and refreshes the log viewport.
+func (m Model) appendServerLogLine(line string) Model {
+	m.serverLog = append(m.serverLog, line)
+	if len(m.serverLog) > maxServerLogLines {
+		m.serverLog = m.serverLog[len(m.serverLog)-maxServerLogLines:]
+	}
+	m.serverViewport.SetContent(strings.Join(m.serverLog, "\n"))
+	m.serverViewport.GotoBottom()
 	return m
 }
 

@@ -64,7 +64,7 @@ func (m Model) paramPanelView() string {
 		}
 		if len(confirmRows) > 0 {
 			confirmRows = append(confirmRows, "",
-				m.styles.footer.Render("y: yes · n: no"),
+				m.styles.footer.Render(FooterParamConfirmYN),
 			)
 			rows = append(rows, confirmBox.Width(cw).Render(lipgloss.JoinVertical(lipgloss.Left, confirmRows...)))
 			rows = append(rows, "")
@@ -168,18 +168,18 @@ func (m Model) paramPanelView() string {
 	var footerHelp string
 	switch m.paramFocus {
 	case paramFocusProfiles:
-		footerHelp = "tab: sections · hjkl: nav · n: new · d: delete · r: rename · esc/q: back"
+		footerHelp = FooterParamFooterProfiles
 	case paramFocusEnv:
 		if m.paramEnvLen() == 0 {
-			footerHelp = "tab: sections · hjkl: nav · a: add row · d: delete · esc/q: back"
+			footerHelp = FooterParamFooterDetailEmpty
 		} else {
-			footerHelp = "tab: sections · hjkl: nav · enter: edit · a: add row · d: delete · esc/q: back"
+			footerHelp = FooterParamFooterDetailRows
 		}
 	case paramFocusArgs:
 		if m.paramArgsLen() == 0 {
-			footerHelp = "tab: sections · hjkl: nav · a: add row · d: delete · esc/q: back"
+			footerHelp = FooterParamFooterDetailEmpty
 		} else {
-			footerHelp = "tab: sections · hjkl: nav · enter: edit · a: add row · d: delete · esc/q: back"
+			footerHelp = FooterParamFooterDetailRows
 		}
 	}
 	if m.paramConfirmDelete == paramConfirmNone {

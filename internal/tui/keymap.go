@@ -1,6 +1,9 @@
 package tui
 
-import "charm.land/bubbles/v2/key"
+import (
+	"charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
+)
 
 // KeyMap holds key bindings. Add fields here as your TUI grows, and wire them in Update.
 type KeyMap struct {
@@ -16,20 +19,40 @@ type KeyMap struct {
 	ToggleTheme key.Binding
 }
 
+// runServerKeyMode returns 1 for split-pane run (R), 2 for fullscreen [tea.ExecProcess] (ctrl+r),
+// or 0 if the key is not a run-server binding.
+//
+// We cannot use "shift+R" for fullscreen: on common layouts, typing uppercase R sets ModShift, so shift+R
+// would be indistinguishable from plain R. Fullscreen uses ctrl+r instead.
+func runServerKeyMode(msg tea.KeyPressMsg) int {
+	k := msg.Key()
+	switch msg.String() {
+	case "ctrl+r", "ctrl+R":
+		return 2
+	}
+	if k.Mod.Contains(tea.ModCtrl) && (k.Code == 'r' || k.Code == 'R') {
+		return 2
+	}
+	if k.Text == "R" {
+		return 1
+	}
+	return 0
+}
+
 // DefaultKeyMap returns the default global shortcuts.
 func DefaultKeyMap() KeyMap {
 	return KeyMap{
 		Quit: key.NewBinding(
-			key.WithKeys("q"),
-			key.WithHelp("q", "quit"),
+			key.WithKeys(FooterKeyQuit),
+			key.WithHelp(FooterKeyQuit, FooterDescQuit),
 		),
 		Refresh: key.NewBinding(
-			key.WithKeys("r"),
-			key.WithHelp("r", "refresh"),
+			key.WithKeys(FooterKeyRefresh),
+			key.WithHelp(FooterKeyRefresh, FooterDescRefresh),
 		),
 		RunServer: key.NewBinding(
-			key.WithKeys("R"),
-			key.WithHelp("R", "run server"),
+			key.WithKeys(FooterKeyRunSplit),
+			key.WithHelp(FooterKeyRunSplit, FooterDescRunSplit),
 		),
 		ScrollLeft: key.NewBinding(
 			key.WithKeys("left", "h"),
@@ -41,23 +64,23 @@ func DefaultKeyMap() KeyMap {
 		),
 		Nav: key.NewBinding(
 			key.WithKeys("up", "down", "left", "right", "j", "k", "h", "l"),
-			key.WithHelp("hjkl", "nav"),
+			key.WithHelp(FooterKeyNav, FooterDescNav),
 		),
 		CopyPath: key.NewBinding(
-			key.WithKeys("enter"),
-			key.WithHelp("enter", "copy path"),
+			key.WithKeys(FooterKeyCopyPath),
+			key.WithHelp(FooterKeyCopyPath, FooterDescCopyPath),
 		),
 		ConfigPort: key.NewBinding(
-			key.WithKeys("c"),
-			key.WithHelp("c", "runtime env"),
+			key.WithKeys(FooterKeyConfigPort),
+			key.WithHelp(FooterKeyConfigPort, FooterDescConfigPort),
 		),
 		Parameters: key.NewBinding(
-			key.WithKeys("p"),
-			key.WithHelp("p", "param profiles"),
+			key.WithKeys(FooterKeyParameters),
+			key.WithHelp(FooterKeyParameters, FooterDescParameters),
 		),
 		ToggleTheme: key.NewBinding(
-			key.WithKeys("t"),
-			key.WithHelp("t", "theme"),
+			key.WithKeys(FooterKeyToggleTheme),
+			key.WithHelp(FooterKeyToggleTheme, FooterDescToggleTheme),
 		),
 	}
 }

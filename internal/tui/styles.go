@@ -8,23 +8,26 @@ import (
 
 // styles holds all lipgloss styles for one resolved theme.
 type styles struct {
-	app                 lipgloss.Style
-	title               lipgloss.Style
-	titleBoldLeft       lipgloss.Style
-	titleToastRowWrap   lipgloss.Style
-	subtitle            lipgloss.Style
-	body                lipgloss.Style
-	footer              lipgloss.Style
-	errLine             lipgloss.Style
-	runtimePanel        lipgloss.Style
-	portConfigTitle     lipgloss.Style
-	portConfigBox       lipgloss.Style
-	paramSectionBox     lipgloss.Style
-	paramConfirmDialog  lipgloss.Style
-	paramSectionHeading lipgloss.Style
-	themeToastInline    lipgloss.Style
-	paramProfileName    lipgloss.Style
-	table               btable.Styles
+	app                    lipgloss.Style
+	title                  lipgloss.Style
+	titleBoldLeft          lipgloss.Style
+	titleToastRowWrap      lipgloss.Style
+	subtitle               lipgloss.Style
+	body                   lipgloss.Style
+	footer                 lipgloss.Style
+	errLine                lipgloss.Style
+	runtimePanel           lipgloss.Style
+	portConfigTitle        lipgloss.Style
+	portConfigBox          lipgloss.Style
+	paramSectionBox        lipgloss.Style
+	paramConfirmDialog     lipgloss.Style
+	paramSectionHeading    lipgloss.Style
+	themeToastInline       lipgloss.Style
+	paramProfileName       lipgloss.Style
+	serverLogViewport      lipgloss.Style
+	splitPaneChromeFocused lipgloss.Style
+	splitPaneChromeDim     lipgloss.Style
+	table                  btable.Styles
 }
 
 // newStyles builds lipgloss styles from a Theme. Header and Cell use
@@ -86,6 +89,18 @@ func newStyles(theme Theme) styles {
 		paramProfileName: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(theme.ParamProfileName),
+		serverLogViewport: lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(theme.Border).
+			Padding(0, 1),
+		splitPaneChromeFocused: lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(theme.SplitPaneBorderFocused).
+			Padding(0, 1),
+		splitPaneChromeDim: lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(theme.SplitPaneBorderDim).
+			Padding(0, 1),
 		table: btable.Styles{
 			Header: lipgloss.NewStyle().
 				Bold(true).

@@ -1,11 +1,14 @@
 package tui
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"runtime"
 	"strings"
+	"sync"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/flyingnobita/llml/internal/llamacpp"
@@ -78,6 +81,16 @@ read -r _ </dev/tty || read -r _
 `, shellSingleQuoted(inv), runLine)
 }
 
+// unixVLLMSplitScript runs vllm under sh with merged stderr for split-pane log streaming (no pause/read).
+func unixVLLMSplitScript(bin, modelDir string, port int, activateScript string, params ModelParams) string {
+	var runLine string
+	if activateScript != "" {
+		runLine = fmt.Sprintf(". %s && ", shellSingleQuoted(activateScript))
+	}
+	runLine += vllmCommandLine(bin, modelDir, port, params)
+	return runLine + " 2>&1"
+}
+
 // runLlamaServerCmd runs llama-server for the selected GGUF in the foreground with the TUI suspended.
 // Stdout and stderr go to the terminal (see tea.ExecProcess). Port matches LLAMA_SERVER_PORT / ListenPort.
 //
@@ -107,6 +120,127 @@ func runLlamaServerCmd(modelPath string, rt llamacpp.RuntimeInfo, params ModelPa
 	return tea.ExecProcess(c, func(err error) tea.Msg {
 		return llamaServerExitedMsg{err: err}
 	})
+}
+
+func newLlamaSplitCmd(modelPath string, rt llamacpp.RuntimeInfo, params ModelParams) (*exec.Cmd, error) {
+	bin := llamacpp.ResolveLlamaServerPath(rt)
+	if bin == "" {
+		return nil, fmt.Errorf("llama-server not found; set %s or install on PATH", llamacpp.EnvLlamaCppPath)
+	}
+	port := llamacpp.ListenPort()
+	args := []string{"-m", modelPath, "--port", fmt.Sprintf("%d", port)}
+	args = append(args, params.Args...)
+	c := exec.Command(bin, args...)
+	c.Env = mergeEnv(os.Environ(), params.Env)
+	return c, nil
+}
+
+func newVLLMSplitCmd(modelDir string, rt llamacpp.RuntimeInfo, params ModelParams) (*exec.Cmd, error) {
+	bin := llamacpp.ResolveVLLMPath(rt)
+	if bin == "" {
+		return nil, fmt.Errorf("vllm not found; set %s (project dir; we use vllm or .venv/bin/vllm) or %s (venv root), or install vllm on PATH", llamacpp.EnvVLLMPath, llamacpp.EnvVLLMVenv)
+	}
+	port := llamacpp.VLLMPort()
+	activate := llamacpp.ResolveVLLMActivateScript(bin)
+	if runtime.GOOS == "windows" {
+		if activate != "" {
+			return nil, fmt.Errorf("vLLM venv activation is not supported on Windows from this app; run vllm from an activated shell or add vllm to PATH (detected %s)", activate)
+		}
+		args := []string{"serve", modelDir, "--port", fmt.Sprintf("%d", port)}
+		args = append(args, params.Args...)
+		c := exec.Command(bin, args...)
+		c.Env = mergeEnv(os.Environ(), params.Env)
+		return c, nil
+	}
+	c := exec.Command("sh", "-c", unixVLLMSplitScript(bin, modelDir, port, activate, params))
+	c.Env = mergeEnv(os.Environ(), params.Env)
+	return c, nil
+}
+
+func scanReaderLines(r io.Reader, ch chan<- tea.Msg, wg *sync.WaitGroup) {
+	defer wg.Done()
+	sc := bufio.NewScanner(r)
+	for sc.Scan() {
+		ch <- serverLogMsg{line: sc.Text()}
+	}
+}
+
+// streamSplitServerCmd starts cmd with stdout/stderr pipes, streams lines as [serverLogMsg], then sends [llamaServerExitedMsg] and closes ch.
+func streamSplitServerCmd(cmd *exec.Cmd, ch chan tea.Msg) {
+	applySplitCmdSysProcAttr(cmd)
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		ch <- llamaServerExitedMsg{err: err}
+		close(ch)
+		return
+	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		ch <- llamaServerExitedMsg{err: err}
+		close(ch)
+		return
+	}
+	if err := cmd.Start(); err != nil {
+		ch <- llamaServerExitedMsg{err: err}
+		close(ch)
+		return
+	}
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go scanReaderLines(stdout, ch, &wg)
+	go scanReaderLines(stderr, ch, &wg)
+	wg.Wait()
+	err = cmd.Wait()
+	ch <- llamaServerExitedMsg{err: err}
+	close(ch)
+}
+
+// runLlamaServerSplitCmd starts llama-server in split-pane mode (log streaming into the TUI).
+func runLlamaServerSplitCmd(modelPath string, rt llamacpp.RuntimeInfo, params ModelParams) tea.Cmd {
+	return func() tea.Msg {
+		cmd, err := newLlamaSplitCmd(modelPath, rt, params)
+		if err != nil {
+			return runServerErrMsg{err: err}
+		}
+		ch := make(chan tea.Msg, 64)
+		bin := llamacpp.ResolveLlamaServerPath(rt)
+		inv := formatLlamaServerInvocation(bin, modelPath, llamacpp.ListenPort(), params)
+		go func() {
+			ch <- serverLogMsg{line: inv}
+			streamSplitServerCmd(cmd, ch)
+		}()
+		return serverSplitReadyMsg{cmd: cmd, ch: ch}
+	}
+}
+
+// runVLLMServerSplitCmd starts vllm serve in split-pane mode.
+func runVLLMServerSplitCmd(modelDir string, rt llamacpp.RuntimeInfo, params ModelParams) tea.Cmd {
+	return func() tea.Msg {
+		cmd, err := newVLLMSplitCmd(modelDir, rt, params)
+		if err != nil {
+			return runServerErrMsg{err: err}
+		}
+		ch := make(chan tea.Msg, 64)
+		bin := llamacpp.ResolveVLLMPath(rt)
+		activate := llamacpp.ResolveVLLMActivateScript(bin)
+		inv := formatVLLMServerInvocation(bin, modelDir, llamacpp.VLLMPort(), activate, params)
+		go func() {
+			ch <- serverLogMsg{line: inv}
+			streamSplitServerCmd(cmd, ch)
+		}()
+		return serverSplitReadyMsg{cmd: cmd, ch: ch}
+	}
+}
+
+// readNextServerMsg blocks for the next message from a split-pane log channel (call from a tea.Cmd).
+func readNextServerMsg(ch chan tea.Msg) tea.Cmd {
+	return func() tea.Msg {
+		msg, ok := <-ch
+		if !ok {
+			return llamaServerExitedMsg{err: nil}
+		}
+		return msg
+	}
 }
 
 // runVLLMServerCmd runs `vllm serve` for a Hugging Face-style model directory.

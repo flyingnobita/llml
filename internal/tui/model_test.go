@@ -30,6 +30,61 @@ func TestLayoutTable_wideTerminalFitsViewport(t *testing.T) {
 	}
 }
 
+func TestModelsLoadedSelectsFirstRow(t *testing.T) {
+	m := New()
+	m.width = 120
+	m.height = 40
+	files := []llamacpp.ModelFile{
+		{Backend: llamacpp.BackendLlama, Path: "/a.gguf", Name: "a", Size: 1, ModTime: time.Unix(0, 0)},
+		{Backend: llamacpp.BackendLlama, Path: "/b.gguf", Name: "b", Size: 1, ModTime: time.Unix(0, 0)},
+	}
+	next, cmd := m.Update(modelsLoadedMsg{files: files})
+	if cmd != nil {
+		t.Fatal("unexpected cmd from modelsLoadedMsg")
+	}
+	m = next.(Model)
+	if m.tbl.Cursor() != 0 {
+		t.Fatalf("cursor %d want 0 (first row)", m.tbl.Cursor())
+	}
+}
+
+func TestSplitServerBodyHeights(t *testing.T) {
+	th, lh := splitServerBodyHeights(20)
+	if th+lh != 20 {
+		t.Fatalf("got table=%d log=%d want sum 20", th, lh)
+	}
+}
+
+func TestAppendServerLogLine_caps(t *testing.T) {
+	m := New()
+	for i := 0; i < maxServerLogLines+50; i++ {
+		m = m.appendServerLogLine("x")
+	}
+	if len(m.serverLog) != maxServerLogLines {
+		t.Fatalf("got len %d want %d", len(m.serverLog), maxServerLogLines)
+	}
+}
+
+func TestRunServerKeyMode(t *testing.T) {
+	// US QWERTY: uppercase R is shift+r — must be split, not fullscreen.
+	shiftR := tea.KeyPressMsg(tea.Key{Text: "R", Code: 'r', Mod: tea.ModShift})
+	if runServerKeyMode(shiftR) != 1 {
+		t.Fatalf("shift+R (normal R): got %d want 1 (split)", runServerKeyMode(shiftR))
+	}
+	capsR := tea.KeyPressMsg(tea.Key{Text: "R", Code: 'R', Mod: 0})
+	if runServerKeyMode(capsR) != 1 {
+		t.Fatalf("R (caps): got %d want 1", runServerKeyMode(capsR))
+	}
+	ctrlR := tea.KeyPressMsg(tea.Key{Text: "R", Code: 'r', Mod: tea.ModCtrl | tea.ModShift})
+	if runServerKeyMode(ctrlR) != 2 {
+		t.Fatalf("ctrl+R: got %d want 2 (fullscreen)", runServerKeyMode(ctrlR))
+	}
+	other := tea.KeyPressMsg(tea.Key{Text: "x", Code: 'x', Mod: 0})
+	if runServerKeyMode(other) != 0 {
+		t.Fatalf("non-R: got %d want 0", runServerKeyMode(other))
+	}
+}
+
 func TestNew_zeroSize(t *testing.T) {
 	m := New()
 	if m.width != 0 || m.height != 0 {

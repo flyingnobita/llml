@@ -59,6 +59,10 @@ type Theme struct {
 	TableSelectedBg     color.Color
 	// ParamProfileName highlights parameter profile names in the params modal.
 	ParamProfileName color.Color
+	// SplitPaneBorderFocused / SplitPaneBorderDim frame the table and log panes in
+	// split-server mode so the keyboard-focused pane reads brighter than the other.
+	SplitPaneBorderFocused color.Color
+	SplitPaneBorderDim     color.Color
 }
 
 // DarkTheme returns the default dark-terminal palette (original llml colors).
@@ -81,7 +85,9 @@ func DarkTheme() Theme {
 		TableSelected:       lipgloss.Color("17"),
 		TableSelectedBg:     lipgloss.Color("51"),
 		// Distinct from ModalTitle / ParamSectionHeading; warm vs purple chrome.
-		ParamProfileName: lipgloss.Color("178"),
+		ParamProfileName:       lipgloss.Color("178"),
+		SplitPaneBorderFocused: lipgloss.Color("51"),
+		SplitPaneBorderDim:     lipgloss.Color("238"),
 	}
 }
 
@@ -105,7 +111,9 @@ func LightTheme() Theme {
 		TableSelected:       lipgloss.Color("255"),
 		TableSelectedBg:     lipgloss.Color("27"),
 		// Distinct from ModalTitle / ParamSectionHeading; green accent on light bg.
-		ParamProfileName: lipgloss.Color("30"),
+		ParamProfileName:       lipgloss.Color("30"),
+		SplitPaneBorderFocused: lipgloss.Color("27"),
+		SplitPaneBorderDim:     lipgloss.Color("243"),
 	}
 }
 

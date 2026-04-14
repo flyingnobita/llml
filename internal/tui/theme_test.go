@@ -60,6 +60,16 @@ func TestDarkAndLightThemesDistinct(t *testing.T) {
 	if d.TableSelectedBg == l.TableSelectedBg {
 		t.Fatal("expected TableSelectedBg colors to differ between themes")
 	}
+	if d.SplitPaneBorderFocused == l.SplitPaneBorderFocused {
+		t.Fatal("expected SplitPaneBorderFocused colors to differ between themes")
+	}
+}
+
+func TestSplitPaneChromeStylesDifferFocusedVsDim(t *testing.T) {
+	st := newStyles(DarkTheme())
+	if st.splitPaneChromeFocused.Render("x") == st.splitPaneChromeDim.Render("x") {
+		t.Fatal("focused and dim split-pane chrome should render differently")
+	}
 }
 
 func TestThemesHaveTableSelectedBackground(t *testing.T) {

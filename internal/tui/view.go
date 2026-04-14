@@ -9,6 +9,52 @@ import (
 	"github.com/flyingnobita/llml/internal/llamacpp"
 )
 
+// serverLogPaneView renders the bordered server log viewport and, when vertical
+// scrolling is possible, a text-mode scroll track beside it (█/░).
+func (m Model) serverLogPaneView() string {
+	vp := m.serverViewport.View()
+	if m.serverViewport.TotalLineCount() <= m.serverViewport.VisibleLineCount() {
+		return vp
+	}
+	trackH := lipgloss.Height(vp)
+	if trackH < 1 {
+		trackH = 1
+	}
+	col := verticalScrollBarColumn(m.serverViewport.ScrollPercent(), trackH)
+	col = m.styles.footer.Render(col)
+	return lipgloss.JoinHorizontal(lipgloss.Top, vp, col)
+}
+
+// verticalScrollBarColumn renders a single-column scroll indicator: filled cells
+// from the top grow with scroll position (see [viewport.Model.ScrollPercent]).
+func verticalScrollBarColumn(pct float64, trackH int) string {
+	if trackH < 2 {
+		return ""
+	}
+	if pct < 0 {
+		pct = 0
+	}
+	if pct > 1 {
+		pct = 1
+	}
+	filled := int(pct * float64(trackH))
+	if filled > trackH {
+		filled = trackH
+	}
+	var b strings.Builder
+	for i := 0; i < trackH; i++ {
+		if i > 0 {
+			b.WriteByte('\n')
+		}
+		if i < filled {
+			b.WriteString("█")
+		} else {
+			b.WriteString("░")
+		}
+	}
+	return b.String()
+}
+
 // runtimePanelView renders the bottom runtime env summary (env var = value per line).
 func runtimePanelView(m Model, contentWidth int) string {
 	if m.width == 0 {
@@ -34,30 +80,49 @@ const appTitle = "LLM Launcher"
 // Each binding uses "key: description"; bindings are separated by " · ".
 // The same convention is used for modal hint bars (runtime config, parameters).
 func footerHelpLine(m Model) string {
-	return fmt.Sprintf(
-		"%s: %s · %s: %s · %s: %s · %s: %s · %s: %s · %s: %s · %s: %s · %s: %s · %d×%d",
-		m.keys.Refresh.Help().Key, m.keys.Refresh.Help().Desc,
-		m.keys.RunServer.Help().Key, m.keys.RunServer.Help().Desc,
-		m.keys.ConfigPort.Help().Key, m.keys.ConfigPort.Help().Desc,
-		m.keys.Parameters.Help().Key, m.keys.Parameters.Help().Desc,
-		m.keys.ToggleTheme.Help().Key, m.keys.ToggleTheme.Help().Desc,
-		m.keys.Quit.Help().Key, m.keys.Quit.Help().Desc,
-		m.keys.Nav.Help().Key, m.keys.Nav.Help().Desc,
-		m.keys.CopyPath.Help().Key, m.keys.CopyPath.Help().Desc,
-		m.width, m.height,
-	)
+	if m.serverRunning {
+		if m.splitLogFocused {
+			return fmt.Sprintf(
+				"%s · %s · %s · %d×%d",
+				FooterSplitTabToTable, FooterSplitStopServer, FooterNavHint, m.width, m.height,
+			)
+		}
+		return fmt.Sprintf(
+			"%s · %s · %s · %d×%d",
+			FooterSplitTabToLog, FooterSplitStopServer, FooterNavHint, m.width, m.height,
+		)
+	}
+	parts := []string{
+		FooterHintRefresh,
+		FooterHintRunSplit,
+		FooterHintRunFullscreen,
+		FooterHintConfigPort,
+		FooterHintParameters,
+		FooterHintToggleTheme,
+		FooterHintQuit,
+		FooterNavHint,
+		FooterHintCopyPath,
+		fmt.Sprintf("%d×%d", m.width, m.height),
+	}
+	return strings.Join(parts, FooterHintSep)
 }
 
 // mainChromeLines counts rows in the main view block excluding the table body
-// (title, subtitle, scroll bar, runtime panel, footer). needsHBar should match
-// whether the horizontal scroll track is shown.
-func mainChromeLines(m Model, needsHBar bool) int {
+// (title, subtitle, scroll bars, runtime panel, footer). needsTableHBar and
+// needsLogHBar should match whether each horizontal track is shown.
+func mainChromeLines(m Model, needsTableHBar bool, needsLogHBar bool) int {
 	iw := m.innerWidth()
 	n := lipgloss.Height(m.appTitleBlock(iw))
 	n += lipgloss.Height(m.styles.subtitle.Render(appSubtitle))
 	n += 1
 
-	if needsHBar && len(m.files) > 0 {
+	if needsTableHBar && len(m.files) > 0 {
+		if bar := horizontalScrollBarLine(0, iw); bar != "" {
+			n += lipgloss.Height(m.styles.footer.Render(bar))
+		}
+	}
+
+	if needsLogHBar && m.serverRunning {
 		if bar := horizontalScrollBarLine(0, iw); bar != "" {
 			n += lipgloss.Height(m.styles.footer.Render(bar))
 		}
@@ -197,7 +262,21 @@ func (m Model) View() tea.View {
 		}
 		m.hscroll.SetWidth(iw)
 		m.hscroll.SetHeight(th)
-		body = m.hscroll.View()
+		if m.serverRunning {
+			if m.serverViewportH > 0 {
+				m.serverViewport.SetHeight(m.serverViewportH)
+			}
+			body = lipgloss.JoinVertical(lipgloss.Left, m.hscroll.View(), m.serverLogPaneView())
+		} else {
+			body = m.hscroll.View()
+		}
+	}
+
+	var logHBar string
+	if m.serverRunning && m.serverLogNeedsHorizontalScroll() {
+		if line := horizontalScrollBarLine(m.serverViewport.HorizontalScrollPercent(), iw); line != "" {
+			logHBar = m.styles.footer.Render(line)
+		}
 	}
 
 	var hBar string
@@ -211,6 +290,9 @@ func (m Model) View() tea.View {
 	runtimePanel := runtimePanelView(m, iw)
 
 	rows := []string{title, sub, "", body}
+	if logHBar != "" {
+		rows = append(rows, logHBar)
+	}
 	if hBar != "" {
 		rows = append(rows, hBar)
 	}
@@ -256,7 +338,7 @@ func (m Model) runtimeConfigView() string {
 		label(m.runtimeFocus == runtimeFieldVLLMPort, llamacpp.EnvVLLMServerPort),
 		m.runtimeInputs[runtimeFieldVLLMPort].View(),
 		"",
-		m.styles.footer.Render("tab: next · shift+tab: prev · enter: save · esc: cancel"),
+		m.styles.footer.Render(FooterRuntimeConfigHints),
 	}
 	block := lipgloss.JoinVertical(lipgloss.Left, rows...)
 	if m.lastRunNote != "" {

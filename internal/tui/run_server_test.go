@@ -70,6 +70,16 @@ func TestUnixLlamaServerScript_containsRead(t *testing.T) {
 	}
 }
 
+func TestUnixVLLMSplitScript_mergesStderr(t *testing.T) {
+	s := unixVLLMSplitScript("/bin/vllm", "/m/model-dir", 8080, "", ModelParams{})
+	if !strings.HasSuffix(strings.TrimSpace(s), "2>&1") {
+		t.Fatalf("expected 2>&1 suffix: %q", s)
+	}
+	if !strings.Contains(s, "'/bin/vllm' serve") {
+		t.Fatalf("expected vllm serve: %q", s)
+	}
+}
+
 func TestMergeEnv(t *testing.T) {
 	base := []string{"PATH=/usr/bin", "FOO=old"}
 	ex := []EnvVar{{Key: "FOO", Value: "new"}}
