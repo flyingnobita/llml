@@ -52,7 +52,7 @@ func modelParamsConfigPath() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, "llm-launch", "model-params.json"), nil
+	return filepath.Join(dir, "llml", "model-params.json"), nil
 }
 
 func parseModelEntry(raw json.RawMessage) (modelEntry, error) {

@@ -3,8 +3,8 @@ package tui
 import (
 	"github.com/mattn/go-runewidth"
 
-	"github.com/flyingnobita/llm-launch/internal/llamacpp"
-	btable "github.com/flyingnobita/llm-launch/internal/tui/btable"
+	"github.com/flyingnobita/llml/internal/llamacpp"
+	btable "github.com/flyingnobita/llml/internal/tui/btable"
 )
 
 // tableColumns computes per-column widths from the terminal width and the

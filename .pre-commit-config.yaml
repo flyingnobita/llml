@@ -1,4 +1,4 @@
-# Pre-commit hooks for llm-launch (Go + Prettier/markdownlint for docs).
+# Pre-commit hooks for LLM Launcher (llml) (Go + Prettier/markdownlint for docs).
 # See https://pre-commit.com for more information.
 
 repos:

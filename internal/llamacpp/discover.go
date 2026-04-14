@@ -1,5 +1,5 @@
 // Package llamacpp provides GGUF and safetensors model discovery, metadata extraction,
-// llama.cpp / vLLM binary detection, and display-formatting helpers for the llm-launch TUI.
+// llama.cpp / vLLM binary detection, and display-formatting helpers for the LLM Launcher TUI.
 package llamacpp
 
 import (

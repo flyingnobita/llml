@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/flyingnobita/llm-launch/internal/llamacpp"
+	"github.com/flyingnobita/llml/internal/llamacpp"
 )
 
 func TestApplyVLLMPortEnv(t *testing.T) {

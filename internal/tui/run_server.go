@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/flyingnobita/llm-launch/internal/llamacpp"
+	"github.com/flyingnobita/llml/internal/llamacpp"
 )
 
 // shellSingleQuoted returns s wrapped in single quotes for POSIX sh (safe for paths with spaces).
@@ -56,7 +56,7 @@ func unixLlamaServerScript(bin, modelPath string, port int, params ModelParams) 
 	return fmt.Sprintf(`printf '%%s\n' %s
 %s
 echo
-echo 'Press Enter to return to llm-launch...'
+echo 'Press Enter to return to LLM Launcher...'
 read -r _ </dev/tty || read -r _
 `, shellSingleQuoted(inv), runLine)
 }
@@ -73,7 +73,7 @@ func unixVLLMServerScript(bin, modelDir string, port int, activateScript string,
 	return fmt.Sprintf(`printf '%%s\n' %s
 %s
 echo
-echo 'Press Enter to return to llm-launch...'
+echo 'Press Enter to return to LLM Launcher...'
 read -r _ </dev/tty || read -r _
 `, shellSingleQuoted(inv), runLine)
 }

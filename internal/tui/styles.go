@@ -3,7 +3,7 @@ package tui
 import (
 	"github.com/charmbracelet/lipgloss"
 
-	btable "github.com/flyingnobita/llm-launch/internal/tui/btable"
+	btable "github.com/flyingnobita/llml/internal/tui/btable"
 )
 
 // DefaultTableStyles sets header/cell colors and spacing.

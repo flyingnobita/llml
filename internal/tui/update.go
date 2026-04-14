@@ -5,7 +5,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/flyingnobita/llm-launch/internal/llamacpp"
+	"github.com/flyingnobita/llml/internal/llamacpp"
 )
 
 // Update implements tea.Model.

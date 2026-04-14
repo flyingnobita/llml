@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/flyingnobita/llm-launch/internal/llamacpp"
+	"github.com/flyingnobita/llml/internal/llamacpp"
 )
 
 // runtimePanelView renders the bottom runtime env summary (env var = value per line).
@@ -27,7 +27,7 @@ func runtimePanelView(m Model, contentWidth int) string {
 	return runtimePanelStyle.Width(contentWidth).Render(inner)
 }
 
-const appTitle = "llm-launch"
+const appTitle = "LLM Launcher"
 
 // View implements tea.Model.
 func (m Model) View() string {

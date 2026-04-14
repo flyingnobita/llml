@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/flyingnobita/llm-launch/internal/tui"
+	"github.com/flyingnobita/llml/internal/tui"
 )
 
 func main() {

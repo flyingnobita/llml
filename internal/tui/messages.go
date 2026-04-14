@@ -1,6 +1,6 @@
 package tui
 
-import "github.com/flyingnobita/llm-launch/internal/llamacpp"
+import "github.com/flyingnobita/llml/internal/llamacpp"
 
 type runtimeReadyMsg struct {
 	runtime llamacpp.RuntimeInfo

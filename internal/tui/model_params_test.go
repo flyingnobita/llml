@@ -151,7 +151,7 @@ func TestModelParamsConfigPath_respectsXDG(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := filepath.Join(dir, "llm-launch", "model-params.json")
+	want := filepath.Join(dir, "llml", "model-params.json")
 	if path != want {
 		t.Fatalf("got %q want %q", path, want)
 	}
@@ -205,7 +205,7 @@ func TestSaveModelEntry_mergesOtherModels(t *testing.T) {
 func TestMigrateV1File_toProfiles(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
-	cfg := filepath.Join(dir, "llm-launch", "model-params.json")
+	cfg := filepath.Join(dir, "llml", "model-params.json")
 	if err := os.MkdirAll(filepath.Dir(cfg), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -253,7 +253,7 @@ func TestParseModelEntry_v2EmptyProfiles_getsDefault(t *testing.T) {
 func TestModelParamsFile_exists(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
-	path := filepath.Join(dir, "llm-launch", "model-params.json")
+	path := filepath.Join(dir, "llml", "model-params.json")
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}

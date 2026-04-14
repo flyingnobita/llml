@@ -7,8 +7,8 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/flyingnobita/llm-launch/internal/llamacpp"
-	btable "github.com/flyingnobita/llm-launch/internal/tui/btable"
+	"github.com/flyingnobita/llml/internal/llamacpp"
+	btable "github.com/flyingnobita/llml/internal/tui/btable"
 )
 
 // Model is the root Bubble Tea model.

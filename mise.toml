@@ -12,8 +12,8 @@ go = "latest"
 "pipx:pre-commit" = "latest"
 
 [tasks]
-run = "go run ./cmd/llm-launch"
-build = "go build -o bin/llm-launch ./cmd/llm-launch"
+run = "go run ./cmd/llml"
+build = "go build -o bin/llml ./cmd/llml"
 fmt = "go fmt ./..."
 fmt-check = "scripts/gofmt-check.sh"
 vet = "go vet ./..."
