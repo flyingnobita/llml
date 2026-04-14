@@ -229,18 +229,10 @@ func (m Model) modalTitleRow(innerW int, titleStyle lipgloss.Style, plain string
 	return m.joinLeftAndToast(innerW, left)
 }
 
-// View implements tea.Model.
-func (m Model) View() tea.View {
-	if m.width == 0 {
-		return tea.NewView("\n  Initializing…\n")
-	}
-	if m.paramPanelOpen {
-		return tea.NewView(m.paramPanelView())
-	}
-	if m.runtimeConfigOpen {
-		return tea.NewView(m.runtimeConfigView())
-	}
-
+// mainAppPlacedView renders the primary UI (title, model table, server log when
+// running, footer, …) as a full-width, full-height string. Used for the normal
+// view and as the backdrop when a centered modal (parameters, runtime config) is open.
+func (m Model) mainAppPlacedView() string {
 	iw := m.innerWidth()
 
 	title := m.appTitleBlock(iw)
@@ -306,12 +298,35 @@ func (m Model) View() tea.View {
 	block := lipgloss.JoinVertical(lipgloss.Left, rows...)
 	framed := m.styles.app.Render(block)
 
-	v := tea.NewView(lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Top, framed))
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Top, framed)
+}
+
+// View implements tea.Model.
+func (m Model) View() tea.View {
+	if m.width == 0 {
+		return tea.NewView("\n  Initializing…\n")
+	}
+	if m.paramPanelOpen {
+		s := overlayCentered(m.mainAppPlacedView(), m.paramPanelModalBlock(), m.width, m.height)
+		v := tea.NewView(s)
+		v.AltScreen = true
+		return v
+	}
+	if m.runtimeConfigOpen {
+		s := overlayCentered(m.mainAppPlacedView(), m.runtimeConfigModalBlock(), m.width, m.height)
+		v := tea.NewView(s)
+		v.AltScreen = true
+		return v
+	}
+
+	v := tea.NewView(m.mainAppPlacedView())
 	v.AltScreen = true
 	return v
 }
 
-func (m Model) runtimeConfigView() string {
+// runtimeConfigModalBlock returns the framed runtime configuration panel only
+// (no full-screen placement). Composed over the main view via [overlayCentered].
+func (m Model) runtimeConfigModalBlock() string {
 	label := func(focused bool, name string) string {
 		prefix := "  "
 		if focused {
@@ -344,8 +359,7 @@ func (m Model) runtimeConfigView() string {
 	if m.lastRunNote != "" {
 		block = lipgloss.JoinVertical(lipgloss.Left, block, "", m.styles.errLine.Render(m.lastRunNote))
 	}
-	framed := m.styles.portConfigBox.Render(block)
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, framed)
+	return m.styles.portConfigBox.Render(block)
 }
 
 // SelectedModel returns the filesystem path and backend for the highlighted row.

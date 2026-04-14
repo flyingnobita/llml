@@ -4,7 +4,7 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
-func (m Model) paramPanelView() string {
+func (m Model) paramPanelModalBlock() string {
 	cw := m.paramPanelContentWidth()
 	maxLine := cw
 	if maxLine < 24 {
@@ -189,6 +189,5 @@ func (m Model) paramPanelView() string {
 	if m.lastRunNote != "" {
 		block = lipgloss.JoinVertical(lipgloss.Left, block, "", m.styles.errLine.Render(m.lastRunNote))
 	}
-	framed := m.styles.portConfigBox.Render(block)
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, framed)
+	return m.styles.portConfigBox.Render(block)
 }

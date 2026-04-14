@@ -1,9 +1,12 @@
 package tui
 
 import (
+	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/flyingnobita/llml/internal/llamacpp"
 )
 
 func TestParamPanelDeleteConfirm(t *testing.T) {
@@ -119,6 +122,40 @@ func TestCommitParamLineEdit_blankArgRemovesNewEmptyRow(t *testing.T) {
 	m = m.commitParamLineEdit()
 	if m.paramArgsLen() != 0 {
 		t.Fatalf("blank commit on new empty arg row should remove row, got %#v", m.paramArgs)
+	}
+}
+
+func TestParamPanelViewIncludesMainAppBackdrop(t *testing.T) {
+	m := New()
+	// Tall terminal so the centered modal does not cover the title row; on 24 lines
+	// a ~22-line modal obscures the title and this test would falsely fail.
+	m.width = 100
+	m.height = 40
+	m.loading = false
+	m.files = []llamacpp.ModelFile{
+		{Backend: llamacpp.BackendLlama, Path: "/x.gguf", Name: "x", Size: 1, ModTime: time.Unix(0, 0)},
+	}
+	m = m.layoutTable()
+	m.paramPanelOpen = true
+	m.paramModelDisplayName = "test/model"
+	m.paramProfiles = []ParameterProfile{{Name: "default"}}
+
+	bg := m.mainAppPlacedView()
+	if !strings.Contains(bg, "LLM Launcher") {
+		t.Fatalf("mainAppPlacedView missing title (len=%d)", len(bg))
+	}
+
+	v := m.View()
+	content := v.Content
+	if !strings.Contains(content, "LLM") || !strings.Contains(content, "Launcher") {
+		t.Fatalf("overlaid view missing title (backdrop should remain above modal)")
+	}
+	if !strings.Contains(content, "Parameters") {
+		t.Fatal("expected parameters modal in view")
+	}
+	// Subtitle line remains visible outside the modal on a tall layout.
+	if !strings.Contains(content, "filesystem scan") {
+		t.Fatal("expected main view subtitle in backdrop outside modal")
 	}
 }
 
