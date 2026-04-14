@@ -4,7 +4,8 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
-- Apr-14, 2026 - [Parameter profiles (`p`): named env+argv sets in UserConfigDir/llm-launch/model-params.json; active profile for `R`; `--flag value` line split; TUI merges flag+value rows on load; minimal quoting in echoed command; README/AGENTS]
+- Apr-14, 2026 - [GoReleaser + GitHub Actions release workflow for `v*` tags; pre-built archives (Linux/macOS/Windows); README install from releases; AGENTS]
+- Apr-14, 2026 - [Parameter profiles (`p`): named env+argv sets in UserConfigDir/llml/model-params.json; active profile for `R`; `--flag value` line split; TUI merges flag+value rows on load; minimal quoting in echoed command; README/AGENTS]
 - Apr-14, 2026 - [After `R`: pause reads from `/dev/tty` when stdin breaks after vLLM (EIO)]
 - Apr-13, 2026 - [vLLM discovery: VLLM_PATH/.venv/bin/vllm and VLLM_VENV/bin/vllm; activate next to binary]
 - Apr-13, 2026 - [vLLM R: optional VLLM_VENV + auto .venv; source activate before vllm serve on Unix; README/AGENTS]

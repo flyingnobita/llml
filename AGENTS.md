@@ -1,4 +1,4 @@
-# AGENTS.md — llm-launch
+# AGENTS.md — LLM Launcher (llml)
 
 AI coding instructions for this project.
 
@@ -6,7 +6,7 @@ AI coding instructions for this project.
 
 ## Project Overview
 
-**llm-launch** is a terminal UI (TUI) for discovering GGUF and Hugging Face-style
+**LLM Launcher** (`llml`) is a terminal UI (TUI) for discovering GGUF and Hugging Face-style
 safetensors models on the local filesystem and launching `llama-server` or
 `vllm serve` for a selected row.
 
@@ -14,13 +14,14 @@ safetensors models on the local filesystem and launching `llama-server` or
 - UI framework: **Bubble Tea** (Elm-style TUI) + **Lip Gloss** (styling)
 - GGUF metadata: `abrander/gguf`
 - Tooling: `mise` (tool versions + tasks), `npm` (Prettier + markdownlint only)
+- Releases: [GoReleaser](https://goreleaser.com/) (`.goreleaser.yaml`); pushing a `v*` tag runs `.github/workflows/release.yml` and publishes archives to GitHub Releases
 
 ---
 
 ## Source Layout
 
 ```text
-cmd/llm-launch/      # Binary entrypoint (main.go)
+cmd/llml/            # Binary entrypoint (main.go)
 internal/
   llamacpp/          # GGUF + safetensors discovery, metadata, runtime detection, formatting
   tui/               # Bubble Tea model, update, view, styles, keymaps
@@ -64,7 +65,7 @@ scripts/             # gofmt-check.sh, precommit-docs-fix.sh
 | `LLM_LAUNCH_LLAMACPP_PATHS`         | Extra model search roots (comma-separated)                                 |
 | `HUGGINGFACE_HUB_CACHE` / `HF_HOME` | Hugging Face hub cache location                                            |
 
-**Parameter profiles** (per-model extra env + argv for `llama-server` / `vllm`, edited with **`p`**) are **not** env vars: they are stored in **`{UserConfigDir}/llm-launch/model-params.json`** (see `internal/tui/model_params.go`). Keys are cleaned model paths; each entry has named profiles and `activeIndex` for which profile **`R`** uses.
+**Parameter profiles** (per-model extra env + argv for `llama-server` / `vllm`, edited with **`p`**) are **not** env vars: they are stored in **`{UserConfigDir}/llml/model-params.json`** (see `internal/tui/model_params.go`). Keys are cleaned model paths; each entry has named profiles and `activeIndex` for which profile **`R`** uses.
 
 Set development defaults in `mise.toml` under `[env]`.
 
