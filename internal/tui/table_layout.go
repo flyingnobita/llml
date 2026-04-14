@@ -11,7 +11,7 @@ import (
 // width inside app horizontal padding) and the current file list. Name expands
 // to fit content (capped at maxNameColW); Path takes remaining space after fixed
 // columns (Name, Runtime, Size, Last modified).
-func tableColumns(totalWidth int, files []llamacpp.ModelFile) []btable.Column {
+func tableColumns(totalWidth int, files []llamacpp.ModelFile, homeDir string) []btable.Column {
 	if totalWidth < minTerminalWidth {
 		totalWidth = minTerminalWidth
 	}
@@ -22,7 +22,7 @@ func tableColumns(totalWidth int, files []llamacpp.ModelFile) []btable.Column {
 		if w := runewidth.StringWidth(f.Name); w > longestName {
 			longestName = w
 		}
-		if w := runewidth.StringWidth(llamacpp.FormatModelFolderDisplay(f.Path)); w > longestPath {
+		if w := runewidth.StringWidth(llamacpp.FormatModelFolderDisplay(f.Path, homeDir)); w > longestPath {
 			longestPath = w
 		}
 	}
@@ -66,7 +66,7 @@ func tableContentMinWidth(cols []btable.Column) int {
 
 // buildTableRows converts ModelFile entries into display rows using the
 // column widths computed by tableColumns. Cells are truncated to fit.
-func buildTableRows(files []llamacpp.ModelFile, cols []btable.Column) []btable.Row {
+func buildTableRows(files []llamacpp.ModelFile, cols []btable.Column, homeDir string) []btable.Row {
 	if len(cols) < 5 {
 		return nil
 	}
@@ -75,7 +75,7 @@ func buildTableRows(files []llamacpp.ModelFile, cols []btable.Column) []btable.R
 		rows[i] = btable.Row{
 			llamacpp.TruncateRunes(f.Name, cols[0].Width-1),
 			llamacpp.TruncateRunes(llamacpp.FormatRuntimeLabel(f.Backend), cols[1].Width-1),
-			llamacpp.TruncateRunes(llamacpp.FormatModelFolderDisplay(f.Path), cols[2].Width-1),
+			llamacpp.TruncateRunes(llamacpp.FormatModelFolderDisplay(f.Path, homeDir), cols[2].Width-1),
 			llamacpp.FormatSize(f.Size),
 			llamacpp.FormatModTime(f.ModTime),
 		}

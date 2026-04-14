@@ -5,65 +5,47 @@ import (
 	"testing"
 )
 
-func TestResolveThemeWithDetector_explicitDark(t *testing.T) {
-	t.Setenv(EnvLLMLTheme, "dark")
-	got := resolveThemeWithDetector(func() bool { return false })
-	want := DarkTheme()
-	if got != want {
-		t.Fatalf("dark env: got %+v want %+v", got, want)
+func TestResolveThemeWithDetector(t *testing.T) {
+	cases := []struct {
+		name      string
+		env       string
+		darkBG    bool
+		wantTheme Theme
+	}{
+		{"explicit_dark", "dark", false, DarkTheme()},
+		{"explicit_light", "light", true, LightTheme()},
+		{"case_insensitive_DaRk", "DaRk", false, DarkTheme()},
+		{"auto_empty_dark_terminal", "", true, DarkTheme()},
+		{"auto_keyword_light_terminal", "auto", false, LightTheme()},
+		{"unknown_falls_back_to_detector", "not-a-theme", true, DarkTheme()},
 	}
-}
-
-func TestResolveThemeWithDetector_explicitLight(t *testing.T) {
-	t.Setenv(EnvLLMLTheme, "light")
-	got := resolveThemeWithDetector(func() bool { return true })
-	want := LightTheme()
-	if got != want {
-		t.Fatalf("light env: got %+v want %+v", got, want)
-	}
-}
-
-func TestResolveThemeWithDetector_caseInsensitive(t *testing.T) {
-	t.Setenv(EnvLLMLTheme, "DaRk")
-	got := resolveThemeWithDetector(func() bool { return false })
-	if got != DarkTheme() {
-		t.Fatalf("expected DarkTheme for DaRk, got %+v", got)
-	}
-}
-
-func TestResolveThemeWithDetector_autoEmptyUsesDetector(t *testing.T) {
-	t.Setenv(EnvLLMLTheme, "")
-	gotDark := resolveThemeWithDetector(func() bool { return true })
-	if gotDark != DarkTheme() {
-		t.Fatalf("auto + dark terminal: got %+v", gotDark)
-	}
-	t.Setenv(EnvLLMLTheme, "auto")
-	gotLight := resolveThemeWithDetector(func() bool { return false })
-	if gotLight != LightTheme() {
-		t.Fatalf("auto + light terminal: got %+v", gotLight)
-	}
-}
-
-func TestResolveThemeWithDetector_unknownUsesDetector(t *testing.T) {
-	t.Setenv(EnvLLMLTheme, "not-a-theme")
-	got := resolveThemeWithDetector(func() bool { return true })
-	if got != DarkTheme() {
-		t.Fatalf("unknown env + dark detector: got %+v", got)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv(EnvLLMLTheme, tc.env)
+			det := tc.darkBG
+			got := resolveThemeWithDetector(func() bool { return det })
+			if got != tc.wantTheme {
+				t.Fatalf("got %+v want %+v", got, tc.wantTheme)
+			}
+		})
 	}
 }
 
 func TestThemeToastText(t *testing.T) {
-	if s := themeToastText(themePickDark, DarkTheme()); s != "Theme: dark" {
-		t.Fatalf("dark: %q", s)
+	cases := []struct {
+		pick  int
+		theme Theme
+		want  string
+	}{
+		{themePickDark, DarkTheme(), "Theme: dark"},
+		{themePickLight, LightTheme(), "Theme: light"},
+		{themePickAuto, DarkTheme(), "Theme: auto (dark)"},
+		{themePickAuto, LightTheme(), "Theme: auto (light)"},
 	}
-	if s := themeToastText(themePickLight, LightTheme()); s != "Theme: light" {
-		t.Fatalf("light: %q", s)
-	}
-	if s := themeToastText(themePickAuto, DarkTheme()); s != "Theme: auto (dark)" {
-		t.Fatalf("auto dark: %q", s)
-	}
-	if s := themeToastText(themePickAuto, LightTheme()); s != "Theme: auto (light)" {
-		t.Fatalf("auto light: %q", s)
+	for _, tc := range cases {
+		if s := themeToastText(tc.pick, tc.theme); s != tc.want {
+			t.Fatalf("pick %d: got %q want %q", tc.pick, s, tc.want)
+		}
 	}
 }
 

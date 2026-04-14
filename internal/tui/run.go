@@ -8,8 +8,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-// Run starts the full-screen TUI. Use [tea.WithAltScreen] for a dedicated screen buffer;
-// omit it if you need to stay in the scrollback (e.g. logging to the terminal).
+// Run starts the full-screen TUI. Alt-screen rendering is enabled on the root [tea.View]
+// (see [Model.View]); do not use the removed [tea.WithAltScreen] program option.
 func Run() error {
 	p := tea.NewProgram(New())
 	if _, err := p.Run(); err != nil {

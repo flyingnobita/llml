@@ -10,6 +10,8 @@ import (
 type styles struct {
 	app                 lipgloss.Style
 	title               lipgloss.Style
+	titleBoldLeft       lipgloss.Style
+	titleToastRowWrap   lipgloss.Style
 	subtitle            lipgloss.Style
 	body                lipgloss.Style
 	footer              lipgloss.Style
@@ -35,6 +37,11 @@ func newStyles(theme Theme) styles {
 		title: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(theme.Title).
+			MarginBottom(1),
+		titleBoldLeft: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(theme.Title),
+		titleToastRowWrap: lipgloss.NewStyle().
 			MarginBottom(1),
 		subtitle: lipgloss.NewStyle().
 			Foreground(theme.Subtitle).

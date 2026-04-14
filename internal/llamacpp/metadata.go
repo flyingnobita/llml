@@ -18,8 +18,8 @@ var contextLengthKeys = []string{
 	"general.context_length",
 }
 
-// parametersSummary reads GGUF metadata for a compact Parameters cell.
-func parametersSummary(path string) string {
+// ggufParamsSummary reads GGUF metadata for a compact Parameters cell.
+func ggufParamsSummary(path string) string {
 	f, err := os.Open(path)
 	if err != nil {
 		return "—"

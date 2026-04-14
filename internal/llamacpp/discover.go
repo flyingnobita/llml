@@ -60,7 +60,7 @@ func Discover(opts Options) ([]ModelFile, error) {
 		if err != nil || !st.IsDir() {
 			continue
 		}
-		if err := discoverWalkRoot(root, maxD, seen, &out); err != nil {
+		if err := discoverGGUFModels(root, maxD, seen, &out); err != nil {
 			return nil, err
 		}
 	}
@@ -71,8 +71,8 @@ func Discover(opts Options) ([]ModelFile, error) {
 
 	filtered := out[:0]
 	for i := range out {
-		out[i].Parameters = parametersSummary(out[i].Path)
-		if skipListedModel(out[i]) {
+		out[i].Parameters = ggufParamsSummary(out[i].Path)
+		if isAuxiliaryModel(out[i]) {
 			continue
 		}
 		filtered = append(filtered, out[i])
@@ -91,75 +91,39 @@ func Discover(opts Options) ([]ModelFile, error) {
 	return filtered, nil
 }
 
-// discoverWalkRoot walks root recursively. Unlike [filepath.WalkDir], it follows symbolic
+// discoverGGUFModels walks root recursively. Unlike [filepath.WalkDir], it follows symbolic
 // links to directories — some Hugging Face hub layouts symlink `models--org--repo` trees,
 // which plain WalkDir would skip entirely.
-func discoverWalkRoot(root string, maxD int, seen map[string]struct{}, out *[]ModelFile) error {
-	var walk func(string) error
-	walk = func(dir string) error {
-		entries, err := os.ReadDir(dir)
-		if err != nil {
+func discoverGGUFModels(root string, maxD int, seen map[string]struct{}, out *[]ModelFile) error {
+	return walkSearchTree(root, maxD, func(full, _ string, ent os.DirEntry, _ int) error {
+		if !strings.EqualFold(filepath.Ext(full), ".gguf") {
 			return nil
 		}
-		for _, ent := range entries {
-			name := ent.Name()
-			full := filepath.Join(dir, name)
-			rel, err := filepath.Rel(root, full)
-			if err != nil {
-				continue
-			}
-			depth := strings.Count(rel, string(filepath.Separator))
 
-			st, err := os.Stat(full)
-			if err != nil {
-				continue
-			}
-			if st.IsDir() {
-				if _, skip := skipDirNames[name]; skip {
-					continue
-				}
-				if depth >= maxD {
-					continue
-				}
-				if err := walk(full); err != nil {
-					return err
-				}
-				continue
-			}
-
-			if depth > maxD {
-				continue
-			}
-			if !strings.EqualFold(filepath.Ext(full), ".gguf") {
-				continue
-			}
-
-			clean := filepath.Clean(full)
-			if _, ok := seen[clean]; ok {
-				continue
-			}
-			seen[clean] = struct{}{}
-
-			size, modTime := fileInfoSizeModTime(full, ent)
-			if size < 0 {
-				continue
-			}
-
-			*out = append(*out, ModelFile{
-				Backend: BackendLlama,
-				Path:    clean,
-				Name:    filepath.Base(clean),
-				Size:    size,
-				ModTime: modTime,
-			})
+		clean := filepath.Clean(full)
+		if _, ok := seen[clean]; ok {
+			return nil
 		}
+		seen[clean] = struct{}{}
+
+		size, modTime := fileInfoSizeModTime(full, ent)
+		if size < 0 {
+			return nil
+		}
+
+		*out = append(*out, ModelFile{
+			Backend: BackendLlama,
+			Path:    clean,
+			Name:    filepath.Base(clean),
+			Size:    size,
+			ModTime: modTime,
+		})
 		return nil
-	}
-	return walk(root)
+	})
 }
 
-// skipListedModel drops non-LLM weight files (e.g. CLIP/mmproj sidecars in multimodal repos).
-func skipListedModel(f ModelFile) bool {
+// isAuxiliaryModel drops non-LLM weight files (e.g. CLIP/mmproj sidecars in multimodal repos).
+func isAuxiliaryModel(f ModelFile) bool {
 	switch strings.TrimSpace(strings.ToLower(f.Parameters)) {
 	case "clip", "flip":
 		return true

@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"os"
 	"strings"
 
 	btable "charm.land/bubbles/v2/table"
@@ -49,15 +50,18 @@ type Model struct {
 	paramArgs             []string
 	paramEditKind         int
 	paramEditInput        textinput.Model
+
+	homeDir string // from [os.UserHomeDir] at startup; used for path display (~/)
 }
 
 // New returns a model with default key bindings and an empty table; Init triggers discovery.
 func New() Model {
+	homeDir, _ := os.UserHomeDir()
 	pick := initialThemePick()
 	th := themeFromPick(pick, compat.HasDarkBackground)
 	st := newStyles(th)
 	t := btable.New(
-		btable.WithColumns(tableColumns(100, nil)),
+		btable.WithColumns(tableColumns(100, nil, homeDir)),
 		btable.WithRows(nil),
 		btable.WithFocused(true),
 		btable.WithStyles(st.table),
@@ -67,6 +71,7 @@ func New() Model {
 	hv := viewport.New(viewport.WithWidth(96), viewport.WithHeight(defaultTableHeight))
 	hv.SetHorizontalStep(hScrollStep)
 	return Model{
+		homeDir:   homeDir,
 		theme:     th,
 		themePick: pick,
 		styles:    st,
@@ -115,7 +120,7 @@ func (m Model) layoutTable() Model {
 	// Column widths must use the same budget as the table viewport (inner body
 	// width). Using full terminal width here made rows ~4 cells wider than
 	// innerW and triggered empty horizontal scrolling.
-	cols := tableColumns(innerW, m.files)
+	cols := tableColumns(innerW, m.files, m.homeDir)
 	m.tbl.SetColumns(cols)
 	m.tbl.SetStyles(m.styles.table)
 	minW := tableContentMinWidth(cols)
@@ -141,7 +146,7 @@ func (m Model) layoutTable() Model {
 	}
 
 	m.tbl.SetHeight(h)
-	m.tbl.SetRows(buildTableRows(m.files, cols))
+	m.tbl.SetRows(buildTableRows(m.files, cols, m.homeDir))
 	tview := m.tbl.View()
 	m.tableBodyH = max(1, strings.Count(tview, "\n")+1)
 	lines := strings.Split(tview, "\n")
@@ -169,7 +174,7 @@ func (m Model) layoutTable() Model {
 			if h2 != h {
 				h = h2
 				m.tbl.SetHeight(h)
-				m.tbl.SetRows(buildTableRows(m.files, cols))
+				m.tbl.SetRows(buildTableRows(m.files, cols, m.homeDir))
 				tview = m.tbl.View()
 				m.tableBodyH = max(1, strings.Count(tview, "\n")+1)
 				lines = strings.Split(tview, "\n")

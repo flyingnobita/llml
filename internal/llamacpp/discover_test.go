@@ -194,16 +194,16 @@ func TestFormatSize(t *testing.T) {
 }
 
 func TestSkipListedModel(t *testing.T) {
-	if !skipListedModel(ModelFile{Name: "x.gguf", Parameters: "clip"}) {
+	if !isAuxiliaryModel(ModelFile{Name: "x.gguf", Parameters: "clip"}) {
 		t.Fatal("expected clip filtered")
 	}
-	if !skipListedModel(ModelFile{Name: "x.gguf", Parameters: "flip"}) {
+	if !isAuxiliaryModel(ModelFile{Name: "x.gguf", Parameters: "flip"}) {
 		t.Fatal("expected flip filtered")
 	}
-	if !skipListedModel(ModelFile{Name: "mmproj-BF16.gguf", Parameters: "gemma4"}) {
+	if !isAuxiliaryModel(ModelFile{Name: "mmproj-BF16.gguf", Parameters: "gemma4"}) {
 		t.Fatal("expected mmproj basename filtered")
 	}
-	if skipListedModel(ModelFile{Name: "model-Q4_K_M.gguf", Parameters: "gemma4"}) {
+	if isAuxiliaryModel(ModelFile{Name: "model-Q4_K_M.gguf", Parameters: "gemma4"}) {
 		t.Fatal("expected to keep main weights")
 	}
 }

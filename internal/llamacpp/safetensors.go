@@ -16,8 +16,8 @@ type hfConfig struct {
 	Architectures []string `json:"architectures"`
 }
 
-// hfConfigSummary returns a short summary for safetensors model dirs (architecture / model_type).
-func hfConfigSummary(dir string) string {
+// hfParamsSummary returns a short summary for safetensors model dirs (architecture / model_type).
+func hfParamsSummary(dir string) string {
 	p := filepath.Join(dir, hfConfigFileName)
 	data, err := os.ReadFile(p)
 	if err != nil {
@@ -41,53 +41,16 @@ func hfConfigSummary(dir string) string {
 	return strings.Join(parts, " · ")
 }
 
-// collectSafetensorModelDirs walks root like discoverWalkRoot and records each directory
+// collectSafetensorModelDirs walks root like discoverGGUFModels and records each directory
 // that directly contains at least one *.safetensors file.
 func collectSafetensorModelDirs(root string, maxD int, out map[string]struct{}) error {
-	var walk func(string) error
-	walk = func(dir string) error {
-		entries, err := os.ReadDir(dir)
-		if err != nil {
+	return walkSearchTree(root, maxD, func(full, parentDir string, _ os.DirEntry, _ int) error {
+		if !strings.EqualFold(filepath.Ext(full), ".safetensors") {
 			return nil
 		}
-		for _, ent := range entries {
-			name := ent.Name()
-			full := filepath.Join(dir, name)
-			rel, err := filepath.Rel(root, full)
-			if err != nil {
-				continue
-			}
-			depth := strings.Count(rel, string(filepath.Separator))
-
-			st, err := os.Stat(full)
-			if err != nil {
-				continue
-			}
-			if st.IsDir() {
-				if _, skip := skipDirNames[name]; skip {
-					continue
-				}
-				if depth >= maxD {
-					continue
-				}
-				if err := walk(full); err != nil {
-					return err
-				}
-				continue
-			}
-
-			if depth > maxD {
-				continue
-			}
-			if !strings.EqualFold(filepath.Ext(full), ".safetensors") {
-				continue
-			}
-
-			out[filepath.Clean(dir)] = struct{}{}
-		}
+		out[filepath.Clean(parentDir)] = struct{}{}
 		return nil
-	}
-	return walk(root)
+	})
 }
 
 // tryVLLMModelDir builds a [ModelFile] if dir contains config.json and at least one
@@ -133,7 +96,7 @@ func tryVLLMModelDir(dir string) (ModelFile, bool) {
 		Name:       FormatVLLMModelName(dir),
 		Size:       totalSize,
 		ModTime:    latest,
-		Parameters: hfConfigSummary(dir),
+		Parameters: hfParamsSummary(dir),
 	}, true
 }
 

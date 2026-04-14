@@ -121,27 +121,38 @@ func (m Model) fitThemeToastInline(maxW int) string {
 	return ""
 }
 
+// joinLeftAndToast renders left (already styled) plus an optional theme toast on one line.
+func (m Model) joinLeftAndToast(innerW int, leftRendered string) string {
+	lw := lipgloss.Width(leftRendered)
+	if lw >= innerW {
+		return leftRendered
+	}
+	toast := m.fitThemeToastInline(innerW - lw)
+	if toast == "" {
+		return leftRendered
+	}
+	gap := innerW - lw - lipgloss.Width(toast)
+	if gap < 1 {
+		gap = 1
+	}
+	return lipgloss.JoinHorizontal(lipgloss.Top, leftRendered, strings.Repeat(" ", gap), toast)
+}
+
 // appTitleBlock renders the app title with an optional same-row theme toast
 // (right-aligned), using the same vertical space as styles.title.
 func (m Model) appTitleBlock(innerW int) string {
 	if m.themeToast == "" {
 		return m.styles.title.Render(appTitle)
 	}
-	left := lipgloss.NewStyle().Bold(true).Foreground(m.theme.Title).Render(appTitle)
-	lw := lipgloss.Width(left)
-	if lw >= innerW {
+	left := m.styles.titleBoldLeft.Render(appTitle)
+	if lipgloss.Width(left) >= innerW {
 		return m.styles.title.Render(appTitle)
 	}
-	toast := m.fitThemeToastInline(innerW - lw)
-	if toast == "" {
+	line := m.joinLeftAndToast(innerW, left)
+	if line == left {
 		return m.styles.title.Render(appTitle)
 	}
-	gap := innerW - lw - lipgloss.Width(toast)
-	if gap < 1 {
-		gap = 1
-	}
-	line := lipgloss.JoinHorizontal(lipgloss.Top, left, strings.Repeat(" ", gap), toast)
-	return lipgloss.NewStyle().MarginBottom(1).Render(line)
+	return m.styles.titleToastRowWrap.Render(line)
 }
 
 // modalTitleRow renders a one-line modal title with an optional same-row theme toast.
@@ -150,19 +161,7 @@ func (m Model) modalTitleRow(innerW int, titleStyle lipgloss.Style, plain string
 		return titleStyle.Render(plain)
 	}
 	left := titleStyle.Render(plain)
-	lw := lipgloss.Width(left)
-	if lw >= innerW {
-		return left
-	}
-	toast := m.fitThemeToastInline(innerW - lw)
-	if toast == "" {
-		return left
-	}
-	gap := innerW - lw - lipgloss.Width(toast)
-	if gap < 1 {
-		gap = 1
-	}
-	return lipgloss.JoinHorizontal(lipgloss.Top, left, strings.Repeat(" ", gap), toast)
+	return m.joinLeftAndToast(innerW, left)
 }
 
 // View implements tea.Model.

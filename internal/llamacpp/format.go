@@ -40,13 +40,13 @@ func FormatRuntimeLabel(b ModelBackend) string {
 }
 
 // FormatPathDisplay shortens the user home directory prefix to ~/ for TUI display only.
-// The original path should be kept for programmatic use (open, copy, compare).
-func FormatPathDisplay(absPath string) string {
-	home, err := os.UserHomeDir()
-	if err != nil {
+// Pass homeDir from [os.UserHomeDir] (or tests). If homeDir is empty, the path is returned
+// unchanged (no tilde shortening). The original path should be kept for programmatic use.
+func FormatPathDisplay(absPath string, homeDir string) string {
+	if homeDir == "" {
 		return absPath
 	}
-	home = filepath.Clean(home)
+	home := filepath.Clean(homeDir)
 	p := filepath.Clean(absPath)
 	rel, err := filepath.Rel(home, p)
 	if err != nil {
@@ -90,8 +90,8 @@ func FormatVLLMModelName(absDir string) string {
 // FormatModelFolderDisplay returns a display path for the "model folder": for Hugging Face hub
 // layouts it stops at the models--* repo directory (omits snapshots/<revision>/). For a GGUF file
 // it uses the parent directory of the file; for a directory path (safetensors / vLLM rows) it
-// uses that path directly.
-func FormatModelFolderDisplay(filePath string) string {
+// uses that path directly. homeDir is passed to [FormatPathDisplay].
+func FormatModelFolderDisplay(filePath string, homeDir string) string {
 	clean := filepath.Clean(filePath)
 	var parent string
 	if st, err := os.Stat(clean); err == nil && st.IsDir() {
@@ -102,7 +102,7 @@ func FormatModelFolderDisplay(filePath string) string {
 	dir := parent
 	for {
 		if strings.HasPrefix(filepath.Base(dir), hfHubRepoDirPrefix) {
-			return FormatPathDisplay(dir)
+			return FormatPathDisplay(dir, homeDir)
 		}
 		up := filepath.Dir(dir)
 		if up == dir {
@@ -110,7 +110,7 @@ func FormatModelFolderDisplay(filePath string) string {
 		}
 		dir = up
 	}
-	return FormatPathDisplay(parent)
+	return FormatPathDisplay(parent, homeDir)
 }
 
 // FormatModTime renders local filesystem modification time (not inference "last run").
