@@ -57,13 +57,13 @@ type KeyMap struct {
 
 // ShortHelp implements the KeyMap interface.
 func (km KeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{km.LineUp, km.LineDown}
+	return []key.Binding{km.LineUp}
 }
 
 // FullHelp implements the KeyMap interface.
 func (km KeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
-		{km.LineUp, km.LineDown, km.GotoTop, km.GotoBottom},
+		{km.LineUp, km.GotoTop, km.GotoBottom},
 		{km.PageUp, km.PageDown, km.HalfPageUp, km.HalfPageDown},
 	}
 }
@@ -74,11 +74,11 @@ func DefaultKeyMap() KeyMap {
 	return KeyMap{
 		LineUp: key.NewBinding(
 			key.WithKeys("up", "k"),
-			key.WithHelp("↑/k", "up"),
+			key.WithHelp("hjkl", "nav"),
 		),
 		LineDown: key.NewBinding(
 			key.WithKeys("down", "j"),
-			key.WithHelp("↓/j", "down"),
+			key.WithHelp("hjkl", "nav"),
 		),
 		PageUp: key.NewBinding(
 			key.WithKeys("b", "pgup"),
@@ -311,10 +311,9 @@ func (m Model) Columns() []Column {
 // SetRows sets a new rows state.
 func (m *Model) SetRows(r []Row) {
 	m.rows = r
-
-	if m.cursor > len(m.rows)-1 {
-		m.cursor = len(m.rows) - 1
-	}
+	// With 0 rows, clamp(..., 0, -1) yields -1 (no selection). After rows appear,
+	// a stale -1 from the empty state becomes 0 (first row selected).
+	m.cursor = clamp(m.cursor, 0, len(m.rows)-1)
 
 	m.UpdateViewport()
 }
