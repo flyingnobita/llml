@@ -93,12 +93,14 @@ const (
 	FooterSplitTabToTable = "tab: model table"
 	FooterSplitTabToLog   = "tab: server log"
 	FooterSplitStopServer = "esc/q: stop server"
+	// Server log pane focused: viewport keys (see charm.land/bubbles/v2/viewport DefaultKeyMap).
+	FooterSplitLogScroll = "j/k/↑↓/f/pgdn: scroll log · ←/→/h/l: wide log"
 
 	// Runtime config modal.
 	FooterRuntimeConfigHints = "tab: next · shift+tab: prev · enter: save · esc: cancel"
 
 	// Parameters modal (per-key fragments, then full footers composed with [FooterHintSep]).
-	FooterParamTabSections = "tab: sections"
+	FooterParamTabSections = "tab/shift+tab: sections"
 	FooterParamConfirmYN   = "y: yes · n: no"
 
 	// Alphabetical by name; footer lines use the same middle action order where modes
@@ -111,9 +113,12 @@ const (
 	FooterParamHintRename    = "r: rename"
 
 	FooterParamFooterProfiles = FooterParamTabSections + FooterHintSep + FooterNavHint + FooterHintSep +
+		FooterHintToggleTheme + FooterHintSep +
 		FooterParamHintNew + FooterHintSep + FooterParamHintDelete + FooterHintSep + FooterParamHintRename + FooterHintSep + FooterParamHintBack
 	FooterParamFooterDetailEmpty = FooterParamTabSections + FooterHintSep + FooterNavHint + FooterHintSep +
+		FooterHintToggleTheme + FooterHintSep +
 		FooterParamHintAddRow + FooterHintSep + FooterParamHintDelete + FooterHintSep + FooterParamHintBack
 	FooterParamFooterDetailRows = FooterParamTabSections + FooterHintSep + FooterNavHint + FooterHintSep +
+		FooterHintToggleTheme + FooterHintSep +
 		FooterParamHintAddRow + FooterHintSep + FooterParamHintDelete + FooterHintSep + FooterParamHintEnterEdit + FooterHintSep + FooterParamHintBack
 )

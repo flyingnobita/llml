@@ -84,13 +84,22 @@ func footerHelpLine(m Model) string {
 		if m.splitLogFocused {
 			return fmt.Sprintf(
 				"%s · %s · %s · %d×%d",
-				FooterSplitTabToTable, FooterSplitStopServer, FooterNavHint, m.width, m.height,
+				FooterSplitTabToTable, FooterSplitStopServer, FooterSplitLogScroll, m.width, m.height,
 			)
 		}
-		return fmt.Sprintf(
-			"%s · %s · %s · %d×%d",
-			FooterSplitTabToLog, FooterSplitStopServer, FooterNavHint, m.width, m.height,
-		)
+		// Table focused: same global shortcuts as the idle view except run (R / ctrl+R) while a server is up.
+		parts := []string{
+			FooterHintRefresh,
+			FooterHintConfigPort,
+			FooterHintParameters,
+			FooterHintToggleTheme,
+			FooterHintCopyPath,
+			FooterNavHint,
+			FooterSplitTabToLog,
+			FooterSplitStopServer,
+			fmt.Sprintf("%d×%d", m.width, m.height),
+		}
+		return strings.Join(parts, FooterHintSep)
 	}
 	parts := []string{
 		FooterHintRefresh,
