@@ -3,7 +3,7 @@ package tui
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 func TestParamPanelDeleteConfirm(t *testing.T) {
@@ -15,7 +15,7 @@ func TestParamPanelDeleteConfirm(t *testing.T) {
 	m.paramProfiles = []ParameterProfile{{Name: "a"}, {Name: "b"}}
 	m.paramProfileIndex = 0
 
-	m, _ = m.updateParamPanelKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	m, _ = m.updateParamPanelKey(tea.KeyPressMsg{Code: 'd', Text: "d"})
 	if m.paramConfirmDelete != paramConfirmProfile {
 		t.Fatal("expected confirm dialog after d with 2+ profiles")
 	}
@@ -23,14 +23,14 @@ func TestParamPanelDeleteConfirm(t *testing.T) {
 		t.Fatal("delete must not run before confirmation")
 	}
 
-	m, _ = m.updateParamPanelKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+	m, _ = m.updateParamPanelKey(tea.KeyPressMsg{Code: 'n', Text: "n"})
 	if m.paramConfirmDelete != paramConfirmNone {
 		t.Fatal("n should dismiss confirm dialog")
 	}
 
 	m.paramProfiles = []ParameterProfile{{Name: "only"}}
 	m.paramConfirmDelete = paramConfirmNone
-	m, _ = m.updateParamPanelKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	m, _ = m.updateParamPanelKey(tea.KeyPressMsg{Code: 'd', Text: "d"})
 	if m.paramConfirmDelete != paramConfirmNone {
 		t.Fatal("no confirm when only one profile")
 	}
@@ -47,14 +47,14 @@ func TestParamPanelDeleteEnvRowConfirm(t *testing.T) {
 	m.paramEnv = []EnvVar{{Key: "K", Value: "V"}}
 	m.paramEnvCursor = 0
 
-	m, _ = m.updateParamPanelKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	m, _ = m.updateParamPanelKey(tea.KeyPressMsg{Code: 'd', Text: "d"})
 	if m.paramConfirmDelete != paramConfirmEnvRow {
 		t.Fatalf("expected env row confirm, got %d", m.paramConfirmDelete)
 	}
 	if len(m.paramEnv) != 1 {
 		t.Fatal("row not deleted yet")
 	}
-	m, _ = m.updateParamPanelKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+	m, _ = m.updateParamPanelKey(tea.KeyPressMsg{Code: 'n', Text: "n"})
 	if m.paramConfirmDelete != paramConfirmNone {
 		t.Fatal("n should dismiss confirm")
 	}

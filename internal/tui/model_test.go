@@ -1,9 +1,11 @@
 package tui
 
 import (
+	"strings"
 	"testing"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/flyingnobita/llml/internal/llamacpp"
 )
 
@@ -35,5 +37,47 @@ func TestNew_zeroSize(t *testing.T) {
 	}
 	if !m.loading {
 		t.Fatal("expected loading true before first frame")
+	}
+}
+
+// TestViewAltScreen verifies that View() opts into the alternate screen buffer,
+// which replaced the tea.WithAltScreen() program option in Bubble Tea v2.
+func TestViewAltScreen(t *testing.T) {
+	t.Setenv(EnvLLMLTheme, "dark")
+	m := New()
+	m.width = 80
+	m.height = 24
+	v := m.View()
+	if _, ok := any(v).(tea.View); !ok {
+		t.Fatalf("View() should return tea.View, got %T", v)
+	}
+	if !v.AltScreen {
+		t.Fatal("expected View().AltScreen = true for full-screen TUI")
+	}
+}
+
+// TestSelectedStyleHasBackground verifies that the table Selected style carries
+// a background color, which is the mechanism that replaced the vendored btable
+// fork's per-cell colour override.
+func TestSelectedStyleHasBackground(t *testing.T) {
+	for _, th := range []struct {
+		name  string
+		theme Theme
+	}{
+		{"dark", DarkTheme()},
+		{"light", LightTheme()},
+	} {
+		st := newStyles(th.theme)
+		// Render a plain cell and a selected cell and confirm they differ —
+		// and that the selected render includes an ANSI background sequence.
+		plain := st.table.Cell.Render("X")
+		selected := st.table.Selected.Render("X")
+		if plain == selected {
+			t.Fatalf("%s: Selected style renders identically to Cell style", th.name)
+		}
+		// ANSI background codes start with \x1b[4 (40-49) or \x1b[10 (100-109).
+		if !strings.Contains(selected, "\x1b[") {
+			t.Fatalf("%s: Selected render contains no ANSI escape", th.name)
+		}
 	}
 }

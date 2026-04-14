@@ -75,6 +75,26 @@ func TestDarkAndLightThemesDistinct(t *testing.T) {
 	if d.TableSelected == l.TableSelected {
 		t.Fatal("expected TableSelected colors to differ")
 	}
+	if d.TableSelectedBg == l.TableSelectedBg {
+		t.Fatal("expected TableSelectedBg colors to differ between themes")
+	}
+}
+
+func TestThemesHaveTableSelectedBackground(t *testing.T) {
+	for _, th := range []struct {
+		name  string
+		theme Theme
+	}{
+		{"dark", DarkTheme()},
+		{"light", LightTheme()},
+	} {
+		if th.theme.TableSelectedBg == nil {
+			t.Fatalf("%s theme: TableSelectedBg must not be nil", th.name)
+		}
+		if th.theme.TableSelected == nil {
+			t.Fatalf("%s theme: TableSelected must not be nil", th.name)
+		}
+	}
 }
 
 func TestNewModelHasThemedStyles(t *testing.T) {
