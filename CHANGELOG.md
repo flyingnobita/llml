@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
+- Apr-14, 2026 - [TUI: theme toast as right-aligned reverse chip on the title row (~2s) instead of a full-width banner so layout does not shift]
+- Apr-14, 2026 - [TUI: table height from terminal chrome (`mainChromeLines`) so Bubble Tea does not clip title when models load]
+- Apr-14, 2026 - [TUI: main view vertically top-aligned so title/subtitle stay visible; modals stay centered]
+- Apr-14, 2026 - [TUI: theme toast — top-pinned full-width reverse bar (no rounded border); main view below]
+- Apr-14, 2026 - [TUI: theme toast banner (~2s) after `t`; layout reserve while visible]
+- Apr-14, 2026 - [TUI: `t` cycles theme (dark/light/auto); README]
+- Apr-14, 2026 - [TUI theming: `LLML_THEME` (`dark` / `light` / `auto`); palettes in theme.go; styles from newStyles; README/AGENTS]
 - Apr-14, 2026 - [GoReleaser + GitHub Actions release workflow for `v*` tags; pre-built archives (Linux/macOS/Windows); README install from releases; AGENTS]
 - Apr-14, 2026 - [Parameter profiles (`p`): named env+argv sets in UserConfigDir/llml/model-params.json; active profile for `R`; `--flag value` line split; TUI merges flag+value rows on load; minimal quoting in echoed command; README/AGENTS]
 - Apr-14, 2026 - [After `R`: pause reads from `/dev/tty` when stdin breaks after vLLM (EIO)]

@@ -78,14 +78,15 @@ Place models under default scan locations (see [How it finds models](#how-it-fin
 
 ## Usage
 
-| Key                | Action                                                       |
-| ------------------ | ------------------------------------------------------------ |
-| `↑` `↓` or `j` `k` | Move selection                                               |
-| `r`                | Rescan filesystem                                            |
-| **`R`**            | Run server for selected row (`llama-server` or `vllm serve`) |
-| `c`                | Edit runtime environment (paths, ports)                      |
-| `p`                | Edit parameter profiles for the selected model               |
-| `q` or `Ctrl+C`    | Quit                                                         |
+| Key                       | Action                                                                            |
+| ------------------------- | --------------------------------------------------------------------------------- |
+| `↑` `↓` `←` `→` or `hjkl` | Move selection; horizontal scroll when the path column is wider than the terminal |
+| `r`                       | Rescan filesystem                                                                 |
+| **`R`**                   | Run server for selected row (`llama-server` or `vllm serve`)                      |
+| `c`                       | Edit runtime environment (paths, ports)                                           |
+| `p`                       | Edit parameter profiles for the selected model                                    |
+| `t`                       | Cycle theme (`dark` → `light` → `auto` → …)                                       |
+| `q`                       | Quit                                                                              |
 
 ### Server output
 
@@ -100,7 +101,7 @@ Each model path can have **multiple named profiles**. Each profile stores:
 - **Environment variables** (`KEY=value` per line).
 - **Extra arguments** appended after `--port` (for vLLM, flags and values are separate argv tokens; the UI may show `--flag value` on one line).
 
-**`R`** uses the **active** profile (the one highlighted when you save with `s` in the `p` panel). **tab** cycles: profile list → env → extra args. In the list: **`n`** new profile, **`d`** delete (not the last), **Enter** rename.
+**`R`** uses the **active** profile (the one highlighted in the `p` panel; changes persist automatically). **tab** cycles: profile list → env → extra args. In the list: **`n`** new profile, **`d`** delete (not the last), **`r`** rename. **esc** or **q** closes the panel (**q** on the main screen still quits the app).
 
 Storage is a single JSON file (not environment variables):
 
@@ -128,13 +129,14 @@ export LLM_LAUNCH_LLAMACPP_PATHS="/data/models,/opt/weights"
 
 ### Ports and paths (runtime)
 
-| Variable            | Default   | Role                                                                       |
-| ------------------- | --------- | -------------------------------------------------------------------------- |
-| `LLAMA_CPP_PATH`    | _(unset)_ | Directory containing `llama-cli` / `llama-server` (checked before `PATH`)  |
-| `VLLM_PATH`         | _(unset)_ | Directory where `vllm` or `.venv/bin/vllm` may live                        |
-| `VLLM_VENV`         | _(unset)_ | Python venv root; on Unix, **`R`** may `source bin/activate` before `vllm` |
-| `LLAMA_SERVER_PORT` | `8080`    | Port for `llama-server` and `/health` probe                                |
-| `VLLM_SERVER_PORT`  | `8000`    | Port for `vllm serve`                                                      |
+| Variable            | Default   | Role                                                                        |
+| ------------------- | --------- | --------------------------------------------------------------------------- |
+| `LLAMA_CPP_PATH`    | _(unset)_ | Directory containing `llama-cli` / `llama-server` (checked before `PATH`)   |
+| `VLLM_PATH`         | _(unset)_ | Directory where `vllm` or `.venv/bin/vllm` may live                         |
+| `VLLM_VENV`         | _(unset)_ | Python venv root; on Unix, **`R`** may `source bin/activate` before `vllm`  |
+| `LLAMA_SERVER_PORT` | `8080`    | Port for `llama-server` and `/health` probe                                 |
+| `VLLM_SERVER_PORT`  | `8000`    | Port for `vllm serve`                                                       |
+| `LLML_THEME`        | `auto`    | Initial TUI palette; **`t`** cycles `dark` → `light` → `auto` while running |
 
 Set these in your shell, or under `[env]` in `mise.toml` for local development.
 

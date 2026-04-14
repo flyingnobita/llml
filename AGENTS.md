@@ -46,24 +46,26 @@ scripts/             # gofmt-check.sh, precommit-docs-fix.sh
 - `Model` in `model.go` holds all state. `New()` returns an initialized model.
 - `Init()`, `Update()`, `View()` implement `tea.Model`.
 - Messages are defined in `messages.go`; commands in `cmd.go`.
-- Layout recalculation lives in `layoutTable()` on `Model`.
-- Styles are centralized in `styles.go`. Do not call `lipgloss.NewStyle()` inline
-  inside `View()` — add named vars to `styles.go` instead.
+- Layout recalculation lives in `layoutTable()` on `Model`. Table row height is chosen so the full `View()` fits the terminal (Bubble Tea otherwise keeps only the **bottom** lines and clips the header).
+- Theme palettes live in `theme.go` (`DarkTheme`, `LightTheme`; startup via `LLML_THEME`, runtime cycle with **`t`**: dark → light → auto). The transient confirmation is a **compact chip on the title row** (not an extra banner line) so the layout does not jump.
+  Lip Gloss styles are built in `styles.go` via `newStyles`. Do not call `lipgloss.NewStyle()` inline
+  inside `View()` — extend `Theme` / `newStyles` instead.
 - Magic numbers belong in `constants.go` (package `tui`).
 
 ### Configuration
 
 **Runtime** config is **environment-variable-driven** (no `config.toml` at runtime):
 
-| Variable                            | Purpose                                                                    |
-| ----------------------------------- | -------------------------------------------------------------------------- |
-| `LLAMA_CPP_PATH`                    | Directory containing `llama-cli`/`llama-server`                            |
-| `VLLM_PATH`                         | Directory containing the `vllm` executable                                 |
-| `VLLM_VENV`                         | Optional Python venv root; `R` sources `bin/activate` before `vllm` (Unix) |
-| `LLAMA_SERVER_PORT`                 | TCP port for `llama-server` and `/health` probe (default 8080)             |
-| `VLLM_SERVER_PORT`                  | TCP port for `vllm serve` (default 8000)                                   |
-| `LLM_LAUNCH_LLAMACPP_PATHS`         | Extra model search roots (comma-separated)                                 |
-| `HUGGINGFACE_HUB_CACHE` / `HF_HOME` | Hugging Face hub cache location                                            |
+| Variable                            | Purpose                                                                                                        |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `LLAMA_CPP_PATH`                    | Directory containing `llama-cli`/`llama-server`                                                                |
+| `VLLM_PATH`                         | Directory containing the `vllm` executable                                                                     |
+| `VLLM_VENV`                         | Optional Python venv root; `R` sources `bin/activate` before `vllm` (Unix)                                     |
+| `LLAMA_SERVER_PORT`                 | TCP port for `llama-server` and `/health` probe (default 8080)                                                 |
+| `VLLM_SERVER_PORT`                  | TCP port for `vllm serve` (default 8000)                                                                       |
+| `LLM_LAUNCH_LLAMACPP_PATHS`         | Extra model search roots (comma-separated)                                                                     |
+| `HUGGINGFACE_HUB_CACHE` / `HF_HOME` | Hugging Face hub cache location                                                                                |
+| `LLML_THEME`                        | Initial TUI palette (`dark` / `light` / `auto`); **`t`** cycles while running (not in runtime `c` text fields) |
 
 **Parameter profiles** (per-model extra env + argv for `llama-server` / `vllm`, edited with **`p`**) are **not** env vars: they are stored in **`{UserConfigDir}/llml/model-params.json`** (see `internal/tui/model_params.go`). Keys are cleaned model paths; each entry has named profiles and `activeIndex` for which profile **`R`** uses.
 
