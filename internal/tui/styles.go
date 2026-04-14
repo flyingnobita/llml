@@ -27,7 +27,9 @@ type styles struct {
 	serverLogViewport      lipgloss.Style
 	splitPaneChromeFocused lipgloss.Style
 	splitPaneChromeDim     lipgloss.Style
-	table                  btable.Styles
+	// launchPreview is the split-pane R invocation line below the model table.
+	launchPreview lipgloss.Style
+	table         btable.Styles
 }
 
 // newStyles builds lipgloss styles from a Theme. Header and Cell use
@@ -101,6 +103,11 @@ func newStyles(theme Theme) styles {
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(theme.SplitPaneBorderDim).
 			Padding(0, 1),
+		// Match primary body text contrast (not Footer); bold reads clearly on dark backgrounds.
+		launchPreview: lipgloss.NewStyle().
+			Foreground(theme.Body).
+			Bold(true).
+			MarginTop(1),
 		table: btable.Styles{
 			Header: lipgloss.NewStyle().
 				Bold(true).

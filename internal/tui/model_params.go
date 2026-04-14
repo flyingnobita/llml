@@ -191,6 +191,28 @@ func normalizeModelEntry(ent modelEntry) modelEntry {
 	return modelEntry{Profiles: profiles, ActiveIndex: idx}
 }
 
+// modelParamsForLaunchPreview returns env/argv for the launch preview line: the active profile
+// from disk, or the in-memory parameters panel state when it is open for the selected model path.
+func modelParamsForLaunchPreview(m Model) (ModelParams, bool) {
+	sel, _ := m.SelectedModel()
+	if sel == "" {
+		return ModelParams{}, false
+	}
+	if m.paramPanelOpen {
+		if filepath.Clean(m.paramModelPath) == filepath.Clean(sel) {
+			return normalizeModelParams(ModelParams{
+				Env:  append([]EnvVar(nil), m.paramEnv...),
+				Args: flattenArgLines(m.paramArgs),
+			}), true
+		}
+	}
+	p, err := loadModelParamsForRun(sel)
+	if err != nil {
+		return ModelParams{}, false
+	}
+	return p, true
+}
+
 // loadModelParamsForRun returns the active parameter profile's env/args for modelPath (for R / server launch).
 func loadModelParamsForRun(modelPath string) (ModelParams, error) {
 	ent, err := loadModelEntry(modelPath)

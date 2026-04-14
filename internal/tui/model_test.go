@@ -24,9 +24,8 @@ func TestLayoutTable_wideTerminalFitsViewport(t *testing.T) {
 	}
 	m.loading = false
 	m = m.layoutTable()
-	innerW := m.bodyInnerW
-	if m.tableLineWidth > innerW {
-		t.Fatalf("table line width %d > inner width %d (spurious horizontal scroll)", m.tableLineWidth, innerW)
+	if m.tableNeedsHScroll {
+		t.Fatalf("table should not need horizontal scroll bar on wide terminal (min width fits inner body)")
 	}
 }
 

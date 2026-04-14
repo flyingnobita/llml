@@ -1,8 +1,12 @@
 package tui
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
+
+	btable "charm.land/bubbles/v2/table"
+	"github.com/flyingnobita/llml/internal/llamacpp"
 )
 
 func TestShellSingleQuoted(t *testing.T) {
@@ -40,6 +44,80 @@ func TestFormatVLLMServerInvocation(t *testing.T) {
 	want2 := "+ . '/proj/.venv/bin/activate' && '/bin/vllm' serve '/m/hf-model' --port 9090"
 	if got2 != want2 {
 		t.Fatalf("got %q want %q", got2, want2)
+	}
+}
+
+func TestSplitServerInvocationEcho_matchesLlamaSplitLogLine(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv(llamacpp.EnvLlamaServerPort, "9090")
+	modelPath := filepath.Join(dir, "a.gguf")
+	m := New()
+	m.loading = false
+	m.loadErr = nil
+	m.files = []llamacpp.ModelFile{
+		{Backend: llamacpp.BackendLlama, Path: modelPath, Name: "a", Size: 1},
+	}
+	m.runtime = llamacpp.RuntimeInfo{LlamaServerPath: "/bin/llama-server"}
+	m.tbl.SetRows([]btable.Row{{"a", "llama.cpp", "1 B", "", modelPath}})
+	m.tbl.SetCursor(0)
+
+	p := ModelParams{
+		Env:  []EnvVar{{Key: "FOO", Value: "bar"}},
+		Args: []string{"--n-gpu-layers", "99"},
+	}
+	want := formatLlamaServerInvocation("/bin/llama-server", modelPath, 9090, p)
+	ent := modelEntry{
+		Profiles: []ParameterProfile{
+			{Name: "default", Env: p.Env, Args: p.Args},
+		},
+		ActiveIndex: 0,
+	}
+	if err := saveModelEntry(modelPath, ent); err != nil {
+		t.Fatal(err)
+	}
+
+	got := splitServerInvocationEcho(m)
+	if got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+
+	wantPreview := llamaCommandLine("/bin/llama-server", modelPath, 9090, p)
+	if g := launchPreviewCommandLine(m); g != wantPreview {
+		t.Fatalf("launchPreviewCommandLine got %q want %q", g, wantPreview)
+	}
+}
+
+func TestLaunchPreviewCommandLine_vllmOmitsActivateWrapper(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv(llamacpp.EnvVLLMServerPort, "8000")
+	modelPath := filepath.Join(dir, "hf-model")
+	m := New()
+	m.loading = false
+	m.loadErr = nil
+	m.files = []llamacpp.ModelFile{
+		{Backend: llamacpp.BackendVLLM, Path: modelPath, Name: "m", Size: 1},
+	}
+	m.runtime = llamacpp.RuntimeInfo{VLLMPath: "/proj/.venv/bin/vllm"}
+	m.tbl.SetRows([]btable.Row{{"m", "vllm", "1 B", "", modelPath}})
+	m.tbl.SetCursor(0)
+
+	p := ModelParams{Env: []EnvVar{{Key: "CUDA_VISIBLE_DEVICES", Value: "0"}}}
+	if err := saveModelEntry(modelPath, modelEntry{
+		Profiles:    []ParameterProfile{{Name: "default", Env: p.Env, Args: nil}},
+		ActiveIndex: 0,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	want := vllmCommandLine("/proj/.venv/bin/vllm", modelPath, 8000, p)
+	g := launchPreviewCommandLine(m)
+	if g != want {
+		t.Fatalf("got %q want %q", g, want)
+	}
+	if strings.HasPrefix(strings.TrimSpace(g), ".") {
+		t.Fatalf("preview should not start with venv dot-source: %q", g)
 	}
 }
 

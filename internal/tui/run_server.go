@@ -52,6 +52,65 @@ func formatVLLMServerInvocation(bin, modelDir string, port int, activateScript s
 	return "+ " + line
 }
 
+// splitServerInvocationEcho returns the same string as the first line written to the split-pane
+// log when R is pressed (the "+ ..." echo). It uses the selected row, active parameter profile,
+// and [llamacpp.RuntimeInfo] the same way as [runLlamaServerSplitCmd] / [runVLLMServerSplitCmd].
+func splitServerInvocationEcho(m Model) string {
+	modelPath, be := m.SelectedModel()
+	if modelPath == "" {
+		return ""
+	}
+	params, ok := modelParamsForLaunchPreview(m)
+	if !ok {
+		return ""
+	}
+	rt := m.runtime
+	switch be {
+	case llamacpp.BackendVLLM:
+		bin := llamacpp.ResolveVLLMPath(rt)
+		activate := llamacpp.ResolveVLLMActivateScript(bin)
+		if bin == "" {
+			bin = "vllm"
+		}
+		return formatVLLMServerInvocation(bin, modelPath, llamacpp.VLLMPort(), activate, params)
+	default:
+		bin := llamacpp.ResolveLlamaServerPath(rt)
+		if bin == "" {
+			bin = "llama-server"
+		}
+		return formatLlamaServerInvocation(bin, modelPath, llamacpp.ListenPort(), params)
+	}
+}
+
+// launchPreviewCommandLine returns the shell form of the server command (env prefix + binary +
+// args) for the table preview: same tokens as the split-pane subprocess, but without the "+ "
+// log marker or the ". /path/activate &&" venv wrapper used when launching vLLM.
+func launchPreviewCommandLine(m Model) string {
+	modelPath, be := m.SelectedModel()
+	if modelPath == "" {
+		return ""
+	}
+	params, ok := modelParamsForLaunchPreview(m)
+	if !ok {
+		return ""
+	}
+	rt := m.runtime
+	switch be {
+	case llamacpp.BackendVLLM:
+		bin := llamacpp.ResolveVLLMPath(rt)
+		if bin == "" {
+			bin = "vllm"
+		}
+		return vllmCommandLine(bin, modelPath, llamacpp.VLLMPort(), params)
+	default:
+		bin := llamacpp.ResolveLlamaServerPath(rt)
+		if bin == "" {
+			bin = "llama-server"
+		}
+		return llamaCommandLine(bin, modelPath, llamacpp.ListenPort(), params)
+	}
+}
+
 // unixLlamaServerScript echoes the invocation, runs llama-server, then waits for Enter so logs stay readable before the TUI redraws.
 func unixLlamaServerScript(bin, modelPath string, port int, params ModelParams) string {
 	inv := formatLlamaServerInvocation(bin, modelPath, port, params)

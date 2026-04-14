@@ -17,6 +17,8 @@ type KeyMap struct {
 	ConfigPort  key.Binding
 	Parameters  key.Binding
 	ToggleTheme key.Binding
+	SortColumn  key.Binding
+	SortReverse key.Binding
 }
 
 // runServerKeyMode returns 1 for split-pane run (R), 2 for fullscreen [tea.ExecProcess] (ctrl+r),
@@ -82,17 +84,25 @@ func DefaultKeyMap() KeyMap {
 			key.WithKeys(FooterKeyToggleTheme),
 			key.WithHelp(FooterKeyToggleTheme, FooterDescToggleTheme),
 		),
+		SortColumn: key.NewBinding(
+			key.WithKeys(FooterKeySortColumn),
+			key.WithHelp(FooterKeySortColumn, FooterDescSortColumn),
+		),
+		SortReverse: key.NewBinding(
+			key.WithKeys(FooterKeySortReverse),
+			key.WithHelp(FooterKeySortReverse, FooterDescSortReverse),
+		),
 	}
 }
 
 // ShortHelp satisfies key.KeyMap (optional; use for help overlay later).
 func (k KeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Refresh, k.RunServer, k.ConfigPort, k.Parameters, k.ToggleTheme, k.Nav, k.Quit}
+	return []key.Binding{k.Refresh, k.RunServer, k.ConfigPort, k.Parameters, k.SortColumn, k.SortReverse, k.ToggleTheme, k.Nav, k.Quit}
 }
 
 // FullHelp satisfies key.KeyMap.
 func (k KeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
-		{k.Refresh, k.RunServer, k.ConfigPort, k.Parameters, k.ToggleTheme, k.Quit},
+		{k.Refresh, k.RunServer, k.ConfigPort, k.Parameters, k.SortColumn, k.SortReverse, k.ToggleTheme, k.Quit},
 	}
 }

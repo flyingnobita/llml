@@ -55,6 +55,38 @@ func verticalScrollBarColumn(pct float64, trackH int) string {
 	return b.String()
 }
 
+// launchPreviewVisible is true when the main table lists models and a launch preview can be shown.
+func launchPreviewVisible(m Model) bool {
+	if m.loading || m.loadErr != nil || len(m.files) == 0 {
+		return false
+	}
+	return true
+}
+
+// launchPreviewStyled renders the server command (wrapped to innerW) or "".
+func (m Model) launchPreviewStyled(innerW int) string {
+	if !launchPreviewVisible(m) {
+		return ""
+	}
+	line := launchPreviewCommandLine(m)
+	if line == "" {
+		return ""
+	}
+	if innerW < 8 {
+		innerW = 8
+	}
+	return m.styles.launchPreview.Width(innerW).Render(line)
+}
+
+// launchPreviewLineCount returns the rendered height of the launch preview, or 0.
+func (m Model) launchPreviewLineCount(innerW int) int {
+	s := m.launchPreviewStyled(innerW)
+	if s == "" {
+		return 0
+	}
+	return lipgloss.Height(s)
+}
+
 // runtimePanelView renders the bottom runtime env summary (env var = value per line).
 func runtimePanelView(m Model, contentWidth int) string {
 	if m.width == 0 {
@@ -92,6 +124,7 @@ func footerHelpLine(m Model) string {
 			FooterHintRefresh,
 			FooterHintConfigPort,
 			FooterHintParameters,
+			FooterHintSort,
 			FooterHintToggleTheme,
 			FooterHintCopyPath,
 			FooterNavHint,
@@ -107,6 +140,7 @@ func footerHelpLine(m Model) string {
 		FooterHintRunFullscreen,
 		FooterHintConfigPort,
 		FooterHintParameters,
+		FooterHintSort,
 		FooterHintToggleTheme,
 		FooterHintQuit,
 		FooterNavHint,
@@ -263,13 +297,24 @@ func (m Model) mainAppPlacedView() string {
 		}
 		m.hscroll.SetWidth(iw)
 		m.hscroll.SetHeight(th)
+		preview := m.launchPreviewStyled(iw)
+		var parts []string
+		parts = append(parts, m.hscroll.View())
+		if preview != "" {
+			parts = append(parts, preview)
+		}
 		if m.serverRunning {
 			if m.serverViewportH > 0 {
 				m.serverViewport.SetHeight(m.serverViewportH)
 			}
-			body = lipgloss.JoinVertical(lipgloss.Left, m.hscroll.View(), m.serverLogPaneView())
+			parts = append(parts, m.serverLogPaneView())
+			body = lipgloss.JoinVertical(lipgloss.Left, parts...)
 		} else {
-			body = m.hscroll.View()
+			if len(parts) == 1 {
+				body = parts[0]
+			} else {
+				body = lipgloss.JoinVertical(lipgloss.Left, parts...)
+			}
 		}
 	}
 
@@ -281,7 +326,7 @@ func (m Model) mainAppPlacedView() string {
 	}
 
 	var hBar string
-	if len(m.files) > 0 && m.tableLineWidth > 0 && m.tableLineWidth > iw {
+	if m.tableNeedsHScroll {
 		pct := m.hscroll.HorizontalScrollPercent()
 		hBar = m.styles.footer.Render(horizontalScrollBarLine(pct, iw))
 	}

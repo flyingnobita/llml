@@ -34,6 +34,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.loading = false
 		m.loadErr = nil
 		m.files = msg.files
+		sortModelFiles(m.files, m.sortCol, m.sortDesc)
 		m = m.layoutTable()
 		m.hscroll.SetXOffset(0)
 		if len(m.files) > 0 {
@@ -57,6 +58,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.serverCmd = nil
 			m.serverMsgCh = nil
 			m.serverLog = nil
+			m.serverLogAlignWidth = 0
 			m.serverViewport.SetContent("")
 			if msg.err != nil {
 				m.lastRunNote = msg.err.Error()
@@ -178,6 +180,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		}
+		if key.Matches(msg, m.keys.SortColumn) {
+			if m.loading || len(m.files) == 0 {
+				return m, nil
+			}
+			sel := m.SelectedPath()
+			m.sortCol = (m.sortCol + 1) % tableSortColCount
+			m = m.applyTableSort(sel)
+			return m, nil
+		}
+		if key.Matches(msg, m.keys.SortReverse) {
+			if m.loading || len(m.files) == 0 {
+				return m, nil
+			}
+			sel := m.SelectedPath()
+			m.sortDesc = !m.sortDesc
+			m = m.applyTableSort(sel)
+			return m, nil
+		}
 		var cmd tea.Cmd
 		m.tbl, cmd = m.tbl.Update(msg)
 		return m, cmd
@@ -237,6 +257,24 @@ func (m Model) updateServerSplitTableKeys(msg tea.KeyPressMsg) (Model, tea.Cmd) 
 		if p := m.SelectedPath(); p != "" {
 			_ = clipboard.WriteAll(p)
 		}
+		return m, nil
+	}
+	if key.Matches(msg, m.keys.SortColumn) {
+		if m.loading || len(m.files) == 0 {
+			return m, nil
+		}
+		sel := m.SelectedPath()
+		m.sortCol = (m.sortCol + 1) % tableSortColCount
+		m = m.applyTableSort(sel)
+		return m, nil
+	}
+	if key.Matches(msg, m.keys.SortReverse) {
+		if m.loading || len(m.files) == 0 {
+			return m, nil
+		}
+		sel := m.SelectedPath()
+		m.sortDesc = !m.sortDesc
+		m = m.applyTableSort(sel)
 		return m, nil
 	}
 	var cmd tea.Cmd

@@ -22,6 +22,7 @@ type Model struct {
 	bodyInnerW        int
 	tableBodyH        int
 	tableLineWidth    int
+	tableNeedsHScroll bool // true when [tableContentMinWidth] exceeds inner body width; used for chrome + View (not rendered line width, so header glyphs cannot shift layout).
 	theme             Theme
 	themePick         int
 	themeToast        string
@@ -30,6 +31,8 @@ type Model struct {
 	tbl               btable.Model
 	hscroll           viewport.Model
 	files             []llamacpp.ModelFile
+	sortCol           int  // [tableSortCol*]; default Path ascending matches [llamacpp.Discover] order
+	sortDesc          bool // false = ascending
 	runtime           llamacpp.RuntimeInfo
 	runtimeScanned    bool
 	lastRunNote       string
@@ -56,13 +59,14 @@ type Model struct {
 	homeDir string // from [os.UserHomeDir] at startup; used for path display (~/)
 
 	// Split-pane server (R): subprocess logs in lower half; see run_server.go.
-	serverRunning   bool
-	serverCmd       *exec.Cmd
-	serverMsgCh     chan tea.Msg
-	serverLog       []string
-	serverViewport  viewport.Model
-	serverViewportH int
-	splitLogFocused bool // true: keys scroll log; false: keys use model table (Tab toggles).
+	serverRunning       bool
+	serverCmd           *exec.Cmd
+	serverMsgCh         chan tea.Msg
+	serverLog           []string
+	serverLogAlignWidth int // measured prefix width for split-pane log alignment (vLLM vs tqdm)
+	serverViewport      viewport.Model
+	serverViewportH     int
+	splitLogFocused     bool // true: keys scroll log; false: keys use model table (Tab toggles).
 }
 
 // New returns a model with default key bindings and an empty table; Init triggers discovery.
@@ -72,7 +76,7 @@ func New() Model {
 	th := themeFromPick(pick, compat.HasDarkBackground)
 	st := newStyles(th)
 	t := btable.New(
-		btable.WithColumns(tableColumns(100, nil, homeDir)),
+		btable.WithColumns(tableColumns(100, nil, homeDir, defaultSortCol, false)),
 		btable.WithRows(nil),
 		btable.WithFocused(true),
 		btable.WithStyles(st.table),
@@ -89,6 +93,7 @@ func New() Model {
 		theme:          th,
 		themePick:      pick,
 		styles:         st,
+		sortCol:        defaultSortCol,
 		keys:           DefaultKeyMap(),
 		tbl:            t,
 		hscroll:        hv,
@@ -176,11 +181,15 @@ func (m Model) layoutTable() Model {
 	// Column widths must use the same budget as the table viewport (inner body
 	// width). Using full terminal width here made rows ~4 cells wider than
 	// innerW and triggered empty horizontal scrolling.
-	cols := tableColumns(innerW, m.files, m.homeDir)
+	cols := tableColumns(innerW, m.files, m.homeDir, m.sortCol, m.sortDesc)
 	m.tbl.SetColumns(cols)
 	m.tbl.SetStyles(m.styles.table)
 	minW := tableContentMinWidth(cols)
 	m.tbl.SetWidth(max(minW, innerW))
+	// Column widths do not change when only header labels (sort indicators) change; using
+	// minW keeps the horizontal scroll bar row and table body height stable. Measuring
+	// lipgloss.Width of the rendered header row can disagree with minW when glyphs differ.
+	m.tableNeedsHScroll = len(m.files) > 0 && minW > innerW
 
 	var h int
 	if m.height <= 0 {
@@ -193,18 +202,24 @@ func (m Model) layoutTable() Model {
 		if innerMax < 1 {
 			innerMax = 1
 		}
-		needsHBarGuess := len(m.files) > 0 && minW > innerW
 		needsLogHBarGuess := m.serverRunning && maxAnsiLineWidth(m.serverLog) > max(1, innerW-8)
-		static := mainChromeLines(m, needsHBarGuess, needsLogHBarGuess)
+		static := mainChromeLines(m, m.tableNeedsHScroll, needsLogHBarGuess)
 		h = innerMax - static
 		if h < 1 {
 			h = 1
 		}
 	}
 
+	previewH := m.launchPreviewLineCount(innerW)
+
 	setHeights := func(bodyH int) {
 		if m.serverRunning {
-			tableH, logH := splitServerBodyHeights(bodyH)
+			rest := bodyH - previewH
+			if rest < 2 {
+				// Need at least one line each for table and log; may exceed bodyH on tiny terminals.
+				rest = 2
+			}
+			tableH, logH := splitServerBodyHeights(rest)
 			m.tbl.SetHeight(tableH)
 			m.serverViewport.SetHeight(logH)
 			m.serverViewport.SetWidth(innerW)
@@ -213,7 +228,11 @@ func (m Model) layoutTable() Model {
 			}
 			m.serverViewportH = logH
 		} else {
-			m.tbl.SetHeight(bodyH)
+			th := bodyH - previewH
+			if th < 1 {
+				th = 1
+			}
+			m.tbl.SetHeight(th)
 			m.serverViewport.SetWidth(innerW)
 			m.serverViewport.SetHeight(1)
 			m.serverViewportH = 0
@@ -231,19 +250,17 @@ func (m Model) layoutTable() Model {
 		m.tableLineWidth = 0
 	}
 
-	// Second pass if scroll bar visibility differs from min-width estimate.
+	// Second pass only when log horizontal scroll bar visibility differs from estimate.
 	if m.height > 0 {
-		needsHBar := len(m.files) > 0 && m.tableLineWidth > 0 && m.tableLineWidth > innerW
-		needsHBarGuess := len(m.files) > 0 && minW > innerW
 		needsLogHBar := m.serverRunning && m.serverLogNeedsHorizontalScroll()
 		needsLogHBarGuess := m.serverRunning && maxAnsiLineWidth(m.serverLog) > max(1, innerW-8)
-		if needsHBar != needsHBarGuess || needsLogHBar != needsLogHBarGuess {
+		if needsLogHBar != needsLogHBarGuess {
 			appPad := m.styles.app.GetVerticalFrameSize()
 			innerMax := m.height - appPad
 			if innerMax < 1 {
 				innerMax = 1
 			}
-			static := mainChromeLines(m, needsHBar, needsLogHBar)
+			static := mainChromeLines(m, m.tableNeedsHScroll, needsLogHBar)
 			h2 := innerMax - static
 			if h2 < 1 {
 				h2 = 1
@@ -292,6 +309,9 @@ func (m Model) applySplitPaneFocusStyles() Model {
 
 // appendServerLogLine appends a log line for split-pane server output and refreshes the log viewport.
 func (m Model) appendServerLogLine(line string) Model {
+	align := m.serverLogAlignWidth
+	line = normalizeSplitServerLogLine(line, &align)
+	m.serverLogAlignWidth = align
 	m.serverLog = append(m.serverLog, line)
 	if len(m.serverLog) > maxServerLogLines {
 		m.serverLog = m.serverLog[len(m.serverLog)-maxServerLogLines:]

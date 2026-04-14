@@ -29,6 +29,13 @@ const (
 	// maxServerLogLines is the rolling cap for split-pane server log lines.
 	maxServerLogLines = 1000
 
+	// defaultServerLogAlignWidth is the pad used for unprefixed progress lines (tqdm) until a
+	// structured vLLM log line has been seen to measure the real prefix width.
+	defaultServerLogAlignWidth = 56
+
+	// serverLogAlignPadMax caps padding width to avoid runaway indentation if prefix detection misbehaves.
+	serverLogAlignPadMax = 256
+
 	// serverLogSeparatorLines is extra body rows between the table and log in split
 	// mode (0 = panes are adjacent).
 	serverLogSeparatorLines = 0
@@ -82,6 +89,17 @@ const (
 	FooterKeyCopyPath  = "enter"
 	FooterDescCopyPath = "copy path"
 	FooterHintCopyPath = FooterKeyCopyPath + ": " + FooterDescCopyPath
+
+	FooterKeySortColumn  = ","
+	FooterDescSortColumn = "sort column"
+	FooterHintSortColumn = FooterKeySortColumn + ": " + FooterDescSortColumn
+
+	FooterKeySortReverse  = "."
+	FooterDescSortReverse = "reverse sort"
+	FooterHintSortReverse = FooterKeySortReverse + ": " + FooterDescSortReverse
+
+	// FooterHintSort combines comma/period sort hints for compact footers.
+	FooterHintSort = FooterHintSortColumn + FooterHintSep + FooterHintSortReverse
 
 	FooterKeyNav  = "hjkl/↑↓←→"
 	FooterDescNav = "nav"

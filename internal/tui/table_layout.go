@@ -7,11 +7,43 @@ import (
 	"github.com/flyingnobita/llml/internal/llamacpp"
 )
 
+// Unicode sort indicators (ascending / descending).
+const (
+	sortIndicatorAsc  = "▲"
+	sortIndicatorDesc = "▼"
+)
+
+// formatSortColumnTitle returns the header label for one column, appending a sort
+// triangle when colIdx is the active sort column. The result fits within maxW cells.
+func formatSortColumnTitle(base string, colIdx, sortCol, maxW int, sortDesc bool) string {
+	if maxW < 1 {
+		return ""
+	}
+	if colIdx != sortCol {
+		return llamacpp.TruncateRunes(base, maxW)
+	}
+	suffix := " " + sortIndicatorAsc
+	if sortDesc {
+		suffix = " " + sortIndicatorDesc
+	}
+	sw := runewidth.StringWidth(suffix)
+	if sw >= maxW {
+		return llamacpp.TruncateRunes(suffix, maxW)
+	}
+	baseMax := maxW - sw
+	if baseMax < 2 {
+		return llamacpp.TruncateRunes(suffix, maxW)
+	}
+	truncated := llamacpp.TruncateRunes(base, baseMax)
+	return truncated + suffix
+}
+
 // tableColumns computes per-column widths from the inner body width (usable
 // width inside app horizontal padding) and the current file list. Name expands
 // to fit content (capped at maxNameColW); Path takes remaining space after fixed
-// columns (Name, Runtime, Size, Last modified).
-func tableColumns(totalWidth int, files []llamacpp.ModelFile, homeDir string) []btable.Column {
+// columns (Name, Runtime, Size, Last modified). sortCol and sortDesc control the
+// ▲/▼ indicator on the active column title.
+func tableColumns(totalWidth int, files []llamacpp.ModelFile, homeDir string, sortCol int, sortDesc bool) []btable.Column {
 	if totalWidth < minTerminalWidth {
 		totalWidth = minTerminalWidth
 	}
@@ -45,11 +77,11 @@ func tableColumns(totalWidth int, files []llamacpp.ModelFile, homeDir string) []
 	}
 
 	return []btable.Column{
-		{Title: "Name", Width: nameW},
-		{Title: "Runtime", Width: runtimeColW},
-		{Title: "Path", Width: pathW},
-		{Title: "Size", Width: sizeColW},
-		{Title: "Last modified", Width: modTimeColW},
+		{Title: formatSortColumnTitle("Name", tableSortColName, sortCol, nameW, sortDesc), Width: nameW},
+		{Title: formatSortColumnTitle("Runtime", tableSortColRuntime, sortCol, runtimeColW, sortDesc), Width: runtimeColW},
+		{Title: formatSortColumnTitle("Path", tableSortColPath, sortCol, pathW, sortDesc), Width: pathW},
+		{Title: formatSortColumnTitle("Size", tableSortColSize, sortCol, sizeColW, sortDesc), Width: sizeColW},
+		{Title: formatSortColumnTitle("Last modified", tableSortColModTime, sortCol, modTimeColW, sortDesc), Width: modTimeColW},
 	}
 }
 
