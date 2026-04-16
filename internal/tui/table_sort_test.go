@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -12,13 +13,26 @@ func TestSortModelFiles_nameAscDesc(t *testing.T) {
 		{Name: "zebra", Path: "/z"},
 		{Name: "alpha", Path: "/a"},
 	}
-	sortModelFiles(files, tableSortColName, false)
+	sortModelFiles(files, tableSortColFileName, false)
 	if files[0].Name != "alpha" || files[1].Name != "zebra" {
 		t.Fatalf("name asc: got %#v", files)
 	}
-	sortModelFiles(files, tableSortColName, true)
+	sortModelFiles(files, tableSortColFileName, true)
 	if files[0].Name != "zebra" || files[1].Name != "alpha" {
 		t.Fatalf("name desc: got %#v", files)
+	}
+}
+
+func TestSortModelFiles_idAsc(t *testing.T) {
+	p1 := filepath.Join("hub", "models--z--z-model", "snapshots", "x")
+	p2 := filepath.Join("hub", "models--a--b", "snapshots", "y")
+	files := []llamacpp.ModelFile{
+		{Path: p1, Name: "x"},
+		{Path: p2, Name: "y"},
+	}
+	sortModelFiles(files, tableSortColID, false)
+	if files[0].Path != p2 || files[1].Path != p1 {
+		t.Fatalf("id asc: got %#v", files)
 	}
 }
 
@@ -77,7 +91,7 @@ func TestSortModelFiles_stableEqualKeys(t *testing.T) {
 		{Name: "same", Path: "/first"},
 		{Name: "same", Path: "/second"},
 	}
-	sortModelFiles(files, tableSortColName, false)
+	sortModelFiles(files, tableSortColFileName, false)
 	if files[0].Path != "/first" || files[1].Path != "/second" {
 		t.Fatalf("stable tie-break: got %#v", files)
 	}
@@ -85,12 +99,12 @@ func TestSortModelFiles_stableEqualKeys(t *testing.T) {
 
 func TestSortModelFiles_emptyOrSingle(t *testing.T) {
 	var empty []llamacpp.ModelFile
-	sortModelFiles(empty, tableSortColName, false)
+	sortModelFiles(empty, tableSortColFileName, false)
 	if len(empty) != 0 {
 		t.Fatal("empty slice mutated")
 	}
 	one := []llamacpp.ModelFile{{Name: "only", Path: "/o"}}
-	sortModelFiles(one, tableSortColName, true)
+	sortModelFiles(one, tableSortColFileName, true)
 	if len(one) != 1 || one[0].Path != "/o" {
 		t.Fatalf("single: got %#v", one)
 	}

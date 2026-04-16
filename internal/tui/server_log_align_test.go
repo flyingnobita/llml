@@ -32,7 +32,7 @@ func TestNormalizeSplitServerLogLine_tqdmPadsToStructuredWidth(t *testing.T) {
 
 func TestNormalizeSplitServerLogLine_invocationEchoUnchanged(t *testing.T) {
 	align := 0
-	line := "+ vllm serve /path --port 8000"
+	line := "+ '/bin/vllm' serve '/path' --served-model-name 'id' --port 8000"
 	got := normalizeSplitServerLogLine(line, &align)
 	if got != line {
 		t.Fatalf("got %q want %q", got, line)

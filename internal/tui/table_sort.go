@@ -7,9 +7,10 @@ import (
 	"github.com/flyingnobita/llml/internal/llamacpp"
 )
 
-// Table sort column indices (must match [tableColumns] order: Name, Runtime, Path, Size, Last modified).
+// Table sort column indices (must match [tableColumns] order: File Name, Model ID, Runtime, Path, Size, Last modified).
 const (
-	tableSortColName = iota
+	tableSortColFileName = iota
+	tableSortColID
 	tableSortColRuntime
 	tableSortColPath
 	tableSortColSize
@@ -47,8 +48,10 @@ func clampSortCol(col int) int {
 
 func compareModelFilesCol(a, b llamacpp.ModelFile, col int) int {
 	switch col {
-	case tableSortColName:
+	case tableSortColFileName:
 		return strings.Compare(a.Name, b.Name)
+	case tableSortColID:
+		return strings.Compare(llamacpp.InferModelID(a.Path), llamacpp.InferModelID(b.Path))
 	case tableSortColRuntime:
 		return int(a.Backend) - int(b.Backend)
 	case tableSortColPath:

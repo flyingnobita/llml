@@ -43,14 +43,16 @@ const (
 
 // Column-width defaults for the model table.
 const (
-	defaultNameColW = 36
-	runtimeColW     = 11 // "llama.cpp", "vllm"
-	sizeColW        = 9
-	modTimeColW     = 17
-	maxNameColW     = 72
-	minPathColW     = 14
-	maxPathColW     = 400
-	colPaddingExtra = 8 // extra padding bubbles/table adds across 5 columns
+	defaultFileNameColW = 36
+	defaultIDColW       = 28
+	maxIDColW           = 56
+	runtimeColW         = 11 // "llama.cpp", "vllm"
+	sizeColW            = 9
+	modTimeColW         = 17
+	maxFileNameColW     = 72
+	minPathColW         = 14
+	maxPathColW         = 400
+	colPaddingExtra     = 10 // extra padding bubbles/table adds across 6 columns
 )
 
 // Footer hints: keyboard shortcut bar fragments ("key: description") joined with

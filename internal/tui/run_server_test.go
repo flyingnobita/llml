@@ -20,7 +20,7 @@ func TestShellSingleQuoted(t *testing.T) {
 
 func TestFormatLlamaServerInvocation(t *testing.T) {
 	got := formatLlamaServerInvocation("/bin/llama-server", "/m/a.gguf", 9090, ModelParams{})
-	want := "+ '/bin/llama-server' -m '/m/a.gguf' --port 9090"
+	want := "+ '/bin/llama-server' -m '/m/a.gguf' --alias 'a.gguf' --port 9090"
 	if got != want {
 		t.Fatalf("got %q want %q", got, want)
 	}
@@ -36,12 +36,12 @@ func TestFormatLlamaServerInvocation(t *testing.T) {
 
 func TestFormatVLLMServerInvocation(t *testing.T) {
 	got := formatVLLMServerInvocation("/bin/vllm", "/m/hf-model", 9090, "", ModelParams{})
-	want := "+ '/bin/vllm' serve '/m/hf-model' --port 9090"
+	want := "+ '/bin/vllm' serve '/m/hf-model' --served-model-name 'hf-model' --port 9090"
 	if got != want {
 		t.Fatalf("got %q want %q", got, want)
 	}
 	got2 := formatVLLMServerInvocation("/bin/vllm", "/m/hf-model", 9090, "/proj/.venv/bin/activate", ModelParams{})
-	want2 := "+ . '/proj/.venv/bin/activate' && '/bin/vllm' serve '/m/hf-model' --port 9090"
+	want2 := "+ . '/proj/.venv/bin/activate' && '/bin/vllm' serve '/m/hf-model' --served-model-name 'hf-model' --port 9090"
 	if got2 != want2 {
 		t.Fatalf("got %q want %q", got2, want2)
 	}
@@ -59,7 +59,7 @@ func TestSplitServerInvocationEcho_matchesLlamaSplitLogLine(t *testing.T) {
 		{Backend: llamacpp.BackendLlama, Path: modelPath, Name: "a", Size: 1},
 	}
 	m.runtime = llamacpp.RuntimeInfo{LlamaServerPath: "/bin/llama-server"}
-	m.tbl.SetRows([]btable.Row{{"a", "llama.cpp", "1 B", "", modelPath}})
+	m.tbl.SetRows([]btable.Row{{"a", "a", "llama.cpp", "1 B", "", modelPath}})
 	m.tbl.SetCursor(0)
 
 	p := ModelParams{
@@ -100,7 +100,7 @@ func TestLaunchPreviewCommandLine_vllmOmitsActivateWrapper(t *testing.T) {
 		{Backend: llamacpp.BackendVLLM, Path: modelPath, Name: "m", Size: 1},
 	}
 	m.runtime = llamacpp.RuntimeInfo{VLLMPath: "/proj/.venv/bin/vllm"}
-	m.tbl.SetRows([]btable.Row{{"m", "vllm", "1 B", "", modelPath}})
+	m.tbl.SetRows([]btable.Row{{"m", "hf-model", "vllm", "1 B", "", modelPath}})
 	m.tbl.SetCursor(0)
 
 	p := ModelParams{Env: []EnvVar{{Key: "CUDA_VISIBLE_DEVICES", Value: "0"}}}

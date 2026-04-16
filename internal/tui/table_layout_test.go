@@ -8,18 +8,18 @@ import (
 )
 
 func TestFormatSortColumnTitle_inactiveColumn(t *testing.T) {
-	got := formatSortColumnTitle("Name", tableSortColName, tableSortColPath, 20, false)
-	if got != "Name" {
+	got := formatSortColumnTitle("File Name", tableSortColFileName, tableSortColPath, 20, false)
+	if got != "File Name" {
 		t.Fatalf("inactive: %q", got)
 	}
 }
 
 func TestFormatSortColumnTitle_activeAscDesc(t *testing.T) {
-	gotAsc := formatSortColumnTitle("Name", tableSortColName, tableSortColName, 20, false)
+	gotAsc := formatSortColumnTitle("File Name", tableSortColFileName, tableSortColFileName, 20, false)
 	if !strings.Contains(gotAsc, sortIndicatorAsc) || strings.Contains(gotAsc, sortIndicatorDesc) {
 		t.Fatalf("asc: %q", gotAsc)
 	}
-	gotDesc := formatSortColumnTitle("Name", tableSortColName, tableSortColName, 20, true)
+	gotDesc := formatSortColumnTitle("File Name", tableSortColFileName, tableSortColFileName, 20, true)
 	if !strings.Contains(gotDesc, sortIndicatorDesc) {
 		t.Fatalf("desc: %q", gotDesc)
 	}

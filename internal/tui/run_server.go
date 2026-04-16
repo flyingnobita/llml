@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -19,18 +20,29 @@ func shellSingleQuoted(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'"'"'`) + "'"
 }
 
+// llamaServerAlias returns the API model id alias: leaf name of the GGUF path (matches File Name column).
+func llamaServerAlias(modelPath string) string {
+	return filepath.Base(filepath.Clean(modelPath))
+}
+
 func llamaCommandLine(bin, modelPath string, port int, params ModelParams) string {
 	envP := shellEnvPrefix(params.Env)
-	cmdPart := fmt.Sprintf("%s -m %s --port %d", shellSingleQuoted(bin), shellSingleQuoted(modelPath), port)
+	alias := llamaServerAlias(modelPath)
+	cmdPart := fmt.Sprintf("%s -m %s --alias %s --port %d",
+		shellSingleQuoted(bin), shellSingleQuoted(modelPath), shellSingleQuoted(alias), port)
 	if x := joinShellArgv(params.Args); x != "" {
 		cmdPart += " " + x
 	}
 	return strings.TrimSpace(envP + cmdPart)
 }
 
+// vllmCommandLine builds the vllm serve invocation: model dir, --served-model-name from
+// [llamacpp.InferModelID] (same as the Model ID column), --port, then profile argv.
 func vllmCommandLine(bin, modelDir string, port int, params ModelParams) string {
 	envP := shellEnvPrefix(params.Env)
-	cmdPart := fmt.Sprintf("%s serve %s --port %d", shellSingleQuoted(bin), shellSingleQuoted(modelDir), port)
+	served := llamacpp.InferModelID(modelDir)
+	cmdPart := fmt.Sprintf("%s serve %s --served-model-name %s --port %d",
+		shellSingleQuoted(bin), shellSingleQuoted(modelDir), shellSingleQuoted(served), port)
 	if x := joinShellArgv(params.Args); x != "" {
 		cmdPart += " " + x
 	}
@@ -169,7 +181,11 @@ func runLlamaServerCmd(modelPath string, rt llamacpp.RuntimeInfo, params ModelPa
 	port := llamacpp.ListenPort()
 	var c *exec.Cmd
 	if runtime.GOOS == "windows" {
-		args := []string{"-m", modelPath, "--port", fmt.Sprintf("%d", port)}
+		args := []string{
+			"-m", modelPath,
+			"--alias", llamaServerAlias(modelPath),
+			"--port", fmt.Sprintf("%d", port),
+		}
 		args = append(args, params.Args...)
 		c = exec.Command(bin, args...)
 		c.Env = mergeEnv(os.Environ(), params.Env)
@@ -187,7 +203,11 @@ func newLlamaSplitCmd(modelPath string, rt llamacpp.RuntimeInfo, params ModelPar
 		return nil, fmt.Errorf("llama-server not found; set %s or install on PATH", llamacpp.EnvLlamaCppPath)
 	}
 	port := llamacpp.ListenPort()
-	args := []string{"-m", modelPath, "--port", fmt.Sprintf("%d", port)}
+	args := []string{
+		"-m", modelPath,
+		"--alias", llamaServerAlias(modelPath),
+		"--port", fmt.Sprintf("%d", port),
+	}
 	args = append(args, params.Args...)
 	c := exec.Command(bin, args...)
 	c.Env = mergeEnv(os.Environ(), params.Env)

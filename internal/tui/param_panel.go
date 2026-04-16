@@ -151,7 +151,7 @@ func (m Model) closeParamPanel() Model {
 	return m
 }
 
-// modelDisplayNameForPath returns the table display name for the row whose path is selected, or a basename fallback.
+// modelDisplayNameForPath returns the File Name column value for the row whose path is selected, or a basename fallback.
 func modelDisplayNameForPath(m Model) string {
 	p := m.SelectedPath()
 	if p == "" {
