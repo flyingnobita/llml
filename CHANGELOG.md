@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
-- Apr-16, 2026 - 02:01 AM +08 - [v0.1.0.0 initial release: local GGUF + safetensors discovery; llama.cpp and vLLM runtime detection; named launch presets and runtime config; split-pane server launch/logging; llml rename and GoReleaser release workflow]
+- Apr-16, 2026 - 02:01 AM +08 - [v0.1.0 initial release: local GGUF + safetensors discovery; llama.cpp and vLLM runtime detection; named launch presets and runtime config; split-pane server launch/logging; llml rename and GoReleaser release workflow]
 - Apr-14, 2026 - [TUI: table column sorting (`,` cycles column, `.` flips asc/desc); ▲/▼ indicator on active header; selection preserved across reorders; stable layout via `tableNeedsHScroll`]
 - Apr-14, 2026 - [TUI: show split-pane `R` invocation line below model table (same `+ …` echo as first log line; respects active profile; wraps narrow terminals)]
 - Apr-14, 2026 - [TUI: parameters + runtime config modals overlay main view (table + split log) via ultraviolet buffer blit; fixes full-screen modal replacing backdrop after v2]
