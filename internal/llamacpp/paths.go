@@ -6,6 +6,27 @@ import (
 	"strings"
 )
 
+// ExpandTildePath trims s and, if it is "~" or begins with "~/", replaces that prefix with the
+// current user's home directory from [os.UserHomeDir]. If the home directory cannot be resolved,
+// the trimmed input is returned unchanged. Other paths are returned trimmed only.
+func ExpandTildePath(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
+	}
+	if s == "~" || strings.HasPrefix(s, "~/") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return s
+		}
+		if s == "~" {
+			return home
+		}
+		return filepath.Join(home, strings.TrimPrefix(s, "~/"))
+	}
+	return s
+}
+
 const (
 	envModelPaths = "LLML_MODEL_PATHS"
 )
@@ -45,7 +66,7 @@ func MergeSearchRoots(extra []string, skipDefaults bool) []string {
 	var out []string
 
 	add := func(p string) {
-		p = filepath.Clean(p)
+		p = filepath.Clean(ExpandTildePath(p))
 		if p == "" || p == "." {
 			return
 		}
