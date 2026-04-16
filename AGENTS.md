@@ -23,6 +23,7 @@ safetensors models on the local filesystem and launching `llama-server` or
 ```text
 cmd/llml/            # Binary entrypoint (main.go)
 internal/
+  config/            # TOML persistence ({UserConfigDir}/llml/config.toml): runtime, discovery cache, [[models]]
   llamacpp/          # GGUF + safetensors discovery, metadata, runtime detection, formatting
   tui/               # Bubble Tea model, update, view, styles, keymaps
 scripts/             # gofmt-check.sh, precommit-docs-fix.sh
@@ -62,7 +63,14 @@ scripts/             # gofmt-check.sh, precommit-docs-fix.sh
 
 ### Configuration
 
-**Runtime** config is **environment-variable-driven** (no `config.toml` at runtime):
+**On-disk config** lives at **`{UserConfigDir}/llml/config.toml`** (see `internal/config`). It stores **`[runtime]`** (paths and ports), **`[discovery]`** (extra model roots and last full-scan time), and **`[[models]]`** (cached discovery rows). **`schema_version`** is reserved for future migrations.
+
+- **Precedence:** **environment variables override** values from `config.toml`; unset env vars fall back to TOML, then built-in defaults.
+- **Startup:** if the cache is valid (`schema_version` matches, at least one cached model path still exists on disk), the UI loads without a full filesystem walk. Otherwise a full scan runs and the file is rewritten.
+- **`r`** reloads **`[runtime]`** from `config.toml` and re-runs runtime detection (does not rescan models). **`S`** runs a full model discovery and refreshes **`[[models]]`**.
+- Saving the runtime panel (**`c`**) updates the process environment and **best-effort** writes **`[runtime]`** to `config.toml` (failure is non-fatal).
+
+**Runtime** env vars (same keys as **`[runtime]`** in TOML):
 
 | Variable                            | Purpose                                                                                                        |
 | ----------------------------------- | -------------------------------------------------------------------------------------------------------------- |
@@ -71,11 +79,11 @@ scripts/             # gofmt-check.sh, precommit-docs-fix.sh
 | `VLLM_VENV`                         | Optional Python venv root; `R` sources `bin/activate` before `vllm` (Unix)                                     |
 | `LLAMA_SERVER_PORT`                 | TCP port for `llama-server` and `/health` probe (default 8080)                                                 |
 | `VLLM_SERVER_PORT`                  | TCP port for `vllm serve` (default 8000)                                                                       |
-| `LLML_MODEL_PATHS`                  | Extra model search roots (comma-separated)                                                                     |
+| `LLML_MODEL_PATHS`                  | Extra model search roots (comma-separated); merged with `discovery.extra_model_paths` in TOML for scans        |
 | `HUGGINGFACE_HUB_CACHE` / `HF_HOME` | Hugging Face hub cache location                                                                                |
 | `LLML_THEME`                        | Initial TUI palette (`dark` / `light` / `auto`); **`t`** cycles while running (not in runtime `c` text fields) |
 
-**Parameter profiles** (per-model extra env + argv for `llama-server` / `vllm`, edited with **`p`**) are **not** env vars: they are stored in **`{UserConfigDir}/llml/model-params.json`** (see `internal/tui/model_params.go`). Keys are cleaned model paths; each entry has named profiles and `activeIndex` for which profile **`R`** uses.
+**Parameter profiles** (per-model extra env + argv for `llama-server` / `vllm`, edited with **`p`**) are **not** in `config.toml`: they are stored in **`{UserConfigDir}/llml/model-params.json`** (see `internal/tui/model_params.go`). Keys are cleaned model paths; each entry has named profiles and `activeIndex` for which profile **`R`** uses.
 
 Set machine-specific env (for example `LLAMA_CPP_PATH`) in `mise.local.toml` (gitignored); keep shared tool/tasks config in `mise.toml`.
 
@@ -100,6 +108,8 @@ The pre-commit hook handles staged files automatically.
 
 ## Testing
 
+- Unit tests for `internal/config` cover TOML round-trip, env precedence over
+  TOML, cache validation, and stale path filtering.
 - Unit tests for `internal/llamacpp` cover discovery, formatting, paths, and
   runtime detection.
 - Unit tests for `internal/tui` cover model initialization, parameter-profile

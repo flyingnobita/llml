@@ -18,7 +18,9 @@ Browse local models. Detect the right runtime. Launch with one key.
 ## ✨ Features
 
 - **Model discovery** — auto-scans common paths for GGUF files and safetensors model
-  directories; add extra roots via `LLML_MODEL_PATHS`.
+  directories; add extra roots via `LLML_MODEL_PATHS` and/or `config.toml`. Results are
+  cached under **`{UserConfigDir}/llml/config.toml`** so the next launch can skip the
+  filesystem walk when the cache is still valid.
 - **Runtime detection** — finds installed `llama-server` and `vllm` binaries and maps
   each model to its compatible runtime.
 - **Named presets** — save multiple launch presets per model (e.g. `fast-laptop`,
@@ -95,16 +97,17 @@ Place models under default scan locations (see [Model configuration and discover
 
 ## ⌨️ Usage
 
-| Key         | Action                                                                            |
-| ----------- | --------------------------------------------------------------------------------- |
-| `hjkl/↑↓←→` | Move selection; horizontal scroll when the path column is wider than the terminal |
-| `r`         | Rescan filesystem                                                                 |
-| `R`         | Run server (split view: table + log pane)                                         |
-| `ctrl`+`R`  | Run server full-screen                                                            |
-| `c`         | Edit runtime environment (paths, ports)                                           |
-| `p`         | Edit parameter profiles for the selected model                                    |
-| `t`         | Cycle theme (`dark` → `light` → `auto` → …)                                       |
-| `q`         | Quit                                                                              |
+| Key         | Action                                                                             |
+| ----------- | ---------------------------------------------------------------------------------- |
+| `hjkl/↑↓←→` | Move selection; horizontal scroll when the path column is wider than the terminal  |
+| `r`         | Reload **`[runtime]`** from `config.toml` and re-detect binaries (no model rescan) |
+| `S`         | Full model filesystem rescan; refresh cached **`[[models]]`** in `config.toml`     |
+| `R`         | Run server (split view: table + log pane)                                          |
+| `ctrl`+`R`  | Run server full-screen                                                             |
+| `c`         | Edit runtime environment (paths, ports)                                            |
+| `p`         | Edit parameter profiles for the selected model                                     |
+| `t`         | Cycle theme (`dark` → `light` → `auto` → …)                                        |
+| `q`         | Quit                                                                               |
 
 ### Server output
 
@@ -131,7 +134,19 @@ Storage is a single JSON file:
 
 ## ⚙️ Configuration
 
-There is **no** runtime `config.toml` and **no** automatic `.env` file. Behavior is driven by **environment variables** and the **parameter profiles** file above.
+Behavior is driven by **environment variables**, optional **`config.toml`**, and the **parameter profiles** JSON file. **Precedence:** env vars override `config.toml`; unset env vars use TOML values, then defaults.
+
+### Config file (`config.toml`)
+
+| Platform    | Typical path                                                        |
+| ----------- | ------------------------------------------------------------------- |
+| Linux (XDG) | `$XDG_CONFIG_HOME/llml/config.toml` or `~/.config/llml/config.toml` |
+| macOS       | `~/Library/Application Support/llml/config.toml`                    |
+| Windows     | `%AppData%\llml\config.toml`                                        |
+
+The file stores **`schema_version`**, **`[runtime]`** (mirrors `LLAMA_CPP_PATH`, `VLLM_PATH`, `VLLM_VENV`, ports), **`[discovery]`** (`extra_model_paths`, `last_scan` timestamp), and **`[[models]]`** (cached rows from the last full scan). Parameter profiles remain in **`model-params.json`** only.
+
+On startup, if the cache is valid, the app skips walking the disk; use **`S`** for a full rescan. **`r`** reloads runtime settings from TOML without rescanning models. Saving the **`c`** runtime panel updates the environment and writes **`[runtime]`** (write failures are ignored).
 
 ### Runtime configuration and detection
 
@@ -150,7 +165,7 @@ Set these in your shell, or under `[env]` in `mise.local.toml` (gitignored) for 
 
 #### Runtime detection order
 
-On launch and on **`r`**, the app resolves **llama.cpp** and **vLLM** binaries, then scans for models.
+On launch (and after **`r`**), the app resolves **llama.cpp** and **vLLM** binaries. Model discovery runs on first start, after **`S`**, or when the cache is missing or stale; **`r`** does not rescan models.
 
 **llama.cpp (`llama-cli` / `llama-server`)**
 
@@ -172,11 +187,11 @@ On **Linux/macOS**, if vLLM lives in a venv, **`R`** may source `activate` befor
 
 #### Model environment variables
 
-| Variable                | Default   | Role                                                   |
-| ----------------------- | --------- | ------------------------------------------------------ |
-| `LLML_MODEL_PATHS`      | _(unset)_ | Extra model search roots (comma-separated)             |
-| `HUGGINGFACE_HUB_CACHE` | _(unset)_ | Hugging Face hub cache root (overrides `HF_HOME/hub`)  |
-| `HF_HOME`               | _(unset)_ | Hugging Face home; hub cache resolves to `HF_HOME/hub` |
+| Variable                | Default   | Role                                                                                                             |
+| ----------------------- | --------- | ---------------------------------------------------------------------------------------------------------------- |
+| `LLML_MODEL_PATHS`      | _(unset)_ | Extra model search roots (comma-separated); merged with `discovery.extra_model_paths` in `config.toml` for scans |
+| `HUGGINGFACE_HUB_CACHE` | _(unset)_ | Hugging Face hub cache root (overrides `HF_HOME/hub`)                                                            |
+| `HF_HOME`               | _(unset)_ | Hugging Face home; hub cache resolves to `HF_HOME/hub`                                                           |
 
 Default scan roots include `~/models`, `~/.cache/llama.cpp`, Hugging Face hub cache paths, and `~/.cache/lm-studio/models` (only existing directories are used).
 
@@ -186,7 +201,7 @@ Hugging Face cache resolution precedence is:
 2. `HF_HOME/hub`
 3. `~/.cache/huggingface/hub`
 
-Scan root merge order is defaults, then `LLML_MODEL_PATHS` entries. This affects where the app looks, but it does not make one root "win" over another; discovered rows are deduplicated and sorted by path.
+Scan root merge order is defaults, then paths from **`config.toml`** (`discovery.extra_model_paths`), then **`LLML_MODEL_PATHS`**. This affects where the app looks, but it does not make one root "win" over another; discovered rows are deduplicated and sorted by path.
 
 Add extra roots:
 
@@ -231,6 +246,7 @@ mise run check    # lint + test (run before opening a PR)
 ### Layout
 
 - `cmd/llml` — entrypoint.
+- `internal/config` — `config.toml` read/write and cache helpers.
 - `internal/tui` — Bubble Tea UI.
 - `internal/llamacpp` — discovery, metadata, runtime detection.
 - `scripts/` — `gofmt-check.sh`, `precommit-docs-fix.sh`.
