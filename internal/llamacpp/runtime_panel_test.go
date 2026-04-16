@@ -11,27 +11,57 @@ import (
 func TestRuntimePanelLines(t *testing.T) {
 	t.Setenv(EnvLlamaServerPort, "")
 	t.Setenv(EnvVLLMServerPort, "")
-	t.Setenv(EnvLlamaCppPath, "/home/u/llama.cpp/bin")
-	t.Setenv(EnvVLLMPath, "/home/u/.local/bin")
 	t.Setenv(EnvVLLMVenv, "")
-	lines := RuntimePanelLines(80, DiscoverRuntime())
+	t.Setenv(EnvLlamaCppPath, "")
+	t.Setenv(EnvVLLMPath, "")
+
+	r := RuntimeInfo{
+		LlamaServerPath: "/home/u/llama.cpp/bin/llama-server",
+		VLLMPath:        "/home/u/.local/bin/vllm",
+		ServerRunning:   false,
+		ProbePort:       8080,
+	}
+	lines := RuntimePanelLines(80, r)
 	if len(lines) != 5 {
 		t.Fatalf("got %d lines", len(lines))
 	}
-	if !strings.Contains(lines[0], EnvLlamaCppPath) || !strings.Contains(lines[0], "llama.cpp") {
-		t.Errorf("LLAMA_CPP_PATH line: %q", lines[0])
+	// Alphabetical: llama-server path, llama-server port, vllm path, vllm port, vllm venv path
+	if !strings.Contains(lines[0], runtimePanelLabelLlamaServerPath) || !strings.Contains(lines[0], "llama-server") {
+		t.Errorf("llama-server path line: %q", lines[0])
 	}
-	if !strings.Contains(lines[1], EnvLlamaServerPort) || !strings.Contains(lines[1], "8080") {
-		t.Errorf("LLAMA_SERVER_PORT line: %q", lines[1])
+	if !strings.Contains(lines[1], runtimePanelLabelLlamaServerPort) || !strings.Contains(lines[1], "8080") {
+		t.Errorf("llama-server port line: %q", lines[1])
 	}
-	if !strings.Contains(lines[2], EnvVLLMPath) || !strings.Contains(lines[2], ".local") {
-		t.Errorf("VLLM_PATH line: %q", lines[2])
+	if !strings.Contains(lines[2], runtimePanelLabelVLLMPath) || !strings.Contains(lines[2], "vllm") {
+		t.Errorf("vllm path line: %q", lines[2])
 	}
-	if !strings.Contains(lines[3], EnvVLLMServerPort) || !strings.Contains(lines[3], "8000") {
-		t.Errorf("VLLM_SERVER_PORT line: %q", lines[3])
+	if !strings.Contains(lines[3], runtimePanelLabelVLLMPort) || !strings.Contains(lines[3], "8000") {
+		t.Errorf("vllm port line: %q", lines[3])
 	}
-	if !strings.Contains(lines[4], EnvVLLMVenv) || !strings.Contains(lines[4], "—") {
-		t.Errorf("VLLM_VENV line: %q", lines[4])
+	if !strings.Contains(lines[4], runtimePanelLabelVLLMVenv) || !strings.Contains(lines[4], "—") {
+		t.Errorf("vllm venv path line: %q", lines[4])
+	}
+}
+
+func TestRuntimePanelLines_ServerRunningNoBinary(t *testing.T) {
+	t.Setenv(EnvLlamaServerPort, "")
+	t.Setenv("PATH", t.TempDir()) // ResolveLlamaServerPath must not find llama-server via LookPath
+	r := RuntimeInfo{
+		LlamaServerPath: "",
+		ServerRunning:   true,
+		ProbePort:       8080,
+	}
+	lines := RuntimePanelLines(120, r)
+	want := "(server at :8080)"
+	found := false
+	for _, ln := range lines {
+		if strings.Contains(ln, want) {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected %q in lines: %v", want, lines)
 	}
 }
 

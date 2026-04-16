@@ -37,8 +37,17 @@ func (r RuntimeInfo) Summary() string {
 	return base + " · " + v
 }
 
-// runtimePanelEnvLabelWidth is the width of the left column (env var names) in RuntimePanelLines.
-const runtimePanelEnvLabelWidth = len(EnvLlamaServerPort) // 17; same as len(EnvVLLMServerPort)
+// Runtime panel row labels (sorted alphabetically in [RuntimePanelLines]).
+const (
+	runtimePanelLabelLlamaServerPath = "llama-server path"
+	runtimePanelLabelLlamaServerPort = "llama-server port"
+	runtimePanelLabelVLLMPath        = "vllm path"
+	runtimePanelLabelVLLMPort        = "vllm port"
+	runtimePanelLabelVLLMVenv        = "vllm venv path"
+)
+
+// runtimePanelEnvLabelWidth is the width of the left column (labels) in RuntimePanelLines.
+const runtimePanelEnvLabelWidth = len(runtimePanelLabelLlamaServerPath) // 17; longest label
 
 // portEnvDisplay returns the env value when set, otherwise the effective TCP port as decimal.
 func portEnvDisplay(envKey string, effective int) string {
@@ -58,7 +67,36 @@ func pathEnvDisplay(envKey string) string {
 	return FormatPathDisplay(v, home)
 }
 
-// vllmVenvPanelDisplay returns the value shown for VLLM_VENV in the runtime panel: the env var
+// llamaServerPathPanelDisplay returns the resolved llama-server binary path for the runtime
+// panel, or "(server at :port)" when a server responds on the health probe but no binary was
+// found, or "—" otherwise.
+func llamaServerPathPanelDisplay(r RuntimeInfo) string {
+	p := ResolveLlamaServerPath(r)
+	if p != "" {
+		home, _ := os.UserHomeDir()
+		return FormatPathDisplay(p, home)
+	}
+	if r.ServerRunning {
+		port := r.ProbePort
+		if port <= 0 {
+			port = ListenPort()
+		}
+		return fmt.Sprintf("(server at :%d)", port)
+	}
+	return "—"
+}
+
+// vllmPathPanelDisplay returns the resolved vllm binary path for the runtime panel, or "—".
+func vllmPathPanelDisplay(r RuntimeInfo) string {
+	p := ResolveVLLMPath(r)
+	if p == "" {
+		return "—"
+	}
+	home, _ := os.UserHomeDir()
+	return FormatPathDisplay(p, home)
+}
+
+// vllmVenvPanelDisplay returns the value shown for vLLM venv in the runtime panel: the env var
 // when set, otherwise the venv root inferred from the same rules as vLLM activation (adjacent
 // bin layout, $VLLM_PATH/.venv, dirname(vllm)/.venv), or "—" when none applies.
 func vllmVenvPanelDisplay(r RuntimeInfo) string {
@@ -74,11 +112,11 @@ func vllmVenvPanelDisplay(r RuntimeInfo) string {
 	return "—"
 }
 
-// RuntimePanelLines returns lines for the TUI footer: each row is an environment variable name
-// (left) and its current value (right), sorted alphabetically by name. Path vars use the process
-// environment; port vars use the env when set, otherwise the effective default (ListenPort /
-// VLLMPort). VLLM_VENV shows the env when set, otherwise the inferred venv root when activation
-// would run. Lines are truncated to maxWidth display width.
+// RuntimePanelLines returns lines for the TUI footer: each row is a label (left) and its current
+// value (right), sorted alphabetically by label. Binary paths use [ResolveLlamaServerPath] and
+// [ResolveVLLMPath]; port rows use the env when set, otherwise the effective default ([ListenPort] /
+// [VLLMPort]). The venv row shows VLLM_VENV when set, otherwise the inferred venv root when
+// activation would run. Lines are truncated to maxWidth display width.
 func RuntimePanelLines(maxWidth int, r RuntimeInfo) []string {
 	if maxWidth < 24 {
 		maxWidth = 24
@@ -87,20 +125,20 @@ func RuntimePanelLines(maxWidth int, r RuntimeInfo) []string {
 	if valW < 8 {
 		valW = 8
 	}
-	line := func(envKey, value string) string {
+	line := func(label, value string) string {
 		v := TruncateRunes(value, valW)
-		s := fmt.Sprintf("%-*s %s", runtimePanelEnvLabelWidth, envKey, v)
+		s := fmt.Sprintf("%-*s %s", runtimePanelEnvLabelWidth, label, v)
 		return TruncateRunes(s, maxWidth)
 	}
 	rows := []struct {
 		key   string
 		value string
 	}{
-		{EnvLlamaCppPath, pathEnvDisplay(EnvLlamaCppPath)},
-		{EnvLlamaServerPort, portEnvDisplay(EnvLlamaServerPort, ListenPort())},
-		{EnvVLLMPath, pathEnvDisplay(EnvVLLMPath)},
-		{EnvVLLMServerPort, portEnvDisplay(EnvVLLMServerPort, VLLMPort())},
-		{EnvVLLMVenv, vllmVenvPanelDisplay(r)},
+		{runtimePanelLabelLlamaServerPath, llamaServerPathPanelDisplay(r)},
+		{runtimePanelLabelLlamaServerPort, portEnvDisplay(EnvLlamaServerPort, ListenPort())},
+		{runtimePanelLabelVLLMPath, vllmPathPanelDisplay(r)},
+		{runtimePanelLabelVLLMPort, portEnvDisplay(EnvVLLMServerPort, VLLMPort())},
+		{runtimePanelLabelVLLMVenv, vllmVenvPanelDisplay(r)},
 	}
 	sort.Slice(rows, func(i, j int) bool { return rows[i].key < rows[j].key })
 	out := make([]string, len(rows))
