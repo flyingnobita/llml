@@ -81,9 +81,9 @@ func TestDiscover_vllmNameUsesHFRepoID(t *testing.T) {
 	if len(got) != 1 {
 		t.Fatalf("want 1 model, got %d", len(got))
 	}
-	want := "opendatalab/MinerU2.5-2509-1.2B"
+	want := "879e58bdd9566632b27a88a81f0e2961873311f"
 	if got[0].Name != want {
-		t.Fatalf("Name: got %q want %q", got[0].Name, want)
+		t.Fatalf("Name (dir basename): got %q want %q", got[0].Name, want)
 	}
 }
 

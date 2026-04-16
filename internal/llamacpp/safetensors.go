@@ -93,7 +93,7 @@ func tryVLLMModelDir(dir string) (ModelFile, bool) {
 	return ModelFile{
 		Backend:    BackendVLLM,
 		Path:       filepath.Clean(dir),
-		Name:       FormatVLLMModelName(dir),
+		Name:       filepath.Base(filepath.Clean(dir)),
 		Size:       totalSize,
 		ModTime:    latest,
 		Parameters: hfParamsSummary(dir),

@@ -30,6 +30,7 @@ var skipDirNames = map[string]struct{}{
 type ModelFile struct {
 	Backend ModelBackend
 	Path    string
+	// Name is the File Name column: leaf of Path (.gguf file name or safetensors dir name).
 	Name    string
 	Size    int64
 	ModTime time.Time
