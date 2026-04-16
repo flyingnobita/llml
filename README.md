@@ -146,7 +146,7 @@ There is **no** runtime `config.toml` and **no** automatic `.env` file. Behavior
 | `VLLM_SERVER_PORT`  | `8000`    | Port for `vllm serve`                                                       |
 | `LLML_THEME`        | `auto`    | Initial TUI palette; **`t`** cycles `dark` → `light` → `auto` while running |
 
-Set these in your shell, or under `[env]` in `mise.toml` for local development.
+Set these in your shell, or under `[env]` in `mise.local.toml` (gitignored) for local development with mise.
 
 #### Runtime detection order
 

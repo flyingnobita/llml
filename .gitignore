@@ -2,6 +2,8 @@
 .env
 .env.*
 !.env.example
+mise.local.toml
+mise.*.local.toml
 
 # Python
 __pycache__/

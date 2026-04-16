@@ -1,11 +1,6 @@
 # mise: package and tool management
 # https://mise.jdx.dev/
-
-[env]
-LLAMA_CPP_PATH = "/home/omarchy/Applications/llama.cpp/build/bin"
-LLAMA_SERVER_PORT = "9001"
-VLLM_PATH = "/home/omarchy/Applications/vllm"
-VLLM_SERVER_PORT = "9002"
+# Machine-specific [env] (paths, ports): use mise.local.toml (gitignored).
 
 [tools]
 go = "latest"

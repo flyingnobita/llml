@@ -77,7 +77,7 @@ scripts/             # gofmt-check.sh, precommit-docs-fix.sh
 
 **Parameter profiles** (per-model extra env + argv for `llama-server` / `vllm`, edited with **`p`**) are **not** env vars: they are stored in **`{UserConfigDir}/llml/model-params.json`** (see `internal/tui/model_params.go`). Keys are cleaned model paths; each entry has named profiles and `activeIndex` for which profile **`R`** uses.
 
-Set development defaults in `mise.toml` under `[env]`.
+Set machine-specific env (for example `LLAMA_CPP_PATH`) in `mise.local.toml` (gitignored); keep shared tool/tasks config in `mise.toml`.
 
 ### Tasks (mise)
 
