@@ -1,6 +1,6 @@
 # LLM Launcher
 
-[![Go](https://img.shields.io/github/go-mod/go-version/flyingnobita/llml)](go.mod)
+[![Go](https://img.shields.io/github/go-mod/go-version/flyingnobita/llm-launcher)](go.mod)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ![LLM Launcher TUI screenshot](assets/llml-screenshot.png)
