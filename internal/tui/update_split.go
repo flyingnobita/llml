@@ -24,9 +24,38 @@ func isCtrlC(msg tea.KeyPressMsg) bool {
 	return k.Mod.Contains(tea.ModCtrl) && (k.Code == 'c' || k.Text == "c" || k.Text == "C")
 }
 
+func isEnterKey(msg tea.KeyPressMsg) bool {
+	if msg.String() == "enter" {
+		return true
+	}
+	return msg.Key().Code == tea.KeyEnter
+}
+
 // updateServerSplitKeys handles input while a split-pane server is running.
 // Tab switches focus between the model table and the log viewport; see [Model.splitLogFocused].
 func (m Model) updateServerSplitKeys(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	if m.serverExited {
+		switch {
+		case isTabKey(msg):
+			m.splitLogFocused = !m.splitLogFocused
+			if m.splitLogFocused {
+				m.tbl.Blur()
+			} else {
+				m.tbl.Focus()
+			}
+			m = m.applySplitPaneFocusStyles()
+			return m, nil
+		case isEnterKey(msg), key.Matches(msg, m.keys.Quit), isEscapeKey(msg), isCtrlC(msg):
+			m = m.dismissSplitServer()
+			return m, nil
+		}
+		if !m.splitLogFocused {
+			return m.updateServerSplitTableKeys(msg)
+		}
+		var cmd tea.Cmd
+		m.serverViewport, cmd = m.serverViewport.Update(msg)
+		return m, cmd
+	}
 	switch {
 	case key.Matches(msg, m.keys.Quit):
 		return m.stopSplitServer()
@@ -60,6 +89,10 @@ func isTabKey(msg tea.KeyPressMsg) bool {
 }
 
 func (m Model) stopSplitServer() (Model, tea.Cmd) {
+	if m.serverExited {
+		m = m.dismissSplitServer()
+		return m, nil
+	}
 	_ = interruptServerProcess(m.serverCmd)
 	return m, nil
 }
