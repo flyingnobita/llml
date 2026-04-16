@@ -1,21 +1,28 @@
 # mise: package and tool management
 # https://mise.jdx.dev/
 
+[env]
+LLAMA_CPP_PATH = "/home/omarchy/Applications/llama.cpp/build/bin"
+LLAMA_SERVER_PORT = "9001"
+VLLM_PATH = "/home/omarchy/Applications/vllm"
+VLLM_SERVER_PORT = "9002"
+
 [tools]
 go = "latest"
+node = "lts"
 "pipx:pre-commit" = "latest"
 
 [tasks]
-run = "go run ./cmd/llm-launch"
-build = "go build -o bin/llm-launch ./cmd/llm-launch"
+run = "go run ./cmd/llml"
+build = "go build -o bin/llml ./cmd/llml"
 fmt = "go fmt ./..."
 fmt-check = "scripts/gofmt-check.sh"
 vet = "go vet ./..."
 test = "go test -race ./..."
 prettier-fix = "npx prettier --write \"**/*.{md,yaml,yml,json}\" \".prettierrc\""
 prettier-check = "npx prettier --check \"**/*.{md,yaml,yml,json}\" \".prettierrc\""
-markdownlint-fix = "npx markdownlint-cli2 --fix \"**/*.md\""
-markdownlint-check = "npx markdownlint-cli2 \"**/*.md\""
+markdownlint-fix = "npx markdownlint-cli2 --fix \"**/*.md\" \"#**/skills/**\""
+markdownlint-check = "npx markdownlint-cli2 \"**/*.md\" \"#**/skills/**\""
 format = "mise run fmt && mise run prettier-fix && mise run markdownlint-fix"
 lint = "mise run fmt-check && mise run vet && mise run prettier-check && mise run markdownlint-check"
 check = "mise run lint && mise run test"

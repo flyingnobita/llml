@@ -1,95 +1,120 @@
-# AGENTS.md
+# AGENTS.md — LLM Launcher (llml)
 
-> **This is a template repository.** Before using it for development, complete
-> the setup steps below. An AI agent or user should follow this guide to adapt
-> the template for a new project.
+AI coding instructions for this project.
 
 ---
 
-## Setup: Adapt This Template
+## Project Overview
 
-When helping a user set up a new project from this template, run through the
-following steps. Ask the user the questions; then apply their answers.
+**LLM Launcher** (`llml`) is a terminal UI (TUI) for discovering GGUF and Hugging Face-style
+safetensors models on the local filesystem and launching `llama-server` or
+`vllm serve` for a selected row.
 
----
-
-### Step 1: Project Identity
-
-Ask the user:
-
-1. **Project name** — Display name for the project (e.g. "My Awesome API")
-2. **Folder/repo name** — Directory and repo name (e.g. `my-awesome-api`)
-3. **Brief description** — One sentence describing the project
-
-**Action:** Rename the project folder from `project-template` to the chosen
-folder name (e.g. `mv project-template my-awesome-api`). Update:
-
-- `README.md` — Replace "Project Name" and "Brief description"
-- `LICENSE` — Replace `<year>` and `<copyright holders>` if applicable
+- Language: **Go 1.26+**
+- UI framework: **Bubble Tea v2** (`charm.land/bubbletea/v2`) + **Lip Gloss v2** (`charm.land/lipgloss/v2`) + **Bubbles v2** (`charm.land/bubbles/v2`)
+- GGUF metadata: `abrander/gguf`
+- Tooling: `mise` (tool versions + tasks), `npm` (Prettier + markdownlint only)
+- Releases: [GoReleaser](https://goreleaser.com/) (`.goreleaser.yaml`); pushing a `v*` tag runs `.github/workflows/release.yml` and publishes archives to GitHub Releases
 
 ---
 
-### Step 2: Tech Stack
+## Source Layout
 
-Ask the user:
-
-1. **Runtime/language** — Python, Node, Rust, Go, or other?
-2. **Version** — Specific version (e.g. Python 3.12, Node 20 LTS)
-3. **Framework** — If any (e.g. FastAPI, Next.js, Actix)
-4. **Database** — If any (e.g. PostgreSQL, SQLite)
-5. **Package manager** — uv, npm/pnpm, cargo, go mod, etc.
-
-**Action:** Update `dev-docs/SPECS.md` Tech Stack table. Update `mise.toml` with
-`[tools]` and `[tasks]` for the chosen stack.
+```text
+cmd/llml/            # Binary entrypoint (main.go)
+internal/
+  llamacpp/          # GGUF + safetensors discovery, metadata, runtime detection, formatting
+  tui/               # Bubble Tea model, update, view, styles, keymaps
+scripts/             # gofmt-check.sh, precommit-docs-fix.sh
+```
 
 ---
 
-### Step 3: Config & Environment
+## Key Conventions
 
-Ask the user:
+### Go
 
-1. **Environment variables** — What API keys, tokens, or secrets are needed?
-2. **Config needs** — Paths, log levels, or other config beyond env vars?
+- Follow standard Go project layout (`cmd/`, `internal/`).
+- All exported types and functions must have doc comments.
+- Use `go fmt` / `gofmt` for formatting; CI enforces via `scripts/gofmt-check.sh`.
+- Run `go vet ./...` before committing.
+- Tests live alongside source (`_test.go`) and run with `go test -race ./...`.
 
-**Action:** Update `.env.example` with actual variable names (remove
-placeholders). Adjust `config.toml.example` if the project needs different
-config (or remove if not needed). Update `dev-docs/SPECS.md` Config section.
+### Bubble Tea pattern
+
+- `Model` in `model.go` holds all state. `New()` returns an initialized model.
+- `Init()`, `Update()`, `View()` implement `tea.Model`.
+- Messages are defined in `messages.go`; commands in `cmd.go`.
+- Layout recalculation lives in `layoutTable()` on `Model`. Table row height is chosen so the full `View()` fits the terminal (Bubble Tea otherwise keeps only the **bottom** lines and clips the header).
+- Theme palettes live in `theme.go` (`DarkTheme`, `LightTheme`; startup via `LLML_THEME`, runtime cycle with **`t`**: dark → light → auto). The transient confirmation is a **compact chip on the title row** (not an extra banner line) so the layout does not jump.
+  Lip Gloss styles are built in `styles.go` via `newStyles`. Do not call `lipgloss.NewStyle()` inline
+  inside `View()` — extend `Theme` / `newStyles` instead.
+- Magic numbers belong in `constants.go` (package `tui`).
+
+#### Bubble Tea v2 API notes
+
+- **`View()` return type**: `tea.View` (not `string`). Wrap with `tea.NewView(s)`. Set `v.AltScreen = true` for the full-screen view; do **not** use the removed `tea.WithAltScreen()` program option.
+- **Key messages**: `tea.KeyPressMsg` (renamed from `tea.KeyMsg`). Fields are `Code rune` and `Text string` — not `Type`/`Runes`.
+- **`textinput` width**: `ti.SetWidth(n)` — not `ti.Width = n`.
+- **`viewport` constructor**: `viewport.New(viewport.WithWidth(w), viewport.WithHeight(h))` — not `viewport.New(w, h)`. Setters: `SetWidth` / `SetHeight`.
+- **Dark-terminal detection**: `compat.HasDarkBackground` (`charm.land/lipgloss/v2/compat`) is a `bool` variable, not a function. `lipgloss.Color` is a function (`func(string) color.Color`); use `color.Color` (from `image/color`) for `Theme` struct fields.
+- **Table selection styling**: The upstream `charm.land/bubbles/v2/table` is used directly (no fork). Selected-row highlighting uses a **background color** on the `Selected` style (`lipgloss.NewStyle().Background(theme.TableSelectedBg)`) so it does not conflict with per-cell foreground styles.
+
+### Configuration
+
+**Runtime** config is **environment-variable-driven** (no `config.toml` at runtime):
+
+| Variable                            | Purpose                                                                                                        |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `LLAMA_CPP_PATH`                    | Directory containing `llama-cli`/`llama-server`                                                                |
+| `VLLM_PATH`                         | Directory containing the `vllm` executable                                                                     |
+| `VLLM_VENV`                         | Optional Python venv root; `R` sources `bin/activate` before `vllm` (Unix)                                     |
+| `LLAMA_SERVER_PORT`                 | TCP port for `llama-server` and `/health` probe (default 8080)                                                 |
+| `VLLM_SERVER_PORT`                  | TCP port for `vllm serve` (default 8000)                                                                       |
+| `LLML_MODEL_PATHS`                  | Extra model search roots (comma-separated)                                                                     |
+| `HUGGINGFACE_HUB_CACHE` / `HF_HOME` | Hugging Face hub cache location                                                                                |
+| `LLML_THEME`                        | Initial TUI palette (`dark` / `light` / `auto`); **`t`** cycles while running (not in runtime `c` text fields) |
+
+**Parameter profiles** (per-model extra env + argv for `llama-server` / `vllm`, edited with **`p`**) are **not** env vars: they are stored in **`{UserConfigDir}/llml/model-params.json`** (see `internal/tui/model_params.go`). Keys are cleaned model paths; each entry has named profiles and `activeIndex` for which profile **`R`** uses.
+
+Set development defaults in `mise.toml` under `[env]`.
+
+### Tasks (mise)
+
+| Task         | Command           |
+| ------------ | ----------------- |
+| Run          | `mise run run`    |
+| Build        | `mise run build`  |
+| Format (all) | `mise run format` |
+| Lint (all)   | `mise run lint`   |
+| Test         | `mise run test`   |
+| Full check   | `mise run check`  |
+
+### Docs formatting
+
+Markdown, YAML, and JSON are formatted with **Prettier** and linted with
+**markdownlint-cli2**. Run `mise run format` before committing docs changes.
+The pre-commit hook handles staged files automatically.
 
 ---
 
-### Step 4: CI & Pre-commit
+## Testing
 
-**Action:** Replace the placeholder `check` job in `.github/workflows/ci.yml`
-with stack-specific setup and commands (test, lint). Uncomment or add
-stack-specific hooks in `.pre-commit-config.yaml` (e.g. ruff, eslint, cargo
-fmt).
-
----
-
-### Step 5: Source Layout
-
-Ask the user:
-
-1. **Source layout** — Does the project use `src/`, `cmd/`, `app/`, or something
-   else? (See `dev-docs/SPECS.md` Project Structure for examples.)
-
-**Action:** Create the source directory structure. Update `dev-docs/SPECS.md` if
-the example structure does not fit.
+- Unit tests for `internal/llamacpp` cover discovery, formatting, paths, and
+  runtime detection.
+- Unit tests for `internal/tui` cover model initialization, parameter-profile
+  persistence, server command construction, theme correctness (including
+  `TableSelectedBg`), `View()` alt-screen flag, and selected-style background rendering.
+- Do not mark a feature complete until `mise run check` passes.
 
 ---
 
-### Step 6: Final Checks
+## Local-only docs (`dev-docs/`)
 
-- [ ] Run `npm install` (or `pnpm install`) to install Prettier and other deps
-- [ ] Run `mise run format` — formats md, yaml, yml, json
-- [ ] Run `mise run check` (or equivalent) to verify setup
-- [ ] Remove or update this AGENTS.md section if project-specific agent rules
-      are needed
+The `dev-docs/` directory is gitignored. Use it for notes that should not be
+committed (e.g. `dev-docs/BACKLOG.md` for a personal backlog).
 
----
+## Architecture Decision Records
 
-## After Setup
-
-Once setup is complete, replace this setup guide with project-specific AI
-instructions (e.g. coding standards, stack conventions, where to find key
-modules). See `TEMPLATE.md` for the full list of customizable items.
+ADRs live in `dev-docs/adr/YYYYMMDD-short-title.md`; index in
+`dev-docs/DECISIONS.md`. Add an ADR for any significant design choice.

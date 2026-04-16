@@ -78,3 +78,6 @@ coverage/
 logs/*
 !logs/app.log.example
 *.log
+
+# Development docs
+dev-docs/
