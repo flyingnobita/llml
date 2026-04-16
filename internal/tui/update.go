@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"fmt"
+
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 	"github.com/atotto/clipboard"
@@ -30,6 +32,66 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.runtimeScanned = true
 		return m, nil
 
+	case startupCacheHitMsg:
+		m.loading = false
+		m.loadErr = nil
+		m.runtime = msg.runtime
+		m.runtimeScanned = true
+		m.files = msg.files
+		m.lastScan = msg.lastScan
+		sortModelFiles(m.files, m.sortCol, m.sortDesc)
+		m = m.layoutTable()
+		m.hscroll.SetXOffset(0)
+		if len(m.files) > 0 {
+			m.tbl.SetCursor(0)
+		}
+		return m.maybeSetMissingRuntimeFooterNote()
+
+	case startupNeedFullScanMsg:
+		return m, applyAndFullScanCmd()
+
+	case fullScanDoneMsg:
+		m.loading = false
+		m.loadErr = nil
+		m.runtime = msg.runtime
+		m.runtimeScanned = true
+		m.files = msg.files
+		m.lastScan = msg.lastScan
+		sortModelFiles(m.files, m.sortCol, m.sortDesc)
+		m = m.layoutTable()
+		m.hscroll.SetXOffset(0)
+		if len(m.files) > 0 {
+			m.tbl.SetCursor(0)
+		}
+		if msg.writeErr != nil {
+			m = m.withLastRunError("Could not save config: " + msg.writeErr.Error())
+		} else {
+			m = m.withLastRunCleared()
+		}
+		return m.maybeSetMissingRuntimeFooterNote()
+
+	case modelRescanDoneMsg:
+		m.loading = false
+		m.loadErr = nil
+		m.files = msg.files
+		m.lastScan = msg.lastScan
+		sortModelFiles(m.files, m.sortCol, m.sortDesc)
+		m = m.layoutTable()
+		m.hscroll.SetXOffset(0)
+		if len(m.files) > 0 && m.tbl.Cursor() >= len(m.files) {
+			m.tbl.SetCursor(len(m.files) - 1)
+		}
+		if msg.writeErr != nil {
+			m = m.withLastRunError("Could not save config: " + msg.writeErr.Error())
+		} else {
+			m = m.withLastRunCleared()
+		}
+		return m.maybeSetMissingRuntimeFooterNote()
+
+	case runtimeReloadErrMsg:
+		m = m.withLastRunError(msg.err.Error())
+		return m, nil
+
 	case modelsLoadedMsg:
 		m.loading = false
 		m.loadErr = nil
@@ -40,7 +102,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if len(m.files) > 0 {
 			m.tbl.SetCursor(0)
 		}
-		return m, nil
+		return m.maybeSetMissingRuntimeFooterNote()
 
 	case modelsErrMsg:
 		m.loading = false
@@ -53,19 +115,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case llamaServerExitedMsg:
 		if m.serverRunning {
-			m.serverRunning = false
-			m.splitLogFocused = false
+			m.serverExited = true
 			m.serverCmd = nil
 			m.serverMsgCh = nil
-			m.serverLog = nil
-			m.serverLogAlignWidth = 0
-			m.serverViewport.SetContent("")
 			if msg.err != nil {
 				m = m.withLastRunError(msg.err.Error())
+				m = m.appendServerLogLine(fmt.Sprintf("%s · %s", msg.err.Error(), splitPanePressEnterToClose))
 			} else {
 				m = m.withLastRunCleared()
+				m = m.appendServerLogLine(splitServerStoppedWithHint)
 			}
-			m.tbl.Focus()
 			m = m.layoutTable()
 			return m, nil
 		}
@@ -78,6 +137,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case serverSplitReadyMsg:
 		m.serverRunning = true
+		m.serverExited = false
 		m.splitLogFocused = false
 		m.serverCmd = msg.cmd
 		m.serverMsgCh = msg.ch
@@ -135,12 +195,29 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m, cmd = m.cycleTheme()
 			return m, cmd
 		}
-		if key.Matches(msg, m.keys.Refresh) {
+		if key.Matches(msg, m.keys.RescanModels) {
+			if m.loading {
+				return m, nil
+			}
+			if m.serverRunning {
+				m = m.withLastRunError("Stop the server before re-scanning models.")
+				return m, nil
+			}
 			m.loading = true
 			m.loadErr = nil
 			m = m.withLastRunCleared()
-			m.runtimeScanned = false
-			return m, startupCmd()
+			return m, rescanModelsCmd()
+		}
+		if key.Matches(msg, m.keys.Refresh) {
+			if m.loading {
+				return m, nil
+			}
+			if m.serverRunning {
+				m = m.withLastRunError("Stop the server before reloading runtime.")
+				return m, nil
+			}
+			m = m.withLastRunCleared()
+			return m, reloadRuntimeCmd()
 		}
 		mode := runServerKeyMode(msg)
 		if mode != 0 {
@@ -217,12 +294,29 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // updateServerSplitTableKeys handles keys when the split-pane server is running
 // and focus is on the model table (navigation, refresh, horizontal scroll, etc.).
 func (m Model) updateServerSplitTableKeys(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	if key.Matches(msg, m.keys.Refresh) {
+	if key.Matches(msg, m.keys.RescanModels) {
+		if m.loading {
+			return m, nil
+		}
+		if m.serverRunning && !m.serverExited {
+			m = m.withLastRunError("Stop the server before re-scanning models.")
+			return m, nil
+		}
 		m.loading = true
 		m.loadErr = nil
 		m = m.withLastRunCleared()
-		m.runtimeScanned = false
-		return m, startupCmd()
+		return m, rescanModelsCmd()
+	}
+	if key.Matches(msg, m.keys.Refresh) {
+		if m.loading {
+			return m, nil
+		}
+		if m.serverRunning && !m.serverExited {
+			m = m.withLastRunError("Stop the server before reloading runtime.")
+			return m, nil
+		}
+		m = m.withLastRunCleared()
+		return m, reloadRuntimeCmd()
 	}
 	if key.Matches(msg, m.keys.ConfigPort) {
 		return m.openRuntimeConfig()
@@ -240,7 +334,11 @@ func (m Model) updateServerSplitTableKeys(msg tea.KeyPressMsg) (Model, tea.Cmd) 
 		return m, cmd
 	}
 	if runServerKeyMode(msg) != 0 {
-		m = m.withLastRunError("Stop the server (esc or q) before starting another.")
+		if m.serverExited {
+			m = m.withLastRunError("Dismiss the log (enter, esc, or q) before starting another.")
+		} else {
+			m = m.withLastRunError("Stop the server (esc or q) before starting another.")
+		}
 		return m, nil
 	}
 	if key.Matches(msg, m.keys.ScrollLeft) {

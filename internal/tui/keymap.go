@@ -7,18 +7,19 @@ import (
 
 // KeyMap holds key bindings. Add fields here as your TUI grows, and wire them in Update.
 type KeyMap struct {
-	Quit        key.Binding
-	Refresh     key.Binding
-	RunServer   key.Binding
-	ScrollLeft  key.Binding
-	ScrollRight key.Binding
-	Nav         key.Binding
-	CopyPath    key.Binding
-	ConfigPort  key.Binding
-	Parameters  key.Binding
-	ToggleTheme key.Binding
-	SortColumn  key.Binding
-	SortReverse key.Binding
+	Quit         key.Binding
+	Refresh      key.Binding
+	RunServer    key.Binding
+	ScrollLeft   key.Binding
+	ScrollRight  key.Binding
+	Nav          key.Binding
+	CopyPath     key.Binding
+	ConfigPort   key.Binding
+	Parameters   key.Binding
+	ToggleTheme  key.Binding
+	SortColumn   key.Binding
+	SortReverse  key.Binding
+	RescanModels key.Binding
 }
 
 // runServerKeyMode returns 1 for split-pane run (R), 2 for fullscreen [tea.ExecProcess] (ctrl+r),
@@ -51,6 +52,10 @@ func DefaultKeyMap() KeyMap {
 		Refresh: key.NewBinding(
 			key.WithKeys(FooterKeyRefresh),
 			key.WithHelp(FooterKeyRefresh, FooterDescRefresh),
+		),
+		RescanModels: key.NewBinding(
+			key.WithKeys(FooterKeyRescan),
+			key.WithHelp(FooterKeyRescan, FooterDescRescan),
 		),
 		RunServer: key.NewBinding(
 			key.WithKeys(FooterKeyRunSplit),
@@ -97,12 +102,12 @@ func DefaultKeyMap() KeyMap {
 
 // ShortHelp satisfies key.KeyMap (optional; use for help overlay later).
 func (k KeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Refresh, k.RunServer, k.ConfigPort, k.Parameters, k.SortColumn, k.SortReverse, k.ToggleTheme, k.Nav, k.Quit}
+	return []key.Binding{k.Refresh, k.RescanModels, k.RunServer, k.ConfigPort, k.Parameters, k.SortColumn, k.SortReverse, k.ToggleTheme, k.Nav, k.Quit}
 }
 
 // FullHelp satisfies key.KeyMap.
 func (k KeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
-		{k.Refresh, k.RunServer, k.ConfigPort, k.Parameters, k.SortColumn, k.SortReverse, k.ToggleTheme, k.Quit},
+		{k.Refresh, k.RescanModels, k.RunServer, k.ConfigPort, k.Parameters, k.SortColumn, k.SortReverse, k.ToggleTheme, k.Quit},
 	}
 }

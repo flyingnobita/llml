@@ -2,6 +2,7 @@ package tui
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/flyingnobita/llml/internal/llamacpp"
@@ -105,5 +106,16 @@ func TestApplyPathEnv(t *testing.T) {
 	applyPathEnv(llamacpp.EnvLlamaCppPath, "  ")
 	if os.Getenv(llamacpp.EnvLlamaCppPath) != "" {
 		t.Fatal("expected unset for whitespace-only")
+	}
+}
+
+func TestApplyPathEnv_tilde(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv(llamacpp.EnvVLLMPath, "")
+	applyPathEnv(llamacpp.EnvVLLMPath, "~/my-vllm")
+	want := filepath.Join(home, "my-vllm")
+	if got := os.Getenv(llamacpp.EnvVLLMPath); got != want {
+		t.Fatalf("got %q want %q", got, want)
 	}
 }

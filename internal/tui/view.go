@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -87,7 +88,7 @@ func (m Model) launchPreviewLineCount(innerW int) int {
 	return lipgloss.Height(s)
 }
 
-// runtimePanelView renders the bottom runtime env summary (env var = value per line).
+// runtimePanelView renders the bottom runtime summary (label = value per line).
 func runtimePanelView(m Model, contentWidth int) string {
 	if m.width == 0 {
 		return ""
@@ -101,6 +102,9 @@ func runtimePanelView(m Model, contentWidth int) string {
 	} else {
 		lines := llamacpp.RuntimePanelLines(contentWidth, m.runtime)
 		block = strings.Join(lines, "\n")
+		if !m.lastScan.IsZero() {
+			block += "\nLast model scan: " + m.lastScan.Local().Format(time.RFC3339)
+		}
 	}
 	inner := "Runtimes\n" + block
 	return m.styles.runtimePanel.Width(contentWidth).Render(inner)
@@ -109,7 +113,7 @@ func runtimePanelView(m Model, contentWidth int) string {
 const appTitle = "LLM Launcher"
 
 // lastRunNoteView renders lastRunNote as one styled line per newline-separated
-// segment (so multiple errors, e.g. missing llama-server and vllm, always show).
+// segment below the main footer (not shown inside the runtime-environment modal).
 func (m Model) lastRunNoteView() string {
 	if m.lastRunNote == "" {
 		return ""
@@ -138,15 +142,20 @@ func (m Model) lastRunNoteView() string {
 // The same convention is used for modal hint bars (runtime config, parameters).
 func footerHelpLine(m Model) string {
 	if m.serverRunning {
+		stopOrDismiss := FooterSplitStopServer
+		if m.serverExited {
+			stopOrDismiss = FooterSplitDismiss
+		}
 		if m.splitLogFocused {
 			return fmt.Sprintf(
 				"%s · %s · %s · %d×%d",
-				FooterSplitTabToTable, FooterSplitStopServer, FooterSplitLogScroll, m.width, m.height,
+				FooterSplitTabToTable, stopOrDismiss, FooterSplitLogScroll, m.width, m.height,
 			)
 		}
 		// Table focused: same global shortcuts as the idle view except run (R / ctrl+R) while a server is up.
 		parts := []string{
 			FooterHintRefresh,
+			FooterHintRescan,
 			FooterNavHint,
 			FooterHintConfigPort,
 			FooterHintParameters,
@@ -154,13 +163,14 @@ func footerHelpLine(m Model) string {
 			FooterHintToggleTheme,
 			FooterHintCopyPath,
 			FooterSplitTabToLog,
-			FooterSplitStopServer,
+			stopOrDismiss,
 			fmt.Sprintf("%d×%d", m.width, m.height),
 		}
 		return strings.Join(parts, FooterHintSep)
 	}
 	parts := []string{
 		FooterHintRefresh,
+		FooterHintRescan,
 		FooterNavHint,
 		FooterHintRunSplit,
 		FooterHintRunFullscreen,
@@ -211,7 +221,8 @@ func mainChromeLines(m Model, needsTableHBar bool, needsLogHBar bool) int {
 	return n
 }
 
-// portConfigContentWidth is the maximum text width inside the runtime/param modal box.
+// portConfigContentWidth is the maximum text width inside modals when uncapped (see
+// [Model.paramPanelContentWidth] for the wide-terminal cap used by runtime + parameters UIs).
 func (m Model) portConfigContentWidth() int {
 	if m.width <= 0 {
 		return minInnerWidth
@@ -223,8 +234,8 @@ func (m Model) portConfigContentWidth() int {
 	return w
 }
 
-// paramPanelContentWidth is the inner width for the parameters modal only. It
-// matches portConfigContentWidth on narrow terminals but is capped on wide ones.
+// paramPanelContentWidth is the inner width for the parameters and runtime-environment
+// modals. It matches portConfigContentWidth on narrow terminals but is capped on wide ones.
 func (m Model) paramPanelContentWidth() int {
 	w := m.portConfigContentWidth()
 	if w > paramPanelMaxInnerWidth {
@@ -325,6 +336,11 @@ func (m Model) mainAppPlacedView() string {
 		preview := m.launchPreviewStyled(iw)
 		var parts []string
 		parts = append(parts, m.hscroll.View())
+		if m.tableNeedsHScroll {
+			if line := horizontalScrollBarLine(m.hscroll.HorizontalScrollPercent(), iw); line != "" {
+				parts = append(parts, m.styles.footer.Render(line))
+			}
+		}
 		if preview != "" {
 			parts = append(parts, preview)
 		}
@@ -333,6 +349,11 @@ func (m Model) mainAppPlacedView() string {
 				m.serverViewport.SetHeight(m.serverViewportH)
 			}
 			parts = append(parts, m.serverLogPaneView())
+			if m.serverLogNeedsHorizontalScroll() {
+				if line := horizontalScrollBarLine(m.serverViewport.HorizontalScrollPercent(), iw); line != "" {
+					parts = append(parts, m.styles.footer.Render(line))
+				}
+			}
 			body = lipgloss.JoinVertical(lipgloss.Left, parts...)
 		} else {
 			if len(parts) == 1 {
@@ -343,30 +364,11 @@ func (m Model) mainAppPlacedView() string {
 		}
 	}
 
-	var logHBar string
-	if m.serverRunning && m.serverLogNeedsHorizontalScroll() {
-		if line := horizontalScrollBarLine(m.serverViewport.HorizontalScrollPercent(), iw); line != "" {
-			logHBar = m.styles.footer.Render(line)
-		}
-	}
-
-	var hBar string
-	if m.tableNeedsHScroll {
-		pct := m.hscroll.HorizontalScrollPercent()
-		hBar = m.styles.footer.Render(horizontalScrollBarLine(pct, iw))
-	}
-
 	footer := m.styles.footer.Render(footerHelpLine(m))
 
 	runtimePanel := runtimePanelView(m, iw)
 
 	rows := []string{title, sub, "", body}
-	if logHBar != "" {
-		rows = append(rows, logHBar)
-	}
-	if hBar != "" {
-		rows = append(rows, hBar)
-	}
 	if runtimePanel != "" {
 		rows = append(rows, runtimePanel)
 	}
@@ -435,9 +437,10 @@ func (m Model) runtimeConfigModalBlock() string {
 		}
 		return m.styles.body.Render(prefix + name)
 	}
-	cw := m.portConfigContentWidth()
+	cw := m.paramPanelContentWidth()
 	rows := []string{
 		m.modalTitleRow(cw, m.styles.portConfigTitle, "Runtime environment"),
+		m.styles.subtitle.Width(cw).Render(runtimeConfigModalSubtitle),
 		"",
 		label(m.runtimeFocus == runtimeFieldLlamaCppPath, llamacpp.EnvLlamaCppPath),
 		m.runtimeInputs[runtimeFieldLlamaCppPath].View(),
@@ -445,7 +448,7 @@ func (m Model) runtimeConfigModalBlock() string {
 		label(m.runtimeFocus == runtimeFieldVLLMPath, llamacpp.EnvVLLMPath),
 		m.runtimeInputs[runtimeFieldVLLMPath].View(),
 		"",
-		label(m.runtimeFocus == runtimeFieldVLLMVenv, llamacpp.EnvVLLMVenv),
+		label(m.runtimeFocus == runtimeFieldVLLMVenv, runtimeConfigLabelVLLMVenv),
 		m.runtimeInputs[runtimeFieldVLLMVenv].View(),
 		"",
 		label(m.runtimeFocus == runtimeFieldLlamaPort, llamacpp.EnvLlamaServerPort),
@@ -457,9 +460,6 @@ func (m Model) runtimeConfigModalBlock() string {
 		m.styles.footer.Render(FooterRuntimeConfigHints),
 	}
 	block := lipgloss.JoinVertical(lipgloss.Left, rows...)
-	if m.lastRunNote != "" {
-		block = lipgloss.JoinVertical(lipgloss.Left, block, "", m.lastRunNoteView())
-	}
 	return m.styles.portConfigBox.Render(block)
 }
 

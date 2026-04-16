@@ -34,6 +34,8 @@ func TestModelsLoadedSelectsFirstRow(t *testing.T) {
 	m := New()
 	m.width = 120
 	m.height = 40
+	// Resolved llama-server path present so the missing-runtime footer line is not set for GGUF rows.
+	m.runtime = llamacpp.RuntimeInfo{LlamaServerPath: "/fake/llama-server"}
 	files := []llamacpp.ModelFile{
 		{Backend: llamacpp.BackendLlama, Path: "/a.gguf", Name: "a", Size: 1, ModTime: time.Unix(0, 0)},
 		{Backend: llamacpp.BackendLlama, Path: "/b.gguf", Name: "b", Size: 1, ModTime: time.Unix(0, 0)},
@@ -45,6 +47,73 @@ func TestModelsLoadedSelectsFirstRow(t *testing.T) {
 	m = next.(Model)
 	if m.tbl.Cursor() != 0 {
 		t.Fatalf("cursor %d want 0 (first row)", m.tbl.Cursor())
+	}
+}
+
+func TestModelsLoaded_FooterErrorWhenGGUFWithoutLlamaServer(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	m := New()
+	m.width = 120
+	m.height = 40
+	m.runtime = llamacpp.RuntimeInfo{}
+	files := []llamacpp.ModelFile{
+		{Backend: llamacpp.BackendLlama, Path: "/a.gguf", Name: "a", Size: 1, ModTime: time.Unix(0, 0)},
+	}
+	next, cmd := m.Update(modelsLoadedMsg{files: files})
+	if cmd != nil {
+		t.Fatal("unexpected cmd from modelsLoadedMsg")
+	}
+	m = next.(Model)
+	if m.runtimeConfigOpen {
+		t.Fatal("runtime config should not auto-open")
+	}
+	if !strings.Contains(m.lastRunNote, MissingLlamaServerFooterNote) {
+		t.Fatalf("lastRunNote %q", m.lastRunNote)
+	}
+}
+
+func TestModelsLoaded_FooterErrorWhenVLLMWithoutVllm(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	m := New()
+	m.width = 120
+	m.height = 40
+	m.runtime = llamacpp.RuntimeInfo{}
+	files := []llamacpp.ModelFile{
+		{Backend: llamacpp.BackendVLLM, Path: "/m", Name: "m", Size: 1, ModTime: time.Unix(0, 0)},
+	}
+	next, cmd := m.Update(modelsLoadedMsg{files: files})
+	if cmd != nil {
+		t.Fatal("unexpected cmd from modelsLoadedMsg")
+	}
+	m = next.(Model)
+	if m.runtimeConfigOpen {
+		t.Fatal("runtime config should not auto-open")
+	}
+	if !strings.Contains(m.lastRunNote, MissingVLLMFooterNote) {
+		t.Fatalf("lastRunNote %q", m.lastRunNote)
+	}
+}
+
+func TestModelsLoaded_FooterErrorBothBackendsMissing(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	m := New()
+	m.width = 120
+	m.height = 40
+	m.runtime = llamacpp.RuntimeInfo{}
+	files := []llamacpp.ModelFile{
+		{Backend: llamacpp.BackendLlama, Path: "/a.gguf", Name: "a", Size: 1, ModTime: time.Unix(0, 0)},
+		{Backend: llamacpp.BackendVLLM, Path: "/m", Name: "m", Size: 1, ModTime: time.Unix(0, 0)},
+	}
+	next, cmd := m.Update(modelsLoadedMsg{files: files})
+	if cmd != nil {
+		t.Fatal("unexpected cmd from modelsLoadedMsg")
+	}
+	m = next.(Model)
+	if m.runtimeConfigOpen {
+		t.Fatal("runtime config should not auto-open")
+	}
+	if !strings.Contains(m.lastRunNote, MissingLlamaServerFooterNote) || !strings.Contains(m.lastRunNote, MissingVLLMFooterNote) {
+		t.Fatalf("lastRunNote %q", m.lastRunNote)
 	}
 }
 
@@ -115,8 +184,9 @@ func TestViewAltScreen(t *testing.T) {
 // fully visible in a common terminal size, including the navigation hint bar.
 func TestMainViewShowsTitleAndFooterNavHint(t *testing.T) {
 	m := New()
-	m.width = minTerminalWidth
-	m.height = 24
+	// Footer line is longer than [minTerminalWidth]; use a width that fits the full hint bar.
+	m.width = 100
+	m.height = 32
 	m.loading = false
 	m.files = []llamacpp.ModelFile{
 		{Backend: llamacpp.BackendLlama, Path: "/a.gguf", Name: "a", Size: 1, ModTime: time.Unix(0, 0)},
@@ -136,7 +206,7 @@ func TestMainViewShowsTitleAndFooterNavHint(t *testing.T) {
 func TestSplitViewShowsTitleAndFooterHints(t *testing.T) {
 	m := New()
 	m.width = 100
-	m.height = 24
+	m.height = 32
 	m.loading = false
 	m.serverRunning = true
 	m.splitLogFocused = false

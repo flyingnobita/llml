@@ -22,8 +22,8 @@ const (
 	// appSubtitle is the subtitle line shown below the app title.
 	appSubtitle = "llama.cpp (GGUF) · vLLM (config.json + safetensors) — filesystem scan · Last modified = file mtime"
 
-	// paramPanelMaxInnerWidth caps the parameters modal inner width on wide
-	// terminals so the panel does not stretch edge-to-edge.
+	// paramPanelMaxInnerWidth caps the parameters and runtime-environment modal inner
+	// width on wide terminals so panels do not stretch edge-to-edge.
 	paramPanelMaxInnerWidth = 88
 
 	// maxServerLogLines is the rolling cap for split-pane server log lines.
@@ -63,8 +63,12 @@ const (
 
 	// Main view (idle).
 	FooterKeyRefresh  = "r"
-	FooterDescRefresh = "refresh"
+	FooterDescRefresh = "reload runtime"
 	FooterHintRefresh = FooterKeyRefresh + ": " + FooterDescRefresh
+
+	FooterKeyRescan  = "S"
+	FooterDescRescan = "rescan models"
+	FooterHintRescan = FooterKeyRescan + ": " + FooterDescRescan
 
 	FooterKeyRunSplit  = "R"
 	FooterDescRunSplit = "run (split)"
@@ -96,6 +100,10 @@ const (
 	CopyCommandFeedbackSuccess = "Command copied to clipboard"
 	CopyCommandFeedbackFailure = "Command failed to copy to clipboard"
 
+	// Missing-runtime footer lines after model scan (see maybeSetMissingRuntimeFooterNote).
+	MissingLlamaServerFooterNote = "llama-server not found - press " + FooterKeyConfigPort + " to set path manually"
+	MissingVLLMFooterNote        = "vllm not found - press " + FooterKeyConfigPort + " to set path manually"
+
 	FooterKeySortColumn  = ","
 	FooterDescSortColumn = "sort column"
 	FooterHintSortColumn = FooterKeySortColumn + ": " + FooterDescSortColumn
@@ -117,11 +125,21 @@ const (
 	FooterSplitTabToTable = "tab: model table"
 	FooterSplitTabToLog   = "tab: server log"
 	FooterSplitStopServer = "esc/q: stop server"
+	FooterSplitDismiss    = "enter/esc/q: close"
 	// Server log pane focused: viewport keys (see charm.land/bubbles/v2/viewport DefaultKeyMap).
 	FooterSplitLogScroll = "j/k/↑↓/f/pgdn: scroll log · ←/→/h/l: wide log"
 
+	// splitPanePressEnterToClose is appended to the split log after the server process exits.
+	splitPanePressEnterToClose = "Press Enter to close..."
+	// splitServerStoppedWithHint is shown on clean exit before the user dismisses the pane.
+	splitServerStoppedWithHint = "Server stopped. Press Enter to close..."
+
 	// Runtime config modal.
 	FooterRuntimeConfigHints = "tab: next · shift+tab: prev · enter: save · esc: cancel"
+	// runtimeConfigModalSubtitle appears below the modal title (values here override startup detection).
+	runtimeConfigModalSubtitle = "Following overrides any configuration found during startup detection."
+	// runtimeConfigLabelVLLMVenv is the field label for the optional venv root (env var remains VLLM_VENV).
+	runtimeConfigLabelVLLMVenv = "VLLM_VENV (Optional - autodetect if not set)"
 
 	// Parameters modal (per-key fragments, then full footers composed with [FooterHintSep]).
 	FooterParamTabSections = "tab/shift+tab: sections"

@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	btable "charm.land/bubbles/v2/table"
 	"charm.land/bubbles/v2/textinput"
@@ -59,8 +60,12 @@ type Model struct {
 
 	homeDir string // from [os.UserHomeDir] at startup; used for path display (~/)
 
+	// lastScan is the timestamp of the last full model filesystem scan written to config.toml.
+	lastScan time.Time
+
 	// Split-pane server (R): subprocess logs in lower half; see run_server.go.
 	serverRunning       bool
+	serverExited        bool // true after the process exits; split pane stays until [dismissSplitServer].
 	serverCmd           *exec.Cmd
 	serverMsgCh         chan tea.Msg
 	serverLog           []string
@@ -373,5 +378,21 @@ func (m Model) withLastRunSuccess(msg string) Model {
 func (m Model) withLastRunCleared() Model {
 	m.lastRunNote = ""
 	m.lastRunNoteSuccess = false
+	return m
+}
+
+// dismissSplitServer clears split-pane server state after the user dismisses the
+// log (enter/esc/q) or tears down the UI after a non-split [llamaServerExitedMsg].
+func (m Model) dismissSplitServer() Model {
+	m.serverRunning = false
+	m.serverExited = false
+	m.splitLogFocused = false
+	m.serverCmd = nil
+	m.serverMsgCh = nil
+	m.serverLog = nil
+	m.serverLogAlignWidth = 0
+	m.serverViewport.SetContent("")
+	m.tbl.Focus()
+	m = m.layoutTable()
 	return m
 }

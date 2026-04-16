@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -61,13 +62,19 @@ func prefillPort(envKey string, effective int) string {
 }
 
 // applyPathEnv sets or unsets a path-style environment variable (trimmed; empty unsets).
+// A leading "~" or "~/" is expanded to the user's home directory ([llamacpp.ExpandTildePath]).
 func applyPathEnv(key, raw string) {
 	v := strings.TrimSpace(raw)
 	if v == "" {
 		os.Unsetenv(key)
-	} else {
-		os.Setenv(key, v)
+		return
 	}
+	v = filepath.Clean(llamacpp.ExpandTildePath(v))
+	if v == "" || v == "." {
+		os.Unsetenv(key)
+		return
+	}
+	os.Setenv(key, v)
 }
 
 func validatePortInput(s string) error {
@@ -116,6 +123,12 @@ func newPathTextInput() textinput.Model {
 
 // openRuntimeConfig shows editors for the same env vars summarized in the runtimes footer.
 func (m Model) openRuntimeConfig() (Model, tea.Cmd) {
+	return m.openRuntimeConfigFocused(runtimeFieldLlamaCppPath)
+}
+
+// openRuntimeConfigFocused opens the runtime editor with the given field focused and clears any
+// footer status line ([Model.lastRunNote]).
+func (m Model) openRuntimeConfigFocused(focus int) (Model, tea.Cmd) {
 	m.runtimeConfigOpen = true
 	m = m.withLastRunCleared()
 	m.runtimeInputs[runtimeFieldLlamaCppPath].SetValue(os.Getenv(llamacpp.EnvLlamaCppPath))
@@ -123,7 +136,38 @@ func (m Model) openRuntimeConfig() (Model, tea.Cmd) {
 	m.runtimeInputs[runtimeFieldVLLMVenv].SetValue(os.Getenv(llamacpp.EnvVLLMVenv))
 	m.runtimeInputs[runtimeFieldLlamaPort].SetValue(prefillPort(llamacpp.EnvLlamaServerPort, llamacpp.ListenPort()))
 	m.runtimeInputs[runtimeFieldVLLMPort].SetValue(prefillPort(llamacpp.EnvVLLMServerPort, llamacpp.VLLMPort()))
-	return m.focusRuntimeField(runtimeFieldLlamaCppPath)
+	return m.focusRuntimeField(focus)
+}
+
+// maybeSetMissingRuntimeFooterNote sets [Model.lastRunNote] when the scan found models that need a
+// backend binary, but [llamacpp.ResolveLlamaServerPath] or [llamacpp.ResolveVLLMPath] is empty.
+// GGUF rows require llama-server; vLLM rows require vllm. Clears the footer line when neither applies.
+func (m Model) maybeSetMissingRuntimeFooterNote() (Model, tea.Cmd) {
+	var wantLlama, wantVLLM bool
+	for _, f := range m.files {
+		switch f.Backend {
+		case llamacpp.BackendLlama:
+			wantLlama = true
+		case llamacpp.BackendVLLM:
+			wantVLLM = true
+		}
+	}
+	haveLlama := llamacpp.ResolveLlamaServerPath(m.runtime) != ""
+	haveVLLM := llamacpp.ResolveVLLMPath(m.runtime) != ""
+
+	var msgs []string
+	if wantLlama && !haveLlama {
+		msgs = append(msgs, MissingLlamaServerFooterNote)
+	}
+	if wantVLLM && !haveVLLM {
+		msgs = append(msgs, MissingVLLMFooterNote)
+	}
+	if len(msgs) > 0 {
+		m = m.withLastRunError(strings.Join(msgs, "\n"))
+	} else {
+		m = m.withLastRunCleared()
+	}
+	return m, nil
 }
 
 func (m Model) closeRuntimeConfig() Model {
@@ -172,7 +216,11 @@ func (m Model) commitRuntimeConfig() (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.runtime = llamacpp.DiscoverRuntime()
-	m = m.withLastRunCleared()
+	if err := writeConfigFromModel(m); err != nil {
+		m = m.withLastRunError("Could not save config: " + err.Error())
+	} else {
+		m = m.withLastRunCleared()
+	}
 	m = m.closeRuntimeConfig()
 	return m, nil
 }
