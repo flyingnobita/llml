@@ -4,6 +4,33 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
+// renderEditableListItems renders the rows for one editable param section (env vars or extra args).
+// It uses "› " prefix for the focused row, shows the inline edit input when that row is being edited,
+// and renders "(none)" when the list is empty and not in an active-append edit.
+func (m Model) renderEditableListItems(items []string, sectionFocus paramFocus, cursor int, sectionEditKind paramEditKind, maxSec int) []string {
+	if len(items) == 0 && !(m.params.focus == sectionFocus && m.params.editKind == sectionEditKind) {
+		prefix := "  "
+		if m.params.focus == sectionFocus {
+			prefix = "› "
+		}
+		return []string{m.ui.styles.body.Render(prefix + "(none)")}
+	}
+	rows := make([]string, 0, len(items))
+	for i, line := range items {
+		focused := m.params.focus == sectionFocus && cursor == i
+		if focused && m.params.editKind == sectionEditKind {
+			rows = append(rows, m.params.editInput.View())
+		} else {
+			prefix := "  "
+			if focused {
+				prefix = "› "
+			}
+			rows = append(rows, m.ui.styles.body.Render(prefix+truncateParamLine(line, maxSec)))
+		}
+	}
+	return rows
+}
+
 func (m Model) paramPanelModalBlock() string {
 	cw := m.paramPanelContentWidth()
 	maxLine := cw
@@ -112,27 +139,11 @@ func (m Model) paramPanelModalBlock() string {
 		m.ui.styles.paramSectionHeading.Render(truncateParamLine(envHeading, maxSec-lipgloss.Width(sectionHeadingIndent))),
 	))
 	detailRows = append(detailRows, "")
-	if m.paramEnvLen() == 0 && !(m.params.focus == paramFocusEnv && m.params.editKind == paramEditEnvLine) {
-		prefix := "  "
-		if m.params.focus == paramFocusEnv {
-			prefix = "› "
-		}
-		detailRows = append(detailRows, m.ui.styles.body.Render(prefix+"(none)"))
+	envItems := make([]string, len(m.params.env))
+	for i, e := range m.params.env {
+		envItems[i] = formatEnvVar(e)
 	}
-	for i := range m.params.env {
-		line := formatEnvVar(m.params.env[i])
-		focused := m.params.focus == paramFocusEnv && m.params.envCursor == i
-		switch {
-		case focused && m.params.editKind == paramEditEnvLine:
-			detailRows = append(detailRows, m.params.editInput.View())
-		default:
-			prefix := "  "
-			if focused {
-				prefix = "› "
-			}
-			detailRows = append(detailRows, m.ui.styles.body.Render(prefix+truncateParamLine(line, maxSec)))
-		}
-	}
+	detailRows = append(detailRows, m.renderEditableListItems(envItems, paramFocusEnv, m.params.envCursor, paramEditEnvLine, maxSec)...)
 
 	detailRows = append(detailRows, "")
 
@@ -142,27 +153,7 @@ func (m Model) paramPanelModalBlock() string {
 		m.ui.styles.paramSectionHeading.Render(truncateParamLine(argHeading, maxSec-lipgloss.Width(sectionHeadingIndent))),
 	))
 	detailRows = append(detailRows, "")
-	if m.paramArgsLen() == 0 && !(m.params.focus == paramFocusArgs && m.params.editKind == paramEditArgLine) {
-		prefix := "  "
-		if m.params.focus == paramFocusArgs {
-			prefix = "› "
-		}
-		detailRows = append(detailRows, m.ui.styles.body.Render(prefix+"(none)"))
-	}
-	for i := range m.params.args {
-		line := m.params.args[i]
-		focused := m.params.focus == paramFocusArgs && m.params.argsCursor == i
-		switch {
-		case focused && m.params.editKind == paramEditArgLine:
-			detailRows = append(detailRows, m.params.editInput.View())
-		default:
-			prefix := "  "
-			if focused {
-				prefix = "› "
-			}
-			detailRows = append(detailRows, m.ui.styles.body.Render(prefix+truncateParamLine(line, maxSec)))
-		}
-	}
+	detailRows = append(detailRows, m.renderEditableListItems(m.params.args, paramFocusArgs, m.params.argsCursor, paramEditArgLine, maxSec)...)
 	rows = append(rows, secBox.Width(cw).Render(lipgloss.JoinVertical(lipgloss.Left, detailRows...)))
 
 	var footerHelp string

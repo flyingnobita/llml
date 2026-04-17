@@ -172,140 +172,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	case tea.KeyPressMsg:
-		if m.params.open {
-			return m.updateParamPanelKey(msg)
-		}
-		if m.rc.open {
-			return m.updateRuntimeConfigKey(msg)
-		}
-		if m.server.running {
-			return m.updateServerSplitKeys(msg)
-		}
-		if key.Matches(msg, m.keys.Quit) {
-			return m, tea.Quit
-		}
-		if m.preview.focused && isTabKey(msg) {
-			m.preview.focused = false
-			m.table.tbl.Focus()
-			m = m.applyMainPaneFocusStyles()
-			return m, nil
-		}
-		if key.Matches(msg, m.keys.ConfigPort) {
-			return m.openRuntimeConfig()
-		}
-		if key.Matches(msg, m.keys.Parameters) {
-			if m.loading {
-				m = m.withLastRunError("Wait for the model scan to finish.")
-				return m, nil
-			}
-			return m.openParamPanel()
-		}
-		if key.Matches(msg, m.keys.ToggleTheme) {
-			var cmd tea.Cmd
-			m, cmd = m.cycleTheme()
-			return m, cmd
-		}
-		if key.Matches(msg, m.keys.RescanModels) {
-			if m.loading {
-				return m, nil
-			}
-			if m.server.running {
-				m = m.withLastRunError("Stop the server before re-scanning models.")
-				return m, nil
-			}
-			m.loading = true
-			m.loadErr = nil
-			m = m.withLastRunCleared()
-			return m, rescanModelsCmd()
-		}
-		if key.Matches(msg, m.keys.Refresh) {
-			if m.loading {
-				return m, nil
-			}
-			if m.server.running {
-				m = m.withLastRunError("Stop the server before reloading runtime.")
-				return m, nil
-			}
-			m = m.withLastRunCleared()
-			return m, reloadRuntimeCmd()
-		}
-		mode := runServerKeyMode(msg)
-		if mode != runServerModeNone {
-			if m.loading {
-				m = m.withLastRunError("Wait for the model scan to finish.")
-				return m, nil
-			}
-			p, be := m.SelectedModel()
-			if p == "" {
-				m = m.withLastRunError("Select a model row first.")
-				return m, nil
-			}
-			m = m.withLastRunCleared()
-			params, _ := loadModelParamsForRun(p)
-			spec, err := buildServerSpec(be, p, params, m.runtime)
-			if err != nil {
-				return m.withLastRunError(err.Error()), nil
-			}
-			if mode == runServerModeFullscreen {
-				return m, runForegroundServerCmd(spec)
-			}
-			return m, runSplitServerCmd(spec)
-		}
-		if key.Matches(msg, m.keys.ScrollLeft) {
-			m.table.hscroll.ScrollLeft(hScrollStep)
-			return m, nil
-		}
-		if key.Matches(msg, m.keys.ScrollRight) {
-			m.table.hscroll.ScrollRight(hScrollStep)
-			return m, nil
-		}
-		if key.Matches(msg, m.keys.CopyPath) {
-			m = copyLaunchCommandToClipboard(m)
-			return m, nil
-		}
-		if key.Matches(msg, m.keys.SortColumn) {
-			if m.loading || len(m.table.files) == 0 {
-				return m, nil
-			}
-			sel := m.SelectedPath()
-			m.table.sortCol = (m.table.sortCol + 1) % tableSortColCount
-			m = m.applyTableSort(sel)
-			return m, nil
-		}
-		if key.Matches(msg, m.keys.SortReverse) {
-			if m.loading || len(m.table.files) == 0 {
-				return m, nil
-			}
-			sel := m.SelectedPath()
-			m.table.sortDesc = !m.table.sortDesc
-			m = m.applyTableSort(sel)
-			return m, nil
-		}
-		if m.preview.focused {
-			var cmd tea.Cmd
-			m.preview.viewport, cmd = m.preview.viewport.Update(msg)
-			return m, cmd
-		}
-		if launchPreviewScrollable(m) {
-			if key.Matches(msg, m.keys.LaunchPreviewScrollUp) {
-				m.preview.viewport.ScrollUp(1)
-				return m, nil
-			}
-			if key.Matches(msg, m.keys.LaunchPreviewScrollDown) {
-				m.preview.viewport.ScrollDown(1)
-				return m, nil
-			}
-		}
-		if !m.loading && len(m.table.files) > 0 && launchPreviewScrollable(m) && isTabKey(msg) {
-			m.preview.focused = true
-			m.table.tbl.Blur()
-			m = m.applyMainPaneFocusStyles()
-			return m, nil
-		}
-		var cmd tea.Cmd
-		m.table.tbl, cmd = m.table.tbl.Update(msg)
-		m = m.withLaunchPreviewSynced()
-		return m, cmd
+		return m.handleKey(msg)
 	}
 
 	var cmd tea.Cmd
@@ -319,6 +186,144 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	m.table.tbl, cmd = m.table.tbl.Update(msg)
 	return m, cmd
+}
+
+// handleKey routes key presses in the idle (no server, no modal) state.
+func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if m.params.open {
+		return m.updateParamPanelKey(msg)
+	}
+	if m.rc.open {
+		return m.updateRuntimeConfigKey(msg)
+	}
+	if m.server.running {
+		return m.updateServerSplitKeys(msg)
+	}
+	if key.Matches(msg, m.keys.Quit) {
+		return m, tea.Quit
+	}
+	if m.preview.focused && isTabKey(msg) {
+		m.preview.focused = false
+		m.table.tbl.Focus()
+		m = m.applyMainPaneFocusStyles()
+		return m, nil
+	}
+	if m2, cmd, handled := m.tableNavKeys(msg); handled {
+		return m2, cmd
+	}
+	if key.Matches(msg, m.keys.RescanModels) {
+		if m.loading {
+			return m, nil
+		}
+		if m.server.running {
+			m = m.withLastRunError("Stop the server before re-scanning models.")
+			return m, nil
+		}
+		m.loading = true
+		m.loadErr = nil
+		m = m.withLastRunCleared()
+		return m, rescanModelsCmd()
+	}
+	if key.Matches(msg, m.keys.Refresh) {
+		if m.loading {
+			return m, nil
+		}
+		if m.server.running {
+			m = m.withLastRunError("Stop the server before reloading runtime.")
+			return m, nil
+		}
+		m = m.withLastRunCleared()
+		return m, reloadRuntimeCmd()
+	}
+	mode := runServerKeyMode(msg)
+	if mode != runServerModeNone {
+		if m.loading {
+			m = m.withLastRunError("Wait for the model scan to finish.")
+			return m, nil
+		}
+		p, be := m.SelectedModel()
+		if p == "" {
+			m = m.withLastRunError("Select a model row first.")
+			return m, nil
+		}
+		m = m.withLastRunCleared()
+		params, _ := loadModelParamsForRun(p)
+		spec, err := buildServerSpec(be, p, params, m.runtime)
+		if err != nil {
+			return m.withLastRunError(err.Error()), nil
+		}
+		if mode == runServerModeFullscreen {
+			return m, runForegroundServerCmd(spec)
+		}
+		return m, runSplitServerCmd(spec)
+	}
+	if m.preview.focused {
+		var cmd tea.Cmd
+		m.preview.viewport, cmd = m.preview.viewport.Update(msg)
+		return m, cmd
+	}
+	if launchPreviewScrollable(m) {
+		if key.Matches(msg, m.keys.LaunchPreviewScrollUp) {
+			m.preview.viewport.ScrollUp(1)
+			return m, nil
+		}
+		if key.Matches(msg, m.keys.LaunchPreviewScrollDown) {
+			m.preview.viewport.ScrollDown(1)
+			return m, nil
+		}
+	}
+	if !m.loading && len(m.table.files) > 0 && launchPreviewScrollable(m) && isTabKey(msg) {
+		m.preview.focused = true
+		m.table.tbl.Blur()
+		m = m.applyMainPaneFocusStyles()
+		return m, nil
+	}
+	var cmd tea.Cmd
+	m.table.tbl, cmd = m.table.tbl.Update(msg)
+	m = m.withLaunchPreviewSynced()
+	return m, cmd
+}
+
+// tableNavKeys handles bindings that are identical in both the idle and split-pane table focus state:
+// config, params, theme, scroll, copy, sort. Returns (model, cmd, handled).
+func (m Model) tableNavKeys(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
+	switch {
+	case key.Matches(msg, m.keys.ConfigPort):
+		m2, cmd := m.openRuntimeConfig()
+		return m2, cmd, true
+	case key.Matches(msg, m.keys.Parameters):
+		if m.loading {
+			return m.withLastRunError("Wait for the model scan to finish."), nil, true
+		}
+		m2, cmd := m.openParamPanel()
+		return m2, cmd, true
+	case key.Matches(msg, m.keys.ToggleTheme):
+		m2, cmd := m.cycleTheme()
+		return m2, cmd, true
+	case key.Matches(msg, m.keys.ScrollLeft):
+		m.table.hscroll.ScrollLeft(hScrollStep)
+		return m, nil, true
+	case key.Matches(msg, m.keys.ScrollRight):
+		m.table.hscroll.ScrollRight(hScrollStep)
+		return m, nil, true
+	case key.Matches(msg, m.keys.CopyPath):
+		return copyLaunchCommandToClipboard(m), nil, true
+	case key.Matches(msg, m.keys.SortColumn):
+		if m.loading || len(m.table.files) == 0 {
+			return m, nil, true
+		}
+		sel := m.SelectedPath()
+		m.table.sortCol = (m.table.sortCol + 1) % tableSortColCount
+		return m.applyTableSort(sel), nil, true
+	case key.Matches(msg, m.keys.SortReverse):
+		if m.loading || len(m.table.files) == 0 {
+			return m, nil, true
+		}
+		sel := m.SelectedPath()
+		m.table.sortDesc = !m.table.sortDesc
+		return m.applyTableSort(sel), nil, true
+	}
+	return m, nil, false
 }
 
 // updateServerSplitTableKeys handles keys when the split-pane server is running
@@ -348,21 +353,6 @@ func (m Model) updateServerSplitTableKeys(msg tea.KeyPressMsg) (Model, tea.Cmd) 
 		m = m.withLastRunCleared()
 		return m, reloadRuntimeCmd()
 	}
-	if key.Matches(msg, m.keys.ConfigPort) {
-		return m.openRuntimeConfig()
-	}
-	if key.Matches(msg, m.keys.Parameters) {
-		if m.loading {
-			m = m.withLastRunError("Wait for the model scan to finish.")
-			return m, nil
-		}
-		return m.openParamPanel()
-	}
-	if key.Matches(msg, m.keys.ToggleTheme) {
-		var cmd tea.Cmd
-		m, cmd = m.cycleTheme()
-		return m, cmd
-	}
 	if runServerKeyMode(msg) != runServerModeNone {
 		if m.server.exited {
 			m = m.withLastRunError("Dismiss the log (enter, esc, or q) before starting another.")
@@ -371,35 +361,8 @@ func (m Model) updateServerSplitTableKeys(msg tea.KeyPressMsg) (Model, tea.Cmd) 
 		}
 		return m, nil
 	}
-	if key.Matches(msg, m.keys.ScrollLeft) {
-		m.table.hscroll.ScrollLeft(hScrollStep)
-		return m, nil
-	}
-	if key.Matches(msg, m.keys.ScrollRight) {
-		m.table.hscroll.ScrollRight(hScrollStep)
-		return m, nil
-	}
-	if key.Matches(msg, m.keys.CopyPath) {
-		m = copyLaunchCommandToClipboard(m)
-		return m, nil
-	}
-	if key.Matches(msg, m.keys.SortColumn) {
-		if m.loading || len(m.table.files) == 0 {
-			return m, nil
-		}
-		sel := m.SelectedPath()
-		m.table.sortCol = (m.table.sortCol + 1) % tableSortColCount
-		m = m.applyTableSort(sel)
-		return m, nil
-	}
-	if key.Matches(msg, m.keys.SortReverse) {
-		if m.loading || len(m.table.files) == 0 {
-			return m, nil
-		}
-		sel := m.SelectedPath()
-		m.table.sortDesc = !m.table.sortDesc
-		m = m.applyTableSort(sel)
-		return m, nil
+	if m2, cmd, handled := m.tableNavKeys(msg); handled {
+		return m2, cmd
 	}
 	var cmd tea.Cmd
 	m.table.tbl, cmd = m.table.tbl.Update(msg)
