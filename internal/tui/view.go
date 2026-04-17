@@ -128,7 +128,7 @@ func runtimePanelView(m Model, contentWidth int) string {
 	if !m.runtimeScanned && m.loading {
 		block = "Detecting runtimes…"
 	} else {
-		lines := models.RuntimePanelLines(contentWidth, m.runtime)
+		lines := RuntimePanelLines(contentWidth, m.runtime)
 		block = strings.Join(lines, "\n")
 		if !m.lastScan.IsZero() {
 			block += "\nLast model scan: " + m.lastScan.Local().Format(time.RFC3339)

@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"strconv"
@@ -36,6 +37,35 @@ type RuntimeInfo struct {
 // Available is true if either binary was found, vLLM was found, or a llama-server responded on the health probe.
 func (r RuntimeInfo) Available() bool {
 	return r.LlamaCLIPath != "" || r.LlamaServerPath != "" || r.VLLMPath != "" || r.ServerRunning
+}
+
+func formatBinLabel(abs string) string {
+	if abs == "" {
+		return "—"
+	}
+	return "✓"
+}
+
+// Summary is a single-line status for the TUI (no trailing newline).
+func (r RuntimeInfo) Summary() string {
+	var base string
+	switch {
+	case r.LlamaCLIPath != "" && r.LlamaServerPath != "":
+		base = fmt.Sprintf("llama.cpp: cli %s · server %s", formatBinLabel(r.LlamaCLIPath), formatBinLabel(r.LlamaServerPath))
+	case r.LlamaCLIPath != "":
+		base = fmt.Sprintf("llama.cpp: cli %s · server —", formatBinLabel(r.LlamaCLIPath))
+	case r.LlamaServerPath != "":
+		base = fmt.Sprintf("llama.cpp: cli — · server %s", formatBinLabel(r.LlamaServerPath))
+	case r.ServerRunning:
+		base = fmt.Sprintf("llama.cpp: binaries not on PATH — server running :%d", r.ProbePort)
+	default:
+		base = "llama.cpp: not found — set " + EnvLlamaCppPath + " or install to PATH (Homebrew: ensure /opt/homebrew/bin is on PATH)"
+	}
+	v := "vllm: —"
+	if r.VLLMPath != "" {
+		v = "vllm: ✓"
+	}
+	return base + " · " + v
 }
 
 // DiscoverRuntime locates llama-cli and llama-server using LLAMA_CPP_PATH, common install

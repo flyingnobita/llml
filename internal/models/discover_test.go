@@ -207,14 +207,3 @@ func TestSkipListedModel(t *testing.T) {
 		t.Fatal("expected to keep main weights")
 	}
 }
-
-func TestTruncateRunes(t *testing.T) {
-	s := "hello世界"
-	if TruncateRunes(s, 100) != s {
-		t.Fatalf("short string changed")
-	}
-	got := TruncateRunes("abcdefghijklmnopqrstuvwxyz", 8)
-	if len(got) < 2 {
-		t.Fatalf("expected ellipsis suffix")
-	}
-}

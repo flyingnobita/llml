@@ -1,4 +1,4 @@
-package models
+package tui
 
 import (
 	"os"
@@ -6,16 +6,18 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/flyingnobita/llml/internal/models"
 )
 
 func TestRuntimePanelLines(t *testing.T) {
-	t.Setenv(EnvLlamaServerPort, "")
-	t.Setenv(EnvVLLMServerPort, "")
-	t.Setenv(EnvVLLMVenv, "")
-	t.Setenv(EnvLlamaCppPath, "")
-	t.Setenv(EnvVLLMPath, "")
+	t.Setenv(models.EnvLlamaServerPort, "")
+	t.Setenv(models.EnvVLLMServerPort, "")
+	t.Setenv(models.EnvVLLMVenv, "")
+	t.Setenv(models.EnvLlamaCppPath, "")
+	t.Setenv(models.EnvVLLMPath, "")
 
-	r := RuntimeInfo{
+	r := models.RuntimeInfo{
 		LlamaServerPath: "/home/u/llama.cpp/bin/llama-server",
 		VLLMPath:        "/home/u/.local/bin/vllm",
 		ServerRunning:   false,
@@ -44,9 +46,9 @@ func TestRuntimePanelLines(t *testing.T) {
 }
 
 func TestRuntimePanelLines_ServerRunningNoBinary(t *testing.T) {
-	t.Setenv(EnvLlamaServerPort, "")
+	t.Setenv(models.EnvLlamaServerPort, "")
 	t.Setenv("PATH", t.TempDir()) // ResolveLlamaServerPath must not find llama-server via LookPath
-	r := RuntimeInfo{
+	r := models.RuntimeInfo{
 		LlamaServerPath: "",
 		ServerRunning:   true,
 		ProbePort:       8080,
@@ -82,14 +84,14 @@ func TestRuntimePanelLines_VLLMVenvInferred(t *testing.T) {
 	if err := os.WriteFile(vllm, []byte{}, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv(EnvLlamaCppPath, "")
-	t.Setenv(EnvVLLMPath, "")
-	t.Setenv(EnvVLLMVenv, "")
-	t.Setenv(EnvLlamaServerPort, "")
-	t.Setenv(EnvVLLMServerPort, "")
+	t.Setenv(models.EnvLlamaCppPath, "")
+	t.Setenv(models.EnvVLLMPath, "")
+	t.Setenv(models.EnvVLLMVenv, "")
+	t.Setenv(models.EnvLlamaServerPort, "")
+	t.Setenv(models.EnvVLLMServerPort, "")
 	t.Setenv("PATH", binDir)
 
-	info := DiscoverRuntime()
+	info := models.DiscoverRuntime()
 	home, err := os.UserHomeDir()
 	if err != nil {
 		t.Fatal(err)

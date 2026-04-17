@@ -20,7 +20,7 @@ func formatSortColumnTitle(base string, colIdx, sortCol, maxW int, sortDesc bool
 		return ""
 	}
 	if colIdx != sortCol {
-		return models.TruncateRunes(base, maxW)
+		return TruncateRunes(base, maxW)
 	}
 	suffix := " " + sortIndicatorAsc
 	if sortDesc {
@@ -28,13 +28,13 @@ func formatSortColumnTitle(base string, colIdx, sortCol, maxW int, sortDesc bool
 	}
 	sw := runewidth.StringWidth(suffix)
 	if sw >= maxW {
-		return models.TruncateRunes(suffix, maxW)
+		return TruncateRunes(suffix, maxW)
 	}
 	baseMax := maxW - sw
 	if baseMax < 2 {
-		return models.TruncateRunes(suffix, maxW)
+		return TruncateRunes(suffix, maxW)
 	}
-	truncated := models.TruncateRunes(base, baseMax)
+	truncated := TruncateRunes(base, baseMax)
 	return truncated + suffix
 }
 
@@ -60,7 +60,7 @@ func tableColumns(totalWidth int, files []models.ModelFile, homeDir string, sort
 		if w := runewidth.StringWidth(models.InferModelID(f.Path)); w > longestID {
 			longestID = w
 		}
-		if w := runewidth.StringWidth(models.FormatModelFolderDisplay(f.Path, homeDir)); w > longestPath {
+		if w := runewidth.StringWidth(FormatModelFolderDisplay(f.Path, homeDir)); w > longestPath {
 			longestPath = w
 		}
 	}
@@ -118,12 +118,12 @@ func buildTableRows(files []models.ModelFile, cols []btable.Column, homeDir stri
 	rows := make([]btable.Row, len(files))
 	for i, f := range files {
 		rows[i] = btable.Row{
-			models.TruncateRunes(f.Name, cols[0].Width-1),
-			models.TruncateRunes(models.InferModelID(f.Path), cols[1].Width-1),
-			models.TruncateRunes(models.FormatRuntimeLabel(f.Backend), cols[2].Width-1),
-			models.TruncateRunes(models.FormatModelFolderDisplay(f.Path, homeDir), cols[3].Width-1),
+			TruncateRunes(f.Name, cols[0].Width-1),
+			TruncateRunes(models.InferModelID(f.Path), cols[1].Width-1),
+			TruncateRunes(models.FormatRuntimeLabel(f.Backend), cols[2].Width-1),
+			TruncateRunes(FormatModelFolderDisplay(f.Path, homeDir), cols[3].Width-1),
 			models.FormatSize(f.Size),
-			models.FormatModTime(f.ModTime),
+			FormatModTime(f.ModTime),
 		}
 	}
 	return rows
