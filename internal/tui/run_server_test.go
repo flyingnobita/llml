@@ -20,7 +20,11 @@ func TestShellSingleQuoted(t *testing.T) {
 
 func TestFormatLlamaServerInvocation(t *testing.T) {
 	got := formatLlamaServerInvocation("/bin/llama-server", "/m/a.gguf", 9090, ModelParams{})
-	want := "+ '/bin/llama-server' -m '/m/a.gguf' --alias 'a.gguf' --port 9090"
+	want := "" +
+		"+ '/bin/llama-server' \\\n" +
+		"  -m '/m/a.gguf' \\\n" +
+		"  --alias 'a.gguf' \\\n" +
+		"  --port 9090"
 	if got != want {
 		t.Fatalf("got %q want %q", got, want)
 	}
@@ -36,12 +40,23 @@ func TestFormatLlamaServerInvocation(t *testing.T) {
 
 func TestFormatVLLMServerInvocation(t *testing.T) {
 	got := formatVLLMServerInvocation("/bin/vllm", "/m/hf-model", 9090, "", ModelParams{})
-	want := "+ '/bin/vllm' serve '/m/hf-model' --served-model-name 'hf-model' --port 9090"
+	want := "" +
+		"+ '/bin/vllm' \\\n" +
+		"  serve \\\n" +
+		"  '/m/hf-model' \\\n" +
+		"  --served-model-name 'hf-model' \\\n" +
+		"  --port 9090"
 	if got != want {
 		t.Fatalf("got %q want %q", got, want)
 	}
 	got2 := formatVLLMServerInvocation("/bin/vllm", "/m/hf-model", 9090, "/proj/.venv/bin/activate", ModelParams{})
-	want2 := "+ . '/proj/.venv/bin/activate' && '/bin/vllm' serve '/m/hf-model' --served-model-name 'hf-model' --port 9090"
+	want2 := "" +
+		"+ . '/proj/.venv/bin/activate' && \\\n" +
+		"  '/bin/vllm' \\\n" +
+		"  serve \\\n" +
+		"  '/m/hf-model' \\\n" +
+		"  --served-model-name 'hf-model' \\\n" +
+		"  --port 9090"
 	if got2 != want2 {
 		t.Fatalf("got %q want %q", got2, want2)
 	}
@@ -82,7 +97,7 @@ func TestSplitServerInvocationEcho_matchesLlamaSplitLogLine(t *testing.T) {
 		t.Fatalf("got %q want %q", got, want)
 	}
 
-	wantPreview := llamaCommandLine("/bin/llama-server", modelPath, 9090, p)
+	wantPreview := shellCommandDisplayMultiline(false, "", p.Env, llamaCommandWords("/bin/llama-server", modelPath, 9090, p))
 	if g := launchPreviewCommandLine(m); g != wantPreview {
 		t.Fatalf("launchPreviewCommandLine got %q want %q", g, wantPreview)
 	}
@@ -111,7 +126,7 @@ func TestLaunchPreviewCommandLine_vllmOmitsActivateWrapper(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := vllmCommandLine("/proj/.venv/bin/vllm", modelPath, 8000, p)
+	want := shellCommandDisplayMultiline(false, "", p.Env, vllmCommandWords("/proj/.venv/bin/vllm", modelPath, 8000, p))
 	g := launchPreviewCommandLine(m)
 	if g != want {
 		t.Fatalf("got %q want %q", g, want)
