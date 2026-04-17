@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
+- Apr-18, 2026 - 01:13 AM +0800 - [v0.2.0 release: config.toml runtime and discovery cache; launch preview/help UX; model ID and gguf-dump tooling; runtime path fixes; TUI and discovery refactors]
 - Apr-17, 2026 - 11:55 PM +08 - [TUI: split-pane tab navigation cycles through table, command preview, and server log]
 - Apr-17, 2026 - 11:55 PM +08 - [TUI: fix terminal rendering misalignment by stripping carriage returns from server logs]
 - Apr-17, 2026 - 10:16 PM +08 - [Runtime: allow LLAMA_CPP_PATH and VLLM_PATH to point directly to the executable file instead of just its parent directory]
