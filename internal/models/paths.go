@@ -27,18 +27,14 @@ func ExpandTildePath(s string) string {
 	return s
 }
 
-const (
-	envModelPaths = "LLML_MODEL_PATHS"
-)
-
 // huggingFaceHubCache returns the Hugging Face Hub "models--*" directory root.
 // It respects the same env vars as huggingface_hub: HUGGINGFACE_HUB_CACHE, then HF_HOME/hub.
 // See https://huggingface.co/docs/huggingface_hub/package_reference/environment_variables
 func huggingFaceHubCache(home string) string {
-	if v := os.Getenv("HUGGINGFACE_HUB_CACHE"); v != "" {
+	if v := os.Getenv(EnvHFHubCache); v != "" {
 		return filepath.Clean(v)
 	}
-	if v := os.Getenv("HF_HOME"); v != "" {
+	if v := os.Getenv(EnvHFHome); v != "" {
 		return filepath.Join(filepath.Clean(v), "hub")
 	}
 	return filepath.Join(home, ".cache", "huggingface", "hub")
@@ -81,7 +77,7 @@ func MergeSearchRoots(extra []string, skipDefaults bool) []string {
 			add(p)
 		}
 	}
-	if v := os.Getenv(envModelPaths); v != "" {
+	if v := os.Getenv(EnvModelPaths); v != "" {
 		for _, part := range strings.Split(v, ",") {
 			part = strings.TrimSpace(part)
 			if part != "" {

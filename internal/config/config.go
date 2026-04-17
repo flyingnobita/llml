@@ -154,7 +154,7 @@ func RuntimeFromEnv() RuntimeConfig {
 
 // ExtraModelPathsFromEnv returns comma-separated LLML_MODEL_PATHS entries.
 func ExtraModelPathsFromEnv() []string {
-	v := strings.TrimSpace(os.Getenv("LLML_MODEL_PATHS"))
+	v := strings.TrimSpace(os.Getenv(models.EnvModelPaths))
 	if v == "" {
 		return nil
 	}

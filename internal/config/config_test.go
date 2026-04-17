@@ -128,8 +128,8 @@ func TestDiscoveryConfigForWrite_merge(t *testing.T) {
 			LastScan:        time.Unix(100, 0).UTC(),
 		},
 	}
-	t.Setenv("LLML_MODEL_PATHS", "/b")
-	t.Cleanup(func() { _ = os.Unsetenv("LLML_MODEL_PATHS") })
+	t.Setenv(models.EnvModelPaths, "/b")
+	t.Cleanup(func() { _ = os.Unsetenv(models.EnvModelPaths) })
 	d := DiscoveryConfigForWrite(prev, time.Unix(200, 0).UTC())
 	if len(d.ExtraModelPaths) != 2 {
 		t.Fatalf("paths %v", d.ExtraModelPaths)

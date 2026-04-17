@@ -9,7 +9,7 @@ import (
 )
 
 func TestMergeSearchRoots_dedupes(t *testing.T) {
-	t.Setenv(envModelPaths, "/foo/bar,/foo/bar,/baz")
+	t.Setenv(EnvModelPaths, "/foo/bar,/foo/bar,/baz")
 	home, err := os.UserHomeDir()
 	if err != nil {
 		t.Fatal(err)

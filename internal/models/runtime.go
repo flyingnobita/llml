@@ -19,6 +19,13 @@ const (
 	// EnvVLLMVenv is an optional Python venv root (directory containing bin/activate on Unix).
 	// When set (or when $VLLM_PATH/.venv or dirname(vllm)/.venv exists), R sources activate before vllm serve.
 	EnvVLLMVenv = "VLLM_VENV"
+
+	// EnvModelPaths is the env var for extra model search roots (comma-separated).
+	EnvModelPaths = "LLML_MODEL_PATHS"
+	// EnvHFHubCache is the Hugging Face hub cache directory override (HUGGINGFACE_HUB_CACHE).
+	EnvHFHubCache = "HUGGINGFACE_HUB_CACHE"
+	// EnvHFHome is the HF_HOME override (hub cache defaults to $HF_HOME/hub).
+	EnvHFHome = "HF_HOME"
 )
 
 const defaultLlamaServerPort = 8080
