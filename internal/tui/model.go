@@ -106,6 +106,7 @@ type Model struct {
 	lastRunNoteSuccess bool // true: lastRunNote is non-error feedback (e.g. copy confirmation)
 	loading            bool
 	loadErr            error
+	helpOpen           bool // keyboard shortcuts popup
 }
 
 // New returns a model with default key bindings and an empty table; Init triggers discovery.

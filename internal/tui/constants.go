@@ -89,7 +89,7 @@ const (
 	FooterHintConfigPort = FooterKeyConfigPort + ": " + FooterDescConfigPort
 
 	FooterKeyParameters  = "p"
-	FooterDescParameters = "param profiles"
+	FooterDescParameters = "profiles"
 	FooterHintParameters = FooterKeyParameters + ": " + FooterDescParameters
 
 	FooterKeyToggleTheme  = "t"
@@ -99,6 +99,8 @@ const (
 	FooterKeyQuit  = "q"
 	FooterDescQuit = "quit"
 	FooterHintQuit = FooterKeyQuit + ": " + FooterDescQuit
+
+	FooterHintHelp = "ctrl+p: more"
 
 	FooterKeyCopyPath  = "enter"
 	FooterDescCopyPath = "copy cmd"
@@ -119,15 +121,10 @@ const (
 	MissingVLLMFooterNote        = "vllm not found - press " + FooterKeyConfigPort + " to set path manually"
 
 	FooterKeySortColumn  = ","
-	FooterDescSortColumn = "sort column"
-	FooterHintSortColumn = FooterKeySortColumn + ": " + FooterDescSortColumn
-
+	FooterDescSortColumn = "sort"
 	FooterKeySortReverse  = "."
-	FooterDescSortReverse = "reverse sort"
-	FooterHintSortReverse = FooterKeySortReverse + ": " + FooterDescSortReverse
-
-	// FooterHintSort combines comma/period sort hints for compact footers.
-	FooterHintSort = FooterHintSortColumn + FooterHintSep + FooterHintSortReverse
+	FooterDescSortReverse = "reverse"
+	FooterHintSort        = FooterKeySortColumn + "/" + FooterKeySortReverse + ": " + FooterDescSortColumn
 
 	FooterKeyNav  = "hjkl/↑↓←→"
 	FooterDescNav = "nav"
@@ -136,12 +133,8 @@ const (
 	FooterNavHint = FooterKeyNav + ": " + FooterDescNav
 
 	// Split server view (while running).
-	FooterSplitTabToTable = "tab: model table"
-	FooterSplitTabToLog   = "tab: server log"
 	FooterSplitStopServer = "esc/q: stop server"
 	FooterSplitDismiss    = "enter/esc/q: close"
-	// Server log pane focused: viewport keys (see charm.land/bubbles/v2/viewport DefaultKeyMap).
-	FooterSplitLogScroll = "j/k/↑↓/f/pgdn: scroll log · ←/→/h/l: wide log"
 
 	// splitPanePressEnterToClose is appended to the split log after the server process exits.
 	splitPanePressEnterToClose = "Press Enter to close..."
@@ -149,32 +142,33 @@ const (
 	splitServerStoppedWithHint = "Server stopped. Press Enter to close..."
 
 	// Runtime config modal.
-	FooterRuntimeConfigHints = "tab: next · shift+tab: prev · enter: save · esc: cancel"
+	FooterRuntimeConfigHints = "tab: fields · enter: save · esc: cancel"
 	// runtimeConfigModalSubtitle appears below the modal title (values here override startup detection).
 	runtimeConfigModalSubtitle = "Following overrides any configuration found during startup detection."
 	// runtimeConfigLabelVLLMVenv is the field label for the optional venv root (env var remains VLLM_VENV).
 	runtimeConfigLabelVLLMVenv = "VLLM_VENV (Optional - autodetect if not set)"
 
-	// Parameters modal (per-key fragments, then full footers composed with [FooterHintSep]).
-	FooterParamTabSections = "tab/shift+tab: sections"
+	// FooterHintTabSections is the shared "tab: sections" fragment used by split-pane
+	// and parameter modal footers.
+	FooterHintTabSections = "tab: sections"
 	FooterParamConfirmYN   = "y: yes · n: no"
 
 	// Alphabetical by name; footer lines use the same middle action order where modes
 	// overlap: create (n/a) → delete → rename or edit → back.
-	FooterParamHintAddRow    = "a: add row"
+	FooterParamHintAddRow    = "a: add"
 	FooterParamHintBack      = "esc/q: back"
 	FooterParamHintDelete    = "d: delete"
 	FooterParamHintEnterEdit = "enter: edit"
 	FooterParamHintNew       = "n: new"
 	FooterParamHintRename    = "r: rename"
 
-	FooterParamFooterProfiles = FooterParamTabSections + FooterHintSep + FooterNavHint + FooterHintSep +
+	FooterParamFooterProfiles = FooterHintTabSections + FooterHintSep + FooterNavHint + FooterHintSep +
 		FooterHintToggleTheme + FooterHintSep +
 		FooterParamHintNew + FooterHintSep + FooterParamHintDelete + FooterHintSep + FooterParamHintRename + FooterHintSep + FooterParamHintBack
-	FooterParamFooterDetailEmpty = FooterParamTabSections + FooterHintSep + FooterNavHint + FooterHintSep +
+	FooterParamFooterDetailEmpty = FooterHintTabSections + FooterHintSep + FooterNavHint + FooterHintSep +
 		FooterHintToggleTheme + FooterHintSep +
 		FooterParamHintAddRow + FooterHintSep + FooterParamHintDelete + FooterHintSep + FooterParamHintBack
-	FooterParamFooterDetailRows = FooterParamTabSections + FooterHintSep + FooterNavHint + FooterHintSep +
+	FooterParamFooterDetailRows = FooterHintTabSections + FooterHintSep + FooterNavHint + FooterHintSep +
 		FooterHintToggleTheme + FooterHintSep +
 		FooterParamHintAddRow + FooterHintSep + FooterParamHintDelete + FooterHintSep + FooterParamHintEnterEdit + FooterHintSep + FooterParamHintBack
 )

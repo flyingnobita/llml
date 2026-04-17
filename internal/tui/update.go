@@ -194,6 +194,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // handleKey routes key presses in the idle (no server, no modal) state.
 func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if m.helpOpen {
+		switch {
+		case isEscapeKey(msg), key.Matches(msg, m.keys.Quit), isCtrlP(msg.String()):
+			m.helpOpen = false
+			return m, nil
+		}
+		return m, nil
+	}
 	if m.params.open {
 		return m.updateParamPanelKey(msg)
 	}
@@ -205,6 +213,10 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	if key.Matches(msg, m.keys.Quit) {
 		return m, tea.Quit
+	}
+	if isCtrlP(msg.String()) {
+		m.helpOpen = true
+		return m, nil
 	}
 	if m.preview.focused && isTabKey(msg) {
 		m.preview.focused = false

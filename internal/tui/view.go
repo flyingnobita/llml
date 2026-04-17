@@ -177,7 +177,7 @@ func footerHelpLine(m Model) string {
 		if m.server.splitFocused {
 			return fmt.Sprintf(
 				"%s · %s · %s · %d×%d",
-				FooterSplitTabToTable, stopOrDismiss, FooterSplitLogScroll, m.layout.width, m.layout.height,
+				FooterHintTabSections, stopOrDismiss, FooterNavHint, m.layout.width, m.layout.height,
 			)
 		}
 		// Table focused: same global shortcuts as the idle view except run (R / ctrl+R) while a server is up.
@@ -190,7 +190,7 @@ func footerHelpLine(m Model) string {
 			FooterHintSort,
 			FooterHintToggleTheme,
 			FooterHintCopyPath,
-			FooterSplitTabToLog,
+			FooterHintTabSections,
 			stopOrDismiss,
 		}
 		if launchPreviewScrollable(m) {
@@ -200,22 +200,12 @@ func footerHelpLine(m Model) string {
 		return strings.Join(parts, FooterHintSep)
 	}
 	parts := []string{
-		FooterHintRefresh,
-		FooterHintRescan,
+		FooterHintTabSections,
 		FooterNavHint,
 		FooterHintRunSplit,
-		FooterHintRunFullscreen,
-		FooterHintConfigPort,
 		FooterHintParameters,
-		FooterHintSort,
-		FooterHintToggleTheme,
-		FooterHintQuit,
-		FooterHintCopyPath,
+		FooterHintHelp,
 	}
-	if launchPreviewScrollable(m) {
-		parts = append(parts, FooterHintLaunchPreviewScroll)
-	}
-	parts = append(parts, fmt.Sprintf("%d×%d", m.layout.width, m.layout.height))
 	return strings.Join(parts, FooterHintSep)
 }
 
@@ -433,6 +423,12 @@ func (m Model) View() tea.View {
 	}
 	if m.params.open {
 		s := overlayCentered(m.mainAppPlacedView(), m.paramPanelModalBlock(), m.layout.width, m.layout.height)
+		v := tea.NewView(s)
+		v.AltScreen = true
+		return v
+	}
+	if m.helpOpen {
+		s := overlayCentered(m.mainAppPlacedView(), m.helpPanelModalBlock(), m.layout.width, m.layout.height)
 		v := tea.NewView(s)
 		v.AltScreen = true
 		return v
