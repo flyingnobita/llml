@@ -24,6 +24,34 @@ func TestFindLlamaBinary_LLamaCppPathWins(t *testing.T) {
 	}
 }
 
+func TestFindLlamaBinary_ExecutablePathWins(t *testing.T) {
+	dir := t.TempDir()
+	name := "llama-server"
+	bin := makeFakeExecutable(t, dir, name)
+	// Set the environment variable to the exact binary path instead of the directory
+	t.Setenv(EnvLlamaCppPath, bin)
+	t.Setenv("PATH", "/nonexistent")
+
+	got := findLlamaBinary(name)
+	if got != bin {
+		t.Fatalf("got %q want %q", got, bin)
+	}
+}
+
+func TestFindVLLMBinary_ExecutablePathWins(t *testing.T) {
+	dir := t.TempDir()
+	name := "vllm"
+	bin := makeFakeExecutable(t, dir, name)
+	// Set the environment variable to the exact binary path instead of the directory
+	t.Setenv(EnvVLLMPath, bin)
+	t.Setenv("PATH", "/nonexistent")
+
+	got := findVLLMBinary()
+	if got != bin {
+		t.Fatalf("got %q want %q", got, bin)
+	}
+}
+
 func TestProbeLlamaServerHealth(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/health" {

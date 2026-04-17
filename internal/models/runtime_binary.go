@@ -14,7 +14,11 @@ import (
 // then [exec.LookPath]. envDir may be empty (skip that step).
 func findBinaryInEnvAndCommonDirs(name, envDir string, commonDirs []string) string {
 	if envDir != "" {
-		candidate := filepath.Join(filepath.Clean(envDir), name)
+		clean := filepath.Clean(envDir)
+		if isRegularFile(clean) && filepath.Base(clean) == name {
+			return clean
+		}
+		candidate := filepath.Join(clean, name)
 		if isRegularFile(candidate) {
 			return candidate
 		}
@@ -34,6 +38,9 @@ func findBinaryInEnvAndCommonDirs(name, envDir string, commonDirs []string) stri
 func findVLLMBinary() string {
 	if dir := os.Getenv(EnvVLLMPath); dir != "" {
 		clean := filepath.Clean(dir)
+		if isRegularFile(clean) && filepath.Base(clean) == "vllm" {
+			return clean
+		}
 		candidate := filepath.Join(clean, "vllm")
 		if isRegularFile(candidate) {
 			return candidate
