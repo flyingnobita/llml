@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
+- Apr-17, 2026 - 10:09 PM +08 - [TUI: rearranged model table columns to Model ID, Runtime, Size, Path, File Name, Last Modified]
 - Apr-17, 2026 - 09:19 PM +08 - [TUI: launch preview fills on first load; Tab focuses command pane for llama.cpp and vLLM rows; missing-runtime run errors match startup footer copy]
 - Apr-17, 2026 - [TUI: multiline launch command (copy-paste style with continuations); fixed-height scrollable preview below table (`[`/`]` scroll, Tab when overflow); correct vertical scroll bar for bordered viewports; runtime summary shown under `c` modal title instead of main view]
 - Apr-16, 2026 - [Config: `{UserConfigDir}/llml/config.toml` caches `[runtime]`, `[discovery]`, and `[[models]]` for instant startup; env overrides TOML; `r` reloads runtime from TOML; `S` full rescan; `c` persists `[runtime]`; last scan time in footer]

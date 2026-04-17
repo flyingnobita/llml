@@ -120,8 +120,8 @@ const (
 	MissingLlamaServerFooterNote = "llama-server not found - press " + FooterKeyConfigPort + " to set path manually"
 	MissingVLLMFooterNote        = "vllm not found - press " + FooterKeyConfigPort + " to set path manually"
 
-	FooterKeySortColumn  = ","
-	FooterDescSortColumn = "sort"
+	FooterKeySortColumn   = ","
+	FooterDescSortColumn  = "sort"
 	FooterKeySortReverse  = "."
 	FooterDescSortReverse = "reverse"
 	FooterHintSort        = FooterKeySortColumn + "/" + FooterKeySortReverse + ": " + FooterDescSortColumn
@@ -151,7 +151,7 @@ const (
 	// FooterHintTabSections is the shared "tab: sections" fragment used by split-pane
 	// and parameter modal footers.
 	FooterHintTabSections = "tab: sections"
-	FooterParamConfirmYN   = "y: yes · n: no"
+	FooterParamConfirmYN  = "y: yes · n: no"
 
 	// Alphabetical by name; footer lines use the same middle action order where modes
 	// overlap: create (n/a) → delete → rename or edit → back.

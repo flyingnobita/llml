@@ -9,13 +9,13 @@ import (
 
 type tableSortCol int
 
-// Table sort column indices (must match [tableColumns] order: File Name, Model ID, Runtime, Path, Size, Last modified).
+// Table sort column indices (must match [tableColumns] order: Model ID, Runtime, Size, Path, File Name, Last modified).
 const (
-	tableSortColFileName tableSortCol = iota
-	tableSortColID
+	tableSortColID tableSortCol = iota
 	tableSortColRuntime
-	tableSortColPath
 	tableSortColSize
+	tableSortColPath
+	tableSortColFileName
 	tableSortColModTime
 	tableSortColCount
 )

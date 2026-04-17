@@ -41,7 +41,7 @@ func formatSortColumnTitle(base string, colIdx, sortCol tableSortCol, maxW int, 
 // tableColumns computes per-column widths from the inner body width (usable
 // width inside app horizontal padding) and the current file list. File Name expands
 // to fit content (capped at maxFileNameColW); ID expands (capped at maxIDColW); Path
-// takes remaining space after fixed columns (File Name, Model ID, Runtime, Path, Size,
+// takes remaining space after fixed columns (Model ID, Runtime, Size, Path, File Name,
 // Last modified). sortCol and sortDesc control the ▲/▼ indicator on the active
 // column title.
 func tableColumns(totalWidth int, files []models.ModelFile, homeDir string, sortCol tableSortCol, sortDesc bool) []btable.Column {
@@ -89,12 +89,12 @@ func tableColumns(totalWidth int, files []models.ModelFile, homeDir string, sort
 	}
 
 	return []btable.Column{
-		{Title: formatSortColumnTitle("File Name", tableSortColFileName, sortCol, nameW, sortDesc), Width: nameW},
 		{Title: formatSortColumnTitle("Model ID", tableSortColID, sortCol, idW, sortDesc), Width: idW},
 		{Title: formatSortColumnTitle("Runtime", tableSortColRuntime, sortCol, runtimeColW, sortDesc), Width: runtimeColW},
-		{Title: formatSortColumnTitle("Path", tableSortColPath, sortCol, pathW, sortDesc), Width: pathW},
 		{Title: formatSortColumnTitle("Size", tableSortColSize, sortCol, sizeColW, sortDesc), Width: sizeColW},
-		{Title: formatSortColumnTitle("Last modified", tableSortColModTime, sortCol, modTimeColW, sortDesc), Width: modTimeColW},
+		{Title: formatSortColumnTitle("Path", tableSortColPath, sortCol, pathW, sortDesc), Width: pathW},
+		{Title: formatSortColumnTitle("File Name", tableSortColFileName, sortCol, nameW, sortDesc), Width: nameW},
+		{Title: formatSortColumnTitle("Last Modified", tableSortColModTime, sortCol, modTimeColW, sortDesc), Width: modTimeColW},
 	}
 }
 
@@ -118,11 +118,11 @@ func buildTableRows(files []models.ModelFile, cols []btable.Column, homeDir stri
 	rows := make([]btable.Row, len(files))
 	for i, f := range files {
 		rows[i] = btable.Row{
-			TruncateRunes(f.Name, cols[0].Width-1),
-			TruncateRunes(models.InferModelID(f.Path), cols[1].Width-1),
-			TruncateRunes(models.FormatRuntimeLabel(f.Backend), cols[2].Width-1),
-			TruncateRunes(FormatModelFolderDisplay(f.Path, homeDir), cols[3].Width-1),
+			TruncateRunes(models.InferModelID(f.Path), cols[0].Width-1),
+			TruncateRunes(models.FormatRuntimeLabel(f.Backend), cols[1].Width-1),
 			models.FormatSize(f.Size),
+			TruncateRunes(FormatModelFolderDisplay(f.Path, homeDir), cols[3].Width-1),
+			TruncateRunes(f.Name, cols[4].Width-1),
 			FormatModTime(f.ModTime),
 		}
 	}
