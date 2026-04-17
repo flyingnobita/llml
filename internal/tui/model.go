@@ -85,7 +85,7 @@ type serverPaneState struct {
 // launchPreviewState holds the launch-command preview viewport below the table.
 type launchPreviewState struct {
 	viewport viewport.Model
-	focused  bool   // idle only: Tab toggles with table when preview is scrollable
+	focused  bool   // idle only: Tab toggles with table whenever the preview is visible
 	lastCmd  string // resets scroll when the displayed command changes
 }
 

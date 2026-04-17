@@ -42,6 +42,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.table.hscroll.SetXOffset(0)
 		if len(m.table.files) > 0 {
 			m.table.tbl.SetCursor(0)
+			m = m.withLaunchPreviewSynced()
 		}
 		return m.maybeSetMissingRuntimeFooterNote()
 
@@ -60,6 +61,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.table.hscroll.SetXOffset(0)
 		if len(m.table.files) > 0 {
 			m.table.tbl.SetCursor(0)
+			m = m.withLaunchPreviewSynced()
 		}
 		if msg.writeErr != nil {
 			m = m.withLastRunError("Could not save config: " + msg.writeErr.Error())
@@ -78,6 +80,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.table.hscroll.SetXOffset(0)
 		if len(m.table.files) > 0 && m.table.tbl.Cursor() >= len(m.table.files) {
 			m.table.tbl.SetCursor(len(m.table.files) - 1)
+			m = m.withLaunchPreviewSynced()
 		}
 		if msg.writeErr != nil {
 			m = m.withLastRunError("Could not save config: " + msg.writeErr.Error())
@@ -99,6 +102,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.table.hscroll.SetXOffset(0)
 		if len(m.table.files) > 0 {
 			m.table.tbl.SetCursor(0)
+			m = m.withLaunchPreviewSynced()
 		}
 		return m.maybeSetMissingRuntimeFooterNote()
 
@@ -272,7 +276,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 	}
-	if !m.loading && len(m.table.files) > 0 && launchPreviewScrollable(m) && isTabKey(msg) {
+	if launchPreviewVisible(m) && isTabKey(msg) {
 		m.preview.focused = true
 		m.table.tbl.Blur()
 		m = m.applyMainPaneFocusStyles()

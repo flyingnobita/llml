@@ -74,7 +74,7 @@ func vllmCommandLine(bin, modelDir string, port int, params ModelParams) string 
 
 // errVLLMNotFound is returned when ResolveVLLMPath finds no vllm binary.
 func errVLLMNotFound() error {
-	return fmt.Errorf("vllm not found; set %s (project dir; we use vllm or .venv/bin/vllm) or %s (venv root), or install vllm on PATH", models.EnvVLLMPath, models.EnvVLLMVenv)
+	return fmt.Errorf(MissingVLLMFooterNote)
 }
 
 // formatLlamaServerInvocation is a multi-line, copy-paste safe command (with a leading "+ " on the
@@ -162,7 +162,7 @@ func buildServerSpec(backend models.ModelBackend, modelPath string, params Model
 	default: // BackendLlama
 		bin := models.ResolveLlamaServerPath(rt)
 		if bin == "" {
-			return serverSpec{}, fmt.Errorf("llama-server not found; set %s or install on PATH", models.EnvLlamaCppPath)
+			return serverSpec{}, fmt.Errorf(MissingLlamaServerFooterNote)
 		}
 		return serverSpec{
 			backend:   models.BackendLlama,

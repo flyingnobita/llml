@@ -48,6 +48,9 @@ func TestModelsLoadedSelectsFirstRow(t *testing.T) {
 	if m.table.tbl.Cursor() != 0 {
 		t.Fatalf("cursor %d want 0 (first row)", m.table.tbl.Cursor())
 	}
+	if got := strings.TrimSpace(m.preview.lastCmd); got == "" {
+		t.Fatal("expected launch preview to be populated on initial models load")
+	}
 }
 
 func TestModelsLoaded_FooterErrorWhenGGUFWithoutLlamaServer(t *testing.T) {
@@ -91,6 +94,50 @@ func TestModelsLoaded_FooterErrorWhenVLLMWithoutVllm(t *testing.T) {
 	}
 	if !strings.Contains(m.lastRunNote, MissingVLLMFooterNote) {
 		t.Fatalf("lastRunNote %q", m.lastRunNote)
+	}
+}
+
+func TestRunServer_ShowsStartupStyleVLLMError(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	m := New()
+	m.layout.width = 120
+	m.layout.height = 40
+	m.loading = false
+	m.runtime = models.RuntimeInfo{}
+	m.table.files = []models.ModelFile{
+		{Backend: models.BackendVLLM, Path: "/m", Name: "m", Size: 1, ModTime: time.Unix(0, 0)},
+	}
+	m = m.layoutTable()
+
+	next, cmd := m.Update(tea.KeyPressMsg(tea.Key{Text: "R", Code: 'R'}))
+	if cmd != nil {
+		t.Fatal("unexpected cmd when vllm is missing")
+	}
+	m = next.(Model)
+	if m.lastRunNote != MissingVLLMFooterNote {
+		t.Fatalf("lastRunNote %q want %q", m.lastRunNote, MissingVLLMFooterNote)
+	}
+}
+
+func TestRunServer_ShowsStartupStyleLlamaError(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	m := New()
+	m.layout.width = 120
+	m.layout.height = 40
+	m.loading = false
+	m.runtime = models.RuntimeInfo{}
+	m.table.files = []models.ModelFile{
+		{Backend: models.BackendLlama, Path: "/a.gguf", Name: "a", Size: 1, ModTime: time.Unix(0, 0)},
+	}
+	m = m.layoutTable()
+
+	next, cmd := m.Update(tea.KeyPressMsg(tea.Key{Text: "R", Code: 'R'}))
+	if cmd != nil {
+		t.Fatal("unexpected cmd when llama-server is missing")
+	}
+	m = next.(Model)
+	if m.lastRunNote != MissingLlamaServerFooterNote {
+		t.Fatalf("lastRunNote %q want %q", m.lastRunNote, MissingLlamaServerFooterNote)
 	}
 }
 

@@ -25,6 +25,20 @@ func setupPreviewScrollableModel() Model {
 	return m
 }
 
+func setupPreviewVisibleModel() Model {
+	m := newTestModel()
+	m.table.files = []models.ModelFile{
+		{Path: "/tmp/test.gguf", Name: "test.gguf", Backend: models.BackendLlama},
+	}
+	cols := tableColumns(100, m.table.files, m.layout.homeDir, m.table.sortCol, m.table.sortDesc)
+	m.table.tbl.SetRows(buildTableRows(m.table.files, cols, m.layout.homeDir))
+	m = m.layoutTable()
+	cmd := "llama-server --model /tmp/test.gguf --port 8080"
+	m.preview.viewport.SetContent(cmd)
+	m.preview.lastCmd = cmd
+	return m
+}
+
 func TestLaunchPreviewFocus_TabFocusesWhenScrollable(t *testing.T) {
 	m := setupPreviewScrollableModel()
 	if !launchPreviewScrollable(m) {
@@ -56,5 +70,25 @@ func TestLaunchPreviewFocus_TabUnfocuses(t *testing.T) {
 	}
 	if gm.preview.focused {
 		t.Fatalf("expected launchPreviewFocused=false after Tab when already focused, got true")
+	}
+}
+
+func TestLaunchPreviewFocus_TabFocusesWhenVisible(t *testing.T) {
+	m := setupPreviewVisibleModel()
+	if !launchPreviewVisible(m) {
+		t.Fatal("expected preview to be visible")
+	}
+	if launchPreviewScrollable(m) {
+		t.Fatal("expected preview to be non-scrollable for this test")
+	}
+	m.preview.focused = false
+
+	got, _ := m.Update(tabMsg())
+	gm, ok := got.(Model)
+	if !ok {
+		t.Fatalf("Update returned unexpected type %T", got)
+	}
+	if !gm.preview.focused {
+		t.Fatalf("expected launchPreviewFocused=true after Tab on visible preview, got false")
 	}
 }
