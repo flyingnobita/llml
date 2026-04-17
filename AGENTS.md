@@ -24,7 +24,7 @@ safetensors models on the local filesystem and launching `llama-server` or
 cmd/llml/            # Binary entrypoint (main.go)
 internal/
   config/            # TOML persistence ({UserConfigDir}/llml/config.toml): runtime, discovery cache, [[models]]
-  models/            # GGUF + safetensors discovery, metadata, runtime detection, formatting; also vLLM and HF-hub support
+  models/            # GGUF + safetensors discovery, metadata, runtime detection, formatting; also vLLM and HF-hub support. Discovery uses a single filesystem walk via the `modelSource` interface (`ggufSource`, `safetensorsSource`).
   tui/               # Bubble Tea model, update, view, styles, keymaps
 scripts/             # gofmt-check.sh, precommit-docs-fix.sh
 ```
@@ -43,13 +43,16 @@ scripts/             # gofmt-check.sh, precommit-docs-fix.sh
 
 ### Bubble Tea pattern
 
-- `Model` in `model.go` holds all state. `New()` returns an initialized model.
+- `Model` in `model.go` is a **coordinator** holding 7 sub-state structs (`layoutState`, `themeState`, `tableState`, `runtimeConfigState`, `paramsState`, `serverPaneState`, `launchPreviewState`) plus top-level fields (`keys`, `runtime`, `loading`, `lastRunNote`, …). `New()` returns an initialized model. Access state via `m.layout.width`, `m.ui.styles`, `m.table.tbl`, `m.server.running`, `m.preview.focused`, etc.
 - `Init()`, `Update()`, `View()` implement `tea.Model`.
 - Messages are defined in `messages.go`; commands in `cmd.go`.
-- Layout recalculation lives in `layoutTable()` on `Model`. Table row height is chosen so the full `View()` fits the terminal (Bubble Tea otherwise keeps only the **bottom** lines and clips the header).
+- Key dispatch in `Update` delegates to `handleKey` (idle/modal routing) → `tableNavKeys` (shared bindings for both idle and split-pane table focus: config, params, theme, scroll, copy, sort). Split-pane key handling is in `update_split.go`.
+- Layout recalculation lives in `layoutTable()` on `Model`, with helpers `computeBodyHeight` and `applyTableAndLogHeights`. Log h-bar visibility is determined from exact style frame sizes (no guess-and-redo second pass). Table row height is chosen so the full `View()` fits the terminal (Bubble Tea otherwise keeps only the **bottom** lines and clips the header).
+- **Server launch** (`run_server.go`): `buildServerSpec` resolves binary/port/venv into a `serverSpec` value; spec methods `foregroundCmd`, `splitCmd`, `invocationEcho`, `previewLine` generate backend- and platform-specific commands. `buildPreviewSpec` is the permissive variant (substitutes placeholder bin names) used for display-only paths.
 - Theme palettes live in `theme.go` (`DarkTheme`, `LightTheme`; startup via `LLML_THEME`, runtime cycle with **`t`**: dark → light → auto). The transient confirmation is a **compact chip on the title row** (not an extra banner line) so the layout does not jump.
   Lip Gloss styles are built in `styles.go` via `newStyles`. Do not call `lipgloss.NewStyle()` inline
   inside `View()` — extend `Theme` / `newStyles` instead.
+- Typed enums (`paramFocus`, `paramConfirm`, `paramEditKind`, `runtimeField`, `tableSortCol`, `runServerMode`) are defined in `constants.go`; use these types, not raw `int`, for state fields.
 - Magic numbers belong in `constants.go` (package `tui`).
 
 #### Bubble Tea v2 API notes
@@ -113,8 +116,9 @@ The pre-commit hook handles staged files automatically.
 - Unit tests for `internal/models` cover discovery, formatting, paths, and
   runtime detection.
 - Unit tests for `internal/tui` cover model initialization, parameter-profile
-  persistence, server command construction, theme correctness (including
-  `TableSelectedBg`), `View()` alt-screen flag, and selected-style background rendering.
+  persistence, server command construction, `layoutTable` idempotence (convergence
+  test), split-pane focus toggle, launch-preview focus cycle, theme correctness
+  (including `TableSelectedBg`), `View()` alt-screen flag, and selected-style background rendering.
 - Do not mark a feature complete until `mise run check` passes.
 
 ---
