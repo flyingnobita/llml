@@ -1,4 +1,4 @@
-package llamacpp
+package models
 
 import (
 	"encoding/json"
@@ -41,18 +41,6 @@ func hfParamsSummary(dir string) string {
 	return strings.Join(parts, " · ")
 }
 
-// collectSafetensorModelDirs walks root like discoverGGUFModels and records each directory
-// that directly contains at least one *.safetensors file.
-func collectSafetensorModelDirs(root string, maxD int, out map[string]struct{}) error {
-	return walkSearchTree(root, maxD, func(full, parentDir string, _ os.DirEntry, _ int) error {
-		if !strings.EqualFold(filepath.Ext(full), ".safetensors") {
-			return nil
-		}
-		out[filepath.Clean(parentDir)] = struct{}{}
-		return nil
-	})
-}
-
 // tryVLLMModelDir builds a [ModelFile] if dir contains config.json and at least one
 // *.safetensors file. It returns false if the directory is not a usable HF weights folder.
 func tryVLLMModelDir(dir string) (ModelFile, bool) {
@@ -93,35 +81,9 @@ func tryVLLMModelDir(dir string) (ModelFile, bool) {
 	return ModelFile{
 		Backend:    BackendVLLM,
 		Path:       filepath.Clean(dir),
-		Name:       FormatVLLMModelName(dir),
+		Name:       filepath.Base(filepath.Clean(dir)),
 		Size:       totalSize,
 		ModTime:    latest,
 		Parameters: hfParamsSummary(dir),
 	}, true
-}
-
-// discoverVLLMModels scans the same roots as GGUF discovery for Hugging Face-style
-// safetensors checkpoints (config.json + *.safetensors in the same directory).
-func discoverVLLMModels(opts Options, maxD int) ([]ModelFile, error) {
-	roots := MergeSearchRoots(opts.ExtraRoots, opts.SkipDefaultRoots)
-	candidates := make(map[string]struct{})
-	for _, root := range roots {
-		st, err := os.Stat(root)
-		if err != nil || !st.IsDir() {
-			continue
-		}
-		if err := collectSafetensorModelDirs(root, maxD, candidates); err != nil {
-			return nil, err
-		}
-	}
-
-	var out []ModelFile
-	for dir := range candidates {
-		mf, ok := tryVLLMModelDir(dir)
-		if !ok {
-			continue
-		}
-		out = append(out, mf)
-	}
-	return out, nil
 }

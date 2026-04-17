@@ -9,7 +9,7 @@ func splitPaneInterruptFilter(m tea.Model, msg tea.Msg) tea.Msg {
 		return msg
 	}
 	mm, ok := m.(Model)
-	if !ok || !mm.serverRunning {
+	if !ok || !mm.server.running {
 		return msg
 	}
 	return splitInterruptMsg{}

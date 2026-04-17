@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
+- Apr-18, 2026 - 01:13 AM +0800 - [v0.2.0 release: config.toml runtime and discovery cache; launch preview/help UX; model ID and gguf-dump tooling; runtime path fixes; TUI and discovery refactors]
+- Apr-17, 2026 - 11:55 PM +08 - [TUI: split-pane tab navigation cycles through table, command preview, and server log]
+- Apr-17, 2026 - 11:55 PM +08 - [TUI: fix terminal rendering misalignment by stripping carriage returns from server logs]
+- Apr-17, 2026 - 10:16 PM +08 - [Runtime: allow LLAMA_CPP_PATH and VLLM_PATH to point directly to the executable file instead of just its parent directory]
+- Apr-17, 2026 - 10:09 PM +08 - [TUI: rearranged model table columns to Model ID, Runtime, Size, Path, File Name, Last Modified]
+- Apr-17, 2026 - 09:19 PM +08 - [TUI: launch preview fills on first load; Tab focuses command pane for llama.cpp and vLLM rows; missing-runtime run errors match startup footer copy]
+- Apr-17, 2026 - [TUI: multiline launch command (copy-paste style with continuations); fixed-height scrollable preview below table (`[`/`]` scroll, Tab when overflow); correct vertical scroll bar for bordered viewports; runtime summary shown under `c` modal title instead of main view]
+- Apr-16, 2026 - [Config: `{UserConfigDir}/llml/config.toml` caches `[runtime]`, `[discovery]`, and `[[models]]` for instant startup; env overrides TOML; `r` reloads runtime from TOML; `S` full rescan; `c` persists `[runtime]`; last scan time in footer]
+- Apr-16, 2026 - [TUI: split-pane — after server process exits (load failure or stop), keep log open until enter/esc/q dismiss; footer shows close hint; SIGINT dismisses when already exited]
+- Apr-16, 2026 - [TUI: Enter copies launch command to clipboard; status line confirms success or failure; success vs error styling for footer notes]
+- Apr-16, 2026 - [TUI: Model ID column (InferModelID from path; HF hub + GGUF rules); sortable; vLLM serve adds --served-model-name matching that id; vLLM File Name uses snapshot dir basename; gguf-dump CLI and llamacpp DumpGGUF / GGUFGeneralName helpers]
 - Apr-16, 2026 - 02:01 AM +08 - [v0.1.0 initial release: local GGUF + safetensors discovery; llama.cpp and vLLM runtime detection; named launch presets and runtime config; split-pane server launch/logging; llml rename and GoReleaser release workflow]
 - Apr-14, 2026 - [TUI: table column sorting (`,` cycles column, `.` flips asc/desc); ▲/▼ indicator on active header; selection preserved across reorders; stable layout via `tableNeedsHScroll`]
 - Apr-14, 2026 - [TUI: show split-pane `R` invocation line below model table (same `+ …` echo as first log line; respects active profile; wraps narrow terminals)]

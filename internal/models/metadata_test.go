@@ -1,4 +1,4 @@
-package llamacpp
+package models
 
 import (
 	"strings"
@@ -8,6 +8,13 @@ import (
 func TestGgufParamsSummary_nonexistentPath(t *testing.T) {
 	if g := ggufParamsSummary("/nonexistent/does-not-exist/model.gguf"); g != "—" {
 		t.Fatalf("got %q want —", g)
+	}
+}
+
+func TestGGUFGeneralName_nonexistent(t *testing.T) {
+	_, err := GGUFGeneralName("/nonexistent/does-not-exist/model.gguf")
+	if err == nil {
+		t.Fatal("expected error")
 	}
 }
 

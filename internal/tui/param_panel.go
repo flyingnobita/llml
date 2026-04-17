@@ -8,24 +8,31 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/flyingnobita/llml/internal/models"
 )
 
+type paramFocus int
+
 const (
-	paramFocusProfiles = iota
+	paramFocusProfiles paramFocus = iota
 	paramFocusEnv
 	paramFocusArgs
 )
 
-// paramConfirmDelete* values for Model.paramConfirmDelete (0 = none).
+type paramConfirm int
+
+// paramConfirmDelete* values for Model.params.confirmDelete (0 = none).
 const (
-	paramConfirmNone = iota
+	paramConfirmNone paramConfirm = iota
 	paramConfirmProfile
 	paramConfirmEnvRow
 	paramConfirmArgRow
 )
 
+type paramEditKind int
+
 const (
-	paramEditNone = iota
+	paramEditNone paramEditKind = iota
 	paramEditEnvLine
 	paramEditArgLine
 	paramEditProfileName
@@ -49,7 +56,10 @@ func parseEnvLine(s string) EnvVar {
 	if i < 0 {
 		return EnvVar{Key: s, Value: ""}
 	}
-	return EnvVar{Key: strings.TrimSpace(s[:i]), Value: s[i+1:]}
+	key := strings.TrimSpace(s[:i])
+	val := strings.TrimSpace(s[i+1:])
+	val = models.ExpandTildePath(val)
+	return EnvVar{Key: key, Value: val}
 }
 
 func formatEnvVar(e EnvVar) string {
@@ -98,38 +108,39 @@ func copyProfiles(in []ParameterProfile) []ParameterProfile {
 func (m Model) openParamPanel() (Model, tea.Cmd) {
 	p := m.SelectedPath()
 	if p == "" {
-		m.lastRunNote = "Select a model row first."
+		m = m.withLastRunError("Select a model row first.")
 		return m, nil
 	}
-	m.paramPanelOpen = true
-	m.paramConfirmDelete = paramConfirmNone
-	m.paramModelPath = filepath.Clean(p)
-	m.paramModelDisplayName = modelDisplayNameForPath(m)
-	m.lastRunNote = ""
-	m.paramEditKind = paramEditNone
-	m.paramEditInput.Blur()
-	m.paramEditInput.SetValue("")
+	m.params.open = true
+	m.preview.focused = false
+	m.params.confirmDelete = paramConfirmNone
+	m.params.modelPath = filepath.Clean(p)
+	m.params.modelDisplayName = modelDisplayNameForPath(m)
+	m = m.withLastRunCleared()
+	m.params.editKind = paramEditNone
+	m.params.editInput.Blur()
+	m.params.editInput.SetValue("")
 
-	ent, err := loadModelEntry(m.paramModelPath)
+	ent, err := loadModelEntry(m.params.modelPath)
 	if err != nil {
-		m.lastRunNote = err.Error()
+		m = m.withLastRunError(err.Error())
 		ent = modelEntry{
 			Profiles:    []ParameterProfile{{Name: "default", Env: nil, Args: nil}},
 			ActiveIndex: 0,
 		}
 	}
-	m.paramProfiles = copyProfiles(ent.Profiles)
-	m.paramProfileIndex = clampInt(ent.ActiveIndex, 0, max(0, len(m.paramProfiles)-1))
-	m.paramFocus = paramFocusProfiles
-	m.loadCurrentProfileIn()
-	m.paramEditInput.SetWidth(m.paramEditInnerWidth())
+	m.params.profiles = copyProfiles(ent.Profiles)
+	m.params.profileIndex = clampInt(ent.ActiveIndex, 0, max(0, len(m.params.profiles)-1))
+	m.params.focus = paramFocusProfiles
+	m.params.loadCurrentProfileIn()
+	m.params.editInput.SetWidth(m.paramEditInnerWidth())
 	return m, nil
 }
 
 // paramEditInnerWidth is the textinput width for profile/env/argv line edits in the params modal.
 func (m Model) paramEditInnerWidth() int {
 	cw := m.paramPanelContentWidth()
-	frame := m.styles.paramSectionBox.GetHorizontalFrameSize()
+	frame := m.ui.styles.paramSectionBox.GetHorizontalFrameSize()
 	w := cw - frame
 	if w < 32 {
 		w = 32
@@ -138,29 +149,29 @@ func (m Model) paramEditInnerWidth() int {
 }
 
 func (m Model) closeParamPanel() Model {
-	m.paramPanelOpen = false
-	m.paramConfirmDelete = paramConfirmNone
-	m.paramEditKind = paramEditNone
-	m.paramEditInput.Blur()
-	m.paramEditInput.SetValue("")
-	m.paramEnv = nil
-	m.paramArgs = nil
-	m.paramProfiles = nil
-	m.paramModelPath = ""
-	m.paramModelDisplayName = ""
+	m.params.open = false
+	m.params.confirmDelete = paramConfirmNone
+	m.params.editKind = paramEditNone
+	m.params.editInput.Blur()
+	m.params.editInput.SetValue("")
+	m.params.env = nil
+	m.params.args = nil
+	m.params.profiles = nil
+	m.params.modelPath = ""
+	m.params.modelDisplayName = ""
 	return m
 }
 
-// modelDisplayNameForPath returns the table display name for the row whose path is selected, or a basename fallback.
+// modelDisplayNameForPath returns the File Name column value for the row whose path is selected, or a basename fallback.
 func modelDisplayNameForPath(m Model) string {
 	p := m.SelectedPath()
 	if p == "" {
 		return ""
 	}
 	p = filepath.Clean(p)
-	for i := range m.files {
-		if filepath.Clean(m.files[i].Path) == p {
-			if n := strings.TrimSpace(m.files[i].Name); n != "" {
+	for i := range m.table.files {
+		if filepath.Clean(m.table.files[i].Path) == p {
+			if n := strings.TrimSpace(m.table.files[i].Name); n != "" {
 				return n
 			}
 			break
@@ -170,17 +181,17 @@ func modelDisplayNameForPath(m Model) string {
 }
 
 func (m Model) focusParamEdit() (Model, tea.Cmd) {
-	return m, m.paramEditInput.Focus()
+	return m, m.params.editInput.Focus()
 }
 
 func (m Model) blurParamEdit() Model {
-	m.paramEditInput.Blur()
+	m.params.editInput.Blur()
 	return m
 }
 
-func (m Model) paramEnvLen() int { return len(m.paramEnv) }
+func (m Model) paramEnvLen() int { return len(m.params.env) }
 func (m Model) paramArgsLen() int {
-	return len(m.paramArgs)
+	return len(m.params.args)
 }
 
 func truncateParamLine(s string, maxW int) string {

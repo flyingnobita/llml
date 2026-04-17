@@ -22,8 +22,8 @@ const (
 	// appSubtitle is the subtitle line shown below the app title.
 	appSubtitle = "llama.cpp (GGUF) · vLLM (config.json + safetensors) — filesystem scan · Last modified = file mtime"
 
-	// paramPanelMaxInnerWidth caps the parameters modal inner width on wide
-	// terminals so the panel does not stretch edge-to-edge.
+	// paramPanelMaxInnerWidth caps the parameters and runtime-environment modal inner
+	// width on wide terminals so panels do not stretch edge-to-edge.
 	paramPanelMaxInnerWidth = 88
 
 	// maxServerLogLines is the rolling cap for split-pane server log lines.
@@ -39,18 +39,28 @@ const (
 	// serverLogSeparatorLines is extra body rows between the table and log in split
 	// mode (0 = panes are adjacent).
 	serverLogSeparatorLines = 0
+
+	// launchPreviewVisibleLines is the number of visible text rows inside the launch
+	// command preview (the bordered viewport outer height adds the frame; see syncLaunchPreviewViewport).
+	launchPreviewVisibleLines = 4
+
+	// shellDisplayArgIndent is the leading spaces for multiline shell display lines after
+	// the first argv line (launch preview and clipboard; split-pane log uses "+ " instead).
+	shellDisplayArgIndent = "  "
 )
 
 // Column-width defaults for the model table.
 const (
-	defaultNameColW = 36
-	runtimeColW     = 11 // "llama.cpp", "vllm"
-	sizeColW        = 9
-	modTimeColW     = 17
-	maxNameColW     = 72
-	minPathColW     = 14
-	maxPathColW     = 400
-	colPaddingExtra = 8 // extra padding bubbles/table adds across 5 columns
+	defaultFileNameColW = 36
+	defaultIDColW       = 28
+	maxIDColW           = 56
+	runtimeColW         = 11 // "llama.cpp", "vllm"
+	sizeColW            = 9
+	modTimeColW         = 17
+	maxFileNameColW     = 72
+	minPathColW         = 14
+	maxPathColW         = 400
+	colPaddingExtra     = 10 // extra padding bubbles/table adds across 6 columns
 )
 
 // Footer hints: keyboard shortcut bar fragments ("key: description") joined with
@@ -61,8 +71,12 @@ const (
 
 	// Main view (idle).
 	FooterKeyRefresh  = "r"
-	FooterDescRefresh = "refresh"
+	FooterDescRefresh = "reload runtime"
 	FooterHintRefresh = FooterKeyRefresh + ": " + FooterDescRefresh
+
+	FooterKeyRescan  = "S"
+	FooterDescRescan = "rescan models"
+	FooterHintRescan = FooterKeyRescan + ": " + FooterDescRescan
 
 	FooterKeyRunSplit  = "R"
 	FooterDescRunSplit = "run (split)"
@@ -75,7 +89,7 @@ const (
 	FooterHintConfigPort = FooterKeyConfigPort + ": " + FooterDescConfigPort
 
 	FooterKeyParameters  = "p"
-	FooterDescParameters = "param profiles"
+	FooterDescParameters = "profiles"
 	FooterHintParameters = FooterKeyParameters + ": " + FooterDescParameters
 
 	FooterKeyToggleTheme  = "t"
@@ -86,20 +100,31 @@ const (
 	FooterDescQuit = "quit"
 	FooterHintQuit = FooterKeyQuit + ": " + FooterDescQuit
 
+	FooterHintHelp = "ctrl+p: more"
+
 	FooterKeyCopyPath  = "enter"
-	FooterDescCopyPath = "copy path"
+	FooterDescCopyPath = "copy cmd"
 	FooterHintCopyPath = FooterKeyCopyPath + ": " + FooterDescCopyPath
 
-	FooterKeySortColumn  = ","
-	FooterDescSortColumn = "sort column"
-	FooterHintSortColumn = FooterKeySortColumn + ": " + FooterDescSortColumn
+	// Launch preview scroll (when the command exceeds the preview height).
+	FooterKeyLaunchPreviewScrollUp   = "["
+	FooterKeyLaunchPreviewScrollDown = "]"
+	FooterDescLaunchPreviewScroll    = "scroll cmd"
+	FooterHintLaunchPreviewScroll    = FooterKeyLaunchPreviewScrollUp + "/" + FooterKeyLaunchPreviewScrollDown + ": " + FooterDescLaunchPreviewScroll
 
+	// CopyCommandFeedback* are shown below the footer after Enter copies the launch command.
+	CopyCommandFeedbackSuccess = "Command copied to clipboard"
+	CopyCommandFeedbackFailure = "Command failed to copy to clipboard"
+
+	// Missing-runtime footer lines after model scan (see maybeSetMissingRuntimeFooterNote).
+	MissingLlamaServerFooterNote = "llama-server not found - press " + FooterKeyConfigPort + " to set path manually"
+	MissingVLLMFooterNote        = "vllm not found - press " + FooterKeyConfigPort + " to set path manually"
+
+	FooterKeySortColumn   = ","
+	FooterDescSortColumn  = "sort"
 	FooterKeySortReverse  = "."
-	FooterDescSortReverse = "reverse sort"
-	FooterHintSortReverse = FooterKeySortReverse + ": " + FooterDescSortReverse
-
-	// FooterHintSort combines comma/period sort hints for compact footers.
-	FooterHintSort = FooterHintSortColumn + FooterHintSep + FooterHintSortReverse
+	FooterDescSortReverse = "reverse"
+	FooterHintSort        = FooterKeySortColumn + "/" + FooterKeySortReverse + ": " + FooterDescSortColumn
 
 	FooterKeyNav  = "hjkl/↑↓←→"
 	FooterDescNav = "nav"
@@ -108,35 +133,42 @@ const (
 	FooterNavHint = FooterKeyNav + ": " + FooterDescNav
 
 	// Split server view (while running).
-	FooterSplitTabToTable = "tab: model table"
-	FooterSplitTabToLog   = "tab: server log"
 	FooterSplitStopServer = "esc/q: stop server"
-	// Server log pane focused: viewport keys (see charm.land/bubbles/v2/viewport DefaultKeyMap).
-	FooterSplitLogScroll = "j/k/↑↓/f/pgdn: scroll log · ←/→/h/l: wide log"
+	FooterSplitDismiss    = "enter/esc/q: close"
+
+	// splitPanePressEnterToClose is appended to the split log after the server process exits.
+	splitPanePressEnterToClose = "Press Enter to close..."
+	// splitServerStoppedWithHint is shown on clean exit before the user dismisses the pane.
+	splitServerStoppedWithHint = "Server stopped. Press Enter to close..."
 
 	// Runtime config modal.
-	FooterRuntimeConfigHints = "tab: next · shift+tab: prev · enter: save · esc: cancel"
+	FooterRuntimeConfigHints = "tab: fields · enter: save · esc: cancel"
+	// runtimeConfigModalSubtitle appears below the modal title (values here override startup detection).
+	runtimeConfigModalSubtitle = "Following overrides any configuration found during startup detection."
+	// runtimeConfigLabelVLLMVenv is the field label for the optional venv root (env var remains VLLM_VENV).
+	runtimeConfigLabelVLLMVenv = "VLLM_VENV (Optional - autodetect if not set)"
 
-	// Parameters modal (per-key fragments, then full footers composed with [FooterHintSep]).
-	FooterParamTabSections = "tab/shift+tab: sections"
-	FooterParamConfirmYN   = "y: yes · n: no"
+	// FooterHintTabSections is the shared "tab: sections" fragment used by split-pane
+	// and parameter modal footers.
+	FooterHintTabSections = "tab: sections"
+	FooterParamConfirmYN  = "y: yes · n: no"
 
 	// Alphabetical by name; footer lines use the same middle action order where modes
 	// overlap: create (n/a) → delete → rename or edit → back.
-	FooterParamHintAddRow    = "a: add row"
+	FooterParamHintAddRow    = "a: add"
 	FooterParamHintBack      = "esc/q: back"
 	FooterParamHintDelete    = "d: delete"
 	FooterParamHintEnterEdit = "enter: edit"
 	FooterParamHintNew       = "n: new"
 	FooterParamHintRename    = "r: rename"
 
-	FooterParamFooterProfiles = FooterParamTabSections + FooterHintSep + FooterNavHint + FooterHintSep +
+	FooterParamFooterProfiles = FooterHintTabSections + FooterHintSep + FooterNavHint + FooterHintSep +
 		FooterHintToggleTheme + FooterHintSep +
 		FooterParamHintNew + FooterHintSep + FooterParamHintDelete + FooterHintSep + FooterParamHintRename + FooterHintSep + FooterParamHintBack
-	FooterParamFooterDetailEmpty = FooterParamTabSections + FooterHintSep + FooterNavHint + FooterHintSep +
+	FooterParamFooterDetailEmpty = FooterHintTabSections + FooterHintSep + FooterNavHint + FooterHintSep +
 		FooterHintToggleTheme + FooterHintSep +
 		FooterParamHintAddRow + FooterHintSep + FooterParamHintDelete + FooterHintSep + FooterParamHintBack
-	FooterParamFooterDetailRows = FooterParamTabSections + FooterHintSep + FooterNavHint + FooterHintSep +
+	FooterParamFooterDetailRows = FooterHintTabSections + FooterHintSep + FooterNavHint + FooterHintSep +
 		FooterHintToggleTheme + FooterHintSep +
 		FooterParamHintAddRow + FooterHintSep + FooterParamHintDelete + FooterHintSep + FooterParamHintEnterEdit + FooterHintSep + FooterParamHintBack
 )

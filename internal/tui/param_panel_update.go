@@ -5,37 +5,39 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+
+	"github.com/flyingnobita/llml/internal/models"
 )
 
-func (m *Model) syncCurrentProfileOut() {
-	if m.paramProfileIndex < 0 || m.paramProfileIndex >= len(m.paramProfiles) {
+func (ps *paramsState) syncCurrentProfileOut() {
+	if ps.profileIndex < 0 || ps.profileIndex >= len(ps.profiles) {
 		return
 	}
-	m.paramProfiles[m.paramProfileIndex].Env = append([]EnvVar(nil), m.paramEnv...)
-	m.paramProfiles[m.paramProfileIndex].Args = flattenArgLines(m.paramArgs)
+	ps.profiles[ps.profileIndex].Env = append([]EnvVar(nil), ps.env...)
+	ps.profiles[ps.profileIndex].Args = flattenArgLines(ps.args)
 }
 
-func (m *Model) loadCurrentProfileIn() {
-	if m.paramProfileIndex < 0 || m.paramProfileIndex >= len(m.paramProfiles) {
+func (ps *paramsState) loadCurrentProfileIn() {
+	if ps.profileIndex < 0 || ps.profileIndex >= len(ps.profiles) {
 		return
 	}
-	p := m.paramProfiles[m.paramProfileIndex]
-	m.paramEnv = append([]EnvVar(nil), p.Env...)
-	m.paramArgs = collapseArgsForDisplay(p.Args)
-	m.paramEnvCursor = 0
-	m.paramArgsCursor = 0
+	p := ps.profiles[ps.profileIndex]
+	ps.env = append([]EnvVar(nil), p.Env...)
+	ps.args = collapseArgsForDisplay(p.Args)
+	ps.envCursor = 0
+	ps.argsCursor = 0
 }
 
 func (m Model) commitParamLineEdit() Model {
-	line := m.paramEditInput.Value()
-	kind := m.paramEditKind
+	line := m.params.editInput.Value()
+	kind := m.params.editKind
 
 	switch kind {
 	case paramEditEnvLine:
 		if strings.TrimSpace(line) == "" {
 			m = m.cancelParamLineEdit()
-			if m.paramEnvCursor >= 0 && m.paramEnvCursor < m.paramEnvLen() {
-				e := m.paramEnv[m.paramEnvCursor]
+			if m.params.envCursor >= 0 && m.params.envCursor < m.paramEnvLen() {
+				e := m.params.env[m.params.envCursor]
 				if strings.TrimSpace(e.Key) == "" && strings.TrimSpace(e.Value) == "" {
 					m = m.deleteParamRow()
 				}
@@ -45,62 +47,62 @@ func (m Model) commitParamLineEdit() Model {
 	case paramEditArgLine:
 		if strings.TrimSpace(line) == "" {
 			m = m.cancelParamLineEdit()
-			if m.paramArgsCursor >= 0 && m.paramArgsCursor < m.paramArgsLen() &&
-				strings.TrimSpace(m.paramArgs[m.paramArgsCursor]) == "" {
+			if m.params.argsCursor >= 0 && m.params.argsCursor < m.paramArgsLen() &&
+				strings.TrimSpace(m.params.args[m.params.argsCursor]) == "" {
 				m = m.deleteParamRow()
 			}
 			return m
 		}
 	}
 
-	m.paramEditKind = paramEditNone
+	m.params.editKind = paramEditNone
 	m = m.blurParamEdit()
 	switch kind {
 	case paramEditProfileName:
-		if m.paramProfileIndex >= 0 && m.paramProfileIndex < len(m.paramProfiles) {
+		if m.params.profileIndex >= 0 && m.params.profileIndex < len(m.params.profiles) {
 			name := strings.TrimSpace(line)
 			if name == "" {
-				name = fmt.Sprintf("parameter profile %d", m.paramProfileIndex+1)
+				name = fmt.Sprintf("parameter profile %d", m.params.profileIndex+1)
 			}
-			if profileNameTaken(m.paramProfiles, name, m.paramProfileIndex) {
-				name = nextProfileName(m.paramProfiles)
+			if profileNameTaken(m.params.profiles, name, m.params.profileIndex) {
+				name = nextProfileName(m.params.profiles)
 			}
-			m.paramProfiles[m.paramProfileIndex].Name = name
+			m.params.profiles[m.params.profileIndex].Name = name
 		}
 	case paramEditEnvLine:
-		if m.paramEnvCursor >= 0 && m.paramEnvCursor < m.paramEnvLen() {
-			m.paramEnv[m.paramEnvCursor] = parseEnvLine(line)
+		if m.params.envCursor >= 0 && m.params.envCursor < m.paramEnvLen() {
+			m.params.env[m.params.envCursor] = parseEnvLine(line)
 		}
 	case paramEditArgLine:
-		if m.paramArgsCursor >= 0 && m.paramArgsCursor < m.paramArgsLen() {
-			m.paramArgs[m.paramArgsCursor] = line
+		if m.params.argsCursor >= 0 && m.params.argsCursor < m.paramArgsLen() {
+			m.params.args[m.params.argsCursor] = models.ExpandTildePath(strings.TrimSpace(line))
 		}
 	}
-	m.paramEditInput.SetValue("")
+	m.params.editInput.SetValue("")
 	return m
 }
 
 func (m Model) cancelParamLineEdit() Model {
-	m.paramEditKind = paramEditNone
+	m.params.editKind = paramEditNone
 	m = m.blurParamEdit()
-	m.paramEditInput.SetValue("")
+	m.params.editInput.SetValue("")
 	return m
 }
 
 func (m Model) startParamLineEdit() (Model, tea.Cmd) {
-	switch m.paramFocus {
+	switch m.params.focus {
 	case paramFocusEnv:
 		if m.paramEnvLen() == 0 {
 			return m, nil
 		}
-		m.paramEditKind = paramEditEnvLine
-		m.paramEditInput.SetValue(formatEnvVar(m.paramEnv[m.paramEnvCursor]))
+		m.params.editKind = paramEditEnvLine
+		m.params.editInput.SetValue(formatEnvVar(m.params.env[m.params.envCursor]))
 	case paramFocusArgs:
 		if m.paramArgsLen() == 0 {
 			return m, nil
 		}
-		m.paramEditKind = paramEditArgLine
-		m.paramEditInput.SetValue(m.paramArgs[m.paramArgsCursor])
+		m.params.editKind = paramEditArgLine
+		m.params.editInput.SetValue(m.params.args[m.params.argsCursor])
 	default:
 		return m, nil
 	}
@@ -108,27 +110,27 @@ func (m Model) startParamLineEdit() (Model, tea.Cmd) {
 }
 
 func (m Model) startProfileNameEdit() (Model, tea.Cmd) {
-	if m.paramProfileIndex < 0 || m.paramProfileIndex >= len(m.paramProfiles) {
+	if m.params.profileIndex < 0 || m.params.profileIndex >= len(m.params.profiles) {
 		return m, nil
 	}
-	m.paramEditKind = paramEditProfileName
-	m.paramEditInput.SetValue(m.paramProfiles[m.paramProfileIndex].Name)
+	m.params.editKind = paramEditProfileName
+	m.params.editInput.SetValue(m.params.profiles[m.params.profileIndex].Name)
 	return m.focusParamEdit()
 }
 
 func (m Model) addParamRow() (Model, tea.Cmd) {
-	(&m).syncCurrentProfileOut()
-	switch m.paramFocus {
+	m.params.syncCurrentProfileOut()
+	switch m.params.focus {
 	case paramFocusEnv:
-		m.paramEnv = append(m.paramEnv, EnvVar{})
-		m.paramEnvCursor = m.paramEnvLen() - 1
-		m.paramEditKind = paramEditEnvLine
-		m.paramEditInput.SetValue("")
+		m.params.env = append(m.params.env, EnvVar{})
+		m.params.envCursor = m.paramEnvLen() - 1
+		m.params.editKind = paramEditEnvLine
+		m.params.editInput.SetValue("")
 	case paramFocusArgs:
-		m.paramArgs = append(m.paramArgs, "")
-		m.paramArgsCursor = m.paramArgsLen() - 1
-		m.paramEditKind = paramEditArgLine
-		m.paramEditInput.SetValue("")
+		m.params.args = append(m.params.args, "")
+		m.params.argsCursor = m.paramArgsLen() - 1
+		m.params.editKind = paramEditArgLine
+		m.params.editInput.SetValue("")
 	default:
 		return m, nil
 	}
@@ -136,23 +138,23 @@ func (m Model) addParamRow() (Model, tea.Cmd) {
 }
 
 func (m Model) deleteParamRow() Model {
-	(&m).syncCurrentProfileOut()
-	switch m.paramFocus {
+	m.params.syncCurrentProfileOut()
+	switch m.params.focus {
 	case paramFocusEnv:
-		if m.paramEnvLen() == 0 || m.paramEnvCursor < 0 || m.paramEnvCursor >= m.paramEnvLen() {
+		if m.paramEnvLen() == 0 || m.params.envCursor < 0 || m.params.envCursor >= m.paramEnvLen() {
 			return m
 		}
-		m.paramEnv = append(m.paramEnv[:m.paramEnvCursor], m.paramEnv[m.paramEnvCursor+1:]...)
-		if m.paramEnvCursor >= m.paramEnvLen() && m.paramEnvLen() > 0 {
-			m.paramEnvCursor = m.paramEnvLen() - 1
+		m.params.env = append(m.params.env[:m.params.envCursor], m.params.env[m.params.envCursor+1:]...)
+		if m.params.envCursor >= m.paramEnvLen() && m.paramEnvLen() > 0 {
+			m.params.envCursor = m.paramEnvLen() - 1
 		}
 	case paramFocusArgs:
-		if m.paramArgsLen() == 0 || m.paramArgsCursor < 0 || m.paramArgsCursor >= m.paramArgsLen() {
+		if m.paramArgsLen() == 0 || m.params.argsCursor < 0 || m.params.argsCursor >= m.paramArgsLen() {
 			return m
 		}
-		m.paramArgs = append(m.paramArgs[:m.paramArgsCursor], m.paramArgs[m.paramArgsCursor+1:]...)
-		if m.paramArgsCursor >= m.paramArgsLen() && m.paramArgsLen() > 0 {
-			m.paramArgsCursor = m.paramArgsLen() - 1
+		m.params.args = append(m.params.args[:m.params.argsCursor], m.params.args[m.params.argsCursor+1:]...)
+		if m.params.argsCursor >= m.paramArgsLen() && m.paramArgsLen() > 0 {
+			m.params.argsCursor = m.paramArgsLen() - 1
 		}
 	default:
 		return m
@@ -161,66 +163,66 @@ func (m Model) deleteParamRow() Model {
 }
 
 func (m Model) addProfile() Model {
-	(&m).syncCurrentProfileOut()
-	nm := nextProfileName(m.paramProfiles)
-	m.paramProfiles = append(m.paramProfiles, ParameterProfile{Name: nm, Env: nil, Args: nil})
-	m.paramProfileIndex = len(m.paramProfiles) - 1
-	m.loadCurrentProfileIn()
-	m.paramEnvCursor = 0
-	m.paramArgsCursor = 0
+	m.params.syncCurrentProfileOut()
+	nm := nextProfileName(m.params.profiles)
+	m.params.profiles = append(m.params.profiles, ParameterProfile{Name: nm, Env: nil, Args: nil})
+	m.params.profileIndex = len(m.params.profiles) - 1
+	m.params.loadCurrentProfileIn()
+	m.params.envCursor = 0
+	m.params.argsCursor = 0
 	return m
 }
 
 func (m Model) deleteProfile() Model {
-	if len(m.paramProfiles) <= 1 {
+	if len(m.params.profiles) <= 1 {
 		return m
 	}
-	(&m).syncCurrentProfileOut()
-	m.paramProfiles = append(m.paramProfiles[:m.paramProfileIndex], m.paramProfiles[m.paramProfileIndex+1:]...)
-	if m.paramProfileIndex >= len(m.paramProfiles) {
-		m.paramProfileIndex = len(m.paramProfiles) - 1
+	m.params.syncCurrentProfileOut()
+	m.params.profiles = append(m.params.profiles[:m.params.profileIndex], m.params.profiles[m.params.profileIndex+1:]...)
+	if m.params.profileIndex >= len(m.params.profiles) {
+		m.params.profileIndex = len(m.params.profiles) - 1
 	}
-	m.loadCurrentProfileIn()
-	m.paramEnvCursor = 0
-	m.paramArgsCursor = 0
+	m.params.loadCurrentProfileIn()
+	m.params.envCursor = 0
+	m.params.argsCursor = 0
 	return m
 }
 
 func (m Model) cycleParamFocus(delta int) Model {
-	(&m).syncCurrentProfileOut()
-	m.paramFocus = (m.paramFocus + delta + 3) % 3
+	m.params.syncCurrentProfileOut()
+	m.params.focus = paramFocus((int(m.params.focus) + delta + 3) % 3)
 	return m
 }
 
 func (m Model) moveProfile(delta int) Model {
-	(&m).syncCurrentProfileOut()
-	n := len(m.paramProfiles)
+	m.params.syncCurrentProfileOut()
+	n := len(m.params.profiles)
 	if n == 0 {
 		return m
 	}
-	next := m.paramProfileIndex + delta
+	next := m.params.profileIndex + delta
 	if next < 0 || next >= n {
 		return m
 	}
-	m.paramProfileIndex = next
-	m.loadCurrentProfileIn()
-	m.paramEnvCursor = 0
-	m.paramArgsCursor = 0
+	m.params.profileIndex = next
+	m.params.loadCurrentProfileIn()
+	m.params.envCursor = 0
+	m.params.argsCursor = 0
 	return m
 }
 
 // persistParamPanel writes the current parameter profiles to disk without closing the panel.
 func (m Model) persistParamPanel() (Model, tea.Cmd) {
-	(&m).syncCurrentProfileOut()
+	m.params.syncCurrentProfileOut()
 	ent := modelEntry{
-		Profiles:    copyProfiles(m.paramProfiles),
-		ActiveIndex: m.paramProfileIndex,
+		Profiles:    copyProfiles(m.params.profiles),
+		ActiveIndex: m.params.profileIndex,
 	}
-	if err := saveModelEntry(m.paramModelPath, ent); err != nil {
-		m.lastRunNote = err.Error()
+	if err := saveModelEntry(m.params.modelPath, ent); err != nil {
+		m = m.withLastRunError(err.Error())
 		return m, nil
 	}
-	m.lastRunNote = ""
+	m = m.withLastRunCleared()
 	return m, nil
 }
 
@@ -236,11 +238,11 @@ func (m Model) closeParamPanelWithPersist() (Model, tea.Cmd) {
 
 // updateParamPanelKey handles keys while the parameters panel is open.
 func (m Model) updateParamPanelKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	if m.paramConfirmDelete != paramConfirmNone {
+	if m.params.confirmDelete != paramConfirmNone {
 		switch msg.String() {
 		case "y", "Y":
-			k := m.paramConfirmDelete
-			m.paramConfirmDelete = paramConfirmNone
+			k := m.params.confirmDelete
+			m.params.confirmDelete = paramConfirmNone
 			switch k {
 			case paramConfirmProfile:
 				m = m.deleteProfile()
@@ -249,14 +251,14 @@ func (m Model) updateParamPanelKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 			}
 			return m.persistParamPanel()
 		case "n", "N":
-			m.paramConfirmDelete = paramConfirmNone
+			m.params.confirmDelete = paramConfirmNone
 			return m, nil
 		default:
 			return m, nil
 		}
 	}
 
-	if m.paramEditKind != paramEditNone {
+	if m.params.editKind != paramEditNone {
 		switch msg.String() {
 		case "esc":
 			m = m.cancelParamLineEdit()
@@ -274,7 +276,7 @@ func (m Model) updateParamPanelKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 			return m.persistParamPanel()
 		default:
 			var cmd tea.Cmd
-			m.paramEditInput, cmd = m.paramEditInput.Update(msg)
+			m.params.editInput, cmd = m.params.editInput.Update(msg)
 			return m, cmd
 		}
 	}
@@ -293,43 +295,43 @@ func (m Model) updateParamPanelKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		m = m.cycleParamFocus(-1)
 		return m, nil
 	case "up", "k":
-		switch m.paramFocus {
+		switch m.params.focus {
 		case paramFocusProfiles:
 			m = m.moveProfile(-1)
 			return m.persistParamPanel()
 		case paramFocusEnv:
-			if m.paramEnvCursor > 0 {
-				m.paramEnvCursor--
+			if m.params.envCursor > 0 {
+				m.params.envCursor--
 			}
 		case paramFocusArgs:
-			if m.paramArgsCursor > 0 {
-				m.paramArgsCursor--
+			if m.params.argsCursor > 0 {
+				m.params.argsCursor--
 			}
 		}
 		return m, nil
 	case "down", "j":
-		switch m.paramFocus {
+		switch m.params.focus {
 		case paramFocusProfiles:
 			m = m.moveProfile(1)
 			return m.persistParamPanel()
 		case paramFocusEnv:
-			if m.paramEnvCursor < m.paramEnvLen()-1 {
-				m.paramEnvCursor++
+			if m.params.envCursor < m.paramEnvLen()-1 {
+				m.params.envCursor++
 			}
 		case paramFocusArgs:
-			if m.paramArgsCursor < m.paramArgsLen()-1 {
-				m.paramArgsCursor++
+			if m.params.argsCursor < m.paramArgsLen()-1 {
+				m.params.argsCursor++
 			}
 		}
 		return m, nil
 	case "n":
-		if m.paramFocus == paramFocusProfiles {
+		if m.params.focus == paramFocusProfiles {
 			m = m.addProfile()
 			return m.persistParamPanel()
 		}
 		return m, nil
 	case "a":
-		if m.paramFocus == paramFocusEnv || m.paramFocus == paramFocusArgs {
+		if m.params.focus == paramFocusEnv || m.params.focus == paramFocusArgs {
 			var cmd tea.Cmd
 			m, cmd = m.addParamRow()
 			m, pcmd := m.persistParamPanel()
@@ -337,34 +339,34 @@ func (m Model) updateParamPanelKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		}
 		return m, nil
 	case "d":
-		switch m.paramFocus {
+		switch m.params.focus {
 		case paramFocusProfiles:
-			if len(m.paramProfiles) <= 1 {
+			if len(m.params.profiles) <= 1 {
 				return m, nil
 			}
-			m.paramConfirmDelete = paramConfirmProfile
+			m.params.confirmDelete = paramConfirmProfile
 			return m, nil
 		case paramFocusEnv:
 			if m.paramEnvLen() == 0 {
 				return m, nil
 			}
-			m.paramConfirmDelete = paramConfirmEnvRow
+			m.params.confirmDelete = paramConfirmEnvRow
 			return m, nil
 		case paramFocusArgs:
 			if m.paramArgsLen() == 0 {
 				return m, nil
 			}
-			m.paramConfirmDelete = paramConfirmArgRow
+			m.params.confirmDelete = paramConfirmArgRow
 			return m, nil
 		}
 		return m, nil
 	case "r", "R":
-		if m.paramFocus == paramFocusProfiles {
+		if m.params.focus == paramFocusProfiles {
 			return m.startProfileNameEdit()
 		}
 		return m, nil
 	case "enter":
-		if m.paramFocus == paramFocusEnv || m.paramFocus == paramFocusArgs {
+		if m.params.focus == paramFocusEnv || m.params.focus == paramFocusArgs {
 			return m.startParamLineEdit()
 		}
 		return m, nil

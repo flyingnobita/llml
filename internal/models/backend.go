@@ -1,4 +1,4 @@
-package llamacpp
+package models
 
 // ModelBackend selects which server command runs for a discovered model row.
 type ModelBackend int

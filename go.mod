@@ -6,6 +6,7 @@ require (
 	charm.land/bubbles/v2 v2.1.0
 	charm.land/bubbletea/v2 v2.0.5
 	charm.land/lipgloss/v2 v2.0.3
+	github.com/BurntSushi/toml v1.5.0
 	github.com/abrander/gguf v0.0.0-20231228004541-3d15a052a17f
 	github.com/atotto/clipboard v0.1.4
 	github.com/charmbracelet/ultraviolet v0.0.0-20260413211237-bd52878bcec2

@@ -1,4 +1,4 @@
-package llamacpp
+package models
 
 import (
 	"bytes"
@@ -9,7 +9,7 @@ import (
 )
 
 func TestMergeSearchRoots_dedupes(t *testing.T) {
-	t.Setenv(envModelPaths, "/foo/bar,/foo/bar,/baz")
+	t.Setenv(EnvModelPaths, "/foo/bar,/foo/bar,/baz")
 	home, err := os.UserHomeDir()
 	if err != nil {
 		t.Fatal(err)
@@ -81,9 +81,9 @@ func TestDiscover_vllmNameUsesHFRepoID(t *testing.T) {
 	if len(got) != 1 {
 		t.Fatalf("want 1 model, got %d", len(got))
 	}
-	want := "opendatalab/MinerU2.5-2509-1.2B"
+	want := "879e58bdd9566632b27a88a81f0e2961873311f"
 	if got[0].Name != want {
-		t.Fatalf("Name: got %q want %q", got[0].Name, want)
+		t.Fatalf("Name (dir basename): got %q want %q", got[0].Name, want)
 	}
 }
 
@@ -193,6 +193,82 @@ func TestFormatSize(t *testing.T) {
 	}
 }
 
+func TestDiscover_findsGGUFAndSafetensorsUnderSameRoot(t *testing.T) {
+	tmp := t.TempDir()
+
+	ggufPath := filepath.Join(tmp, "model.gguf")
+	if err := os.WriteFile(ggufPath, []byte{}, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	stDir := filepath.Join(tmp, "hf_model")
+	if err := os.MkdirAll(stDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cfg := `{"model_type":"llama","architectures":["LlamaForCausalLM"]}`
+	if err := os.WriteFile(filepath.Join(stDir, "config.json"), []byte(cfg), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(stDir, "model.safetensors"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := Discover(Options{ExtraRoots: []string{tmp}, MaxDepth: 4, SkipDefaultRoots: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("want 2 models (1 GGUF + 1 safetensors), got %d: %v", len(got), got)
+	}
+	backends := map[ModelBackend]int{}
+	for _, mf := range got {
+		backends[mf.Backend]++
+	}
+	if backends[BackendLlama] != 1 || backends[BackendVLLM] != 1 {
+		t.Fatalf("want 1 llama + 1 vllm, got %v", backends)
+	}
+}
+
+func TestDiscover_filtersAuxiliaryVLLMModel(t *testing.T) {
+	tmp := t.TempDir()
+
+	// mmproj-named directory is an auxiliary model and should be filtered.
+	mmprojDir := filepath.Join(tmp, "mmproj-BF16")
+	if err := os.MkdirAll(mmprojDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cfg := `{"model_type":"clip","architectures":["CLIPModel"]}`
+	if err := os.WriteFile(filepath.Join(mmprojDir, "config.json"), []byte(cfg), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(mmprojDir, "model.safetensors"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// A normal model that should be kept.
+	goodDir := filepath.Join(tmp, "llama-model")
+	if err := os.MkdirAll(goodDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(goodDir, "config.json"), []byte(`{"model_type":"llama"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(goodDir, "model.safetensors"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := Discover(Options{ExtraRoots: []string{tmp}, MaxDepth: 4, SkipDefaultRoots: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("want 1 model (mmproj filtered), got %d: %v", len(got), got)
+	}
+	if got[0].Name != "llama-model" {
+		t.Fatalf("got %q want llama-model", got[0].Name)
+	}
+}
+
 func TestSkipListedModel(t *testing.T) {
 	if !isAuxiliaryModel(ModelFile{Name: "x.gguf", Parameters: "clip"}) {
 		t.Fatal("expected clip filtered")
@@ -205,16 +281,5 @@ func TestSkipListedModel(t *testing.T) {
 	}
 	if isAuxiliaryModel(ModelFile{Name: "model-Q4_K_M.gguf", Parameters: "gemma4"}) {
 		t.Fatal("expected to keep main weights")
-	}
-}
-
-func TestTruncateRunes(t *testing.T) {
-	s := "hello世界"
-	if TruncateRunes(s, 100) != s {
-		t.Fatalf("short string changed")
-	}
-	got := TruncateRunes("abcdefghijklmnopqrstuvwxyz", 8)
-	if len(got) < 2 {
-		t.Fatalf("expected ellipsis suffix")
 	}
 }

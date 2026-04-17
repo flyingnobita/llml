@@ -1,95 +1,106 @@
 package tui
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/flyingnobita/llml/internal/llamacpp"
+	"github.com/flyingnobita/llml/internal/models"
 )
+
+func TestParseEnvLine_expandTilde(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	e := parseEnvLine("FOO=" + "~/bar")
+	want := filepath.Join(home, "bar")
+	if e.Key != "FOO" || e.Value != want {
+		t.Fatalf("got %+v want FOO=%q", e, want)
+	}
+}
 
 func TestParamPanelDeleteConfirm(t *testing.T) {
 	m := New()
-	m.width = 80
-	m.height = 24
-	m.paramPanelOpen = true
-	m.paramFocus = paramFocusProfiles
-	m.paramProfiles = []ParameterProfile{{Name: "a"}, {Name: "b"}}
-	m.paramProfileIndex = 0
+	m.layout.width = 80
+	m.layout.height = 24
+	m.params.open = true
+	m.params.focus = paramFocusProfiles
+	m.params.profiles = []ParameterProfile{{Name: "a"}, {Name: "b"}}
+	m.params.profileIndex = 0
 
 	m, _ = m.updateParamPanelKey(tea.KeyPressMsg{Code: 'd', Text: "d"})
-	if m.paramConfirmDelete != paramConfirmProfile {
+	if m.params.confirmDelete != paramConfirmProfile {
 		t.Fatal("expected confirm dialog after d with 2+ profiles")
 	}
-	if len(m.paramProfiles) != 2 {
+	if len(m.params.profiles) != 2 {
 		t.Fatal("delete must not run before confirmation")
 	}
 
 	m, _ = m.updateParamPanelKey(tea.KeyPressMsg{Code: 'n', Text: "n"})
-	if m.paramConfirmDelete != paramConfirmNone {
+	if m.params.confirmDelete != paramConfirmNone {
 		t.Fatal("n should dismiss confirm dialog")
 	}
 
-	m.paramProfiles = []ParameterProfile{{Name: "only"}}
-	m.paramConfirmDelete = paramConfirmNone
+	m.params.profiles = []ParameterProfile{{Name: "only"}}
+	m.params.confirmDelete = paramConfirmNone
 	m, _ = m.updateParamPanelKey(tea.KeyPressMsg{Code: 'd', Text: "d"})
-	if m.paramConfirmDelete != paramConfirmNone {
+	if m.params.confirmDelete != paramConfirmNone {
 		t.Fatal("no confirm when only one profile")
 	}
 }
 
 func TestParamPanelDeleteEnvRowConfirm(t *testing.T) {
 	m := New()
-	m.width = 80
-	m.height = 24
-	m.paramPanelOpen = true
-	m.paramFocus = paramFocusEnv
-	m.paramProfiles = []ParameterProfile{{Name: "p", Env: []EnvVar{{Key: "K", Value: "V"}}, Args: nil}}
-	m.paramProfileIndex = 0
-	m.paramEnv = []EnvVar{{Key: "K", Value: "V"}}
-	m.paramEnvCursor = 0
+	m.layout.width = 80
+	m.layout.height = 24
+	m.params.open = true
+	m.params.focus = paramFocusEnv
+	m.params.profiles = []ParameterProfile{{Name: "p", Env: []EnvVar{{Key: "K", Value: "V"}}, Args: nil}}
+	m.params.profileIndex = 0
+	m.params.env = []EnvVar{{Key: "K", Value: "V"}}
+	m.params.envCursor = 0
 
 	m, _ = m.updateParamPanelKey(tea.KeyPressMsg{Code: 'd', Text: "d"})
-	if m.paramConfirmDelete != paramConfirmEnvRow {
-		t.Fatalf("expected env row confirm, got %d", m.paramConfirmDelete)
+	if m.params.confirmDelete != paramConfirmEnvRow {
+		t.Fatalf("expected env row confirm, got %d", m.params.confirmDelete)
 	}
-	if len(m.paramEnv) != 1 {
+	if len(m.params.env) != 1 {
 		t.Fatal("row not deleted yet")
 	}
 	m, _ = m.updateParamPanelKey(tea.KeyPressMsg{Code: 'n', Text: "n"})
-	if m.paramConfirmDelete != paramConfirmNone {
+	if m.params.confirmDelete != paramConfirmNone {
 		t.Fatal("n should dismiss confirm")
 	}
-	if len(m.paramEnv) != 1 {
+	if len(m.params.env) != 1 {
 		t.Fatal("row still present after cancel")
 	}
 }
 
 func TestCommitParamLineEdit_blankEnvLikeCancel(t *testing.T) {
 	m := New()
-	m.paramFocus = paramFocusEnv
-	m.paramEnv = []EnvVar{{Key: "K", Value: "V"}}
-	m.paramEnvCursor = 0
-	m.paramEditKind = paramEditEnvLine
-	m.paramEditInput.SetValue("   ")
+	m.params.focus = paramFocusEnv
+	m.params.env = []EnvVar{{Key: "K", Value: "V"}}
+	m.params.envCursor = 0
+	m.params.editKind = paramEditEnvLine
+	m.params.editInput.SetValue("   ")
 
 	m = m.commitParamLineEdit()
-	if m.paramEnvLen() != 1 || m.paramEnv[0].Key != "K" || m.paramEnv[0].Value != "V" {
-		t.Fatalf("blank commit should keep existing env, got %#v", m.paramEnv)
+	if m.paramEnvLen() != 1 || m.params.env[0].Key != "K" || m.params.env[0].Value != "V" {
+		t.Fatalf("blank commit should keep existing env, got %#v", m.params.env)
 	}
-	if m.paramEditKind != paramEditNone {
+	if m.params.editKind != paramEditNone {
 		t.Fatal("expected edit closed")
 	}
 }
 
 func TestCommitParamLineEdit_blankEnvRemovesNewEmptyRow(t *testing.T) {
 	m := New()
-	m.paramFocus = paramFocusEnv
-	m.paramEnv = []EnvVar{{}}
-	m.paramEnvCursor = 0
-	m.paramEditKind = paramEditEnvLine
-	m.paramEditInput.SetValue("")
+	m.params.focus = paramFocusEnv
+	m.params.env = []EnvVar{{}}
+	m.params.envCursor = 0
+	m.params.editKind = paramEditEnvLine
+	m.params.editInput.SetValue("")
 
 	m = m.commitParamLineEdit()
 	if m.paramEnvLen() != 0 {
@@ -99,29 +110,29 @@ func TestCommitParamLineEdit_blankEnvRemovesNewEmptyRow(t *testing.T) {
 
 func TestCommitParamLineEdit_blankArgLikeCancel(t *testing.T) {
 	m := New()
-	m.paramFocus = paramFocusArgs
-	m.paramArgs = []string{"--foo"}
-	m.paramArgsCursor = 0
-	m.paramEditKind = paramEditArgLine
-	m.paramEditInput.SetValue("\t ")
+	m.params.focus = paramFocusArgs
+	m.params.args = []string{"--foo"}
+	m.params.argsCursor = 0
+	m.params.editKind = paramEditArgLine
+	m.params.editInput.SetValue("\t ")
 
 	m = m.commitParamLineEdit()
-	if m.paramArgsLen() != 1 || m.paramArgs[0] != "--foo" {
-		t.Fatalf("blank commit should keep existing arg, got %#v", m.paramArgs)
+	if m.paramArgsLen() != 1 || m.params.args[0] != "--foo" {
+		t.Fatalf("blank commit should keep existing arg, got %#v", m.params.args)
 	}
 }
 
 func TestCommitParamLineEdit_blankArgRemovesNewEmptyRow(t *testing.T) {
 	m := New()
-	m.paramFocus = paramFocusArgs
-	m.paramArgs = []string{""}
-	m.paramArgsCursor = 0
-	m.paramEditKind = paramEditArgLine
-	m.paramEditInput.SetValue("  ")
+	m.params.focus = paramFocusArgs
+	m.params.args = []string{""}
+	m.params.argsCursor = 0
+	m.params.editKind = paramEditArgLine
+	m.params.editInput.SetValue("  ")
 
 	m = m.commitParamLineEdit()
 	if m.paramArgsLen() != 0 {
-		t.Fatalf("blank commit on new empty arg row should remove row, got %#v", m.paramArgs)
+		t.Fatalf("blank commit on new empty arg row should remove row, got %#v", m.params.args)
 	}
 }
 
@@ -129,16 +140,16 @@ func TestParamPanelViewIncludesMainAppBackdrop(t *testing.T) {
 	m := New()
 	// Tall terminal so the centered modal does not cover the title row; on 24 lines
 	// a ~22-line modal obscures the title and this test would falsely fail.
-	m.width = 100
-	m.height = 40
+	m.layout.width = 100
+	m.layout.height = 40
 	m.loading = false
-	m.files = []llamacpp.ModelFile{
-		{Backend: llamacpp.BackendLlama, Path: "/x.gguf", Name: "x", Size: 1, ModTime: time.Unix(0, 0)},
+	m.table.files = []models.ModelFile{
+		{Backend: models.BackendLlama, Path: "/x.gguf", Name: "x", Size: 1, ModTime: time.Unix(0, 0)},
 	}
 	m = m.layoutTable()
-	m.paramPanelOpen = true
-	m.paramModelDisplayName = "test/model"
-	m.paramProfiles = []ParameterProfile{{Name: "default"}}
+	m.params.open = true
+	m.params.modelDisplayName = "test/model"
+	m.params.profiles = []ParameterProfile{{Name: "default"}}
 
 	bg := m.mainAppPlacedView()
 	if !strings.Contains(bg, "LLM Launcher") {
@@ -161,8 +172,8 @@ func TestParamPanelViewIncludesMainAppBackdrop(t *testing.T) {
 
 func TestParamPanelContentWidth_wideTerminalUsesCap(t *testing.T) {
 	m := New()
-	m.width = 200
-	m.height = 40
+	m.layout.width = 200
+	m.layout.height = 40
 	if got := m.paramPanelContentWidth(); got != paramPanelMaxInnerWidth {
 		t.Fatalf("paramPanelContentWidth = %d, want %d", got, paramPanelMaxInnerWidth)
 	}

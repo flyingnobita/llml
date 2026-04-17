@@ -2,17 +2,49 @@ package tui
 
 import (
 	"os/exec"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/flyingnobita/llml/internal/llamacpp"
+	"github.com/flyingnobita/llml/internal/models"
 )
 
 type runtimeReadyMsg struct {
-	runtime llamacpp.RuntimeInfo
+	runtime models.RuntimeInfo
 }
 
+// modelsLoadedMsg is used in tests to simulate a completed filesystem scan.
 type modelsLoadedMsg struct {
-	files []llamacpp.ModelFile
+	files []models.ModelFile
+}
+
+// startupNeedFullScanMsg triggers a full runtime probe and model discovery (writes config.toml).
+type startupNeedFullScanMsg struct{}
+
+// startupCacheHitMsg loads models from config.toml cache (no filesystem walk).
+type startupCacheHitMsg struct {
+	runtime  models.RuntimeInfo
+	files    []models.ModelFile
+	lastScan time.Time
+}
+
+// fullScanDoneMsg completes a full discovery pass (startup or refresh-all path).
+type fullScanDoneMsg struct {
+	runtime  models.RuntimeInfo
+	files    []models.ModelFile
+	writeErr error
+	lastScan time.Time
+}
+
+// modelRescanDoneMsg completes an S-key model-only re-scan.
+type modelRescanDoneMsg struct {
+	files    []models.ModelFile
+	writeErr error
+	lastScan time.Time
+}
+
+// runtimeReloadErrMsg reports failure to reload [runtime] from config.toml (r key).
+type runtimeReloadErrMsg struct {
+	err error
 }
 
 type modelsErrMsg struct {

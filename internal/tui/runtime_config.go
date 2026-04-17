@@ -3,16 +3,19 @@ package tui
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
-	"github.com/flyingnobita/llml/internal/llamacpp"
+	"github.com/flyingnobita/llml/internal/models"
 )
 
+type runtimeField int
+
 const (
-	runtimeFieldLlamaCppPath = iota
+	runtimeFieldLlamaCppPath runtimeField = iota
 	runtimeFieldVLLMPath
 	runtimeFieldVLLMVenv
 	runtimeFieldLlamaPort
@@ -21,34 +24,34 @@ const (
 )
 
 // applyListenPortEnv sets LLAMA_SERVER_PORT from user input, or unsets it when empty
-// (default port 8080 via llamacpp.ListenPort). Input should be digits only or empty.
+// (default port 8080 via models.ListenPort). Input should be digits only or empty.
 func applyListenPortEnv(raw string) error {
 	v := strings.TrimSpace(raw)
 	if v == "" {
-		os.Unsetenv(llamacpp.EnvLlamaServerPort)
+		os.Unsetenv(models.EnvLlamaServerPort)
 		return nil
 	}
 	p, err := strconv.Atoi(v)
 	if err != nil || p < 1 || p > 65535 {
 		return fmt.Errorf("port must be 1-65535 or empty for default 8080")
 	}
-	os.Setenv(llamacpp.EnvLlamaServerPort, v)
+	os.Setenv(models.EnvLlamaServerPort, v)
 	return nil
 }
 
 // applyVLLMPortEnv sets VLLM_SERVER_PORT from user input, or unsets it when empty
-// (default port 8000 via llamacpp.VLLMPort).
+// (default port 8000 via models.VLLMPort).
 func applyVLLMPortEnv(raw string) error {
 	v := strings.TrimSpace(raw)
 	if v == "" {
-		os.Unsetenv(llamacpp.EnvVLLMServerPort)
+		os.Unsetenv(models.EnvVLLMServerPort)
 		return nil
 	}
 	p, err := strconv.Atoi(v)
 	if err != nil || p < 1 || p > 65535 {
 		return fmt.Errorf("port must be 1-65535 or empty for default 8000")
 	}
-	os.Setenv(llamacpp.EnvVLLMServerPort, v)
+	os.Setenv(models.EnvVLLMServerPort, v)
 	return nil
 }
 
@@ -61,13 +64,19 @@ func prefillPort(envKey string, effective int) string {
 }
 
 // applyPathEnv sets or unsets a path-style environment variable (trimmed; empty unsets).
+// A leading "~" or "~/" is expanded to the user's home directory ([models.ExpandTildePath]).
 func applyPathEnv(key, raw string) {
 	v := strings.TrimSpace(raw)
 	if v == "" {
 		os.Unsetenv(key)
-	} else {
-		os.Setenv(key, v)
+		return
 	}
+	v = filepath.Clean(models.ExpandTildePath(v))
+	if v == "" || v == "." {
+		os.Unsetenv(key)
+		return
+	}
+	os.Setenv(key, v)
 }
 
 func validatePortInput(s string) error {
@@ -82,7 +91,7 @@ func validatePortInput(s string) error {
 	return nil
 }
 
-// validatePortCommit checks a port field before applying (empty = llamacpp default for that env).
+// validatePortCommit checks a port field before applying (empty = models default for that env).
 func validatePortCommit(raw string) error {
 	v := strings.TrimSpace(raw)
 	if v == "" {
@@ -116,63 +125,105 @@ func newPathTextInput() textinput.Model {
 
 // openRuntimeConfig shows editors for the same env vars summarized in the runtimes footer.
 func (m Model) openRuntimeConfig() (Model, tea.Cmd) {
-	m.runtimeConfigOpen = true
-	m.lastRunNote = ""
-	m.runtimeInputs[runtimeFieldLlamaCppPath].SetValue(os.Getenv(llamacpp.EnvLlamaCppPath))
-	m.runtimeInputs[runtimeFieldVLLMPath].SetValue(os.Getenv(llamacpp.EnvVLLMPath))
-	m.runtimeInputs[runtimeFieldVLLMVenv].SetValue(os.Getenv(llamacpp.EnvVLLMVenv))
-	m.runtimeInputs[runtimeFieldLlamaPort].SetValue(prefillPort(llamacpp.EnvLlamaServerPort, llamacpp.ListenPort()))
-	m.runtimeInputs[runtimeFieldVLLMPort].SetValue(prefillPort(llamacpp.EnvVLLMServerPort, llamacpp.VLLMPort()))
-	return m.focusRuntimeField(runtimeFieldLlamaCppPath)
+	return m.openRuntimeConfigFocused(runtimeFieldLlamaCppPath)
+}
+
+// openRuntimeConfigFocused opens the runtime editor with the given field focused and clears any
+// footer status line ([Model.lastRunNote]).
+func (m Model) openRuntimeConfigFocused(focus runtimeField) (Model, tea.Cmd) {
+	m.rc.open = true
+	m.preview.focused = false
+	m = m.withLastRunCleared()
+	m.rc.inputs[runtimeFieldLlamaCppPath].SetValue(os.Getenv(models.EnvLlamaCppPath))
+	m.rc.inputs[runtimeFieldVLLMPath].SetValue(os.Getenv(models.EnvVLLMPath))
+	m.rc.inputs[runtimeFieldVLLMVenv].SetValue(os.Getenv(models.EnvVLLMVenv))
+	m.rc.inputs[runtimeFieldLlamaPort].SetValue(prefillPort(models.EnvLlamaServerPort, models.ListenPort()))
+	m.rc.inputs[runtimeFieldVLLMPort].SetValue(prefillPort(models.EnvVLLMServerPort, models.VLLMPort()))
+	return m.focusRuntimeField(focus)
+}
+
+// maybeSetMissingRuntimeFooterNote sets [Model.lastRunNote] when the scan found models that need a
+// backend binary, but [models.ResolveLlamaServerPath] or [models.ResolveVLLMPath] is empty.
+// GGUF rows require llama-server; vLLM rows require vllm. Clears the footer line when neither applies.
+func (m Model) maybeSetMissingRuntimeFooterNote() (Model, tea.Cmd) {
+	var wantLlama, wantVLLM bool
+	for _, f := range m.table.files {
+		switch f.Backend {
+		case models.BackendLlama:
+			wantLlama = true
+		case models.BackendVLLM:
+			wantVLLM = true
+		}
+	}
+	haveLlama := models.ResolveLlamaServerPath(m.runtime) != ""
+	haveVLLM := models.ResolveVLLMPath(m.runtime) != ""
+
+	var msgs []string
+	if wantLlama && !haveLlama {
+		msgs = append(msgs, MissingLlamaServerFooterNote)
+	}
+	if wantVLLM && !haveVLLM {
+		msgs = append(msgs, MissingVLLMFooterNote)
+	}
+	if len(msgs) > 0 {
+		m = m.withLastRunError(strings.Join(msgs, "\n"))
+	} else {
+		m = m.withLastRunCleared()
+	}
+	return m, nil
 }
 
 func (m Model) closeRuntimeConfig() Model {
-	m.runtimeConfigOpen = false
-	for i := range m.runtimeInputs {
-		(&m.runtimeInputs[i]).Blur()
-		m.runtimeInputs[i].SetValue("")
+	m.rc.open = false
+	for i := range m.rc.inputs {
+		(&m.rc.inputs[i]).Blur()
+		m.rc.inputs[i].SetValue("")
 	}
 	return m
 }
 
-func (m Model) focusRuntimeField(i int) (Model, tea.Cmd) {
+func (m Model) focusRuntimeField(i runtimeField) (Model, tea.Cmd) {
 	if i < 0 || i >= runtimeFieldCount {
 		i = 0
 	}
-	m.runtimeFocus = i
+	m.rc.focus = i
 	var cmd tea.Cmd
-	for j := range m.runtimeInputs {
-		if j == i {
-			cmd = (&m.runtimeInputs[j]).Focus()
+	for j := range m.rc.inputs {
+		if runtimeField(j) == i {
+			cmd = (&m.rc.inputs[j]).Focus()
 		} else {
-			(&m.runtimeInputs[j]).Blur()
+			(&m.rc.inputs[j]).Blur()
 		}
 	}
 	return m, cmd
 }
 
 func (m Model) commitRuntimeConfig() (Model, tea.Cmd) {
-	if err := validatePortCommit(m.runtimeInputs[runtimeFieldLlamaPort].Value()); err != nil {
-		m.lastRunNote = fmt.Sprintf("%s: %v", llamacpp.EnvLlamaServerPort, err)
+	if err := validatePortCommit(m.rc.inputs[runtimeFieldLlamaPort].Value()); err != nil {
+		m = m.withLastRunError(fmt.Sprintf("%s: %v", models.EnvLlamaServerPort, err))
 		return m, nil
 	}
-	if err := validatePortCommit(m.runtimeInputs[runtimeFieldVLLMPort].Value()); err != nil {
-		m.lastRunNote = fmt.Sprintf("%s: %v", llamacpp.EnvVLLMServerPort, err)
+	if err := validatePortCommit(m.rc.inputs[runtimeFieldVLLMPort].Value()); err != nil {
+		m = m.withLastRunError(fmt.Sprintf("%s: %v", models.EnvVLLMServerPort, err))
 		return m, nil
 	}
-	applyPathEnv(llamacpp.EnvLlamaCppPath, m.runtimeInputs[runtimeFieldLlamaCppPath].Value())
-	applyPathEnv(llamacpp.EnvVLLMPath, m.runtimeInputs[runtimeFieldVLLMPath].Value())
-	applyPathEnv(llamacpp.EnvVLLMVenv, m.runtimeInputs[runtimeFieldVLLMVenv].Value())
-	if err := applyListenPortEnv(m.runtimeInputs[runtimeFieldLlamaPort].Value()); err != nil {
-		m.lastRunNote = err.Error()
+	applyPathEnv(models.EnvLlamaCppPath, m.rc.inputs[runtimeFieldLlamaCppPath].Value())
+	applyPathEnv(models.EnvVLLMPath, m.rc.inputs[runtimeFieldVLLMPath].Value())
+	applyPathEnv(models.EnvVLLMVenv, m.rc.inputs[runtimeFieldVLLMVenv].Value())
+	if err := applyListenPortEnv(m.rc.inputs[runtimeFieldLlamaPort].Value()); err != nil {
+		m = m.withLastRunError(err.Error())
 		return m, nil
 	}
-	if err := applyVLLMPortEnv(m.runtimeInputs[runtimeFieldVLLMPort].Value()); err != nil {
-		m.lastRunNote = err.Error()
+	if err := applyVLLMPortEnv(m.rc.inputs[runtimeFieldVLLMPort].Value()); err != nil {
+		m = m.withLastRunError(err.Error())
 		return m, nil
 	}
-	m.runtime = llamacpp.DiscoverRuntime()
-	m.lastRunNote = ""
+	m.runtime = models.DiscoverRuntime()
+	if err := writeConfigFromModel(m); err != nil {
+		m = m.withLastRunError("Could not save config: " + err.Error())
+	} else {
+		m = m.withLastRunCleared()
+	}
 	m = m.closeRuntimeConfig()
 	return m, nil
 }
@@ -181,20 +232,20 @@ func (m Model) commitRuntimeConfig() (Model, tea.Cmd) {
 func (m Model) updateRuntimeConfigKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
-		m.lastRunNote = ""
+		m = m.withLastRunCleared()
 		m = m.closeRuntimeConfig()
 		return m, nil
 	case "enter":
 		return m.commitRuntimeConfig()
 	case "tab":
-		next := (m.runtimeFocus + 1) % runtimeFieldCount
+		next := (m.rc.focus + 1) % runtimeFieldCount
 		return m.focusRuntimeField(next)
 	case "shift+tab":
-		prev := (m.runtimeFocus + runtimeFieldCount - 1) % runtimeFieldCount
+		prev := (m.rc.focus + runtimeFieldCount - 1) % runtimeFieldCount
 		return m.focusRuntimeField(prev)
 	default:
 		var cmd tea.Cmd
-		m.runtimeInputs[m.runtimeFocus], cmd = m.runtimeInputs[m.runtimeFocus].Update(msg)
+		m.rc.inputs[m.rc.focus], cmd = m.rc.inputs[m.rc.focus].Update(msg)
 		return m, cmd
 	}
 }

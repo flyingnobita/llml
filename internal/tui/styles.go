@@ -8,13 +8,15 @@ import (
 
 // styles holds all lipgloss styles for one resolved theme.
 type styles struct {
-	app                    lipgloss.Style
-	title                  lipgloss.Style
-	titleBoldLeft          lipgloss.Style
-	titleToastRowWrap      lipgloss.Style
-	subtitle               lipgloss.Style
-	body                   lipgloss.Style
-	footer                 lipgloss.Style
+	app               lipgloss.Style
+	title             lipgloss.Style
+	titleBoldLeft     lipgloss.Style
+	titleToastRowWrap lipgloss.Style
+	subtitle          lipgloss.Style
+	body              lipgloss.Style
+	footer            lipgloss.Style
+	// scrollBarColumn colors the █/░ track beside viewports; no margin (unlike footer).
+	scrollBarColumn        lipgloss.Style
 	errLine                lipgloss.Style
 	runtimePanel           lipgloss.Style
 	portConfigTitle        lipgloss.Style
@@ -27,9 +29,13 @@ type styles struct {
 	serverLogViewport      lipgloss.Style
 	splitPaneChromeFocused lipgloss.Style
 	splitPaneChromeDim     lipgloss.Style
-	// launchPreview is the split-pane R invocation line below the model table.
+	// launchPreview wraps the bordered launch command viewport (margin only).
 	launchPreview lipgloss.Style
-	table         btable.Styles
+	// launchPreviewViewport frames the scrollable command text (border + horizontal padding).
+	launchPreviewViewport lipgloss.Style
+	// launchPreviewContent styles the command string inside the viewport.
+	launchPreviewContent lipgloss.Style
+	table                btable.Styles
 }
 
 // newStyles builds lipgloss styles from a Theme. Header and Cell use
@@ -56,6 +62,8 @@ func newStyles(theme Theme) styles {
 		footer: lipgloss.NewStyle().
 			Foreground(theme.Footer).
 			MarginTop(1),
+		scrollBarColumn: lipgloss.NewStyle().
+			Foreground(theme.Footer),
 		errLine: lipgloss.NewStyle().Foreground(theme.Error),
 		runtimePanel: lipgloss.NewStyle().
 			BorderTop(true).
@@ -103,11 +111,14 @@ func newStyles(theme Theme) styles {
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(theme.SplitPaneBorderDim).
 			Padding(0, 1),
-		// Match primary body text contrast (not Footer); bold reads clearly on dark backgrounds.
-		launchPreview: lipgloss.NewStyle().
+		launchPreview: lipgloss.NewStyle().MarginTop(1),
+		launchPreviewViewport: lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(theme.Border).
+			Padding(0, 1),
+		launchPreviewContent: lipgloss.NewStyle().
 			Foreground(theme.Body).
-			Bold(true).
-			MarginTop(1),
+			Bold(true),
 		table: btable.Styles{
 			Header: lipgloss.NewStyle().
 				Bold(true).

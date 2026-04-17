@@ -1,4 +1,4 @@
-package llamacpp
+package models
 
 import (
 	"os"
@@ -7,9 +7,9 @@ import (
 	"strings"
 )
 
-// venvRootFromActivateScript returns the venv root directory given an activate script path
+// VenvRootFromActivateScript returns the venv root directory given an activate script path
 // (Unix: .../bin/activate, Windows: .../Scripts/activate.bat), or "" if activate is empty.
-func venvRootFromActivateScript(activate string) string {
+func VenvRootFromActivateScript(activate string) string {
 	activate = strings.TrimSpace(activate)
 	if activate == "" {
 		return ""

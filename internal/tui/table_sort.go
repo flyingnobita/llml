@@ -4,24 +4,27 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/flyingnobita/llml/internal/llamacpp"
+	"github.com/flyingnobita/llml/internal/models"
 )
 
-// Table sort column indices (must match [tableColumns] order: Name, Runtime, Path, Size, Last modified).
+type tableSortCol int
+
+// Table sort column indices (must match [tableColumns] order: Model ID, Runtime, Size, Path, File Name, Last modified).
 const (
-	tableSortColName = iota
+	tableSortColID tableSortCol = iota
 	tableSortColRuntime
-	tableSortColPath
 	tableSortColSize
+	tableSortColPath
+	tableSortColFileName
 	tableSortColModTime
 	tableSortColCount
 )
 
-// defaultSortCol matches discovery order ([llamacpp.Discover] sorts by path ascending).
-const defaultSortCol = tableSortColPath
+// defaultSortCol matches discovery order ([models.Discover] sorts by path ascending).
+const defaultSortCol tableSortCol = tableSortColPath
 
 // sortModelFiles reorders files in place with a stable sort by column and direction.
-func sortModelFiles(files []llamacpp.ModelFile, col int, desc bool) {
+func sortModelFiles(files []models.ModelFile, col tableSortCol, desc bool) {
 	if len(files) < 2 {
 		return
 	}
@@ -38,17 +41,19 @@ func sortModelFiles(files []llamacpp.ModelFile, col int, desc bool) {
 	})
 }
 
-func clampSortCol(col int) int {
+func clampSortCol(col tableSortCol) tableSortCol {
 	if col < 0 || col >= tableSortColCount {
 		return defaultSortCol
 	}
 	return col
 }
 
-func compareModelFilesCol(a, b llamacpp.ModelFile, col int) int {
+func compareModelFilesCol(a, b models.ModelFile, col tableSortCol) int {
 	switch col {
-	case tableSortColName:
+	case tableSortColFileName:
 		return strings.Compare(a.Name, b.Name)
+	case tableSortColID:
+		return strings.Compare(models.InferModelID(a.Path), models.InferModelID(b.Path))
 	case tableSortColRuntime:
 		return int(a.Backend) - int(b.Backend)
 	case tableSortColPath:
@@ -74,19 +79,19 @@ func compareModelFilesCol(a, b llamacpp.ModelFile, col int) int {
 	}
 }
 
-// applyTableSort sorts [Model.files] according to [Model.sortCol] and [Model.sortDesc], rebuilds the
+// applyTableSort sorts [Model.table.files] according to [Model.table.sortCol] and [Model.table.sortDesc], rebuilds the
 // table, and moves the cursor to the row whose path matched selPath when non-empty.
 //
-// The cursor must be restored BEFORE layoutTable because [launchPreviewLineCount]
+// The cursor must be restored BEFORE layoutTable because [Model.launchPreviewPaneLayoutHeight]
 // inside layoutTable reads [Model.SelectedModel] to size the table body. A stale
 // cursor after reorder points at a different model whose preview command may wrap
 // to a different number of lines, shifting the table height by 1 row.
 func (m Model) applyTableSort(selPath string) Model {
-	sortModelFiles(m.files, m.sortCol, m.sortDesc)
+	sortModelFiles(m.table.files, m.table.sortCol, m.table.sortDesc)
 	if selPath != "" {
-		for i := range m.files {
-			if m.files[i].Path == selPath {
-				m.tbl.SetCursor(i)
+		for i := range m.table.files {
+			if m.table.files[i].Path == selPath {
+				m.table.tbl.SetCursor(i)
 				break
 			}
 		}

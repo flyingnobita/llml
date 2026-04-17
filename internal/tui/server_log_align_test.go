@@ -32,7 +32,7 @@ func TestNormalizeSplitServerLogLine_tqdmPadsToStructuredWidth(t *testing.T) {
 
 func TestNormalizeSplitServerLogLine_invocationEchoUnchanged(t *testing.T) {
 	align := 0
-	line := "+ vllm serve /path --port 8000"
+	line := "+ '/bin/vllm' serve '/path' --served-model-name 'id' --port 8000"
 	got := normalizeSplitServerLogLine(line, &align)
 	if got != line {
 		t.Fatalf("got %q want %q", got, line)
@@ -57,5 +57,31 @@ func TestLooksLikeUnprefixedProgressLine(t *testing.T) {
 	}
 	if looksLikeUnprefixedProgressLine("random stderr") {
 		t.Fatal("should not match arbitrary text")
+	}
+}
+
+func TestNormalizeSplitServerLogLine_carriageReturns(t *testing.T) {
+	align := 0
+	cases := []struct {
+		name string
+		in   string
+		out  string
+	}{
+		{"leading", "\rtqdm: 0%", "tqdm: 0%"},
+		{"trailing", "tqdm: 0%\r", "tqdm: 0%"},
+		{"multiple", "\r0%\r10%\r20%", "20%"},
+		{"with padding setup", "plain", "plain"},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := normalizeSplitServerLogLine(c.in, &align)
+			// For unprefixed strings without padding setup, it leaves them alone unless it matches progress line,
+			// or if align=0 and it is just plain string, it returns plain.
+			// The CRs should be stripped in all cases.
+			if !strings.Contains(got, c.out) || strings.Contains(got, "\r") {
+				t.Fatalf("expected output to contain %q without \\r, got %q", c.out, got)
+			}
+		})
 	}
 }

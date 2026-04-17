@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	btable "charm.land/bubbles/v2/table"
 	"charm.land/bubbles/v2/textinput"
@@ -12,61 +13,100 @@ import (
 	"charm.land/lipgloss/v2"
 	"charm.land/lipgloss/v2/compat"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/flyingnobita/llml/internal/llamacpp"
+	"github.com/flyingnobita/llml/internal/models"
 )
 
-// Model is the root Bubble Tea model.
-type Model struct {
+// layoutState holds terminal geometry and derived table dimensions.
+type layoutState struct {
 	width             int
 	height            int
 	bodyInnerW        int
 	tableBodyH        int
 	tableLineWidth    int
-	tableNeedsHScroll bool // true when [tableContentMinWidth] exceeds inner body width; used for chrome + View (not rendered line width, so header glyphs cannot shift layout).
-	theme             Theme
-	themePick         int
-	themeToast        string
-	styles            styles
-	keys              KeyMap
-	tbl               btable.Model
-	hscroll           viewport.Model
-	files             []llamacpp.ModelFile
-	sortCol           int  // [tableSortCol*]; default Path ascending matches [llamacpp.Discover] order
-	sortDesc          bool // false = ascending
-	runtime           llamacpp.RuntimeInfo
-	runtimeScanned    bool
-	lastRunNote       string
-	loading           bool
-	loadErr           error
-	runtimeConfigOpen bool
-	runtimeFocus      int
-	runtimeInputs     [runtimeFieldCount]textinput.Model
+	tableNeedsHScroll bool // true when tableContentMinWidth exceeds inner body width
+	homeDir           string
+}
 
-	paramPanelOpen        bool
-	paramConfirmDelete    int // paramConfirm* (see param_panel.go); 0 = none
-	paramModelPath        string
-	paramModelDisplayName string
-	paramFocus            int
-	paramProfileIndex     int
-	paramProfiles         []ParameterProfile
-	paramEnvCursor        int
-	paramArgsCursor       int
-	paramEnv              []EnvVar
-	paramArgs             []string
-	paramEditKind         int
-	paramEditInput        textinput.Model
+// themeState holds visual theme, style set, and transient toast text.
+type themeState struct {
+	theme      Theme
+	themePick  int
+	themeToast string
+	styles     styles
+}
 
-	homeDir string // from [os.UserHomeDir] at startup; used for path display (~/)
+// tableState holds the file list, sort state, table component, and scroll viewport.
+type tableState struct {
+	tbl      btable.Model
+	hscroll  viewport.Model
+	files    []models.ModelFile
+	sortCol  tableSortCol // default Path ascending matches models.Discover order
+	sortDesc bool         // false = ascending
+	lastScan time.Time
+}
 
-	// Split-pane server (R): subprocess logs in lower half; see run_server.go.
-	serverRunning       bool
-	serverCmd           *exec.Cmd
-	serverMsgCh         chan tea.Msg
-	serverLog           []string
-	serverLogAlignWidth int // measured prefix width for split-pane log alignment (vLLM vs tqdm)
-	serverViewport      viewport.Model
-	serverViewportH     int
-	splitLogFocused     bool // true: keys scroll log; false: keys use model table (Tab toggles).
+// runtimeConfigState holds the runtime-config modal's open/focus/input state.
+type runtimeConfigState struct {
+	open   bool
+	focus  runtimeField
+	inputs [runtimeFieldCount]textinput.Model
+}
+
+// paramsState holds the parameter-profiles panel's state.
+type paramsState struct {
+	open             bool
+	confirmDelete    paramConfirm
+	modelPath        string
+	modelDisplayName string
+	focus            paramFocus
+	profileIndex     int
+	profiles         []ParameterProfile
+	envCursor        int
+	argsCursor       int
+	env              []EnvVar
+	args             []string
+	editKind         paramEditKind
+	editInput        textinput.Model
+}
+
+// serverPaneState holds the split-pane server subprocess and log viewport.
+type serverPaneState struct {
+	running       bool
+	exited        bool // true after the process exits; split pane stays until dismissSplitServer.
+	cmd           *exec.Cmd
+	msgCh         chan tea.Msg
+	log           []string
+	logAlignWidth int // measured prefix width for split-pane log alignment (vLLM vs tqdm)
+	viewport      viewport.Model
+	viewportH     int
+	splitFocused  bool // true: keys scroll log; false: keys use model table (Tab toggles).
+}
+
+// launchPreviewState holds the launch-command preview viewport below the table.
+type launchPreviewState struct {
+	viewport viewport.Model
+	focused  bool   // idle only: Tab toggles with table whenever the preview is visible
+	lastCmd  string // resets scroll when the displayed command changes
+}
+
+// Model is the root Bubble Tea model.
+type Model struct {
+	layout  layoutState
+	ui      themeState
+	table   tableState
+	rc      runtimeConfigState
+	params  paramsState
+	server  serverPaneState
+	preview launchPreviewState
+
+	keys               KeyMap
+	runtime            models.RuntimeInfo
+	runtimeScanned     bool
+	lastRunNote        string
+	lastRunNoteSuccess bool // true: lastRunNote is non-error feedback (e.g. copy confirmation)
+	loading            bool
+	loadErr            error
+	helpOpen           bool // keyboard shortcuts popup
 }
 
 // New returns a model with default key bindings and an empty table; Init triggers discovery.
@@ -85,28 +125,50 @@ func New() Model {
 	)
 	hv := viewport.New(viewport.WithWidth(96), viewport.WithHeight(defaultTableHeight))
 	hv.SetHorizontalStep(hScrollStep)
+	hv.Style = st.splitPaneChromeFocused
 	sv := viewport.New(viewport.WithWidth(96), viewport.WithHeight(1))
 	sv.MouseWheelEnabled = true
 	sv.Style = st.serverLogViewport
+	lpvOuter := launchPreviewVisibleLines + st.launchPreviewViewport.GetVerticalFrameSize()
+	lpv := viewport.New(viewport.WithWidth(96), viewport.WithHeight(lpvOuter))
+	lpv.MouseWheelEnabled = true
+	lpv.MouseWheelDelta = 1
+	lpv.SoftWrap = true
+	lpv.Style = st.launchPreviewViewport
 	return Model{
-		homeDir:        homeDir,
-		theme:          th,
-		themePick:      pick,
-		styles:         st,
-		sortCol:        defaultSortCol,
-		keys:           DefaultKeyMap(),
-		tbl:            t,
-		hscroll:        hv,
-		serverViewport: sv,
-		runtimeInputs: [runtimeFieldCount]textinput.Model{
-			newPathTextInput(),
-			newPathTextInput(),
-			newPathTextInput(),
-			newPortTextInput(),
-			newPortTextInput(),
+		layout: layoutState{
+			homeDir: homeDir,
 		},
-		paramEditInput: newParamLineTextInput(),
-		loading:        true,
+		ui: themeState{
+			theme:     th,
+			themePick: pick,
+			styles:    st,
+		},
+		table: tableState{
+			sortCol: defaultSortCol,
+			tbl:     t,
+			hscroll: hv,
+		},
+		server: serverPaneState{
+			viewport: sv,
+		},
+		preview: launchPreviewState{
+			viewport: lpv,
+		},
+		rc: runtimeConfigState{
+			inputs: [runtimeFieldCount]textinput.Model{
+				newPathTextInput(),
+				newPathTextInput(),
+				newPathTextInput(),
+				newPortTextInput(),
+				newPortTextInput(),
+			},
+		},
+		params: paramsState{
+			editInput: newParamLineTextInput(),
+		},
+		keys:    DefaultKeyMap(),
+		loading: true,
 	}
 }
 
@@ -118,11 +180,11 @@ func (m Model) Init() tea.Cmd {
 // innerWidth returns the usable inner body width for rendering. It falls back
 // to a computed value when bodyInnerW has not yet been set by layoutTable.
 func (m Model) innerWidth() int {
-	if m.bodyInnerW >= 1 {
-		return m.bodyInnerW
+	if m.layout.bodyInnerW >= 1 {
+		return m.layout.bodyInnerW
 	}
-	if m.width > 0 {
-		return max(m.width-appPaddingH*2, minInnerWidth)
+	if m.layout.width > 0 {
+		return max(m.layout.width-appPaddingH*2, minInnerWidth)
 	}
 	return minInnerWidth
 }
@@ -140,14 +202,14 @@ func maxAnsiLineWidth(lines []string) int {
 // serverLogNeedsHorizontalScroll reports whether any log line is wider than the
 // viewport's inner content width (after border and optional vertical track).
 func (m Model) serverLogNeedsHorizontalScroll() bool {
-	if !m.serverRunning || len(m.serverLog) == 0 {
+	if !m.server.running || len(m.server.log) == 0 {
 		return false
 	}
-	inner := m.serverViewport.Width() - m.serverViewport.Style.GetHorizontalFrameSize()
+	inner := m.server.viewport.Width() - m.server.viewport.Style.GetHorizontalFrameSize()
 	if inner < 1 {
 		return false
 	}
-	return maxAnsiLineWidth(m.serverLog) > inner
+	return maxAnsiLineWidth(m.server.log) > inner
 }
 
 // splitServerBodyHeights divides total body rows between the model table (top) and server log viewport (bottom).
@@ -177,134 +239,197 @@ func tableRowAreaHeight(contentAreaH int) int {
 }
 
 func (m Model) layoutTable() Model {
-	w := m.width
+	w := m.layout.width
 	if w < minTerminalWidth {
 		w = minTerminalWidth
 	}
-	innerW := m.width - appPaddingH*2
+	innerW := m.layout.width - appPaddingH*2
 	if innerW < minInnerWidth {
 		innerW = w - appPaddingH*2
 	}
-	m.bodyInnerW = innerW
+	m.layout.bodyInnerW = innerW
 	// Column widths must use the same budget as the table viewport (inner body
 	// width). Using full terminal width here made rows ~4 cells wider than
 	// innerW and triggered empty horizontal scrolling.
-	cols := tableColumns(innerW, m.files, m.homeDir, m.sortCol, m.sortDesc)
-	m.tbl.SetColumns(cols)
-	m.tbl.SetStyles(m.styles.table)
+	cols := tableColumns(innerW, m.table.files, m.layout.homeDir, m.table.sortCol, m.table.sortDesc)
+	m.table.tbl.SetColumns(cols)
+	m.table.tbl.SetStyles(m.ui.styles.table)
 	minW := tableContentMinWidth(cols)
-	m.tbl.SetWidth(max(minW, innerW))
+	m.table.tbl.SetWidth(max(minW, innerW))
 	// Column widths do not change when only header labels (sort indicators) change; using
-	// minW keeps the horizontal scroll bar row and table body height stable. Measuring
-	// lipgloss.Width of the rendered header row can disagree with minW when glyphs differ.
-	m.tableNeedsHScroll = len(m.files) > 0 && minW > innerW
+	// minW keeps the horizontal scroll bar row and table body height stable.
+	m.layout.tableNeedsHScroll = len(m.table.files) > 0 && minW > innerW
 
-	var h int
-	if m.height <= 0 {
-		h = defaultTableHeight
-	} else {
-		// Bubble Tea keeps only the bottom m.height lines if the view is taller;
-		// size the table so framed (padding + chrome + body) fits.
-		appPad := m.styles.app.GetVerticalFrameSize()
-		innerMax := m.height - appPad
-		if innerMax < 1 {
-			innerMax = 1
-		}
-		needsLogHBarGuess := m.serverRunning && maxAnsiLineWidth(m.serverLog) > max(1, innerW-8)
-		static := mainChromeLines(m, m.tableNeedsHScroll, needsLogHBarGuess)
-		h = innerMax - static
-		if h < 1 {
-			h = 1
-		}
-	}
+	// Determine log h-bar without a heuristic: content wider than viewport inner width → bar shown.
+	// Uses the style frame size directly so no second pass is needed.
+	logFrameH := m.server.viewport.Style.GetHorizontalFrameSize()
+	needsLogHBar := m.server.running && maxAnsiLineWidth(m.server.log) > max(1, innerW-logFrameH)
 
-	previewH := m.launchPreviewLineCount(innerW)
+	previewH := m.launchPreviewPaneLayoutHeight()
+	h := m.computeBodyHeight(needsLogHBar)
+	m = m.applyTableAndLogHeights(h, innerW, previewH)
 
-	setHeights := func(bodyH int) {
-		tableFrameV := m.hscroll.Style.GetVerticalFrameSize()
-		logFrameV := m.serverViewport.Style.GetVerticalFrameSize()
-		if m.serverRunning {
-			rest := bodyH - previewH
-			if rest < 2 {
-				// Need at least one line each for table and log; may exceed bodyH on tiny terminals.
-				rest = 2
-			}
-			tablePaneH, logPaneH := splitServerBodyHeights(rest)
-			tableContentH := tablePaneH - tableFrameV
-			if tableContentH < 1 {
-				tableContentH = 1
-			}
-			logContentH := logPaneH - logFrameV
-			if logContentH < 1 {
-				logContentH = 1
-			}
-			m.tbl.SetHeight(tableRowAreaHeight(tableContentH))
-			m.serverViewport.SetHeight(logContentH)
-			m.serverViewport.SetWidth(innerW)
-			if m.serverViewport.TotalLineCount() > m.serverViewport.VisibleLineCount() {
-				m.serverViewport.SetWidth(innerW - 1)
-			}
-			m.serverViewportH = logContentH
-		} else {
-			tablePaneH := bodyH - previewH
-			if tablePaneH < 1 {
-				tablePaneH = 1
-			}
-			tableContentH := tablePaneH - tableFrameV
-			if tableContentH < 1 {
-				tableContentH = 1
-			}
-			m.tbl.SetHeight(tableRowAreaHeight(tableContentH))
-			m.serverViewport.SetWidth(innerW)
-			m.serverViewport.SetHeight(1)
-			m.serverViewportH = 0
-		}
-	}
-	setHeights(h)
-
-	m.tbl.SetRows(buildTableRows(m.files, cols, m.homeDir))
-	tview := m.tbl.View()
-	m.tableBodyH = max(1, strings.Count(tview, "\n")+1)
+	m.table.tbl.SetRows(buildTableRows(m.table.files, cols, m.layout.homeDir))
+	tview := m.table.tbl.View()
+	m.layout.tableBodyH = max(1, strings.Count(tview, "\n")+1)
 	lines := strings.Split(tview, "\n")
 	if len(lines) > 0 {
-		m.tableLineWidth = lipgloss.Width(lines[0])
+		m.layout.tableLineWidth = lipgloss.Width(lines[0])
 	} else {
-		m.tableLineWidth = 0
+		m.layout.tableLineWidth = 0
 	}
 
-	// Second pass only when log horizontal scroll bar visibility differs from estimate.
-	if m.height > 0 {
-		needsLogHBar := m.serverRunning && m.serverLogNeedsHorizontalScroll()
-		needsLogHBarGuess := m.serverRunning && maxAnsiLineWidth(m.serverLog) > max(1, innerW-8)
-		if needsLogHBar != needsLogHBarGuess {
-			appPad := m.styles.app.GetVerticalFrameSize()
-			innerMax := m.height - appPad
-			if innerMax < 1 {
-				innerMax = 1
-			}
-			static := mainChromeLines(m, m.tableNeedsHScroll, needsLogHBar)
-			h2 := innerMax - static
-			if h2 < 1 {
-				h2 = 1
-			}
-			if h2 != h {
-				h = h2
-				setHeights(h)
-				m.tbl.SetRows(buildTableRows(m.files, cols, m.homeDir))
-				tview = m.tbl.View()
-				m.tableBodyH = max(1, strings.Count(tview, "\n")+1)
-				lines = strings.Split(tview, "\n")
-				if len(lines) > 0 {
-					m.tableLineWidth = lipgloss.Width(lines[0])
-				}
-			}
+	m.table.hscroll.SetContent(tview)
+	m.table.hscroll.SetWidth(innerW)
+	m.table.hscroll.SetHeight(m.layout.tableBodyH)
+
+	m = m.syncLaunchPreviewViewport(innerW)
+	m = m.applyMainPaneFocusStyles()
+	return m
+}
+
+// computeBodyHeight returns the total body rows available for the table + log panes.
+func (m Model) computeBodyHeight(needsLogHBar bool) int {
+	if m.layout.height <= 0 {
+		return defaultTableHeight
+	}
+	// Bubble Tea keeps only the bottom m.layout.height lines if the view is taller;
+	// size the table so framed (padding + chrome + body) fits.
+	appPad := m.ui.styles.app.GetVerticalFrameSize()
+	innerMax := m.layout.height - appPad
+	if innerMax < 1 {
+		innerMax = 1
+	}
+	h := innerMax - mainChromeLines(m, m.layout.tableNeedsHScroll, needsLogHBar)
+	if h < 1 {
+		h = 1
+	}
+	return h
+}
+
+// applyTableAndLogHeights sets table and server-log viewport dimensions from bodyH.
+func (m Model) applyTableAndLogHeights(bodyH, innerW, previewH int) Model {
+	tableFrameV := m.table.hscroll.Style.GetVerticalFrameSize()
+	logFrameV := m.server.viewport.Style.GetVerticalFrameSize()
+	if m.server.running {
+		rest := bodyH - previewH
+		if rest < 2 {
+			// Need at least one line each for table and log; may exceed bodyH on tiny terminals.
+			rest = 2
 		}
+		tablePaneH, logPaneH := splitServerBodyHeights(rest)
+		tableContentH := tablePaneH - tableFrameV
+		if tableContentH < 1 {
+			tableContentH = 1
+		}
+		logContentH := logPaneH - logFrameV
+		if logContentH < 1 {
+			logContentH = 1
+		}
+		m.table.tbl.SetHeight(tableRowAreaHeight(tableContentH))
+		m.server.viewport.SetHeight(logContentH)
+		m.server.viewport.SetWidth(innerW)
+		if m.server.viewport.TotalLineCount() > m.server.viewport.VisibleLineCount() {
+			m.server.viewport.SetWidth(innerW - 1)
+		}
+		m.server.viewportH = logContentH
+	} else {
+		tablePaneH := bodyH - previewH
+		if tablePaneH < 1 {
+			tablePaneH = 1
+		}
+		tableContentH := tablePaneH - tableFrameV
+		if tableContentH < 1 {
+			tableContentH = 1
+		}
+		m.table.tbl.SetHeight(tableRowAreaHeight(tableContentH))
+		m.server.viewport.SetWidth(innerW)
+		m.server.viewport.SetHeight(1)
+		m.server.viewportH = 0
 	}
+	return m
+}
 
-	m = m.applySplitPaneFocusStyles()
-	m.hscroll.SetContent(tview)
-	m.hscroll.SetWidth(innerW)
-	m.hscroll.SetHeight(m.tableBodyH)
+// launchPreviewPaneLayoutHeight returns vertical rows consumed by the launch command preview
+// (margin + bordered viewport) when models are listed.
+func (m Model) launchPreviewPaneLayoutHeight() int {
+	if !launchPreviewVisible(m) {
+		return 0
+	}
+	// MarginTop(1) on [styles.launchPreview] plus the fixed-height bordered viewport.
+	return m.ui.styles.launchPreview.GetMarginTop() +
+		m.ui.styles.launchPreviewViewport.GetVerticalFrameSize() +
+		launchPreviewVisibleLines
+}
+
+// syncLaunchPreviewViewport sets viewport dimensions and wrapped content from the selected row.
+func (m Model) syncLaunchPreviewViewport(innerW int) Model {
+	if innerW < minInnerWidth {
+		innerW = minInnerWidth
+	}
+	if !launchPreviewVisible(m) {
+		m.preview.viewport.SetContent("")
+		m.preview.lastCmd = ""
+		return m
+	}
+	cmd := launchPreviewCommandLine(m)
+	if cmd != m.preview.lastCmd {
+		m.preview.viewport.GotoTop()
+		m.preview.lastCmd = cmd
+	}
+	fr := m.preview.viewport.Style.GetHorizontalFrameSize()
+	textW := innerW - fr
+	if textW < 8 {
+		textW = 8
+	}
+	pvFrV := m.preview.viewport.Style.GetVerticalFrameSize()
+	outerH := launchPreviewVisibleLines + pvFrV
+
+	m.preview.viewport.SetWidth(innerW)
+	rendered := m.ui.styles.launchPreviewContent.Width(textW).Render(cmd)
+	m.preview.viewport.SetContent(rendered)
+	m.preview.viewport.SetHeight(outerH)
+	if m.preview.viewport.TotalLineCount() > m.preview.viewport.VisibleLineCount() {
+		m.preview.viewport.SetWidth(innerW - 1)
+		textW = innerW - 1 - fr
+		if textW < 8 {
+			textW = 8
+		}
+		rendered = m.ui.styles.launchPreviewContent.Width(textW).Render(cmd)
+		m.preview.viewport.SetContent(rendered)
+		m.preview.viewport.SetHeight(outerH)
+	}
+	return m
+}
+
+// withLaunchPreviewSynced refreshes the launch preview after table input without a full layout pass.
+func (m Model) withLaunchPreviewSynced() Model {
+	iw := m.layout.bodyInnerW
+	if iw < 1 {
+		iw = m.innerWidth()
+	}
+	return m.syncLaunchPreviewViewport(iw)
+}
+
+// applyMainPaneFocusStyles sets table vs launch-preview chrome when idle, or delegates to
+// [Model.applySplitPaneFocusStyles] when a split-pane server is running.
+func (m Model) applyMainPaneFocusStyles() Model {
+	if m.server.running {
+		m = m.applySplitPaneFocusStyles()
+		if m.preview.focused {
+			m.preview.viewport.Style = m.ui.styles.splitPaneChromeFocused
+		} else {
+			m.preview.viewport.Style = m.ui.styles.launchPreviewViewport
+		}
+		return m
+	}
+	if m.preview.focused {
+		m.table.hscroll.Style = m.ui.styles.splitPaneChromeDim
+		m.preview.viewport.Style = m.ui.styles.splitPaneChromeFocused
+	} else {
+		m.table.hscroll.Style = m.ui.styles.splitPaneChromeFocused
+		m.preview.viewport.Style = m.ui.styles.launchPreviewViewport
+	}
 	return m
 }
 
@@ -314,42 +439,84 @@ func (m Model) layoutTable() Model {
 // style. When the server is running, the keyboard-focused split pane uses
 // SplitPaneBorderFocused and the other SplitPaneBorderDim.
 func (m Model) applySplitPaneFocusStyles() Model {
-	if !m.serverRunning {
-		m.hscroll.Style = m.styles.splitPaneChromeFocused
-		m.serverViewport.Style = m.styles.serverLogViewport
+	if !m.server.running {
+		m.table.hscroll.Style = m.ui.styles.splitPaneChromeFocused
+		m.server.viewport.Style = m.ui.styles.serverLogViewport
 		return m
 	}
-	if m.splitLogFocused {
-		m.hscroll.Style = m.styles.splitPaneChromeDim
-		m.serverViewport.Style = m.styles.splitPaneChromeFocused
+	if m.server.splitFocused {
+		m.table.hscroll.Style = m.ui.styles.splitPaneChromeDim
+		m.server.viewport.Style = m.ui.styles.splitPaneChromeFocused
+	} else if m.preview.focused {
+		m.table.hscroll.Style = m.ui.styles.splitPaneChromeDim
+		m.server.viewport.Style = m.ui.styles.splitPaneChromeDim
 	} else {
-		m.hscroll.Style = m.styles.splitPaneChromeFocused
-		m.serverViewport.Style = m.styles.splitPaneChromeDim
+		m.table.hscroll.Style = m.ui.styles.splitPaneChromeFocused
+		m.server.viewport.Style = m.ui.styles.splitPaneChromeDim
 	}
 	return m
 }
 
 // appendServerLogLine appends a log line for split-pane server output and refreshes the log viewport.
 func (m Model) appendServerLogLine(line string) Model {
-	align := m.serverLogAlignWidth
+	align := m.server.logAlignWidth
 	line = normalizeSplitServerLogLine(line, &align)
-	m.serverLogAlignWidth = align
-	m.serverLog = append(m.serverLog, line)
-	if len(m.serverLog) > maxServerLogLines {
-		m.serverLog = m.serverLog[len(m.serverLog)-maxServerLogLines:]
+	m.server.logAlignWidth = align
+	m.server.log = append(m.server.log, line)
+	if len(m.server.log) > maxServerLogLines {
+		m.server.log = m.server.log[len(m.server.log)-maxServerLogLines:]
 	}
-	m.serverViewport.SetContent(strings.Join(m.serverLog, "\n"))
-	m.serverViewport.GotoBottom()
+	m.server.viewport.SetContent(strings.Join(m.server.log, "\n"))
+	m.server.viewport.GotoBottom()
 	return m
 }
 
 // cycleTheme advances dark → light → auto → dark, rebuilds lipgloss styles, and
 // shows a short toast on the title row naming the active mode.
 func (m Model) cycleTheme() (Model, tea.Cmd) {
-	m.themePick = (m.themePick + 1) % themePickCount
-	m.theme = themeFromPick(m.themePick, compat.HasDarkBackground)
-	m.styles = newStyles(m.theme)
-	m.themeToast = themeToastText(m.themePick, m.theme)
+	m.ui.themePick = (m.ui.themePick + 1) % themePickCount
+	m.ui.theme = themeFromPick(m.ui.themePick, compat.HasDarkBackground)
+	m.ui.styles = newStyles(m.ui.theme)
+	m.ui.themeToast = themeToastText(m.ui.themePick, m.ui.theme)
+	m.preview.viewport.Style = m.ui.styles.launchPreviewViewport
 	m = m.layoutTable()
 	return m, clearThemeToastAfterCmd()
+}
+
+// withLastRunError sets a red status line below the footer (see lastRunNoteView).
+func (m Model) withLastRunError(msg string) Model {
+	m.lastRunNote = msg
+	m.lastRunNoteSuccess = false
+	return m
+}
+
+// withLastRunSuccess sets a non-error status line below the footer.
+func (m Model) withLastRunSuccess(msg string) Model {
+	m.lastRunNote = msg
+	m.lastRunNoteSuccess = true
+	return m
+}
+
+// withLastRunCleared removes the footer status line.
+func (m Model) withLastRunCleared() Model {
+	m.lastRunNote = ""
+	m.lastRunNoteSuccess = false
+	return m
+}
+
+// dismissSplitServer clears split-pane server state after the user dismisses the
+// log (enter/esc/q) or tears down the UI after a non-split llamaServerExitedMsg.
+func (m Model) dismissSplitServer() Model {
+	m.server.running = false
+	m.server.exited = false
+	m.server.splitFocused = false
+	m.preview.focused = false
+	m.server.cmd = nil
+	m.server.msgCh = nil
+	m.server.log = nil
+	m.server.logAlignWidth = 0
+	m.server.viewport.SetContent("")
+	m.table.tbl.Focus()
+	m = m.layoutTable()
+	return m
 }

@@ -1,4 +1,4 @@
-package llamacpp
+package models
 
 import (
 	"encoding/json"
@@ -33,24 +33,6 @@ func TestHfParamsSummary_withConfig(t *testing.T) {
 		if !strings.Contains(got, sub) {
 			t.Fatalf("summary %q should contain %q", got, sub)
 		}
-	}
-}
-
-func TestCollectSafetensorModelDirs_findsDir(t *testing.T) {
-	root := t.TempDir()
-	weights := filepath.Join(root, "repo", "snap", "w")
-	if err := os.MkdirAll(weights, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(weights, "model.safetensors"), []byte("x"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	out := make(map[string]struct{})
-	if err := collectSafetensorModelDirs(root, DefaultMaxDepth, out); err != nil {
-		t.Fatal(err)
-	}
-	if _, ok := out[filepath.Clean(weights)]; !ok {
-		t.Fatalf("expected weights dir in map, got %v", out)
 	}
 }
 

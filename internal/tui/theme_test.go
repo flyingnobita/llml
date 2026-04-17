@@ -92,13 +92,13 @@ func TestThemesHaveTableSelectedBackground(t *testing.T) {
 func TestNewModelHasThemedStyles(t *testing.T) {
 	t.Setenv(EnvLLMLTheme, "dark")
 	m := New()
-	if m.themePick != themePickDark {
-		t.Fatalf("expected themePickDark, got %d", m.themePick)
+	if m.ui.themePick != themePickDark {
+		t.Fatalf("expected themePickDark, got %d", m.ui.themePick)
 	}
-	if m.theme != DarkTheme() {
-		t.Fatalf("expected DarkTheme on model, got %+v", m.theme)
+	if m.ui.theme != DarkTheme() {
+		t.Fatalf("expected DarkTheme on model, got %+v", m.ui.theme)
 	}
-	if got := m.styles.title.Render("x"); got == "" {
+	if got := m.ui.styles.title.Render("x"); got == "" {
 		t.Fatal("expected non-empty themed title render")
 	}
 }
@@ -121,10 +121,10 @@ func TestInitialThemePick(t *testing.T) {
 func TestAppTitleBlockIncludesInlineToast(t *testing.T) {
 	t.Setenv(EnvLLMLTheme, "dark")
 	m := New()
-	m.width = 120
-	m.height = 40
-	m.bodyInnerW = m.width - appPaddingH*2
-	m.themeToast = "Theme: light"
+	m.layout.width = 120
+	m.layout.height = 40
+	m.layout.bodyInnerW = m.layout.width - appPaddingH*2
+	m.ui.themeToast = "Theme: light"
 	block := m.appTitleBlock(m.innerWidth())
 	if block == "" {
 		t.Fatal("empty title block")
@@ -137,25 +137,25 @@ func TestAppTitleBlockIncludesInlineToast(t *testing.T) {
 func TestCycleThemeRotatesPick(t *testing.T) {
 	t.Setenv(EnvLLMLTheme, "dark")
 	m := New()
-	if m.themePick != themePickDark {
-		t.Fatalf("start pick %d", m.themePick)
+	if m.ui.themePick != themePickDark {
+		t.Fatalf("start pick %d", m.ui.themePick)
 	}
 	m, _ = m.cycleTheme()
-	if m.themeToast == "" {
+	if m.ui.themeToast == "" {
 		t.Fatal("expected theme toast after cycle")
 	}
-	if m.themePick != themePickLight {
-		t.Fatalf("after 1: want light got %d", m.themePick)
+	if m.ui.themePick != themePickLight {
+		t.Fatalf("after 1: want light got %d", m.ui.themePick)
 	}
-	if m.theme != LightTheme() {
+	if m.ui.theme != LightTheme() {
 		t.Fatal("expected LightTheme palette")
 	}
 	m, _ = m.cycleTheme()
-	if m.themePick != themePickAuto {
-		t.Fatalf("after 2: want auto got %d", m.themePick)
+	if m.ui.themePick != themePickAuto {
+		t.Fatalf("after 2: want auto got %d", m.ui.themePick)
 	}
 	m, _ = m.cycleTheme()
-	if m.themePick != themePickDark {
-		t.Fatalf("after 3: want dark got %d", m.themePick)
+	if m.ui.themePick != themePickDark {
+		t.Fatalf("after 3: want dark got %d", m.ui.themePick)
 	}
 }

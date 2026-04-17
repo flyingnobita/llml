@@ -23,7 +23,8 @@ safetensors models on the local filesystem and launching `llama-server` or
 ```text
 cmd/llml/            # Binary entrypoint (main.go)
 internal/
-  llamacpp/          # GGUF + safetensors discovery, metadata, runtime detection, formatting
+  config/            # TOML persistence ({UserConfigDir}/llml/config.toml): runtime, discovery cache, [[models]]
+  models/            # GGUF + safetensors discovery, metadata, runtime detection, formatting; also vLLM and HF-hub support. Discovery uses a single filesystem walk via the `modelSource` interface (`ggufSource`, `safetensorsSource`).
   tui/               # Bubble Tea model, update, view, styles, keymaps
 scripts/             # gofmt-check.sh, precommit-docs-fix.sh
 ```
@@ -42,13 +43,16 @@ scripts/             # gofmt-check.sh, precommit-docs-fix.sh
 
 ### Bubble Tea pattern
 
-- `Model` in `model.go` holds all state. `New()` returns an initialized model.
+- `Model` in `model.go` is a **coordinator** holding 7 sub-state structs (`layoutState`, `themeState`, `tableState`, `runtimeConfigState`, `paramsState`, `serverPaneState`, `launchPreviewState`) plus top-level fields (`keys`, `runtime`, `loading`, `lastRunNote`, …). `New()` returns an initialized model. Access state via `m.layout.width`, `m.ui.styles`, `m.table.tbl`, `m.server.running`, `m.preview.focused`, etc.
 - `Init()`, `Update()`, `View()` implement `tea.Model`.
 - Messages are defined in `messages.go`; commands in `cmd.go`.
-- Layout recalculation lives in `layoutTable()` on `Model`. Table row height is chosen so the full `View()` fits the terminal (Bubble Tea otherwise keeps only the **bottom** lines and clips the header).
+- Key dispatch in `Update` delegates to `handleKey` (idle/modal routing) → `tableNavKeys` (shared bindings for both idle and split-pane table focus: config, params, theme, scroll, copy, sort). Split-pane key handling is in `update_split.go`.
+- Layout recalculation lives in `layoutTable()` on `Model`, with helpers `computeBodyHeight` and `applyTableAndLogHeights`. Log h-bar visibility is determined from exact style frame sizes (no guess-and-redo second pass). Table row height is chosen so the full `View()` fits the terminal (Bubble Tea otherwise keeps only the **bottom** lines and clips the header).
+- **Server launch** (`run_server.go`): `buildServerSpec` resolves binary/port/venv into a `serverSpec` value; spec methods `foregroundCmd`, `splitCmd`, `invocationEcho`, `previewLine` generate backend- and platform-specific commands. `buildPreviewSpec` is the permissive variant (substitutes placeholder bin names) used for display-only paths.
 - Theme palettes live in `theme.go` (`DarkTheme`, `LightTheme`; startup via `LLML_THEME`, runtime cycle with **`t`**: dark → light → auto). The transient confirmation is a **compact chip on the title row** (not an extra banner line) so the layout does not jump.
   Lip Gloss styles are built in `styles.go` via `newStyles`. Do not call `lipgloss.NewStyle()` inline
   inside `View()` — extend `Theme` / `newStyles` instead.
+- Typed enums (`paramFocus`, `paramConfirm`, `paramEditKind`, `runtimeField`, `tableSortCol`, `runServerMode`) are defined in `constants.go`; use these types, not raw `int`, for state fields.
 - Magic numbers belong in `constants.go` (package `tui`).
 
 #### Bubble Tea v2 API notes
@@ -62,7 +66,14 @@ scripts/             # gofmt-check.sh, precommit-docs-fix.sh
 
 ### Configuration
 
-**Runtime** config is **environment-variable-driven** (no `config.toml` at runtime):
+**On-disk config** lives at **`{UserConfigDir}/llml/config.toml`** (see `internal/config`). It stores **`[runtime]`** (paths and ports), **`[discovery]`** (extra model roots and last full-scan time), and **`[[models]]`** (cached discovery rows). **`schema_version`** is reserved for future migrations.
+
+- **Precedence:** **environment variables override** values from `config.toml`; unset env vars fall back to TOML, then built-in defaults.
+- **Startup:** if the cache is valid (`schema_version` matches, at least one cached model path still exists on disk), the UI loads without a full filesystem walk. Otherwise a full scan runs and the file is rewritten.
+- **`r`** reloads **`[runtime]`** from `config.toml` and re-runs runtime detection (does not rescan models). **`S`** runs a full model discovery and refreshes **`[[models]]`**.
+- Saving the runtime panel (**`c`**) updates the process environment and **best-effort** writes **`[runtime]`** to `config.toml` (failure is non-fatal).
+
+**Runtime** env vars (same keys as **`[runtime]`** in TOML):
 
 | Variable                            | Purpose                                                                                                        |
 | ----------------------------------- | -------------------------------------------------------------------------------------------------------------- |
@@ -71,11 +82,11 @@ scripts/             # gofmt-check.sh, precommit-docs-fix.sh
 | `VLLM_VENV`                         | Optional Python venv root; `R` sources `bin/activate` before `vllm` (Unix)                                     |
 | `LLAMA_SERVER_PORT`                 | TCP port for `llama-server` and `/health` probe (default 8080)                                                 |
 | `VLLM_SERVER_PORT`                  | TCP port for `vllm serve` (default 8000)                                                                       |
-| `LLML_MODEL_PATHS`                  | Extra model search roots (comma-separated)                                                                     |
+| `LLML_MODEL_PATHS`                  | Extra model search roots (comma-separated); merged with `discovery.extra_model_paths` in TOML for scans        |
 | `HUGGINGFACE_HUB_CACHE` / `HF_HOME` | Hugging Face hub cache location                                                                                |
 | `LLML_THEME`                        | Initial TUI palette (`dark` / `light` / `auto`); **`t`** cycles while running (not in runtime `c` text fields) |
 
-**Parameter profiles** (per-model extra env + argv for `llama-server` / `vllm`, edited with **`p`**) are **not** env vars: they are stored in **`{UserConfigDir}/llml/model-params.json`** (see `internal/tui/model_params.go`). Keys are cleaned model paths; each entry has named profiles and `activeIndex` for which profile **`R`** uses.
+**Parameter profiles** (per-model extra env + argv for `llama-server` / `vllm`, edited with **`p`**) are **not** in `config.toml`: they are stored in **`{UserConfigDir}/llml/model-params.json`** (see `internal/tui/model_params.go`). Keys are cleaned model paths; each entry has named profiles and `activeIndex` for which profile **`R`** uses.
 
 Set machine-specific env (for example `LLAMA_CPP_PATH`) in `mise.local.toml` (gitignored); keep shared tool/tasks config in `mise.toml`.
 
@@ -100,11 +111,14 @@ The pre-commit hook handles staged files automatically.
 
 ## Testing
 
-- Unit tests for `internal/llamacpp` cover discovery, formatting, paths, and
+- Unit tests for `internal/config` cover TOML round-trip, env precedence over
+  TOML, cache validation, and stale path filtering.
+- Unit tests for `internal/models` cover discovery, formatting, paths, and
   runtime detection.
 - Unit tests for `internal/tui` cover model initialization, parameter-profile
-  persistence, server command construction, theme correctness (including
-  `TableSelectedBg`), `View()` alt-screen flag, and selected-style background rendering.
+  persistence, server command construction, `layoutTable` idempotence (convergence
+  test), split-pane focus toggle, launch-preview focus cycle, theme correctness
+  (including `TableSelectedBg`), `View()` alt-screen flag, and selected-style background rendering.
 - Do not mark a feature complete until `mise run check` passes.
 
 ---

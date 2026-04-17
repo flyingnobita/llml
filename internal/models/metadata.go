@@ -1,12 +1,39 @@
-package llamacpp
+package models
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
 
 	"github.com/abrander/gguf"
 )
+
+// GGUFGeneralName returns trimmed general.name from the GGUF file's KV metadata.
+// It returns an error if the file cannot be read, is not valid GGUF, the key is absent,
+// or the value is empty after trimming.
+func GGUFGeneralName(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	r, err := gguf.Open(f)
+	if err != nil {
+		return "", err
+	}
+
+	s, err := r.Metadata.String("general.name")
+	if err != nil {
+		return "", fmt.Errorf("general.name: %w", err)
+	}
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return "", fmt.Errorf("general.name empty or missing")
+	}
+	return s, nil
+}
 
 var contextLengthKeys = []string{
 	"llama.context_length",

@@ -7,38 +7,51 @@ import (
 
 // KeyMap holds key bindings. Add fields here as your TUI grows, and wire them in Update.
 type KeyMap struct {
-	Quit        key.Binding
-	Refresh     key.Binding
-	RunServer   key.Binding
-	ScrollLeft  key.Binding
-	ScrollRight key.Binding
-	Nav         key.Binding
-	CopyPath    key.Binding
-	ConfigPort  key.Binding
-	Parameters  key.Binding
-	ToggleTheme key.Binding
-	SortColumn  key.Binding
-	SortReverse key.Binding
+	Quit         key.Binding
+	Refresh      key.Binding
+	RunServer    key.Binding
+	ScrollLeft   key.Binding
+	ScrollRight  key.Binding
+	Nav          key.Binding
+	CopyPath     key.Binding
+	ConfigPort   key.Binding
+	Parameters   key.Binding
+	ToggleTheme  key.Binding
+	SortColumn   key.Binding
+	SortReverse  key.Binding
+	RescanModels key.Binding
+	// LaunchPreviewScroll scroll the fixed-height launch command preview (idle main view).
+	LaunchPreviewScrollUp   key.Binding
+	LaunchPreviewScrollDown key.Binding
 }
 
-// runServerKeyMode returns 1 for split-pane run (R), 2 for fullscreen [tea.ExecProcess] (ctrl+r),
-// or 0 if the key is not a run-server binding.
+type runServerMode int
+
+const (
+	runServerModeNone       runServerMode = 0
+	runServerModeSplit      runServerMode = 1
+	runServerModeFullscreen runServerMode = 2
+)
+
+// runServerKeyMode returns [runServerModeSplit] for split-pane run (R),
+// [runServerModeFullscreen] for fullscreen [tea.ExecProcess] (ctrl+r),
+// or [runServerModeNone] if the key is not a run-server binding.
 //
 // We cannot use "shift+R" for fullscreen: on common layouts, typing uppercase R sets ModShift, so shift+R
 // would be indistinguishable from plain R. Fullscreen uses ctrl+r instead.
-func runServerKeyMode(msg tea.KeyPressMsg) int {
+func runServerKeyMode(msg tea.KeyPressMsg) runServerMode {
 	k := msg.Key()
 	switch msg.String() {
 	case "ctrl+r", "ctrl+R":
-		return 2
+		return runServerModeFullscreen
 	}
 	if k.Mod.Contains(tea.ModCtrl) && (k.Code == 'r' || k.Code == 'R') {
-		return 2
+		return runServerModeFullscreen
 	}
 	if k.Text == "R" {
-		return 1
+		return runServerModeSplit
 	}
-	return 0
+	return runServerModeNone
 }
 
 // DefaultKeyMap returns the default global shortcuts.
@@ -51,6 +64,10 @@ func DefaultKeyMap() KeyMap {
 		Refresh: key.NewBinding(
 			key.WithKeys(FooterKeyRefresh),
 			key.WithHelp(FooterKeyRefresh, FooterDescRefresh),
+		),
+		RescanModels: key.NewBinding(
+			key.WithKeys(FooterKeyRescan),
+			key.WithHelp(FooterKeyRescan, FooterDescRescan),
 		),
 		RunServer: key.NewBinding(
 			key.WithKeys(FooterKeyRunSplit),
@@ -92,17 +109,25 @@ func DefaultKeyMap() KeyMap {
 			key.WithKeys(FooterKeySortReverse),
 			key.WithHelp(FooterKeySortReverse, FooterDescSortReverse),
 		),
+		LaunchPreviewScrollUp: key.NewBinding(
+			key.WithKeys(FooterKeyLaunchPreviewScrollUp),
+			key.WithHelp(FooterKeyLaunchPreviewScrollUp, FooterDescLaunchPreviewScroll),
+		),
+		LaunchPreviewScrollDown: key.NewBinding(
+			key.WithKeys(FooterKeyLaunchPreviewScrollDown),
+			key.WithHelp(FooterKeyLaunchPreviewScrollDown, FooterDescLaunchPreviewScroll),
+		),
 	}
 }
 
 // ShortHelp satisfies key.KeyMap (optional; use for help overlay later).
 func (k KeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Refresh, k.RunServer, k.ConfigPort, k.Parameters, k.SortColumn, k.SortReverse, k.ToggleTheme, k.Nav, k.Quit}
+	return []key.Binding{k.Refresh, k.RescanModels, k.RunServer, k.ConfigPort, k.Parameters, k.SortColumn, k.SortReverse, k.ToggleTheme, k.Nav, k.Quit}
 }
 
 // FullHelp satisfies key.KeyMap.
 func (k KeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
-		{k.Refresh, k.RunServer, k.ConfigPort, k.Parameters, k.SortColumn, k.SortReverse, k.ToggleTheme, k.Quit},
+		{k.Refresh, k.RescanModels, k.RunServer, k.ConfigPort, k.Parameters, k.SortColumn, k.SortReverse, k.ToggleTheme, k.Quit},
 	}
 }

@@ -144,6 +144,67 @@ func TestJoinShellArgv_minimalQuoting(t *testing.T) {
 	}
 }
 
+func TestPairFlagValueForShellDisplay(t *testing.T) {
+	toks := []string{
+		"'/bin/vllm'", "serve", "'/m/model'",
+		"--max-model-len", "131072",
+		"--max-num-seqs", "4",
+		"--gpu-memory-utilization", "0.90",
+		"--enable-auto-tool-choice",
+		"--tool-call-parser", "gemma4",
+		"--reasoning-parser", "gemma4",
+	}
+	got := pairFlagValueForShellDisplay(toks)
+	want := []string{
+		"'/bin/vllm'", "serve", "'/m/model'",
+		"--max-model-len 131072",
+		"--max-num-seqs 4",
+		"--gpu-memory-utilization 0.90",
+		"--enable-auto-tool-choice",
+		"--tool-call-parser gemma4",
+		"--reasoning-parser gemma4",
+	}
+	if len(got) != len(want) {
+		t.Fatalf("len %d got %v", len(got), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("[%d] got %q want %q", i, got[i], want[i])
+		}
+	}
+}
+
+func TestShellCommandDisplayMultiline_previewIndentsArgvContinuation(t *testing.T) {
+	got := shellCommandDisplayMultiline(false, "", nil, []string{
+		"'/bin/llama-server'",
+		"-m", "/m/model.gguf",
+		"--alias", "a.gguf",
+		"--port", "9001",
+	})
+	want := "" +
+		"'/bin/llama-server' \\\n" +
+		"  -m /m/model.gguf \\\n" +
+		"  --alias a.gguf \\\n" +
+		"  --port 9001"
+	if got != want {
+		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestShellCommandDisplayMultiline_envLinesUnindentedArgvIndented(t *testing.T) {
+	got := shellCommandDisplayMultiline(false, "", []EnvVar{{Key: "FOO", Value: "bar"}}, []string{
+		"'/bin/llama-server'",
+		"-m", "/m/a.gguf",
+	})
+	want := "" +
+		"FOO='bar' \\\n" +
+		"'/bin/llama-server' \\\n" +
+		"  -m /m/a.gguf"
+	if got != want {
+		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
+	}
+}
+
 func TestModelParamsConfigPath_respectsXDG(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
