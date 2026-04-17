@@ -96,25 +96,21 @@ func DiscoverRuntime() RuntimeInfo {
 	return info
 }
 
-// ListenPort returns the TCP port from LLAMA_SERVER_PORT, or 8080 if unset or invalid.
-func ListenPort() int {
-	if v := os.Getenv(EnvLlamaServerPort); v != "" {
+// portFromEnv reads a port number from the named env var, returning def if unset or invalid.
+func portFromEnv(key string, def int) int {
+	if v := os.Getenv(key); v != "" {
 		if p, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && p > 0 && p <= 65535 {
 			return p
 		}
 	}
-	return defaultLlamaServerPort
+	return def
 }
 
+// ListenPort returns the TCP port from LLAMA_SERVER_PORT, or 8080 if unset or invalid.
+func ListenPort() int { return portFromEnv(EnvLlamaServerPort, defaultLlamaServerPort) }
+
 // VLLMPort returns the TCP port from VLLM_SERVER_PORT, or 8000 if unset or invalid.
-func VLLMPort() int {
-	if v := os.Getenv(EnvVLLMServerPort); v != "" {
-		if p, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && p > 0 && p <= 65535 {
-			return p
-		}
-	}
-	return defaultVLLMServerPort
-}
+func VLLMPort() int { return portFromEnv(EnvVLLMServerPort, defaultVLLMServerPort) }
 
 // ResolveLlamaServerPath returns the detected llama-server binary path, or the first match on PATH.
 func ResolveLlamaServerPath(r RuntimeInfo) string {

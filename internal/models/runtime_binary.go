@@ -10,23 +10,18 @@ import (
 	"time"
 )
 
-func tryStatBinary(path string) bool {
-	st, err := os.Stat(path)
-	return err == nil && !st.IsDir() && st.Mode().IsRegular()
-}
-
 // findBinaryInEnvAndCommonDirs resolves name as $envDir/name, then each of commonDirs/name,
 // then [exec.LookPath]. envDir may be empty (skip that step).
 func findBinaryInEnvAndCommonDirs(name, envDir string, commonDirs []string) string {
 	if envDir != "" {
 		candidate := filepath.Join(filepath.Clean(envDir), name)
-		if tryStatBinary(candidate) {
+		if isRegularFile(candidate) {
 			return candidate
 		}
 	}
 	for _, dir := range commonDirs {
 		candidate := filepath.Join(dir, name)
-		if tryStatBinary(candidate) {
+		if isRegularFile(candidate) {
 			return candidate
 		}
 	}
@@ -40,7 +35,7 @@ func findVLLMBinary() string {
 	if dir := os.Getenv(EnvVLLMPath); dir != "" {
 		clean := filepath.Clean(dir)
 		candidate := filepath.Join(clean, "vllm")
-		if tryStatBinary(candidate) {
+		if isRegularFile(candidate) {
 			return candidate
 		}
 		// vllm often lives only at $VLLM_PATH/.venv/bin/vllm until the venv is activated.
