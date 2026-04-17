@@ -21,6 +21,9 @@ var vllmStructuredLogPrefix = regexp.MustCompile(
 // left unchanged.
 func normalizeSplitServerLogLine(line string, alignWidth *int) string {
 	line = strings.TrimRight(line, "\r")
+	if i := strings.LastIndex(line, "\r"); i >= 0 {
+		line = line[i+1:]
+	}
 	if line == "" {
 		return line
 	}
