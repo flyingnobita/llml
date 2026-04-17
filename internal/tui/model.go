@@ -32,8 +32,8 @@ type Model struct {
 	tbl                btable.Model
 	hscroll            viewport.Model
 	files              []models.ModelFile
-	sortCol            int  // [tableSortCol*]; default Path ascending matches [models.Discover] order
-	sortDesc           bool // false = ascending
+	sortCol            tableSortCol // default Path ascending matches [models.Discover] order
+	sortDesc           bool         // false = ascending
 	runtime            models.RuntimeInfo
 	runtimeScanned     bool
 	lastRunNote        string
@@ -41,21 +41,21 @@ type Model struct {
 	loading            bool
 	loadErr            error
 	runtimeConfigOpen  bool
-	runtimeFocus       int
+	runtimeFocus       runtimeField
 	runtimeInputs      [runtimeFieldCount]textinput.Model
 
 	paramPanelOpen        bool
-	paramConfirmDelete    int // paramConfirm* (see param_panel.go); 0 = none
+	paramConfirmDelete    paramConfirm
 	paramModelPath        string
 	paramModelDisplayName string
-	paramFocus            int
+	paramFocus            paramFocus
 	paramProfileIndex     int
 	paramProfiles         []ParameterProfile
 	paramEnvCursor        int
 	paramArgsCursor       int
 	paramEnv              []EnvVar
 	paramArgs             []string
-	paramEditKind         int
+	paramEditKind         paramEditKind
 	paramEditInput        textinput.Model
 
 	homeDir string // from [os.UserHomeDir] at startup; used for path display (~/)

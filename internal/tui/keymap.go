@@ -25,24 +25,33 @@ type KeyMap struct {
 	LaunchPreviewScrollDown key.Binding
 }
 
-// runServerKeyMode returns 1 for split-pane run (R), 2 for fullscreen [tea.ExecProcess] (ctrl+r),
-// or 0 if the key is not a run-server binding.
+type runServerMode int
+
+const (
+	runServerModeNone       runServerMode = 0
+	runServerModeSplit      runServerMode = 1
+	runServerModeFullscreen runServerMode = 2
+)
+
+// runServerKeyMode returns [runServerModeSplit] for split-pane run (R),
+// [runServerModeFullscreen] for fullscreen [tea.ExecProcess] (ctrl+r),
+// or [runServerModeNone] if the key is not a run-server binding.
 //
 // We cannot use "shift+R" for fullscreen: on common layouts, typing uppercase R sets ModShift, so shift+R
 // would be indistinguishable from plain R. Fullscreen uses ctrl+r instead.
-func runServerKeyMode(msg tea.KeyPressMsg) int {
+func runServerKeyMode(msg tea.KeyPressMsg) runServerMode {
 	k := msg.Key()
 	switch msg.String() {
 	case "ctrl+r", "ctrl+R":
-		return 2
+		return runServerModeFullscreen
 	}
 	if k.Mod.Contains(tea.ModCtrl) && (k.Code == 'r' || k.Code == 'R') {
-		return 2
+		return runServerModeFullscreen
 	}
 	if k.Text == "R" {
-		return 1
+		return runServerModeSplit
 	}
-	return 0
+	return runServerModeNone
 }
 
 // DefaultKeyMap returns the default global shortcuts.

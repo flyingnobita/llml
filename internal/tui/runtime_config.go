@@ -12,8 +12,10 @@ import (
 	"github.com/flyingnobita/llml/internal/models"
 )
 
+type runtimeField int
+
 const (
-	runtimeFieldLlamaCppPath = iota
+	runtimeFieldLlamaCppPath runtimeField = iota
 	runtimeFieldVLLMPath
 	runtimeFieldVLLMVenv
 	runtimeFieldLlamaPort
@@ -128,7 +130,7 @@ func (m Model) openRuntimeConfig() (Model, tea.Cmd) {
 
 // openRuntimeConfigFocused opens the runtime editor with the given field focused and clears any
 // footer status line ([Model.lastRunNote]).
-func (m Model) openRuntimeConfigFocused(focus int) (Model, tea.Cmd) {
+func (m Model) openRuntimeConfigFocused(focus runtimeField) (Model, tea.Cmd) {
 	m.runtimeConfigOpen = true
 	m.launchPreviewFocused = false
 	m = m.withLastRunCleared()
@@ -180,14 +182,14 @@ func (m Model) closeRuntimeConfig() Model {
 	return m
 }
 
-func (m Model) focusRuntimeField(i int) (Model, tea.Cmd) {
+func (m Model) focusRuntimeField(i runtimeField) (Model, tea.Cmd) {
 	if i < 0 || i >= runtimeFieldCount {
 		i = 0
 	}
 	m.runtimeFocus = i
 	var cmd tea.Cmd
 	for j := range m.runtimeInputs {
-		if j == i {
+		if runtimeField(j) == i {
 			cmd = (&m.runtimeInputs[j]).Focus()
 		} else {
 			(&m.runtimeInputs[j]).Blur()

@@ -7,9 +7,11 @@ import (
 	"github.com/flyingnobita/llml/internal/models"
 )
 
+type tableSortCol int
+
 // Table sort column indices (must match [tableColumns] order: File Name, Model ID, Runtime, Path, Size, Last modified).
 const (
-	tableSortColFileName = iota
+	tableSortColFileName tableSortCol = iota
 	tableSortColID
 	tableSortColRuntime
 	tableSortColPath
@@ -19,10 +21,10 @@ const (
 )
 
 // defaultSortCol matches discovery order ([models.Discover] sorts by path ascending).
-const defaultSortCol = tableSortColPath
+const defaultSortCol tableSortCol = tableSortColPath
 
 // sortModelFiles reorders files in place with a stable sort by column and direction.
-func sortModelFiles(files []models.ModelFile, col int, desc bool) {
+func sortModelFiles(files []models.ModelFile, col tableSortCol, desc bool) {
 	if len(files) < 2 {
 		return
 	}
@@ -39,14 +41,14 @@ func sortModelFiles(files []models.ModelFile, col int, desc bool) {
 	})
 }
 
-func clampSortCol(col int) int {
+func clampSortCol(col tableSortCol) tableSortCol {
 	if col < 0 || col >= tableSortColCount {
 		return defaultSortCol
 	}
 	return col
 }
 
-func compareModelFilesCol(a, b models.ModelFile, col int) int {
+func compareModelFilesCol(a, b models.ModelFile, col tableSortCol) int {
 	switch col {
 	case tableSortColFileName:
 		return strings.Compare(a.Name, b.Name)

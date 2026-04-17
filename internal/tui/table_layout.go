@@ -15,7 +15,7 @@ const (
 
 // formatSortColumnTitle returns the header label for one column, appending a sort
 // triangle when colIdx is the active sort column. The result fits within maxW cells.
-func formatSortColumnTitle(base string, colIdx, sortCol, maxW int, sortDesc bool) string {
+func formatSortColumnTitle(base string, colIdx, sortCol tableSortCol, maxW int, sortDesc bool) string {
 	if maxW < 1 {
 		return ""
 	}
@@ -44,7 +44,7 @@ func formatSortColumnTitle(base string, colIdx, sortCol, maxW int, sortDesc bool
 // takes remaining space after fixed columns (File Name, Model ID, Runtime, Path, Size,
 // Last modified). sortCol and sortDesc control the ▲/▼ indicator on the active
 // column title.
-func tableColumns(totalWidth int, files []models.ModelFile, homeDir string, sortCol int, sortDesc bool) []btable.Column {
+func tableColumns(totalWidth int, files []models.ModelFile, homeDir string, sortCol tableSortCol, sortDesc bool) []btable.Column {
 	if totalWidth < minTerminalWidth {
 		totalWidth = minTerminalWidth
 	}

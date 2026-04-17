@@ -190,7 +190,7 @@ func (m Model) deleteProfile() Model {
 
 func (m Model) cycleParamFocus(delta int) Model {
 	(&m).syncCurrentProfileOut()
-	m.paramFocus = (m.paramFocus + delta + 3) % 3
+	m.paramFocus = paramFocus((int(m.paramFocus) + delta + 3) % 3)
 	return m
 }
 

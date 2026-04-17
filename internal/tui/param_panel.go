@@ -11,22 +11,28 @@ import (
 	"github.com/flyingnobita/llml/internal/models"
 )
 
+type paramFocus int
+
 const (
-	paramFocusProfiles = iota
+	paramFocusProfiles paramFocus = iota
 	paramFocusEnv
 	paramFocusArgs
 )
 
+type paramConfirm int
+
 // paramConfirmDelete* values for Model.paramConfirmDelete (0 = none).
 const (
-	paramConfirmNone = iota
+	paramConfirmNone paramConfirm = iota
 	paramConfirmProfile
 	paramConfirmEnvRow
 	paramConfirmArgRow
 )
 
+type paramEditKind int
+
 const (
-	paramEditNone = iota
+	paramEditNone paramEditKind = iota
 	paramEditEnvLine
 	paramEditArgLine
 	paramEditProfileName

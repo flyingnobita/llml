@@ -232,7 +232,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, reloadRuntimeCmd()
 		}
 		mode := runServerKeyMode(msg)
-		if mode != 0 {
+		if mode != runServerModeNone {
 			if m.loading {
 				m = m.withLastRunError("Wait for the model scan to finish.")
 				return m, nil
@@ -244,7 +244,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m = m.withLastRunCleared()
 			params, _ := loadModelParamsForRun(p)
-			if mode == 2 {
+			if mode == runServerModeFullscreen {
 				if be == models.BackendVLLM {
 					return m, runVLLMServerCmd(p, m.runtime, params)
 				}
@@ -367,7 +367,7 @@ func (m Model) updateServerSplitTableKeys(msg tea.KeyPressMsg) (Model, tea.Cmd) 
 		m, cmd = m.cycleTheme()
 		return m, cmd
 	}
-	if runServerKeyMode(msg) != 0 {
+	if runServerKeyMode(msg) != runServerModeNone {
 		if m.serverExited {
 			m = m.withLastRunError("Dismiss the log (enter, esc, or q) before starting another.")
 		} else {
