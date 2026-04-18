@@ -100,7 +100,7 @@ const (
 	FooterDescQuit = "quit"
 	FooterHintQuit = FooterKeyQuit + ": " + FooterDescQuit
 
-	FooterHintHelp = "ctrl+p: more"
+	FooterHintHelp = "?: more"
 
 	FooterKeyCopyPath  = "enter"
 	FooterDescCopyPath = "copy cmd"

@@ -20,6 +20,7 @@ type KeyMap struct {
 	SortColumn   key.Binding
 	SortReverse  key.Binding
 	RescanModels key.Binding
+	Help         key.Binding
 	// LaunchPreviewScroll scroll the fixed-height launch command preview (idle main view).
 	LaunchPreviewScrollUp   key.Binding
 	LaunchPreviewScrollDown key.Binding
@@ -68,6 +69,10 @@ func DefaultKeyMap() KeyMap {
 		RescanModels: key.NewBinding(
 			key.WithKeys(FooterKeyRescan),
 			key.WithHelp(FooterKeyRescan, FooterDescRescan),
+		),
+		Help: key.NewBinding(
+			key.WithKeys("?"),
+			key.WithHelp("?", "help"),
 		),
 		RunServer: key.NewBinding(
 			key.WithKeys(FooterKeyRunSplit),

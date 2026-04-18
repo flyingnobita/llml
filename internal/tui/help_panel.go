@@ -1,8 +1,6 @@
 package tui
 
 import (
-	"strings"
-
 	"charm.land/lipgloss/v2"
 )
 
@@ -60,7 +58,7 @@ func helpSections() []struct {
 			title: "General",
 			entries: []helpEntry{
 				{"t", "Cycle theme"},
-				{"ctrl+p", "Keyboard shortcuts"},
+				{"?", "Keyboard shortcuts"},
 				{"q", "Quit"},
 			},
 		},
@@ -123,9 +121,4 @@ func (m Model) helpPanelModalBlock() string {
 
 	block := lipgloss.JoinVertical(lipgloss.Left, rows...)
 	return m.ui.styles.portConfigBox.Render(block)
-}
-
-// isCtrlP returns true if the key press is ctrl+p.
-func isCtrlP(msg string) bool {
-	return strings.EqualFold(msg, "ctrl+p")
 }

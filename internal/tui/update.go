@@ -196,7 +196,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.helpOpen {
 		switch {
-		case isEscapeKey(msg), key.Matches(msg, m.keys.Quit), isCtrlP(msg.String()):
+		case isEscapeKey(msg), key.Matches(msg, m.keys.Quit), key.Matches(msg, m.keys.Help):
 			m.helpOpen = false
 			return m, nil
 		}
@@ -214,7 +214,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if key.Matches(msg, m.keys.Quit) {
 		return m, tea.Quit
 	}
-	if isCtrlP(msg.String()) {
+	if key.Matches(msg, m.keys.Help) {
 		m.helpOpen = true
 		return m, nil
 	}
