@@ -16,7 +16,7 @@ import (
 )
 
 // SchemaVersion is the current on-disk format for config.toml.
-const SchemaVersion = 1
+const SchemaVersion = 3
 
 // Config is the root document stored at [ConfigPath].
 type Config struct {
@@ -29,11 +29,11 @@ type Config struct {
 // RuntimeConfig mirrors env vars LLAMA_CPP_PATH, VLLM_PATH, VLLM_VENV, and server ports.
 // Empty strings mean unset; ports use pointers so zero can mean "omit default in file".
 type RuntimeConfig struct {
-	LlamaCppPath    string `toml:"llama_cpp_path"`
-	VLLMPath        string `toml:"vllm_path"`
-	VLLMVenv        string `toml:"vllm_venv"`
-	LlamaServerPort *int   `toml:"llama_server_port,omitempty"`
-	VLLMServerPort  *int   `toml:"vllm_server_port,omitempty"`
+	DefaultLlamaCppPath    string `toml:"default_llama_cpp_path"`
+	DefaultVLLMPath        string `toml:"default_vllm_path"`
+	DefaultVLLMVenv        string `toml:"default_vllm_venv"`
+	DefaultLlamaServerPort *int   `toml:"default_llama_server_port,omitempty"`
+	DefaultVLLMServerPort  *int   `toml:"default_vllm_server_port,omitempty"`
 }
 
 // DiscoveryConfig holds extra search roots and the last full filesystem scan time.
@@ -98,14 +98,14 @@ func ApplyRuntimeFromConfig(r *RuntimeConfig) {
 	if r == nil {
 		return
 	}
-	applyPathIfUnset(models.EnvLlamaCppPath, r.LlamaCppPath)
-	applyPathIfUnset(models.EnvVLLMPath, r.VLLMPath)
-	applyPathIfUnset(models.EnvVLLMVenv, r.VLLMVenv)
-	if r.LlamaServerPort != nil && os.Getenv(models.EnvLlamaServerPort) == "" {
-		os.Setenv(models.EnvLlamaServerPort, strconv.Itoa(*r.LlamaServerPort))
+	applyPathIfUnset(models.EnvLlamaCppPath, r.DefaultLlamaCppPath)
+	applyPathIfUnset(models.EnvVLLMPath, r.DefaultVLLMPath)
+	applyPathIfUnset(models.EnvVLLMVenv, r.DefaultVLLMVenv)
+	if r.DefaultLlamaServerPort != nil && os.Getenv(models.EnvLlamaServerPort) == "" {
+		os.Setenv(models.EnvLlamaServerPort, strconv.Itoa(*r.DefaultLlamaServerPort))
 	}
-	if r.VLLMServerPort != nil && os.Getenv(models.EnvVLLMServerPort) == "" {
-		os.Setenv(models.EnvVLLMServerPort, strconv.Itoa(*r.VLLMServerPort))
+	if r.DefaultVLLMServerPort != nil && os.Getenv(models.EnvVLLMServerPort) == "" {
+		os.Setenv(models.EnvVLLMServerPort, strconv.Itoa(*r.DefaultVLLMServerPort))
 	}
 }
 
@@ -125,29 +125,29 @@ func applyPathIfUnset(key, value string) {
 func RuntimeFromEnv() RuntimeConfig {
 	var r RuntimeConfig
 	if v := strings.TrimSpace(os.Getenv(models.EnvLlamaCppPath)); v != "" {
-		r.LlamaCppPath = filepath.Clean(models.ExpandTildePath(v))
+		r.DefaultLlamaCppPath = filepath.Clean(models.ExpandTildePath(v))
 	}
 	if v := strings.TrimSpace(os.Getenv(models.EnvVLLMPath)); v != "" {
-		r.VLLMPath = filepath.Clean(models.ExpandTildePath(v))
+		r.DefaultVLLMPath = filepath.Clean(models.ExpandTildePath(v))
 	}
 	if v := strings.TrimSpace(os.Getenv(models.EnvVLLMVenv)); v != "" {
-		r.VLLMVenv = filepath.Clean(models.ExpandTildePath(v))
+		r.DefaultVLLMVenv = filepath.Clean(models.ExpandTildePath(v))
 	}
 	if v := strings.TrimSpace(os.Getenv(models.EnvLlamaServerPort)); v != "" {
 		if p, err := strconv.Atoi(v); err == nil && p > 0 && p <= 65535 {
-			r.LlamaServerPort = &p
+			r.DefaultLlamaServerPort = &p
 		}
 	} else {
 		p := models.ListenPort()
-		r.LlamaServerPort = &p
+		r.DefaultLlamaServerPort = &p
 	}
 	if v := strings.TrimSpace(os.Getenv(models.EnvVLLMServerPort)); v != "" {
 		if p, err := strconv.Atoi(v); err == nil && p > 0 && p <= 65535 {
-			r.VLLMServerPort = &p
+			r.DefaultVLLMServerPort = &p
 		}
 	} else {
 		p := models.VLLMPort()
-		r.VLLMServerPort = &p
+		r.DefaultVLLMServerPort = &p
 	}
 	return r
 }

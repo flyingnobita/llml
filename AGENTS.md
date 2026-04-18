@@ -66,9 +66,9 @@ scripts/             # gofmt-check.sh, precommit-docs-fix.sh
 
 ### Configuration
 
-**On-disk config** lives at **`{UserConfigDir}/llml/config.toml`** (see `internal/config`). It stores **`[runtime]`** (paths and ports), **`[discovery]`** (extra model roots and last full-scan time), and **`[[models]]`** (cached discovery rows). **`schema_version`** is reserved for future migrations.
+- **On-disk config** lives at **`{UserConfigDir}/llml/config.toml`** (see `internal/config`). It stores **`[runtime]`** (default paths and ports), **`[discovery]`** (extra model roots and last full-scan time), and **`[[models]]`** (cached discovery rows). **`schema_version`** is reserved for future migrations.
 
-- **Precedence:** **environment variables override** values from `config.toml`; unset env vars fall back to TOML, then built-in defaults.
+- **Precedence:** **environment variables override** values from `config.toml`; unset env vars fall back to TOML `default_` keys, then built-in defaults.
 - **Startup:** if the cache is valid (`schema_version` matches, at least one cached model path still exists on disk), the UI loads without a full filesystem walk. Otherwise a full scan runs and the file is rewritten.
 - **`r`** reloads **`[runtime]`** from `config.toml` and re-runs runtime detection (does not rescan models). **`S`** runs a full model discovery and refreshes **`[[models]]`**.
 - Saving the runtime panel (**`c`**) updates the process environment and **best-effort** writes **`[runtime]`** to `config.toml` (failure is non-fatal).

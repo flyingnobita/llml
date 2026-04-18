@@ -18,11 +18,11 @@ func TestConfigRoundTrip(t *testing.T) {
 	p1 := 8080
 	p2 := 8000
 	c := Config{
-		SchemaVersion: 1,
+		SchemaVersion: 3,
 		Runtime: RuntimeConfig{
-			LlamaCppPath:    "/opt/llama",
-			LlamaServerPort: &p1,
-			VLLMServerPort:  &p2,
+			DefaultLlamaCppPath:    "/opt/llama",
+			DefaultLlamaServerPort: &p1,
+			DefaultVLLMServerPort:  &p2,
 		},
 		Discovery: DiscoveryConfig{
 			ExtraModelPaths: []string{"/extra/models"},
@@ -49,8 +49,8 @@ func TestConfigRoundTrip(t *testing.T) {
 	if got.SchemaVersion != SchemaVersion {
 		t.Fatalf("schema %d", got.SchemaVersion)
 	}
-	if got.Runtime.LlamaCppPath != c.Runtime.LlamaCppPath {
-		t.Fatalf("runtime path %q", got.Runtime.LlamaCppPath)
+	if got.Runtime.DefaultLlamaCppPath != c.Runtime.DefaultLlamaCppPath {
+		t.Fatalf("runtime path %q", got.Runtime.DefaultLlamaCppPath)
 	}
 	if len(got.Models) != 1 || got.Models[0].Path != "/models/a.gguf" {
 		t.Fatalf("models %+v", got.Models)
@@ -62,10 +62,10 @@ func TestValidForCache(t *testing.T) {
 	if (Config{SchemaVersion: 0}).ValidForCache() {
 		t.Fatal("wrong schema should not validate")
 	}
-	if (Config{SchemaVersion: 1, Models: nil}).ValidForCache() {
+	if (Config{SchemaVersion: 3, Models: nil}).ValidForCache() {
 		t.Fatal("empty models should not validate")
 	}
-	if !(Config{SchemaVersion: 1, Models: []ModelEntry{{Path: "/x"}}}).ValidForCache() {
+	if !(Config{SchemaVersion: 3, Models: []ModelEntry{{Path: "/x"}}}).ValidForCache() {
 		t.Fatal("valid config should validate")
 	}
 }
@@ -74,7 +74,7 @@ func TestApplyRuntimeFromConfig_envWins(t *testing.T) {
 	t.Setenv(models.EnvLlamaCppPath, "/from-env")
 	t.Cleanup(func() { _ = os.Unsetenv(models.EnvLlamaCppPath) })
 
-	ApplyRuntimeFromConfig(&RuntimeConfig{LlamaCppPath: "/from-toml"})
+	ApplyRuntimeFromConfig(&RuntimeConfig{DefaultLlamaCppPath: "/from-toml"})
 	if os.Getenv(models.EnvLlamaCppPath) != "/from-env" {
 		t.Fatalf("env should win, got %q", os.Getenv(models.EnvLlamaCppPath))
 	}
@@ -84,7 +84,7 @@ func TestApplyRuntimeFromConfig_tomlFallback(t *testing.T) {
 	_ = os.Unsetenv(models.EnvLlamaCppPath)
 	t.Cleanup(func() { _ = os.Unsetenv(models.EnvLlamaCppPath) })
 
-	ApplyRuntimeFromConfig(&RuntimeConfig{LlamaCppPath: "/from-toml"})
+	ApplyRuntimeFromConfig(&RuntimeConfig{DefaultLlamaCppPath: "/from-toml"})
 	got := os.Getenv(models.EnvLlamaCppPath)
 	if got == "" {
 		t.Fatal("expected TOML path applied")

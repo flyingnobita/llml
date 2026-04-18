@@ -144,7 +144,7 @@ Behavior is driven by **environment variables**, optional **`config.toml`**, and
 | macOS       | `~/Library/Application Support/llml/config.toml`                    |
 | Windows     | `%AppData%\llml\config.toml`                                        |
 
-The file stores **`schema_version`**, **`[runtime]`** (mirrors `LLAMA_CPP_PATH`, `VLLM_PATH`, `VLLM_VENV`, ports), **`[discovery]`** (`extra_model_paths`, `last_scan` timestamp), and **`[[models]]`** (cached rows from the last full scan). Parameter profiles remain in **`model-params.json`** only.
+The file stores **`schema_version`**, **`[runtime]`** (stores `default_` paths and ports used when environment variables are unset), **`[discovery]`** (`extra_model_paths`, `last_scan` timestamp), and **`[[models]]`** (cached rows from the last full scan). Parameter profiles remain in **`model-params.json`** only.
 
 On startup, if the cache is valid, the app skips walking the disk; use **`S`** for a full rescan. **`r`** reloads runtime settings from TOML without rescanning models. Saving the **`c`** runtime panel updates the environment and writes **`[runtime]`** (write failures are ignored).
 
