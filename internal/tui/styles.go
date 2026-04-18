@@ -14,6 +14,8 @@ type styles struct {
 	titleToastRowWrap lipgloss.Style
 	subtitle          lipgloss.Style
 	body              lipgloss.Style
+	bodyBold          lipgloss.Style
+	bodyDim           lipgloss.Style
 	footer            lipgloss.Style
 	// scrollBarColumn colors the █/░ track beside viewports; no margin (unlike footer).
 	scrollBarColumn        lipgloss.Style
@@ -59,6 +61,11 @@ func newStyles(theme Theme) styles {
 			MarginBottom(1),
 		body: lipgloss.NewStyle().
 			Foreground(theme.Body),
+		bodyBold: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(theme.Body),
+		bodyDim: lipgloss.NewStyle().
+			Foreground(theme.Subtitle),
 		footer: lipgloss.NewStyle().
 			Foreground(theme.Footer).
 			MarginTop(1),

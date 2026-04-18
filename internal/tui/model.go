@@ -89,15 +89,25 @@ type launchPreviewState struct {
 	lastCmd  string // resets scroll when the displayed command changes
 }
 
+// discoveryPathsState holds the model-discovery paths modal's state.
+type discoveryPathsState struct {
+	open      bool
+	cursor    int
+	paths     []string
+	editOpen  bool
+	editInput textinput.Model
+}
+
 // Model is the root Bubble Tea model.
 type Model struct {
-	layout  layoutState
-	ui      themeState
-	table   tableState
-	rc      runtimeConfigState
-	params  paramsState
-	server  serverPaneState
-	preview launchPreviewState
+	layout    layoutState
+	ui        themeState
+	table     tableState
+	rc        runtimeConfigState
+	params    paramsState
+	server    serverPaneState
+	preview   launchPreviewState
+	discovery discoveryPathsState
 
 	keys               KeyMap
 	runtime            models.RuntimeInfo
@@ -166,6 +176,9 @@ func New() Model {
 		},
 		params: paramsState{
 			editInput: newParamLineTextInput(),
+		},
+		discovery: discoveryPathsState{
+			editInput: newPathTextInput(),
 		},
 		keys:    DefaultKeyMap(),
 		loading: true,

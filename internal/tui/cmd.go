@@ -19,7 +19,7 @@ func discoverRuntimeCmd() tea.Cmd {
 }
 
 // applyAndFullScanCmd applies [runtime] from config.toml when present, then runs a full discovery and writes config.toml.
-func applyAndFullScanCmd() tea.Cmd {
+func applyAndFullScanCmd(explicitPaths ...string) tea.Cmd {
 	return func() tea.Msg {
 		cfg, err := config.ReadFile()
 		opts := models.Options{}
@@ -28,6 +28,9 @@ func applyAndFullScanCmd() tea.Cmd {
 			config.ApplyRuntimeFromConfig(&cfg.Runtime)
 			fromFile = cfg.Discovery.ExtraModelPaths
 		}
+		if len(explicitPaths) > 0 {
+			fromFile = explicitPaths
+		}
 		opts.ExtraRoots = config.MergeExtraRoots(fromFile, config.ExtraModelPathsFromEnv())
 		rt := models.DiscoverRuntime()
 		files, derr := models.Discover(opts)
@@ -35,18 +38,14 @@ func applyAndFullScanCmd() tea.Cmd {
 			return modelsErrMsg{err: derr}
 		}
 		now := time.Now()
-		var prev *config.Config
-		if err == nil {
-			prev = &cfg
-		}
-		disc := config.DiscoveryConfigForWrite(prev, now)
+		disc := config.DiscoveryConfigFromInputs(fromFile, now)
 		werr := config.WriteFile(config.BuildConfig(config.RuntimeFromEnv(), disc, files))
-		return fullScanDoneMsg{runtime: rt, files: files, writeErr: werr, lastScan: now}
+		return fullScanDoneMsg{runtime: rt, files: files, writeErr: werr, lastScan: now, configPaths: fromFile}
 	}
 }
 
 // rescanModelsCmd runs filesystem discovery only (S key); preserves current runtime env and merges discovery metadata into config.toml.
-func rescanModelsCmd() tea.Cmd {
+func rescanModelsCmd(explicitPaths ...string) tea.Cmd {
 	return func() tea.Msg {
 		cfg, err := config.ReadFile()
 		opts := models.Options{}
@@ -54,19 +53,18 @@ func rescanModelsCmd() tea.Cmd {
 		if err == nil {
 			fromFile = cfg.Discovery.ExtraModelPaths
 		}
+		if len(explicitPaths) > 0 {
+			fromFile = explicitPaths
+		}
 		opts.ExtraRoots = config.MergeExtraRoots(fromFile, config.ExtraModelPathsFromEnv())
 		files, derr := models.Discover(opts)
 		if derr != nil {
 			return modelsErrMsg{err: derr}
 		}
 		now := time.Now()
-		var prev *config.Config
-		if err == nil {
-			prev = &cfg
-		}
-		disc := config.DiscoveryConfigForWrite(prev, now)
+		disc := config.DiscoveryConfigFromInputs(fromFile, now)
 		werr := config.WriteFile(config.BuildConfig(config.RuntimeFromEnv(), disc, files))
-		return modelRescanDoneMsg{files: files, writeErr: werr, lastScan: now}
+		return modelRescanDoneMsg{files: files, writeErr: werr, lastScan: now, configPaths: fromFile}
 	}
 }
 
@@ -98,7 +96,7 @@ func startupCmd() tea.Cmd {
 		if len(files) == 0 {
 			return startupNeedFullScanMsg{}
 		}
-		return startupCacheHitMsg{runtime: rt, files: files, lastScan: cfg.Discovery.LastScan}
+		return startupCacheHitMsg{runtime: rt, files: files, lastScan: cfg.Discovery.LastScan, configPaths: cfg.Discovery.ExtraModelPaths}
 	}
 }
 

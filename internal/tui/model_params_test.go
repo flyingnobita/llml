@@ -11,6 +11,8 @@ import (
 func TestLoadSaveModelEntry_roundTrip(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("HOME", dir)
+	t.Setenv("AppData", dir)
 	modelPath := filepath.Join(t.TempDir(), "m", "model.gguf")
 	ent := modelEntry{
 		Profiles: []ParameterProfile{
@@ -41,6 +43,8 @@ func TestLoadSaveModelEntry_roundTrip(t *testing.T) {
 func TestLoadModelParamsForRun_usesActiveProfile(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("HOME", dir)
+	t.Setenv("AppData", dir)
 	modelPath := filepath.Join(dir, "m.gguf")
 	ent := modelEntry{
 		Profiles: []ParameterProfile{
@@ -208,11 +212,14 @@ func TestShellCommandDisplayMultiline_envLinesUnindentedArgvIndented(t *testing.
 func TestModelParamsConfigPath_respectsXDG(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("HOME", dir)
+	t.Setenv("AppData", dir)
 	path, err := modelParamsConfigPath()
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := filepath.Join(dir, "llml", "model-params.json")
+	cfgDir, _ := os.UserConfigDir()
+	want := filepath.Join(cfgDir, "llml", "model-params.json")
 	if path != want {
 		t.Fatalf("got %q want %q", path, want)
 	}
@@ -221,6 +228,8 @@ func TestModelParamsConfigPath_respectsXDG(t *testing.T) {
 func TestLoadModelParamsForRun_missingFile(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("HOME", dir)
+	t.Setenv("AppData", dir)
 	p, err := loadModelParamsForRun("/nonexistent/model.gguf")
 	if err != nil {
 		t.Fatal(err)
@@ -233,6 +242,8 @@ func TestLoadModelParamsForRun_missingFile(t *testing.T) {
 func TestSaveModelEntry_mergesOtherModels(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("HOME", dir)
+	t.Setenv("AppData", dir)
 	a := filepath.Join(dir, "a.gguf")
 	b := filepath.Join(dir, "b.gguf")
 	if err := saveModelEntry(a, modelEntry{
@@ -266,7 +277,10 @@ func TestSaveModelEntry_mergesOtherModels(t *testing.T) {
 func TestMigrateV1File_toProfiles(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
-	cfg := filepath.Join(dir, "llml", "model-params.json")
+	t.Setenv("HOME", dir)
+	t.Setenv("AppData", dir)
+	cfgDir, _ := os.UserConfigDir()
+	cfg := filepath.Join(cfgDir, "llml", "model-params.json")
 	if err := os.MkdirAll(filepath.Dir(cfg), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -314,7 +328,10 @@ func TestParseModelEntry_v2EmptyProfiles_getsDefault(t *testing.T) {
 func TestModelParamsFile_exists(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
-	path := filepath.Join(dir, "llml", "model-params.json")
+	t.Setenv("HOME", dir)
+	t.Setenv("AppData", dir)
+	cfgDir, _ := os.UserConfigDir()
+	path := filepath.Join(cfgDir, "llml", "model-params.json")
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}

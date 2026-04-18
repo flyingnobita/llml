@@ -272,6 +272,15 @@ func BuildConfig(runtime RuntimeConfig, discovery DiscoveryConfig, files []model
 	return c
 }
 
+// DiscoveryConfigFromInputs builds a DiscoveryConfig from explicit config-owned paths plus lastScan.
+// It normalizes and deduplicates paths without merging environment variables.
+func DiscoveryConfigFromInputs(configPaths []string, lastScan time.Time) DiscoveryConfig {
+	return DiscoveryConfig{
+		ExtraModelPaths: MergeExtraRoots(configPaths, nil),
+		LastScan:        lastScan,
+	}
+}
+
 // DiscoveryConfigForWrite merges extra model paths from a previous on-disk config with
 // current LLML_MODEL_PATHS so hand-edited TOML entries are preserved across writes.
 func DiscoveryConfigForWrite(prev *Config, lastScan time.Time) DiscoveryConfig {

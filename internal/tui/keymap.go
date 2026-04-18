@@ -16,6 +16,7 @@ type KeyMap struct {
 	CopyPath     key.Binding
 	ConfigPort   key.Binding
 	Parameters   key.Binding
+	ModelPaths   key.Binding
 	ToggleTheme  key.Binding
 	SortColumn   key.Binding
 	SortReverse  key.Binding
@@ -102,6 +103,10 @@ func DefaultKeyMap() KeyMap {
 			key.WithKeys(FooterKeyParameters),
 			key.WithHelp(FooterKeyParameters, FooterDescParameters),
 		),
+		ModelPaths: key.NewBinding(
+			key.WithKeys(FooterKeyModelPaths),
+			key.WithHelp(FooterKeyModelPaths, FooterDescModelPaths),
+		),
 		ToggleTheme: key.NewBinding(
 			key.WithKeys(FooterKeyToggleTheme),
 			key.WithHelp(FooterKeyToggleTheme, FooterDescToggleTheme),
@@ -127,12 +132,12 @@ func DefaultKeyMap() KeyMap {
 
 // ShortHelp satisfies key.KeyMap (optional; use for help overlay later).
 func (k KeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Refresh, k.RescanModels, k.RunServer, k.ConfigPort, k.Parameters, k.SortColumn, k.SortReverse, k.ToggleTheme, k.Nav, k.Quit}
+	return []key.Binding{k.Refresh, k.RescanModels, k.RunServer, k.ConfigPort, k.Parameters, k.ModelPaths, k.SortColumn, k.SortReverse, k.ToggleTheme, k.Nav, k.Quit}
 }
 
 // FullHelp satisfies key.KeyMap.
 func (k KeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
-		{k.Refresh, k.RescanModels, k.RunServer, k.ConfigPort, k.Parameters, k.SortColumn, k.SortReverse, k.ToggleTheme, k.Quit},
+		{k.Refresh, k.RescanModels, k.RunServer, k.ConfigPort, k.Parameters, k.ModelPaths, k.SortColumn, k.SortReverse, k.ToggleTheme, k.Quit},
 	}
 }

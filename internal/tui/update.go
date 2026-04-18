@@ -37,6 +37,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.runtimeScanned = true
 		m.table.files = msg.files
 		m.table.lastScan = msg.lastScan
+		m.discovery.paths = msg.configPaths
 		sortModelFiles(m.table.files, m.table.sortCol, m.table.sortDesc)
 		m = m.layoutTable()
 		m.table.hscroll.SetXOffset(0)
@@ -56,6 +57,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.runtimeScanned = true
 		m.table.files = msg.files
 		m.table.lastScan = msg.lastScan
+		m.discovery.paths = msg.configPaths
 		sortModelFiles(m.table.files, m.table.sortCol, m.table.sortDesc)
 		m = m.layoutTable()
 		m.table.hscroll.SetXOffset(0)
@@ -75,6 +77,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.loadErr = nil
 		m.table.files = msg.files
 		m.table.lastScan = msg.lastScan
+		m.discovery.paths = msg.configPaths
 		sortModelFiles(m.table.files, m.table.sortCol, m.table.sortDesc)
 		m = m.layoutTable()
 		m.table.hscroll.SetXOffset(0)
@@ -188,6 +191,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.rc.inputs[m.rc.focus], cmd = m.rc.inputs[m.rc.focus].Update(msg)
 		return m, cmd
 	}
+	if m.discovery.open && m.discovery.editOpen {
+		m.discovery.editInput, cmd = m.discovery.editInput.Update(msg)
+		return m, cmd
+	}
 	m.table.tbl, cmd = m.table.tbl.Update(msg)
 	return m, cmd
 }
@@ -207,6 +214,9 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	if m.rc.open {
 		return m.updateRuntimeConfigKey(msg)
+	}
+	if m.discovery.open {
+		return m.updateDiscoveryPathsKey(msg)
 	}
 	if m.server.running {
 		return m.updateServerSplitKeys(msg)
@@ -312,6 +322,12 @@ func (m Model) tableNavKeys(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 			return m.withLastRunError("Wait for the model scan to finish."), nil, true
 		}
 		m2, cmd := m.openParamPanel()
+		return m2, cmd, true
+	case key.Matches(msg, m.keys.ModelPaths):
+		if m.loading {
+			return m.withLastRunError("Wait for the model scan to finish."), nil, true
+		}
+		m2, cmd := m.openDiscoveryPathsModal()
 		return m2, cmd, true
 	case key.Matches(msg, m.keys.ToggleTheme):
 		m2, cmd := m.cycleTheme()

@@ -22,24 +22,27 @@ type startupNeedFullScanMsg struct{}
 
 // startupCacheHitMsg loads models from config.toml cache (no filesystem walk).
 type startupCacheHitMsg struct {
-	runtime  models.RuntimeInfo
-	files    []models.ModelFile
-	lastScan time.Time
+	runtime     models.RuntimeInfo
+	files       []models.ModelFile
+	lastScan    time.Time
+	configPaths []string
 }
 
 // fullScanDoneMsg completes a full discovery pass (startup or refresh-all path).
 type fullScanDoneMsg struct {
-	runtime  models.RuntimeInfo
-	files    []models.ModelFile
-	writeErr error
-	lastScan time.Time
+	runtime     models.RuntimeInfo
+	files       []models.ModelFile
+	writeErr    error
+	lastScan    time.Time
+	configPaths []string
 }
 
 // modelRescanDoneMsg completes an S-key model-only re-scan.
 type modelRescanDoneMsg struct {
-	files    []models.ModelFile
-	writeErr error
-	lastScan time.Time
+	files       []models.ModelFile
+	writeErr    error
+	lastScan    time.Time
+	configPaths []string
 }
 
 // runtimeReloadErrMsg reports failure to reload [runtime] from config.toml (r key).

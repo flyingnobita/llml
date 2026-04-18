@@ -12,6 +12,8 @@ import (
 func TestConfigRoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("HOME", dir)
+	t.Setenv("AppData", dir)
 
 	p1 := 8080
 	p2 := 8000
@@ -135,6 +137,28 @@ func TestDiscoveryConfigForWrite_merge(t *testing.T) {
 		t.Fatalf("paths %v", d.ExtraModelPaths)
 	}
 	if !d.LastScan.Equal(time.Unix(200, 0).UTC()) {
+		t.Fatalf("last scan %v", d.LastScan)
+	}
+}
+
+func TestDiscoveryConfigFromInputs(t *testing.T) {
+	t.Setenv(models.EnvModelPaths, "/env/ignored") // should not be used
+	t.Cleanup(func() { _ = os.Unsetenv(models.EnvModelPaths) })
+
+	paths := []string{" /a ", "  ", ".", "/b/../c", "/a"}
+	lastScan := time.Unix(300, 0).UTC()
+	d := DiscoveryConfigFromInputs(paths, lastScan)
+
+	if len(d.ExtraModelPaths) != 2 {
+		t.Fatalf("want 2 paths, got %v", d.ExtraModelPaths)
+	}
+	if filepath.ToSlash(d.ExtraModelPaths[0]) != "/a" {
+		t.Errorf("got %q", d.ExtraModelPaths[0])
+	}
+	if filepath.ToSlash(d.ExtraModelPaths[1]) != "/c" {
+		t.Errorf("got %q", d.ExtraModelPaths[1])
+	}
+	if !d.LastScan.Equal(lastScan) {
 		t.Fatalf("last scan %v", d.LastScan)
 	}
 }

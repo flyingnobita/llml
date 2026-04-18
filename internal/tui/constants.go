@@ -92,6 +92,10 @@ const (
 	FooterDescParameters = "profiles"
 	FooterHintParameters = FooterKeyParameters + ": " + FooterDescParameters
 
+	FooterKeyModelPaths  = "m"
+	FooterDescModelPaths = "model paths"
+	FooterHintModelPaths = FooterKeyModelPaths + ": " + FooterDescModelPaths
+
 	FooterKeyToggleTheme  = "t"
 	FooterDescToggleTheme = "theme"
 	FooterHintToggleTheme = FooterKeyToggleTheme + ": " + FooterDescToggleTheme
@@ -147,6 +151,10 @@ const (
 	runtimeConfigModalSubtitle = "Following overrides any configuration found during startup detection."
 	// runtimeConfigLabelVLLMVenv is the field label for the optional venv root (env var remains VLLM_VENV).
 	runtimeConfigLabelVLLMVenv = "VLLM_VENV (Optional - autodetect if not set)"
+
+	// Discovery paths modal.
+	FooterDiscoveryPathsHints   = FooterNavHint + FooterHintSep + "n: add · enter: edit · d: delete · s: save · esc/q: cancel"
+	discoveryPathsModalSubtitle = "These paths are saved to config.toml and scanned in addition to the defaults below."
 
 	// FooterHintTabSections is the shared "tab: sections" fragment used by split-pane
 	// and parameter modal footers.

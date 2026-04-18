@@ -342,7 +342,7 @@ func (m Model) mainAppPlacedView() string {
 	case m.loadErr != nil:
 		body = m.ui.styles.errLine.Render("Error: " + m.loadErr.Error())
 	case len(m.table.files) == 0:
-		body = m.ui.styles.body.Render("No GGUF or safetensors models found. Set HUGGINGFACE_HUB_CACHE or HF_HOME if your Hub cache is non-default; add paths via LLML_MODEL_PATHS or place models under ~/models, ~/.cache/huggingface/hub, etc.")
+		body = m.ui.styles.body.Render(fmt.Sprintf("No GGUF or safetensors models found. Press '%s' to add search paths, or place models under ~/models, ~/.cache/huggingface/hub, etc.", FooterKeyModelPaths))
 	default:
 		m.table.hscroll.SetContent(m.table.tbl.View())
 		th := m.layout.tableBodyH
@@ -439,10 +439,63 @@ func (m Model) View() tea.View {
 		v.AltScreen = true
 		return v
 	}
+	if m.discovery.open {
+		s := overlayCentered(m.mainAppPlacedView(), m.discoveryPathsModalBlock(), m.layout.width, m.layout.height)
+		v := tea.NewView(s)
+		v.AltScreen = true
+		return v
+	}
 
 	v := tea.NewView(m.mainAppPlacedView())
 	v.AltScreen = true
 	return v
+}
+
+// discoveryPathsModalBlock returns the framed discovery paths configuration panel.
+func (m Model) discoveryPathsModalBlock() string {
+	cw := m.paramPanelContentWidth()
+	rows := []string{
+		m.modalTitleRow(cw, m.ui.styles.portConfigTitle, "Model paths"),
+		m.ui.styles.subtitle.Width(cw).Render(discoveryPathsModalSubtitle),
+		"",
+	}
+
+	for i, p := range m.discovery.paths {
+		prefix := "  "
+		if i == m.discovery.cursor {
+			prefix = "› "
+		}
+		if m.discovery.editOpen && i == m.discovery.cursor {
+			rows = append(rows, m.ui.styles.body.Render(prefix)+m.discovery.editInput.View())
+		} else {
+			style := m.ui.styles.body
+			if i == m.discovery.cursor {
+				style = m.ui.styles.bodyBold
+			}
+			rows = append(rows, style.Render(prefix+p))
+		}
+	}
+
+	if m.discovery.editOpen && m.discovery.cursor == len(m.discovery.paths) {
+		rows = append(rows, m.ui.styles.body.Render("› ")+m.discovery.editInput.View())
+	}
+
+	if len(m.discovery.paths) == 0 && !m.discovery.editOpen {
+		rows = append(rows, m.ui.styles.bodyDim.Render("  (No extra paths configured)"))
+	}
+
+	rows = append(rows, "")
+	rows = append(rows, m.ui.styles.body.Render("Defaults (read-only):"))
+
+	for _, p := range models.DefaultSearchRoots() {
+		rows = append(rows, m.ui.styles.bodyDim.Render("  "+p))
+	}
+
+	rows = append(rows, "")
+	rows = append(rows, m.ui.styles.footer.Render(FooterDiscoveryPathsHints))
+
+	block := lipgloss.JoinVertical(lipgloss.Left, rows...)
+	return m.ui.styles.portConfigBox.Render(block)
 }
 
 // runtimeConfigModalBlock returns the framed runtime configuration panel only
