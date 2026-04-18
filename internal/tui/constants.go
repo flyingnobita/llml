@@ -147,10 +147,15 @@ const (
 
 	// Runtime config modal.
 	FooterRuntimeConfigHints = "tab: fields · enter: save · esc: cancel"
-	// runtimeConfigModalSubtitle appears below the modal title (values here override startup detection).
-	runtimeConfigModalSubtitle = "Following overrides any configuration found during startup detection."
-	// runtimeConfigLabelVLLMVenv is the field label for the optional venv root (env var remains VLLM_VENV).
-	runtimeConfigLabelVLLMVenv = "VLLM_VENV (Optional - autodetect if not set)"
+	// runtimeConfigModalSubtitle appears below the modal title (values here override startup discovery).
+	runtimeConfigModalSubtitle     = "Overrides saved to config.toml. Shell environment variables take precedence."
+	runtimeConfigHeaderLlama       = "LLAMA.CPP"
+	runtimeConfigHeaderVLLM        = "VLLM"
+	runtimeConfigLabelLlamaCppPath = "Path (llama-cli / llama-server)"
+	runtimeConfigLabelVLLMPath     = "Path (vllm binary)"
+	runtimeConfigLabelVLLMVenv     = "Venv Root (Optional)"
+	runtimeConfigLabelLlamaPort    = "Server Port"
+	runtimeConfigLabelVLLMPort     = "Server Port"
 
 	// Discovery paths modal.
 	FooterDiscoveryPathsHints   = FooterNavHint + FooterHintSep + "n: add · enter: edit · d: delete · s: save · esc/q: cancel"

@@ -16,9 +16,9 @@ type runtimeField int
 
 const (
 	runtimeFieldLlamaCppPath runtimeField = iota
+	runtimeFieldLlamaPort
 	runtimeFieldVLLMPath
 	runtimeFieldVLLMVenv
-	runtimeFieldLlamaPort
 	runtimeFieldVLLMPort
 	runtimeFieldCount
 )
@@ -118,7 +118,7 @@ func newPathTextInput() textinput.Model {
 	ti := textinput.New()
 	ti.Placeholder = ""
 	ti.CharLimit = 2048
-	ti.SetWidth(56)
+	ti.SetWidth(38)
 	ti.Blur()
 	return ti
 }

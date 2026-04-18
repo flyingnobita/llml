@@ -134,7 +134,7 @@ func runtimePanelView(m Model, contentWidth int) string {
 			block += "\nLast model scan: " + m.table.lastScan.Local().Format(time.RFC3339)
 		}
 	}
-	inner := "Runtimes\n" + block
+	inner := m.ui.styles.paramSectionHeading.Render("Active Configuration") + "\n" + block
 	return m.ui.styles.runtimePanel.Width(contentWidth).Render(inner)
 }
 
@@ -509,26 +509,56 @@ func (m Model) runtimeConfigModalBlock() string {
 		}
 		return m.ui.styles.body.Render(prefix + name)
 	}
+	header := func(text string) string {
+		return m.ui.styles.bodyBold.Render(text)
+	}
 	cw := m.paramPanelContentWidth()
-	rows := []string{
-		m.modalTitleRow(cw, m.ui.styles.portConfigTitle, "Runtime environment"),
-		runtimePanelView(m, cw),
-		m.ui.styles.subtitle.Width(cw).Render(runtimeConfigModalSubtitle),
+
+	// Build the llama.cpp column
+	llamaRows := []string{
+		header(runtimeConfigHeaderLlama),
 		"",
-		label(m.rc.focus == runtimeFieldLlamaCppPath, models.EnvLlamaCppPath),
+		label(m.rc.focus == runtimeFieldLlamaCppPath, runtimeConfigLabelLlamaCppPath),
 		m.rc.inputs[runtimeFieldLlamaCppPath].View(),
 		"",
-		label(m.rc.focus == runtimeFieldVLLMPath, models.EnvVLLMPath),
+		label(m.rc.focus == runtimeFieldLlamaPort, runtimeConfigLabelLlamaPort),
+		m.rc.inputs[runtimeFieldLlamaPort].View(),
+	}
+	llamaBlock := lipgloss.JoinVertical(lipgloss.Left, llamaRows...)
+
+	// Build the vLLM column
+	vllmRows := []string{
+		header(runtimeConfigHeaderVLLM),
+		"",
+		label(m.rc.focus == runtimeFieldVLLMPath, runtimeConfigLabelVLLMPath),
 		m.rc.inputs[runtimeFieldVLLMPath].View(),
 		"",
 		label(m.rc.focus == runtimeFieldVLLMVenv, runtimeConfigLabelVLLMVenv),
 		m.rc.inputs[runtimeFieldVLLMVenv].View(),
 		"",
-		label(m.rc.focus == runtimeFieldLlamaPort, models.EnvLlamaServerPort),
-		m.rc.inputs[runtimeFieldLlamaPort].View(),
-		"",
-		label(m.rc.focus == runtimeFieldVLLMPort, models.EnvVLLMServerPort),
+		label(m.rc.focus == runtimeFieldVLLMPort, runtimeConfigLabelVLLMPort),
 		m.rc.inputs[runtimeFieldVLLMPort].View(),
+	}
+	vllmBlock := lipgloss.JoinVertical(lipgloss.Left, vllmRows...)
+
+	var inputBlock string
+	if cw >= 80 {
+		// Side-by-side layout: llama on left, vLLM on right
+		vllmBlock = m.ui.styles.body.PaddingLeft(4).Render(vllmBlock)
+		inputBlock = lipgloss.JoinHorizontal(lipgloss.Top, llamaBlock, vllmBlock)
+	} else {
+		// Stacked layout: llama then vLLM
+		inputBlock = lipgloss.JoinVertical(lipgloss.Left, llamaBlock, "", vllmBlock)
+	}
+
+	rows := []string{
+		m.modalTitleRow(cw, m.ui.styles.portConfigTitle, "Runtime environment"),
+		runtimePanelView(m, cw),
+		"",
+		m.ui.styles.paramSectionHeading.Render("Overrides"),
+		m.ui.styles.subtitle.Width(cw).Render(runtimeConfigModalSubtitle),
+		"",
+		inputBlock,
 		"",
 		m.ui.styles.footer.Render(FooterRuntimeConfigHints),
 	}
