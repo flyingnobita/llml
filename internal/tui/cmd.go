@@ -12,12 +12,6 @@ import (
 
 const themeToastVisibleDuration = 2 * time.Second
 
-func discoverRuntimeCmd() tea.Cmd {
-	return func() tea.Msg {
-		return runtimeReadyMsg{runtime: models.DiscoverRuntime()}
-	}
-}
-
 // applyAndFullScanCmd applies [runtime] from config.toml when present, then runs a full discovery and writes config.toml.
 func applyAndFullScanCmd(explicitPaths ...string) tea.Cmd {
 	return func() tea.Msg {

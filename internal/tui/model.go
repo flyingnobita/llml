@@ -132,7 +132,7 @@ type Model struct {
 func New() Model {
 	homeDir, _ := os.UserHomeDir()
 	pick := initialThemePick()
-	th := themeFromPick(pick, compat.HasDarkBackground)
+	th := resolveTheme()
 	st := newStyles(th)
 	t := btable.New(
 		btable.WithColumns(tableColumns(100, nil, homeDir, defaultSortCol, false)),
