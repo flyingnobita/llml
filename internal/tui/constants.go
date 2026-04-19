@@ -168,15 +168,15 @@ const (
 
 	// Alphabetical by name; footer lines use the same middle action order where modes
 	// overlap: create (n/a) → delete → rename or edit → back.
-	FooterParamHintAddRow    = "a: add"
-	FooterParamHintBack      = "esc: back"
-	FooterParamHintDelete    = "d: delete"
-	FooterParamHintEnterEdit = "enter: edit"
-	FooterParamHintNew       = "n: add"
-	FooterParamHintClone     = "c: clone"
-	FooterParamHintRename    = "r: rename"
+	FooterParamHintAddRow     = "a: add"
+	FooterParamHintBack       = "esc: back"
+	FooterParamHintDelete     = "d: delete"
+	FooterParamHintEnterEdit  = "enter: edit"
+	FooterParamHintAddProfile = "n: add"
+	FooterParamHintClone      = "c: clone"
+	FooterParamHintRename     = "r: rename"
 
-	FooterParamFooterProfiles    = FooterHintTabSections + FooterHintSep + FooterNavHint + FooterHintSep + FooterParamHintNew + FooterHintSep + FooterParamHintClone + FooterHintSep + FooterParamHintDelete + FooterHintSep + FooterParamHintRename + FooterHintSep + FooterParamHintBack
+	FooterParamFooterProfiles    = FooterHintTabSections + FooterHintSep + FooterNavHint + FooterHintSep + FooterParamHintAddProfile + FooterHintSep + FooterParamHintClone + FooterHintSep + FooterParamHintDelete + FooterHintSep + FooterParamHintRename + FooterHintSep + FooterParamHintBack
 	FooterParamFooterDetailEmpty = FooterHintTabSections + FooterHintSep + FooterNavHint + FooterHintSep + FooterParamHintAddRow + FooterHintSep + FooterParamHintDelete + FooterHintSep + FooterParamHintBack
 	FooterParamFooterDetailRows  = FooterHintTabSections + FooterHintSep + FooterNavHint + FooterHintSep + FooterParamHintAddRow + FooterHintSep + FooterParamHintDelete + FooterHintSep + FooterParamHintEnterEdit + FooterHintSep + FooterParamHintBack
 )
