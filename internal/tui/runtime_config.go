@@ -233,6 +233,7 @@ func (m Model) commitRuntimeConfig() (Model, tea.Cmd) {
 		m = m.withLastRunCleared()
 	}
 	m = m.closeRuntimeConfig()
+	m = m.withLaunchPreviewSynced()
 	return m, cmd
 }
 

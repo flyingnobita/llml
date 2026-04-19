@@ -223,6 +223,7 @@ func (m Model) persistParamPanel() (Model, tea.Cmd) {
 		return m, clearLastRunNoteAfterCmd()
 	}
 	m = m.withLastRunCleared()
+	m = m.withLaunchPreviewSynced()
 	return m, nil
 }
 
