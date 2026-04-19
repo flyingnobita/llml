@@ -50,16 +50,15 @@ archives:
 checksum:
   name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
 
-brews:
+homebrew_casks:
   - name: llml
     ids:
       - llml
+    binary: llml
     homepage: https://github.com/flyingnobita/llml
     description: Terminal UI to discover local models and launch llama-server or vLLM
     license: MIT
     skip_upload: '{{ eq (env "GITHUB_TOKEN") "" }}'
-    test: |
-      system "#{bin}/llml", "-version"
     repository:
       owner: flyingnobita
       name: llml

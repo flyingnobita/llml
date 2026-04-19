@@ -52,17 +52,17 @@ go install github.com/flyingnobita/llml/cmd/llml@latest
 
 #### Homebrew (tap in this repo)
 
-macOS or Linux with [Homebrew](https://brew.sh/). The formula is [`Formula/llml.rb`](Formula/llml.rb) in this repository; GoReleaser updates it on each `v*` tag using the release workflow’s `GITHUB_TOKEN` (see [Releases and packaging](#releases-and-packaging)).
+macOS or Linux with [Homebrew](https://brew.sh/). The cask is [`Casks/llml.rb`](Casks/llml.rb) in this repository; GoReleaser updates it on each `v*` tag using the release workflow’s `GITHUB_TOKEN` (see [Releases and packaging](#releases-and-packaging)).
 
 ```bash
 brew tap flyingnobita/llml
-brew install llml
+brew install --cask llml
 ```
 
 One-liner:
 
 ```bash
-brew install flyingnobita/llml/llml
+brew install --cask flyingnobita/llml/llml
 ```
 
 #### Scoop (Windows)
@@ -129,7 +129,7 @@ To install a development build from your clone, use `go install ./cmd/llml` from
 
 Tags matching `v*` trigger [.github/workflows/release.yml](.github/workflows/release.yml), which runs [GoReleaser](https://goreleaser.com/) and publishes GitHub Release archives plus checksums.
 
-**Homebrew:** GoReleaser commits updates to [`Formula/llml.rb`](Formula/llml.rb) in this repo using the workflow’s default `GITHUB_TOKEN` (`contents: write` is already set on the job). No separate tap repository or `HOMEBREW_GITHUB_API_TOKEN` secret is required. If branch protection blocks bot commits to `main`, use a PAT with write access instead (set it as `GITHUB_TOKEN` in the workflow only if you adopt that pattern; otherwise adjust protection rules).
+**Homebrew:** GoReleaser commits updates to [`Casks/llml.rb`](Casks/llml.rb) in this repo using the workflow’s default `GITHUB_TOKEN` (`contents: write` is already set on the job). No separate tap repository or `HOMEBREW_GITHUB_API_TOKEN` secret is required. If branch protection blocks bot commits to `main`, use a PAT with write access instead (set it as `GITHUB_TOKEN` in the workflow only if you adopt that pattern; otherwise adjust protection rules). Anyone who previously installed the old formula should run `brew uninstall llml` once, then `brew install --cask llml`. After the first release that publishes the cask, delete any leftover `Formula/llml.rb` from this repository so the tap only ships the cask.
 
 Optional automation for **other** publishers (off until you add secrets on this repository):
 
