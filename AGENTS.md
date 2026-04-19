@@ -14,7 +14,7 @@ safetensors models on the local filesystem and launching `llama-server` or
 - UI framework: **Bubble Tea v2** (`charm.land/bubbletea/v2`) + **Lip Gloss v2** (`charm.land/lipgloss/v2`) + **Bubbles v2** (`charm.land/bubbles/v2`)
 - GGUF metadata: `abrander/gguf`
 - Tooling: `mise` (tool versions + tasks; includes **GoReleaser** for `mise run goreleaser-check` / lint), `npm` (Prettier + markdownlint only)
-- Releases: [GoReleaser](https://goreleaser.com/) (`.goreleaser.yaml`); pushing a `v*` tag runs `.github/workflows/release.yml` and publishes archives to GitHub Releases. Before creating a release tag, update the repo-root `VERSION` file to match the release version and commit that change. Homebrew is **`homebrew_casks`** → `Casks/llml.rb` in this repo (not `brews` / `Formula/`); users install with `brew install --cask llml` after `brew tap flyingnobita/llml`. Workflow `GITHUB_TOKEN` updates the cask. Optional **Actions secrets** (see README “Releases and packaging”): `SCOOP_BUCKET_GITHUB_TOKEN` (`flyingnobita/scoop-bucket`), `WINGET_GITHUB_TOKEN` (PR from `flyingnobita/winget-pkgs` fork to `microsoft/winget-pkgs`). If unset, GoReleaser skips that publisher; releases still publish to this repo’s Releases.
+- Releases: [GoReleaser](https://goreleaser.com/) (`.goreleaser.yaml`); pushing a `v*` tag runs `.github/workflows/release.yml` and publishes archives to GitHub Releases. Before creating a release tag, update the repo-root `VERSION` file to match the release version and commit that change. Homebrew is **`homebrew_casks`** → `Casks/llml.rb` in this repo (not `brews` / `Formula/`); users install with `brew install --cask llml` after `brew tap flyingnobita/llml`. Workflow **`GITHUB_TOKEN`** pushes branch **`homebrew-cask-<version>`** and opens a **PR to `main`** (branch protection safe). Optional **Actions secrets** (see README “Releases and packaging”): `SCOOP_BUCKET_GITHUB_TOKEN` (`flyingnobita/scoop-bucket`), **`WINGET_GITHUB_TOKEN`** (push fork + open PR to `microsoft/winget-pkgs`; use a **classic PAT** with **`public_repo`** or **`repo`** so the upstream PR API succeeds). If unset, GoReleaser skips that publisher; releases still publish to this repo’s Releases.
 
 ---
 
@@ -26,7 +26,7 @@ internal/
   config/            # TOML persistence ({UserConfigDir}/llml/config.toml): runtime, discovery cache, [[models]]
   models/            # GGUF + safetensors discovery, metadata, runtime detection, formatting; also vLLM and HF-hub support. Discovery uses a single filesystem walk via the `modelSource` interface (`ggufSource`, `safetensorsSource`).
   tui/               # Bubble Tea model, update, view, styles, keymaps
-scripts/             # gofmt-check.sh, precommit-docs-fix.sh
+scripts/             # gofmt-check.sh, goreleaser-check.sh, precommit-docs-fix.sh
 ```
 
 ---

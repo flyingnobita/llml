@@ -63,7 +63,14 @@ homebrew_casks:
     repository:
       owner: flyingnobita
       name: llml
+      branch: "homebrew-cask-{{ .Version }}"
       token: "{{ .Env.GITHUB_TOKEN }}"
+      pull_request:
+        enabled: true
+        base:
+          owner: flyingnobita
+          name: llml
+          branch: main
     commit_author:
       name: goreleaserbot
       email: bot@goreleaser.com
