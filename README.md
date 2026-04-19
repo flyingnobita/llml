@@ -50,14 +50,6 @@ Requires [Go 1.26+](go.mod). Ensure `$(go env GOPATH)/bin` is on your `PATH`.
 go install github.com/flyingnobita/llml/cmd/llml@latest
 ```
 
-Pin to a tagged release (example uses v0.2.0; pick the tag you want from [Releases](https://github.com/flyingnobita/llml/releases)):
-
-```bash
-go install github.com/flyingnobita/llml/cmd/llml@v0.2.0
-```
-
-There is no separate module registry: public Git tags on this repo are enough for the Go proxy and checksum database.
-
 #### Homebrew (tap in this repo)
 
 macOS or Linux with [Homebrew](https://brew.sh/). The formula is [`Formula/llml.rb`](Formula/llml.rb) in this repository; GoReleaser updates it on each `v*` tag using the release workflow’s `GITHUB_TOKEN` (see [Releases and packaging](#releases-and-packaging)).
@@ -147,6 +139,14 @@ Optional automation for **other** publishers (off until you add secrets on this 
 | `WINGET_GITHUB_TOKEN`       | Open a PR from your fork [`flyingnobita/winget-pkgs`](https://github.com/flyingnobita/winget-pkgs) into `microsoft/winget-pkgs` (`master`). Fork `microsoft/winget-pkgs` first, then create a PAT that can push to your fork. If unset, winget PR creation is skipped. |
 
 Create an empty GitHub repository for the Scoop bucket before the first release that should publish it. **homebrew-core** is not targeted yet; the tap-in-repo path is the supported Brew install.
+
+#### Maintainer automation
+
+| What                           | How                                                                                                                                                                                                      |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Validate GoReleaser config     | `mise run goreleaser-check` (also runs as part of `mise run lint` / CI).                                                                                                                                 |
+| winget fork + first-time setup | Run [`scripts/setup-winget-fork.sh`](scripts/setup-winget-fork.sh) locally with `gh auth login` (creates `your-user/winget-pkgs` if missing, then `gh repo sync`).                                       |
+| winget fork sync from GitHub   | Actions → **Sync winget-pkgs fork** ([`.github/workflows/winget-fork-sync.yml`](.github/workflows/winget-fork-sync.yml)). Uses `WINGET_GITHUB_TOKEN`. On a weekly schedule only when that secret is set. |
 
 ### Start
 

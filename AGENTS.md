@@ -13,7 +13,7 @@ safetensors models on the local filesystem and launching `llama-server` or
 - Language: **Go 1.26+**
 - UI framework: **Bubble Tea v2** (`charm.land/bubbletea/v2`) + **Lip Gloss v2** (`charm.land/lipgloss/v2`) + **Bubbles v2** (`charm.land/bubbles/v2`)
 - GGUF metadata: `abrander/gguf`
-- Tooling: `mise` (tool versions + tasks), `npm` (Prettier + markdownlint only)
+- Tooling: `mise` (tool versions + tasks; includes **GoReleaser** for `mise run goreleaser-check` / lint), `npm` (Prettier + markdownlint only)
 - Releases: [GoReleaser](https://goreleaser.com/) (`.goreleaser.yaml`); pushing a `v*` tag runs `.github/workflows/release.yml` and publishes archives to GitHub Releases. Before creating a release tag, update the repo-root `VERSION` file to match the release version and commit that change. The Homebrew formula is maintained in-repo at `Formula/llml.rb` using the workflow `GITHUB_TOKEN`. Optional **Actions secrets** (see README “Releases and packaging”): `SCOOP_BUCKET_GITHUB_TOKEN` (`flyingnobita/scoop-bucket`), `WINGET_GITHUB_TOKEN` (PR from `flyingnobita/winget-pkgs` fork to `microsoft/winget-pkgs`). If unset, GoReleaser skips that publisher; releases still publish to this repo’s Releases.
 
 ---

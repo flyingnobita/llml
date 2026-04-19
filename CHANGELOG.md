@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
+- Apr-19, 2026 - [CI: `goreleaser check` via mise; winget fork sync workflow + `scripts/setup-winget-fork.sh`; README maintainer automation table]
 - Apr-19, 2026 - [Homebrew: publish formula to this repo (`Formula/llml.rb`) with `GITHUB_TOKEN`; remove separate `homebrew-tap` and `HOMEBREW_GITHUB_API_TOKEN`; README and AGENTS updated]
 - Apr-19, 2026 - [Distribution: README install paths for `go install`, Homebrew tap, Scoop, winget, and releases; GoReleaser `brews` / `scoops` / `winget` with optional secrets; `llml -version` for packaging tests; Linux apt/Nix/AUR deferred]
 - Apr-19, 2026 - [GitHub repository renamed to `flyingnobita/llml` to match Go module path `github.com/flyingnobita/llml`; README and backlog links updated for `go install` and releases]
