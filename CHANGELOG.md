@@ -4,7 +4,10 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
-- Apr-19, 2026 - 11:32 PM +0800 - [v0.2.3 release: configure GoReleaser to open Homebrew PRs to bypass branch protection]
+- Apr-19, 2026 - 11:38 PM +0800 - [v0.2.4 release: fix GitHub Actions release workflow permissions and GoReleaser token guards]
+- Apr-19, 2026 - [CI: add `pull-requests: write` to release workflow permissions so GITHUB_TOKEN can open Homebrew formula PRs]
+- Apr-19, 2026 - [CI: guard scoop and winget tokens with `isEnvSet` to prevent template evaluation errors when secrets are absent]
+
 - Apr-19, 2026 - [CI: add `directory: Formula` and `pull_request` inside GoReleaser brews to avoid direct push rejections on `main`]
 
 - Apr-19, 2026 - [CI: replace deprecated `env` template function with `isEnvSet` in `.goreleaser.yaml` to fix GoReleaser v2 failures]
