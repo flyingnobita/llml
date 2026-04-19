@@ -38,7 +38,54 @@ Browse local models. Detect the right runtime. Launch with one key.
 - **Runtime engine (at least one)**: **llama.cpp** (`llama-server`) for GGUF models, and/or **vLLM** (`vllm`) for safetensors models are installed (see [Runtime configuration and detection](#runtime-configuration-and-detection)).
 - **Models** in default scan locations, or configure custom roots with `LLML_MODEL_PATHS` (see [Model configuration and discovery](#model-configuration-and-discovery)).
 
-### Pre-built binaries (recommended)
+### Install
+
+Pick one path; you only need a single install method.
+
+#### Go (`go install`)
+
+Requires [Go 1.26+](go.mod). Ensure `$(go env GOPATH)/bin` is on your `PATH`.
+
+```bash
+go install github.com/flyingnobita/llml/cmd/llml@latest
+```
+
+Pin to a tagged release (example uses v0.2.0; pick the tag you want from [Releases](https://github.com/flyingnobita/llml/releases)):
+
+```bash
+go install github.com/flyingnobita/llml/cmd/llml@v0.2.0
+```
+
+There is no separate module registry: public Git tags on this repo are enough for the Go proxy and checksum database.
+
+#### Homebrew (custom tap)
+
+macOS or Linux with [Homebrew](https://brew.sh/). Maintainers publish the formula to the [`flyingnobita/homebrew-tap`](https://github.com/flyingnobita/homebrew-tap) repository when a `v*` tag is released (see [Releases and packaging](#releases-and-packaging) below).
+
+```bash
+brew install flyingnobita/tap/llml
+```
+
+#### Scoop (Windows)
+
+Requires [Scoop](https://scoop.sh/). Add the [Scoop bucket](https://github.com/flyingnobita/scoop-bucket) that holds the `llml` manifest, then install:
+
+```powershell
+scoop bucket add flyingnobita https://github.com/flyingnobita/scoop-bucket
+scoop install llml
+```
+
+#### winget (Windows)
+
+Once the package is accepted into [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs) (GoReleaser can open a PR from a fork when `WINGET_GITHUB_TOKEN` is configured), install with:
+
+```powershell
+winget install --id FlyingNobita.llml
+```
+
+Until the manifest is merged upstream, use Scoop, `go install`, or a release archive.
+
+#### Pre-built binaries
 
 For each [GitHub release](https://github.com/flyingnobita/llml/releases), archives are published for Linux and macOS (`tar.gz`) plus Windows (`zip`). Download the archive for your OS and CPU, extract the `llml` binary.
 
@@ -77,13 +124,21 @@ cd llml
 go build -o llml ./cmd/llml
 ```
 
-Install on your `PATH` if you like:
+To install a development build from your clone, use `go install ./cmd/llml` from the repo root, or copy the `llml` binary onto your `PATH`.
 
-```bash
-go install github.com/flyingnobita/llml/cmd/llml@latest
-```
+### Releases and packaging
 
-(Ensure `$(go env GOPATH)/bin` is on your `PATH`.)
+Tags matching `v*` trigger [.github/workflows/release.yml](.github/workflows/release.yml), which runs [GoReleaser](https://goreleaser.com/) and publishes GitHub Release archives plus checksums.
+
+Optional automation (off until you add secrets on this repository):
+
+| Secret                      | Purpose                                                                                                                                                                                                                                                                         |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `HOMEBREW_GITHUB_API_TOKEN` | Push the Homebrew formula to [`flyingnobita/homebrew-tap`](https://github.com/flyingnobita/homebrew-tap). Use a fine-grained or classic PAT with **Contents: Read and write** on that tap repo only. The default `GITHUB_TOKEN` on this repo cannot push to another repository. |
+| `SCOOP_BUCKET_GITHUB_TOKEN` | Push the Scoop manifest to [`flyingnobita/scoop-bucket`](https://github.com/flyingnobita/scoop-bucket). Same PAT pattern as above if one token has access to both tap and bucket. If unset, the release still succeeds; the Scoop manifest upload is skipped.                   |
+| `WINGET_GITHUB_TOKEN`       | Open a PR from your fork [`flyingnobita/winget-pkgs`](https://github.com/flyingnobita/winget-pkgs) into `microsoft/winget-pkgs` (`master`). Fork `microsoft/winget-pkgs` first, then create a PAT that can push to your fork. If unset, winget PR creation is skipped.          |
+
+Create empty GitHub repositories for the tap and bucket before the first release that should publish them. **homebrew-core** is not targeted yet; the custom tap is the supported Brew path.
 
 ### Start
 
@@ -223,7 +278,7 @@ The table shows a decoded repo id from `models--*` hub folders when possible; ot
 - **[mise](https://mise.jdx.dev/)** — manages Go, Node.js, and tasks. [Install mise](https://mise.jdx.dev/getting-started.html) first.
 - **Go** [1.26+](go.mod) and **Node.js** (LTS) — both installed automatically by `mise install`.
 
-### Install
+### Set up tooling
 
 Clone the repository and install tooling:
 

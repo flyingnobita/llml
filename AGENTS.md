@@ -14,7 +14,7 @@ safetensors models on the local filesystem and launching `llama-server` or
 - UI framework: **Bubble Tea v2** (`charm.land/bubbletea/v2`) + **Lip Gloss v2** (`charm.land/lipgloss/v2`) + **Bubbles v2** (`charm.land/bubbles/v2`)
 - GGUF metadata: `abrander/gguf`
 - Tooling: `mise` (tool versions + tasks), `npm` (Prettier + markdownlint only)
-- Releases: [GoReleaser](https://goreleaser.com/) (`.goreleaser.yaml`); pushing a `v*` tag runs `.github/workflows/release.yml` and publishes archives to GitHub Releases. Before creating a release tag, update the repo-root `VERSION` file to match the release version and commit that change.
+- Releases: [GoReleaser](https://goreleaser.com/) (`.goreleaser.yaml`); pushing a `v*` tag runs `.github/workflows/release.yml` and publishes archives to GitHub Releases. Before creating a release tag, update the repo-root `VERSION` file to match the release version and commit that change. Optional repo **Actions secrets** (see README “Releases and packaging”): `HOMEBREW_GITHUB_API_TOKEN` (push to `flyingnobita/homebrew-tap`), `SCOOP_BUCKET_GITHUB_TOKEN` (`flyingnobita/scoop-bucket`), `WINGET_GITHUB_TOKEN` (PR from `flyingnobita/winget-pkgs` fork to `microsoft/winget-pkgs`). If unset, GoReleaser skips that publisher; releases still publish to this repo’s Releases.
 
 ---
 

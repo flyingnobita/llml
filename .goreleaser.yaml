@@ -28,6 +28,7 @@ builds:
       - -trimpath
     ldflags:
       - -s -w
+      - -X=main.version={{.Version}}
 
 archives:
   - id: default
@@ -48,3 +49,64 @@ archives:
 
 checksum:
   name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
+
+brews:
+  - name: llml
+    ids:
+      - llml
+    homepage: https://github.com/flyingnobita/llml
+    description: Terminal UI to discover local models and launch llama-server or vLLM
+    license: MIT
+    skip_upload: '{{ eq (env "HOMEBREW_GITHUB_API_TOKEN") "" }}'
+    test: |
+      system "#{bin}/llml", "-version"
+    repository:
+      owner: flyingnobita
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_GITHUB_API_TOKEN }}"
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+
+scoops:
+  - name: llml
+    ids:
+      - llml
+    homepage: https://github.com/flyingnobita/llml
+    description: Terminal UI to discover local models and launch llama-server or vLLM
+    license: MIT
+    skip_upload: '{{ eq (env "SCOOP_BUCKET_GITHUB_TOKEN") "" }}'
+    repository:
+      owner: flyingnobita
+      name: scoop-bucket
+      token: "{{ .Env.SCOOP_BUCKET_GITHUB_TOKEN }}"
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+
+winget:
+  - name: llml
+    ids:
+      - llml
+    publisher: Flying Nobita
+    publisher_url: https://github.com/flyingnobita
+    publisher_support_url: https://github.com/flyingnobita/llml/issues
+    package_identifier: FlyingNobita.llml
+    short_description: Terminal UI to discover local models and launch llama-server or vLLM
+    license: mit
+    homepage: https://github.com/flyingnobita/llml
+    skip_upload: '{{ eq (env "WINGET_GITHUB_TOKEN") "" }}'
+    repository:
+      owner: flyingnobita
+      name: winget-pkgs
+      branch: "llml-{{ .Version }}"
+      token: "{{ .Env.WINGET_GITHUB_TOKEN }}"
+      pull_request:
+        enabled: true
+        base:
+          owner: microsoft
+          name: winget-pkgs
+          branch: master
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
