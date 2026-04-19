@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
+- Apr-19, 2026 - [Homebrew: switch distribution from Cask to Formula via GoReleaser `brews` to bypass macOS Gatekeeper unsigned binary quarantine]
 - Apr-19, 2026 - [Homebrew: drop `license` from cask and GoReleaser `homebrew_casks` (undefined method on older Homebrew)]
 - Apr-19, 2026 - [Homebrew: add `Casks/llml.rb` for v0.2.0 so `brew install --cask llml` works after tapping; GoReleaser will replace on future releases]
 - Apr-19, 2026 - [CI: winget-fork-sync — drop `secrets` from job `if` (unsupported; workflow failed validation); handle unset token in script for dispatch vs schedule]

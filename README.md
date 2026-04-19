@@ -50,21 +50,21 @@ Requires [Go 1.26+](go.mod). Ensure `$(go env GOPATH)/bin` is on your `PATH`.
 go install github.com/flyingnobita/llml/cmd/llml@latest
 ```
 
-#### Homebrew (cask in this repository)
+#### Homebrew (formula in this repository)
 
-macOS or Linux with [Homebrew](https://brew.sh/). The cask file lives in **this** repo ([`Casks/llml.rb`](Casks/llml.rb)); GoReleaser’s `homebrew_casks` block updates it on each `v*` tag using the release workflow’s `GITHUB_TOKEN` (see [Releases and packaging](#releases-and-packaging)).
+macOS or Linux with [Homebrew](https://brew.sh/). The formula file lives in **this** repo ([`Formula/llml.rb`](Formula/llml.rb)); GoReleaser’s `brews` block updates it on each `v*` tag using the release workflow’s `GITHUB_TOKEN` (see [Releases and packaging](#releases-and-packaging)).
 
 Homebrew’s default tap URL for `user/repo` is `https://github.com/user/homebrew-repo`, so `flyingnobita/llml` would look for [`homebrew-llml`](https://github.com/flyingnobita/homebrew-llml), which does not exist. Point the tap at this repository explicitly:
 
 ```bash
 brew tap flyingnobita/llml https://github.com/flyingnobita/llml.git
-brew install --cask llml
+brew install llml
 ```
 
 After that tap exists locally, you can reinstall with:
 
 ```bash
-brew install --cask flyingnobita/llml/llml
+brew install flyingnobita/llml/llml
 ```
 
 #### Scoop (Windows)
@@ -131,13 +131,11 @@ To install a development build from your clone, use `go install ./cmd/llml` from
 
 Tags matching `v*` trigger [.github/workflows/release.yml](.github/workflows/release.yml), which runs [GoReleaser](https://goreleaser.com/) and publishes GitHub Release archives plus checksums.
 
-**Homebrew (cask, not a core formula):**
+**Homebrew (formula, not default core):**
 
-- GoReleaser publishes via **`homebrew_casks`** in [`.goreleaser.yaml`](.goreleaser.yaml), committing [`Casks/llml.rb`](Casks/llml.rb) into **this** repo using the workflow’s **`GITHUB_TOKEN`** (`contents: write` is already set on the job). No separate tap repository and no `HOMEBREW_GITHUB_API_TOKEN`. Users must **`brew tap flyingnobita/llml https://github.com/flyingnobita/llml.git`** once (see [Homebrew](#homebrew-cask-in-this-repository)); a bare `brew tap flyingnobita/llml` clones the wrong GitHub repo by convention.
-- If **branch protection** blocks the Actions bot from pushing to `main`, relax rules for `Casks/**` or use a PAT with write access (only if you adopt overriding `GITHUB_TOKEN` in the workflow).
-- **Upgrading from the old formula:** run `brew uninstall llml` once, then `brew install --cask llml` as above.
-- **After the first cask release:** remove any leftover **`Formula/llml.rb`** on `main` so the tap only ships the cask (avoids duplicate/conflicting definitions).
-- **Toolchain note:** [mise.toml](mise.toml) pins **GoReleaser 2.12.2**, which expects **`binary: llml`** under `homebrew_casks`. When you bump GoReleaser **past v2.12.6**, follow upstream and rename that field to **`binaries: [llml]`** (see GoReleaser deprecations for `binary` → `binaries`).
+- GoReleaser publishes via **`brews`** in [`.goreleaser.yaml`](.goreleaser.yaml), committing [`Formula/llml.rb`](Formula/llml.rb) into **this** repo using the workflow’s **`GITHUB_TOKEN`** (`contents: write` is already set on the job). No separate tap repository and no `HOMEBREW_GITHUB_API_TOKEN`. Users must **`brew tap flyingnobita/llml https://github.com/flyingnobita/llml.git`** once (see [Homebrew](#homebrew-formula-in-this-repository)); a bare `brew tap flyingnobita/llml` clones the wrong GitHub repo by convention.
+- If **branch protection** blocks the Actions bot from pushing to `main`, relax rules for `Formula/**` or use a PAT with write access (only if you adopt overriding `GITHUB_TOKEN` in the workflow).
+- **Toolchain note:** [mise.toml](mise.toml) pins **GoReleaser 2.12.2**.
 
 Optional automation for **other** publishers (off until you add secrets on this repository):
 
@@ -146,7 +144,7 @@ Optional automation for **other** publishers (off until you add secrets on this 
 | `SCOOP_BUCKET_GITHUB_TOKEN` | Push the Scoop manifest to [`flyingnobita/scoop-bucket`](https://github.com/flyingnobita/scoop-bucket). Use a fine-grained or classic PAT with **Contents: Read and write** on that bucket repo. If unset, the Scoop manifest upload is skipped.                       |
 | `WINGET_GITHUB_TOKEN`       | Open a PR from your fork [`flyingnobita/winget-pkgs`](https://github.com/flyingnobita/winget-pkgs) into `microsoft/winget-pkgs` (`master`). Fork `microsoft/winget-pkgs` first, then create a PAT that can push to your fork. If unset, winget PR creation is skipped. |
 
-Create an empty GitHub repository for the Scoop bucket before the first release that should publish it. **homebrew-core** is not targeted yet; the supported Brew path is **this tap + cask** (`brew install --cask …`).
+Create an empty GitHub repository for the Scoop bucket before the first release that should publish it. **homebrew-core** is not targeted yet; the supported Brew path is **this tap + formula** (`brew install llml`).
 
 #### Maintainer automation
 
