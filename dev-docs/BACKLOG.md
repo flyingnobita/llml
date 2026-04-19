@@ -2,7 +2,7 @@
 
 Planned work, bugs, and ideas that are **not** shipped yet. Shipped changes belong in [CHANGELOG.md](../CHANGELOG.md).
 
-**Detailed tracking:** [GitHub Issues](https://github.com/flyingnobita/llm-launcher/issues).
+**Detailed tracking:** [GitHub Issues](https://github.com/flyingnobita/llml/issues).
 
 Use **one line per item**. Link an issue when it exists (`#42`). Drop checkboxes if you prefer plain bullets.
 

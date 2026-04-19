@@ -1,6 +1,6 @@
 # LLM Launcher (`llml`)
 
-[![Go](https://img.shields.io/github/go-mod/go-version/flyingnobita/llm-launcher)](go.mod)
+[![Go](https://img.shields.io/github/go-mod/go-version/flyingnobita/llml)](go.mod)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ![LLM Launcher TUI screenshot](assets/llml-screenshot.png)
@@ -40,7 +40,7 @@ Browse local models. Detect the right runtime. Launch with one key.
 
 ### Pre-built binaries (recommended)
 
-For each [GitHub release](https://github.com/flyingnobita/llm-launcher/releases), archives are published for Linux and macOS (`tar.gz`) plus Windows (`zip`). Download the archive for your OS and CPU, extract the `llml` binary.
+For each [GitHub release](https://github.com/flyingnobita/llml/releases), archives are published for Linux and macOS (`tar.gz`) plus Windows (`zip`). Download the archive for your OS and CPU, extract the `llml` binary.
 
 ```bash
 # Example: replace with the file you downloaded
@@ -72,8 +72,8 @@ Verify the download against `llml_<version>_checksums.txt` on the release page i
 - **Go** [1.26+](go.mod)
 
 ```bash
-git clone https://github.com/flyingnobita/llm-launcher.git
-cd llm-launcher
+git clone https://github.com/flyingnobita/llml.git
+cd llml
 go build -o llml ./cmd/llml
 ```
 
