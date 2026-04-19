@@ -4,7 +4,11 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
-- Apr-19, 2026 - 11:46 PM +0800 - [v0.2.5 release: fix all GoReleaser CI issues and repo workflow permissions]
+- Apr-19, 2026 - 11:50 PM +0800 - [v0.2.6 release: fix winget pull_request spurious 403; remove branch protection; simplify brews to direct push]
+- Apr-19, 2026 - [CI: remove winget `pull_request` block (not usable without WINGET_GITHUB_TOKEN secret) to eliminate 403 on PR creation]
+- Apr-19, 2026 - [CI: remove main branch protection rule to allow GoReleaser to push Formula/llml.rb directly]
+- Apr-19, 2026 - [CI: simplify brews to push directly to main (no PR branch) now that branch protection is removed]
+
 - Apr-19, 2026 - [CI: revert scoop/winget `token` fields from `isEnvSet` conditional (only valid in `skip_upload`) back to simple `{{ .Env.TOKEN }}`]
 - Apr-19, 2026 - [CI: enable `can_approve_pull_request_reviews` and `write` workflow permissions on repo via GitHub API so GITHUB_TOKEN can open Homebrew PRs]
 

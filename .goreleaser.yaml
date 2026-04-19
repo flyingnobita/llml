@@ -62,9 +62,6 @@ brews:
       owner: flyingnobita
       name: llml
       token: "{{ .Env.GITHUB_TOKEN }}"
-      branch: "homebrew-{{ .Version }}"
-      pull_request:
-        enabled: true
     commit_author:
       name: goreleaserbot
       email: bot@goreleaser.com
@@ -102,12 +99,6 @@ winget:
       name: winget-pkgs
       branch: "llml-{{ .Version }}"
       token: "{{ .Env.WINGET_GITHUB_TOKEN }}"
-      pull_request:
-        enabled: true
-        base:
-          owner: microsoft
-          name: winget-pkgs
-          branch: master
     commit_author:
       name: goreleaserbot
       email: bot@goreleaser.com
