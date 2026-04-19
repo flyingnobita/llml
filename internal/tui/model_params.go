@@ -70,7 +70,7 @@ func parseModelEntry(raw json.RawMessage) (modelEntry, error) {
 		}
 		for i := range e.Profiles {
 			if strings.TrimSpace(e.Profiles[i].Name) == "" {
-				e.Profiles[i].Name = fmt.Sprintf("parameter profile %d", i+1)
+				e.Profiles[i].Name = fmt.Sprintf("Parameter Profile %d", i+1)
 			}
 		}
 		e.ActiveIndex = clampInt(e.ActiveIndex, 0, len(e.Profiles)-1)
@@ -180,7 +180,7 @@ func normalizeModelEntry(ent modelEntry) modelEntry {
 		nm := normalizeModelParams(ModelParams{Env: p.Env, Args: p.Args})
 		name := strings.TrimSpace(p.Name)
 		if name == "" {
-			name = fmt.Sprintf("parameter profile %d", len(profiles)+1)
+			name = fmt.Sprintf("Parameter Profile %d", len(profiles)+1)
 		}
 		profiles = append(profiles, ParameterProfile{Name: name, Env: nm.Env, Args: nm.Args})
 	}

@@ -84,15 +84,15 @@ func profileNameTaken(profiles []ParameterProfile, name string, skip int) bool {
 
 func nextProfileName(profiles []ParameterProfile) string {
 	for n := 1; n < 1000; n++ {
-		cand := "Parameter profile"
+		cand := "Parameter Profile"
 		if n > 1 {
-			cand = fmt.Sprintf("Parameter profile %d", n)
+			cand = fmt.Sprintf("Parameter Profile %d", n)
 		}
 		if !profileNameTaken(profiles, cand, -1) {
 			return cand
 		}
 	}
-	return "Parameter profile"
+	return "Parameter Profile"
 }
 
 // cloneProfileName picks a unique profile name derived from base (e.g. "foo copy", "foo copy 2").

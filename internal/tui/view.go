@@ -462,7 +462,7 @@ func (m Model) View() tea.View {
 func (m Model) discoveryPathsModalBlock() string {
 	cw := m.paramPanelContentWidth()
 	rows := []string{
-		m.modalTitleRow(cw, m.ui.styles.portConfigTitle, "Model paths"),
+		m.modalTitleRow(cw, m.ui.styles.portConfigTitle, "Model Paths"),
 		m.ui.styles.subtitle.Width(cw).Render(discoveryPathsModalSubtitle),
 		"",
 	}
@@ -492,7 +492,7 @@ func (m Model) discoveryPathsModalBlock() string {
 	}
 
 	rows = append(rows, "")
-	rows = append(rows, m.ui.styles.body.Render("Defaults (read-only):"))
+	rows = append(rows, m.ui.styles.body.Render("Defaults (Read-Only):"))
 
 	for _, p := range models.DefaultSearchRoots() {
 		rows = append(rows, m.ui.styles.bodyDim.Render("  "+p))
@@ -559,7 +559,7 @@ func (m Model) runtimeConfigModalBlock() string {
 	}
 
 	rows := []string{
-		m.modalTitleRow(cw, m.ui.styles.portConfigTitle, "Runtime environment"),
+		m.modalTitleRow(cw, m.ui.styles.portConfigTitle, "Runtime Environment"),
 		runtimePanelView(m, cw),
 		"",
 		m.ui.styles.paramSectionHeading.Render("Overrides"),

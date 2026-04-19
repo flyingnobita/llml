@@ -62,7 +62,7 @@ func (m Model) commitParamLineEdit() Model {
 		if m.params.profileIndex >= 0 && m.params.profileIndex < len(m.params.profiles) {
 			name := strings.TrimSpace(line)
 			if name == "" {
-				name = fmt.Sprintf("parameter profile %d", m.params.profileIndex+1)
+				name = fmt.Sprintf("Parameter Profile %d", m.params.profileIndex+1)
 			}
 			if profileNameTaken(m.params.profiles, name, m.params.profileIndex) {
 				name = nextProfileName(m.params.profiles)
@@ -304,7 +304,7 @@ func (m Model) updateParamPanelKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	}
 
 	switch msg.String() {
-	case "esc", "q":
+	case "esc":
 		return m.closeParamPanelWithPersist()
 	case "t":
 		var cmd tea.Cmd

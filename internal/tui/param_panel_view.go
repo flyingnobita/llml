@@ -46,7 +46,7 @@ func (m Model) paramPanelModalBlock() string {
 		maxSec = 24
 	}
 
-	title := m.modalTitleRow(cw, m.ui.styles.portConfigTitle, "Parameters — "+m.params.modelDisplayName)
+	title := m.modalTitleRow(cw, m.ui.styles.portConfigTitle, "Parameter Profiles — "+m.params.modelDisplayName)
 	rows := []string{title, ""}
 
 	if k := m.params.confirmDelete; k != paramConfirmNone {
@@ -70,7 +70,7 @@ func (m Model) paramPanelModalBlock() string {
 				m.ui.styles.paramProfileName.Render(truncateParamLine(pName, confirmInner-2)),
 			)
 			confirmRows = []string{
-				m.ui.styles.body.Render("Delete this parameter profile?"),
+				m.ui.styles.body.Render("Delete This Parameter Profile?"),
 				nameLine,
 			}
 		case paramConfirmEnvRow:
@@ -79,7 +79,7 @@ func (m Model) paramPanelModalBlock() string {
 				line = formatEnvVar(m.params.env[m.params.envCursor])
 			}
 			confirmRows = []string{
-				m.ui.styles.body.Render("Delete this environment variable line?"),
+				m.ui.styles.body.Render("Delete This Environment Variable Line?"),
 				m.ui.styles.body.Render("  " + truncateParamLine(line, max(confirmInner-2, 8))),
 			}
 		case paramConfirmArgRow:
@@ -88,7 +88,7 @@ func (m Model) paramPanelModalBlock() string {
 				line = m.params.args[m.params.argsCursor]
 			}
 			confirmRows = []string{
-				m.ui.styles.body.Render("Delete this extra argument line?"),
+				m.ui.styles.body.Render("Delete This Extra Argument Line?"),
 				m.ui.styles.body.Render("  " + truncateParamLine(line, max(confirmInner-2, 8))),
 			}
 		}
@@ -101,7 +101,7 @@ func (m Model) paramPanelModalBlock() string {
 		}
 	}
 
-	rows = append(rows, m.ui.styles.body.Render("  Profiles"))
+	rows = append(rows, m.ui.styles.body.Render("  Parameter Profiles"))
 	rows = append(rows, "")
 	for i := range m.params.profiles {
 		name := m.params.profiles[i].Name
@@ -159,7 +159,7 @@ func (m Model) paramPanelModalBlock() string {
 
 	detailRows = append(detailRows, "")
 
-	argHeading := "Extra arguments (e.g. --max-model-len 131072)"
+	argHeading := "Extra Arguments (e.g. --max-model-len 131072)"
 	detailRows = append(detailRows, lipgloss.JoinHorizontal(lipgloss.Top,
 		m.ui.styles.body.Render(sectionHeadingIndent),
 		m.ui.styles.paramSectionHeading.Render(truncateParamLine(argHeading, maxSec-lipgloss.Width(sectionHeadingIndent))),

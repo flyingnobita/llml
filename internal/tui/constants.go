@@ -91,15 +91,15 @@ const (
 	FooterHintRunFullscreen = "ctrl+R: full terminal"
 
 	FooterKeyConfigPort  = "c"
-	FooterDescConfigPort = "runtime env"
+	FooterDescConfigPort = "Runtime Environment"
 	FooterHintConfigPort = FooterKeyConfigPort + ": " + FooterDescConfigPort
 
 	FooterKeyParameters  = "p"
-	FooterDescParameters = "profiles"
+	FooterDescParameters = "Parameter Profiles"
 	FooterHintParameters = FooterKeyParameters + ": " + FooterDescParameters
 
 	FooterKeyModelPaths  = "m"
-	FooterDescModelPaths = "model paths"
+	FooterDescModelPaths = "Model Paths"
 	FooterHintModelPaths = FooterKeyModelPaths + ": " + FooterDescModelPaths
 
 	FooterKeyToggleTheme  = "t"
@@ -146,11 +146,11 @@ const (
 	splitServerStoppedWithHint = "Server stopped. Press Enter to close..."
 
 	// Runtime config modal.
-	FooterRuntimeConfigHints = "tab: fields · enter: save · esc: cancel"
+	FooterRuntimeConfigHints = "tab: fields · enter: save · esc: back"
 	// runtimeConfigModalSubtitle appears below the modal title (values here override startup discovery).
 	runtimeConfigModalSubtitle     = "Overrides saved to config.toml. Shell environment variables take precedence."
-	runtimeConfigHeaderLlama       = "LLAMA.CPP"
-	runtimeConfigHeaderVLLM        = "VLLM"
+	runtimeConfigHeaderLlama       = "Llama.cpp"
+	runtimeConfigHeaderVLLM        = "vLLM"
 	runtimeConfigLabelLlamaCppPath = "Path (llama-cli / llama-server)"
 	runtimeConfigLabelVLLMPath     = "Path (vllm binary)"
 	runtimeConfigLabelVLLMVenv     = "Venv Root (Optional)"
@@ -158,7 +158,7 @@ const (
 	runtimeConfigLabelVLLMPort     = "Server Port"
 
 	// Discovery paths modal.
-	FooterDiscoveryPathsHints   = FooterNavHint + FooterHintSep + "n: add · enter: edit · d: delete · s: save · esc/q: cancel"
+	FooterDiscoveryPathsHints   = FooterNavHint + FooterHintSep + "n: add · enter: edit · d: delete · s: save · esc: back"
 	discoveryPathsModalSubtitle = "These paths are saved to config.toml and scanned in addition to the defaults below."
 
 	// FooterHintTabSections is the shared "tab: sections" fragment used by split-pane
@@ -169,10 +169,10 @@ const (
 	// Alphabetical by name; footer lines use the same middle action order where modes
 	// overlap: create (n/a) → delete → rename or edit → back.
 	FooterParamHintAddRow    = "a: add"
-	FooterParamHintBack      = "esc/q: back"
+	FooterParamHintBack      = "esc: back"
 	FooterParamHintDelete    = "d: delete"
 	FooterParamHintEnterEdit = "enter: edit"
-	FooterParamHintNew       = "n: new"
+	FooterParamHintNew       = "n: add"
 	FooterParamHintClone     = "c: clone"
 	FooterParamHintRename    = "r: rename"
 

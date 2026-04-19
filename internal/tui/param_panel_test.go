@@ -207,8 +207,8 @@ func TestParamPanelViewIncludesMainAppBackdrop(t *testing.T) {
 	if !strings.Contains(content, "LLM") || !strings.Contains(content, "Launcher") {
 		t.Fatalf("overlaid view missing title (backdrop should remain above modal)")
 	}
-	if !strings.Contains(content, "Parameters") {
-		t.Fatal("expected parameters modal in view")
+	if !strings.Contains(content, "Parameter Profiles") {
+		t.Fatal("expected parameter profiles modal in view")
 	}
 	if !strings.Contains(content, "(active)") {
 		t.Fatal("expected (active) prefix on active profile in parameters modal")

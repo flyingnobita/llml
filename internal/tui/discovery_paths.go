@@ -111,12 +111,12 @@ func (m Model) saveDiscoveryPaths() (Model, tea.Cmd) {
 
 	if reflect.DeepEqual(oldNorm, newNorm) {
 		m = m.closeDiscoveryPathsModal()
-		m = m.withLastRunSuccess("Model paths unchanged.")
+		m = m.withLastRunSuccess("Model Paths Unchanged.")
 		return m, clearLastRunNoteAfterCmd()
 	}
 
 	m = m.closeDiscoveryPathsModal()
-	m = m.withLastRunSuccess("Model paths saved. Rescanning models...")
+	m = m.withLastRunSuccess("Model Paths Saved. Rescanning Models...")
 	m.loading = true
 	m.loadErr = nil
 	return m, tea.Batch(rescanModelsCmd(m.discovery.paths...), clearLastRunNoteAfterCmd())
@@ -140,7 +140,7 @@ func (m Model) updateDiscoveryPathsKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	}
 
 	switch msg.String() {
-	case "esc", "q":
+	case "esc":
 		m = m.closeDiscoveryPathsModal()
 		m = m.withLastRunCleared()
 		return m, nil

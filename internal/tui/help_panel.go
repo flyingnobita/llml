@@ -41,9 +41,9 @@ func helpSections() []struct {
 		{
 			title: "Configuration",
 			entries: []helpEntry{
-				{"c", "Runtime environment"},
-				{"p", "Parameter profiles"},
-				{"m", "Model paths"},
+				{"c", "Runtime Environment"},
+				{"p", "Parameter Profiles"},
+				{"m", "Model Paths"},
 				{"r", "Reload runtime"},
 				{"S", "Rescan models"},
 			},
@@ -118,7 +118,7 @@ func (m Model) helpPanelModalBlock() string {
 		}
 	}
 	rows = append(rows, "")
-	rows = append(rows, m.ui.styles.footer.Render("esc: close"))
+	rows = append(rows, m.ui.styles.footer.Render("esc: back"))
 
 	block := lipgloss.JoinVertical(lipgloss.Left, rows...)
 	return m.ui.styles.portConfigBox.Render(block)

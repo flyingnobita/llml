@@ -58,7 +58,7 @@ func TestDiscoveryPathsModal_opensAndLoadsPaths(t *testing.T) {
 	if !strings.Contains(view, "/prev/path") {
 		t.Fatalf("missing config path in view:\n%s", view)
 	}
-	if !strings.Contains(view, "Defaults (read-only):") {
+	if !strings.Contains(view, "Defaults (Read-Only):") {
 		t.Fatalf("missing defaults header in view:\n%s", view)
 	}
 	roots := models.DefaultSearchRoots()
@@ -121,7 +121,7 @@ func TestDiscoveryPathsModal_SaveTriggersRescanIfChanged(t *testing.T) {
 	if m2.discovery.open {
 		t.Fatal("should close modal")
 	}
-	if !strings.Contains(m2.lastRunNote, "Rescanning models") {
+	if !strings.Contains(m2.lastRunNote, "Rescanning Models") {
 		t.Fatalf("got note: %s", m2.lastRunNote)
 	}
 	if cmd == nil {
@@ -157,7 +157,7 @@ func TestDiscoveryPathsModal_SaveSkipsRescanIfUnchanged(t *testing.T) {
 	if m2.discovery.open {
 		t.Fatal("should close modal")
 	}
-	if !strings.Contains(m2.lastRunNote, "unchanged") {
+	if !strings.Contains(m2.lastRunNote, "Unchanged") {
 		t.Fatalf("got note: %s", m2.lastRunNote)
 	}
 
