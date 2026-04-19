@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
+- Apr-19, 2026 - [CI: winget-fork-sync — drop `secrets` from job `if` (unsupported; workflow failed validation); handle unset token in script for dispatch vs schedule]
 - Apr-19, 2026 - [Chore: TUI — remove unused discoverRuntimeCmd; initialize theme via resolveTheme in New()]
 - Apr-19, 2026 - [Docs: Homebrew tap must use explicit `https://github.com/flyingnobita/llml.git` URL; default `flyingnobita/llml` resolves to non-existent `homebrew-llml` repo]
 - Apr-19, 2026 - [Chore: restore tracked tree to commit f878385 (Homebrew cask docs baseline); main is protected so history was not rewritten]

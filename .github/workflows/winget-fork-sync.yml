@@ -10,9 +10,8 @@ on:
 
 jobs:
   sync:
-    # Manual run always executes (fails clearly if the secret is missing). Scheduled runs
-    # are skipped when the secret is unset so the repo does not get weekly failure emails.
-    if: ${{ github.event_name == 'workflow_dispatch' || secrets.WINGET_GITHUB_TOKEN != '' }}
+    # Secrets cannot be used in job-level `if:` (invalid workflow). Manual runs fail clearly
+    # when the secret is missing; scheduled runs exit 0 if unset so weekly cron does not spam.
     runs-on: ubuntu-latest
     permissions: {}
     steps:
@@ -22,8 +21,12 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${GH_TOKEN}" ]; then
-            echo "::error::WINGET_GITHUB_TOKEN is not set. Add a PAT in Repo → Settings → Secrets and variables → Actions (needs push access to ${{ github.repository_owner }}/winget-pkgs)."
-            exit 1
+            if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+              echo "::error::WINGET_GITHUB_TOKEN is not set. Add a PAT in Repo → Settings → Secrets and variables → Actions (needs push access to ${{ github.repository_owner }}/winget-pkgs)."
+              exit 1
+            fi
+            echo "Skipping scheduled sync: WINGET_GITHUB_TOKEN is not set."
+            exit 0
           fi
           FORK="${{ github.repository_owner }}/winget-pkgs"
           if ! gh repo view "${FORK}" >/dev/null 2>&1; then
