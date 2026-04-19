@@ -213,9 +213,9 @@ func TestParamPanelViewIncludesMainAppBackdrop(t *testing.T) {
 	if !strings.Contains(content, "(active)") {
 		t.Fatal("expected (active) prefix on active profile in parameters modal")
 	}
-	// Subtitle line remains visible outside the modal on a tall layout.
-	if !strings.Contains(content, "filesystem scan") {
-		t.Fatal("expected main view subtitle in backdrop outside modal")
+	// Main footer remains visible in the backdrop on a tall layout (not covered by the modal).
+	if !strings.Contains(content, FooterHintRunSplit) {
+		t.Fatal("expected main footer in backdrop outside modal")
 	}
 }
 

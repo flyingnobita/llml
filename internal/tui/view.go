@@ -212,12 +212,14 @@ func footerHelpLine(m Model) string {
 }
 
 // mainChromeLines counts rows in the main view block excluding the table body
-// (title, subtitle, scroll bars, footer). needsTableHBar and needsLogHBar should
+// (title, optional subtitle, scroll bars, footer). needsTableHBar and needsLogHBar should
 // match whether each horizontal track is shown.
 func mainChromeLines(m Model, needsTableHBar bool, needsLogHBar bool) int {
 	iw := m.innerWidth()
 	n := lipgloss.Height(m.appTitleBlock(iw))
-	n += lipgloss.Height(m.ui.styles.subtitle.Render(appSubtitle))
+	if strings.TrimSpace(appSubtitle) != "" {
+		n += lipgloss.Height(m.ui.styles.subtitle.Render(appSubtitle))
+	}
 	n += 1
 
 	if needsTableHBar && len(m.table.files) > 0 {
@@ -335,7 +337,6 @@ func (m Model) mainAppPlacedView() string {
 	iw := m.innerWidth()
 
 	title := m.appTitleBlock(iw)
-	sub := m.ui.styles.subtitle.Render(appSubtitle)
 
 	var body string
 	switch {
@@ -386,7 +387,11 @@ func (m Model) mainAppPlacedView() string {
 
 	footer := m.ui.styles.footer.Render(footerHelpLine(m))
 
-	rows := []string{title, sub, "", body, "", footer}
+	rows := []string{title}
+	if strings.TrimSpace(appSubtitle) != "" {
+		rows = append(rows, m.ui.styles.subtitle.Render(appSubtitle))
+	}
+	rows = append(rows, "", body, "", footer)
 	if m.lastRunNote != "" {
 		rows = append(rows, m.lastRunNoteView())
 	}

@@ -21,8 +21,8 @@ const (
 	// hScrollStep is the number of columns scrolled per arrow/key press.
 	hScrollStep = 4
 
-	// appSubtitle is the subtitle line shown below the app title.
-	appSubtitle = "llama.cpp (GGUF) · vLLM (config.json + safetensors) — filesystem scan · Last modified = file mtime"
+	// appSubtitle is the optional subtitle line below the app title (empty = hidden).
+	appSubtitle = ""
 
 	// paramPanelMaxInnerWidth caps the parameters and runtime-environment modal inner
 	// width on wide terminals so panels do not stretch edge-to-edge.
@@ -176,7 +176,7 @@ const (
 	FooterParamHintClone     = "c: clone"
 	FooterParamHintRename    = "r: rename"
 
-	FooterParamFooterProfiles = FooterHintTabSections + FooterHintSep + FooterNavHint + FooterHintSep + FooterHintToggleTheme + FooterHintSep + FooterParamHintNew + FooterHintSep + FooterParamHintClone + FooterHintSep + FooterParamHintDelete + FooterHintSep + FooterParamHintRename + FooterHintSep + FooterParamHintBack
-	FooterParamFooterDetailEmpty = FooterHintTabSections + FooterHintSep + FooterNavHint + FooterHintSep + FooterHintToggleTheme + FooterHintSep + FooterParamHintAddRow + FooterHintSep + FooterParamHintDelete + FooterHintSep + FooterParamHintBack
-	FooterParamFooterDetailRows  = FooterHintTabSections + FooterHintSep + FooterNavHint + FooterHintSep + FooterHintToggleTheme + FooterHintSep + FooterParamHintAddRow + FooterHintSep + FooterParamHintDelete + FooterHintSep + FooterParamHintEnterEdit + FooterHintSep + FooterParamHintBack
+	FooterParamFooterProfiles    = FooterHintTabSections + FooterHintSep + FooterNavHint + FooterHintSep + FooterParamHintNew + FooterHintSep + FooterParamHintClone + FooterHintSep + FooterParamHintDelete + FooterHintSep + FooterParamHintRename + FooterHintSep + FooterParamHintBack
+	FooterParamFooterDetailEmpty = FooterHintTabSections + FooterHintSep + FooterNavHint + FooterHintSep + FooterParamHintAddRow + FooterHintSep + FooterParamHintDelete + FooterHintSep + FooterParamHintBack
+	FooterParamFooterDetailRows  = FooterHintTabSections + FooterHintSep + FooterNavHint + FooterHintSep + FooterParamHintAddRow + FooterHintSep + FooterParamHintDelete + FooterHintSep + FooterParamHintEnterEdit + FooterHintSep + FooterParamHintBack
 )
