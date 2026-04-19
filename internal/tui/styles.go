@@ -24,6 +24,7 @@ type styles struct {
 	portConfigTitle        lipgloss.Style
 	portConfigBox          lipgloss.Style
 	paramSectionBox        lipgloss.Style
+	paramSectionBoxFocused lipgloss.Style
 	paramConfirmDialog     lipgloss.Style
 	paramSectionHeading    lipgloss.Style
 	themeToastInline       lipgloss.Style
@@ -92,6 +93,11 @@ func newStyles(theme Theme) styles {
 		paramSectionBox: lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(theme.Border).
+			Padding(0, 1),
+		// Same chrome as paramSectionBox; brighter border when env/argv has keyboard focus.
+		paramSectionBoxFocused: lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(theme.SplitPaneBorderFocused).
 			Padding(0, 1),
 		paramConfirmDialog: lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).

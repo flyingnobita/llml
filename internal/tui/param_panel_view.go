@@ -38,6 +38,9 @@ func (m Model) paramPanelModalBlock() string {
 		maxLine = 24
 	}
 	secBox := m.ui.styles.paramSectionBox
+	if m.params.focus == paramFocusEnv || m.params.focus == paramFocusArgs {
+		secBox = m.ui.styles.paramSectionBoxFocused
+	}
 	maxSec := cw - secBox.GetHorizontalFrameSize()
 	if maxSec < 24 {
 		maxSec = 24

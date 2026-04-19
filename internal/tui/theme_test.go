@@ -78,6 +78,15 @@ func TestSplitPaneChromeStylesDifferFocusedVsDim(t *testing.T) {
 	}
 }
 
+func TestParamSectionBoxBorderChangesWhenDetailFocused(t *testing.T) {
+	st := newStyles(DarkTheme())
+	plain := st.paramSectionBox.Width(12).Render("x")
+	focused := st.paramSectionBoxFocused.Width(12).Render("x")
+	if plain == focused {
+		t.Fatal("param section focused style should change border rendering vs unfocused")
+	}
+}
+
 func TestThemesHaveTableSelectedBackground(t *testing.T) {
 	for _, th := range []struct {
 		name  string
