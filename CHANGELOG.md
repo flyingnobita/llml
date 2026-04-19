@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
+- Apr-19, 2026 - [TUI: parameter profiles — drop Active-for-R summary line; show `(active)` prefix on active profile row]
 - Apr-19, 2026 - [TUI: parameter profiles — inactive profile names dimmed; active name + env/argv lines share accent color]
 - Apr-19, 2026 - [TUI: parameter profiles (`p`) — show active profile for R/copy; `c` clones highlighted profile; footer hint for clone]
 - Apr-19, 2026 - [TUI: restore table vs launch-preview vs split-log keyboard focus after closing parameter profiles (`p`), runtime config (`c`), or model paths (`m`)]

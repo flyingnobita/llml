@@ -210,8 +210,8 @@ func TestParamPanelViewIncludesMainAppBackdrop(t *testing.T) {
 	if !strings.Contains(content, "Parameters") {
 		t.Fatal("expected parameters modal in view")
 	}
-	if !strings.Contains(content, "Active for R / copy cmd:") {
-		t.Fatal("expected active profile summary in parameters modal")
+	if !strings.Contains(content, "(active)") {
+		t.Fatal("expected (active) prefix on active profile in parameters modal")
 	}
 	// Subtitle line remains visible outside the modal on a tall layout.
 	if !strings.Contains(content, "filesystem scan") {

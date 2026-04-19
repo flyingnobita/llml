@@ -122,7 +122,7 @@ Each model path can have **multiple named profiles**. Each profile stores:
 - **Environment variables** (`KEY=value` per line).
 - **Extra arguments** appended after `--port` (for vLLM, flags and values are separate argv tokens; the UI may show `--flag value` on one line).
 
-**`R`** / **ctrl+`R`** use the **active** profile (the one highlighted in the `p` profile list; the panel shows **Active for R / copy cmd:** with that name, and **Active profile:** at the top of env/args when you tab there). Changes persist automatically. **tab** cycles: profile list → env → extra args. In the list: **`n`** new profile, **`c`** clone (duplicate) the highlighted profile, **`d`** delete (not the last), **`r`** rename. **`esc`** or **`q`** closes the panel.
+**`R`** / **ctrl+`R`** use the **active** profile (the highlighted row in the `p` profile list is prefixed with **`(active)`** in the name column). Changes persist automatically. **tab** cycles: profile list → env → extra args. In the list: **`n`** new profile, **`c`** clone (duplicate) the highlighted profile, **`d`** delete (not the last), **`r`** rename. **`esc`** or **`q`** closes the panel.
 
 Storage is a single JSON file:
 

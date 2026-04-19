@@ -1,22 +1,8 @@
 package tui
 
 import (
-	"strings"
-
 	"charm.land/lipgloss/v2"
 )
-
-// activeProfileLabelForView returns the display name of the profile used for R and copy-cmd.
-func (m Model) activeProfileLabelForView() string {
-	if m.params.profileIndex < 0 || m.params.profileIndex >= len(m.params.profiles) {
-		return "(unnamed)"
-	}
-	n := strings.TrimSpace(m.params.profiles[m.params.profileIndex].Name)
-	if n == "" {
-		return "(unnamed)"
-	}
-	return n
-}
 
 // renderEditableListItems renders the rows for one editable param section (env vars or extra args).
 // It uses "› " prefix for the focused row, shows the inline edit input when that row is being edited,
@@ -113,12 +99,6 @@ func (m Model) paramPanelModalBlock() string {
 	}
 
 	rows = append(rows, m.ui.styles.body.Render("  Profiles"))
-	activeLabel := "Active for R / copy cmd: "
-	activeNameW := max(4, maxLine-2-lipgloss.Width("  "+activeLabel))
-	rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Top,
-		m.ui.styles.bodyDim.Render("  "+activeLabel),
-		m.ui.styles.paramProfileName.Render(truncateParamLine(m.activeProfileLabelForView(), activeNameW)),
-	))
 	rows = append(rows, "")
 	for i := range m.params.profiles {
 		name := m.params.profiles[i].Name
@@ -140,13 +120,17 @@ func (m Model) paramPanelModalBlock() string {
 			if nameW < 8 {
 				nameW = maxLine
 			}
+			displayName := name
+			if activeRow {
+				displayName = "(active) " + name
+			}
 			nameStyle := m.ui.styles.paramProfileInactive
 			if activeRow {
 				nameStyle = m.ui.styles.paramProfileName
 			}
 			row := lipgloss.JoinHorizontal(lipgloss.Top,
 				m.ui.styles.body.Render(prefix),
-				nameStyle.Render(truncateParamLine(name, nameW)),
+				nameStyle.Render(truncateParamLine(displayName, nameW)),
 			)
 			rows = append(rows, row)
 		}
@@ -157,15 +141,6 @@ func (m Model) paramPanelModalBlock() string {
 
 	rows = append(rows, "")
 	var detailRows []string
-	if m.params.focus == paramFocusEnv || m.params.focus == paramFocusArgs {
-		apLabel := "  Active profile: "
-		apNameW := max(4, maxSec-lipgloss.Width(apLabel))
-		detailRows = append(detailRows, lipgloss.JoinHorizontal(lipgloss.Top,
-			m.ui.styles.bodyDim.Render(apLabel),
-			m.ui.styles.paramProfileName.Render(truncateParamLine(m.activeProfileLabelForView(), apNameW)),
-		))
-		detailRows = append(detailRows, "")
-	}
 	const sectionHeadingIndent = "  "
 	envHeading := "Environment Variables (e.g. PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True)"
 	detailRows = append(detailRows, lipgloss.JoinHorizontal(lipgloss.Top,
