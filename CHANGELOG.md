@@ -4,7 +4,10 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
-- Apr-19, 2026 - 11:38 PM +0800 - [v0.2.4 release: fix GitHub Actions release workflow permissions and GoReleaser token guards]
+- Apr-19, 2026 - 11:46 PM +0800 - [v0.2.5 release: fix all GoReleaser CI issues and repo workflow permissions]
+- Apr-19, 2026 - [CI: revert scoop/winget `token` fields from `isEnvSet` conditional (only valid in `skip_upload`) back to simple `{{ .Env.TOKEN }}`]
+- Apr-19, 2026 - [CI: enable `can_approve_pull_request_reviews` and `write` workflow permissions on repo via GitHub API so GITHUB_TOKEN can open Homebrew PRs]
+
 - Apr-19, 2026 - [CI: add `pull-requests: write` to release workflow permissions so GITHUB_TOKEN can open Homebrew formula PRs]
 - Apr-19, 2026 - [CI: guard scoop and winget tokens with `isEnvSet` to prevent template evaluation errors when secrets are absent]
 

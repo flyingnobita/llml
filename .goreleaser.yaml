@@ -80,7 +80,7 @@ scoops:
     repository:
       owner: flyingnobita
       name: scoop-bucket
-      token: "{{ if isEnvSet \"SCOOP_BUCKET_GITHUB_TOKEN\" }}{{ .Env.SCOOP_BUCKET_GITHUB_TOKEN }}{{ end }}"
+      token: "{{ .Env.SCOOP_BUCKET_GITHUB_TOKEN }}"
     commit_author:
       name: goreleaserbot
       email: bot@goreleaser.com
@@ -101,7 +101,7 @@ winget:
       owner: flyingnobita
       name: winget-pkgs
       branch: "llml-{{ .Version }}"
-      token: "{{ if isEnvSet \"WINGET_GITHUB_TOKEN\" }}{{ .Env.WINGET_GITHUB_TOKEN }}{{ end }}"
+      token: "{{ .Env.WINGET_GITHUB_TOKEN }}"
       pull_request:
         enabled: true
         base:
