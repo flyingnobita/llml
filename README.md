@@ -135,7 +135,7 @@ Tags matching `v*` trigger [.github/workflows/release.yml](.github/workflows/rel
 - If **branch protection** blocks the Actions bot from pushing to `main`, relax rules for `Casks/**` or use a PAT with write access (only if you adopt overriding `GITHUB_TOKEN` in the workflow).
 - **Upgrading from the old formula:** run `brew uninstall llml` once, then `brew install --cask llml` as above.
 - **After the first cask release:** remove any leftover **`Formula/llml.rb`** on `main` so the tap only ships the cask (avoids duplicate/conflicting definitions).
-- **Toolchain note:** [mise.toml](mise.toml) and [.github/workflows/release.yml](.github/workflows/release.yml) pin **GoReleaser v2.15.3**. `homebrew_casks` uses **`binaries: [llml]`** (the old `binary:` key is deprecated). Optional publishers use **`skip_upload`** templates that read **`index .Env "…"`** because the **`env`** template helper was removed in GoReleaser 2.15.
+- **Toolchain note:** [mise.toml](mise.toml) and [.github/workflows/release.yml](.github/workflows/release.yml) pin **GoReleaser v2.15.3**. `homebrew_casks` uses **`binaries: [llml]`** (the old `binary:` key is deprecated). Optional publishers use **`skip_upload`** templates with **`eq (index .Env "…") ""`** (built-in `index` only; the **`env`** helper is gone in 2.15 and Sprig helpers like **`empty`/`default`** are not available in this template context on CI). Local **`mise run check`** runs **`scripts/goreleaser-check.sh`** so the pinned GoReleaser wins over a stray **`go install`** copy on `PATH`.
 
 Optional automation for **other** publishers (off until you add secrets on this repository):
 
