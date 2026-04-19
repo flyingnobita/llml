@@ -98,6 +98,14 @@ type discoveryPathsState struct {
 	editInput textinput.Model
 }
 
+// mainPaneFocusSnap stores keyboard focus among the model table, launch preview, and
+// split-pane server log before a full-screen modal opens. At most one modal uses it at a time.
+type mainPaneFocusSnap struct {
+	valid           bool
+	previewFocused  bool
+	splitLogFocused bool
+}
+
 // Model is the root Bubble Tea model.
 type Model struct {
 	layout    layoutState
@@ -108,6 +116,7 @@ type Model struct {
 	server    serverPaneState
 	preview   launchPreviewState
 	discovery discoveryPathsState
+	paneFocus mainPaneFocusSnap
 
 	keys               KeyMap
 	runtime            models.RuntimeInfo
@@ -422,6 +431,32 @@ func (m Model) withLaunchPreviewSynced() Model {
 		iw = m.innerWidth()
 	}
 	return m.syncLaunchPreviewViewport(iw)
+}
+
+// saveMainPaneFocusForModal snapshots which main pane had keyboard focus, then clears
+// launch-preview focus so modal routing matches existing behavior.
+func (m Model) saveMainPaneFocusForModal() Model {
+	m.paneFocus.valid = true
+	m.paneFocus.previewFocused = m.preview.focused
+	m.paneFocus.splitLogFocused = m.server.splitFocused
+	m.preview.focused = false
+	return m
+}
+
+// restoreMainPaneFocusAfterModal restores focus saved by [Model.saveMainPaneFocusForModal].
+func (m Model) restoreMainPaneFocusAfterModal() Model {
+	if !m.paneFocus.valid {
+		return m
+	}
+	m.preview.focused = m.paneFocus.previewFocused
+	m.server.splitFocused = m.paneFocus.splitLogFocused
+	m.paneFocus.valid = false
+	if m.preview.focused || m.server.splitFocused {
+		m.table.tbl.Blur()
+	} else {
+		m.table.tbl.Focus()
+	}
+	return m.applyMainPaneFocusStyles()
 }
 
 // applyMainPaneFocusStyles sets table vs launch-preview chrome when idle, or delegates to

@@ -10,8 +10,8 @@ import (
 
 // openDiscoveryPathsModal opens the model discovery paths modal.
 func (m Model) openDiscoveryPathsModal() (Model, tea.Cmd) {
+	m = m.saveMainPaneFocusForModal()
 	m.discovery.open = true
-	m.preview.focused = false
 	m = m.withLastRunCleared()
 	m.discovery.editOpen = false
 	if len(m.discovery.paths) > 0 {
@@ -30,7 +30,7 @@ func (m Model) closeDiscoveryPathsModal() Model {
 	m.discovery.editOpen = false
 	m.discovery.editInput.Blur()
 	m.discovery.editInput.SetValue("")
-	return m
+	return m.restoreMainPaneFocusAfterModal()
 }
 
 // startDiscoveryPathEdit opens the inline text input for editing the current row or a new row.

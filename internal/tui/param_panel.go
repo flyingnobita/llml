@@ -112,7 +112,7 @@ func (m Model) openParamPanel() (Model, tea.Cmd) {
 		return m, clearLastRunNoteAfterCmd()
 	}
 	m.params.open = true
-	m.preview.focused = false
+	m = m.saveMainPaneFocusForModal()
 	m.params.confirmDelete = paramConfirmNone
 	m.params.modelPath = filepath.Clean(p)
 	m.params.modelDisplayName = modelDisplayNameForPath(m)
@@ -161,7 +161,7 @@ func (m Model) closeParamPanel() Model {
 	m.params.profiles = nil
 	m.params.modelPath = ""
 	m.params.modelDisplayName = ""
-	return m
+	return m.restoreMainPaneFocusAfterModal()
 }
 
 // modelDisplayNameForPath returns the File Name column value for the row whose path is selected, or a basename fallback.

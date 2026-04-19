@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
+- Apr-19, 2026 - [TUI: restore table vs launch-preview vs split-log keyboard focus after closing parameter profiles (`p`), runtime config (`c`), or model paths (`m`)]
 - Apr-19, 2026 - [TUI: refresh launch command preview immediately after saving Runtime Environment (`c`) or persisting parameter profiles; align discovery-path and run-error tests with batched cmds]
 - Apr-18, 2026 - [TUI: 5-second auto-timeout for status notifications (copy feedback, scan results, errors); polished footer shortcut bar (removed terminal dimensions and scroll hints, added help key handling in all split-pane states)]
 - Apr-18, 2026 - 01:13 AM +0800 - [v0.2.0 release: config.toml runtime and discovery cache; launch preview/help UX; model ID and gguf-dump tooling; runtime path fixes; TUI and discovery refactors]

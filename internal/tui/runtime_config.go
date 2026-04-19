@@ -131,8 +131,8 @@ func (m Model) openRuntimeConfig() (Model, tea.Cmd) {
 // openRuntimeConfigFocused opens the runtime editor with the given field focused and clears any
 // footer status line ([Model.lastRunNote]).
 func (m Model) openRuntimeConfigFocused(focus runtimeField) (Model, tea.Cmd) {
+	m = m.saveMainPaneFocusForModal()
 	m.rc.open = true
-	m.preview.focused = false
 	m = m.withLastRunCleared()
 	m.rc.inputs[runtimeFieldLlamaCppPath].SetValue(os.Getenv(models.EnvLlamaCppPath))
 	m.rc.inputs[runtimeFieldVLLMPath].SetValue(os.Getenv(models.EnvVLLMPath))
@@ -185,7 +185,7 @@ func (m Model) closeRuntimeConfig() Model {
 		(&m.rc.inputs[i]).Blur()
 		m.rc.inputs[i].SetValue("")
 	}
-	return m
+	return m.restoreMainPaneFocusAfterModal()
 }
 
 func (m Model) focusRuntimeField(i runtimeField) (Model, tea.Cmd) {
