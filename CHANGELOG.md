@@ -4,7 +4,8 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
-- Apr-19, 2026 - [VERSION reset to 0.2.0 in repo root; GitHub `v0.3.*` tags/releases stay as published history]
+- Apr-19, 2026 - [Remove Scoop: GoReleaser `scoops`, `SCOOP_BUCKET_GITHUB_TOKEN` from release workflow, README/AGENTS install and maintainer docs; GitHub releases and tags `v0.3.0`–`v0.3.3` removed; `llml-*` branches removed on `flyingnobita/winget-pkgs` fork]
+- Apr-19, 2026 - [VERSION reset to 0.2.0 in repo root]
 - Apr-19, 2026 - [Remove GoReleaser winget publishing, `WINGET_GITHUB_TOKEN` from release workflow, winget fork sync workflow, and `scripts/setup-winget-fork.sh`; README/AGENTS de-scoped from automated winget PRs]
 - Apr-19, 2026 - [v0.3.3 release: homebrew cask opens PR to `main` (`homebrew-cask-<version>`); release workflow `pull-requests: write`; README `WINGET_GITHUB_TOKEN` PAT notes for upstream PR (classic `public_repo` / `repo`)]
 - Apr-19, 2026 - [v0.3.2 release: GoReleaser winget/scoop/cask `ids` point at archive id `default` (was build id `llml`, broke winget zip selection)]

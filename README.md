@@ -65,18 +65,9 @@ One-liner:
 brew install --cask flyingnobita/llml/llml
 ```
 
-#### Scoop (Windows)
-
-Requires [Scoop](https://scoop.sh/). Add the [Scoop bucket](https://github.com/flyingnobita/scoop-bucket) that holds the `llml` manifest, then install:
-
-```powershell
-scoop bucket add flyingnobita https://github.com/flyingnobita/scoop-bucket
-scoop install llml
-```
-
 #### winget (Windows)
 
-This repository’s release workflow does **not** publish to [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs). Use Scoop, `go install`, or a release archive on Windows. A future winget manifest would be maintained separately.
+This repository’s release workflow does **not** publish to [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs). On Windows use **`go install`**, a **GitHub release** archive (`.zip`), or **WSL** with Homebrew as above. A future winget manifest would be maintained separately.
 
 #### Pre-built binaries
 
@@ -129,21 +120,14 @@ Tags matching `v*` trigger [.github/workflows/release.yml](.github/workflows/rel
 - If you prefer direct commits to **`main`** instead of a PR, remove **`repository.branch`** / **`pull_request`** from **`homebrew_casks`** and relax branch protection for **`Casks/**`\*\* (or use a PAT with bypass rights).
 - **Upgrading from the old formula:** run `brew uninstall llml` once, then `brew install --cask llml` as above.
 - **After the first cask release:** remove any leftover **`Formula/llml.rb`** on `main` so the tap only ships the cask (avoids duplicate/conflicting definitions).
-- **Toolchain note:** [mise.toml](mise.toml) and [.github/workflows/release.yml](.github/workflows/release.yml) pin **GoReleaser v2.15.3**. `homebrew_casks` uses **`binaries: [llml]`** (the old `binary:` key is deprecated). In **`scoops`** and **`homebrew_casks`**, **`ids`** must reference the **archive id** (here **`default`** from [`.goreleaser.yaml`](.goreleaser.yaml)), not the Go **`builds`** id. Optional publishers use **`skip_upload`** templates with **`eq (index .Env "…") ""`** (built-in `index` only; the **`env`** helper is gone in 2.15 and Sprig helpers like **`empty`/`default`** are not available in this template context on CI). Local **`mise run check`** runs **`scripts/goreleaser-check.sh`** so the pinned GoReleaser wins over a stray **`go install`** copy on `PATH`.
-
-Optional automation for **other** publishers (off until you add secrets on this repository):
-
-| Secret                      | Purpose                                                                                                                                                                                                                                          |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `SCOOP_BUCKET_GITHUB_TOKEN` | Push the Scoop manifest to [`flyingnobita/scoop-bucket`](https://github.com/flyingnobita/scoop-bucket). Use a fine-grained or classic PAT with **Contents: Read and write** on that bucket repo. If unset, the Scoop manifest upload is skipped. |
-
-Create an empty GitHub repository for the Scoop bucket before the first release that should publish it. **homebrew-core** is not targeted yet; the supported Brew path is **this tap + cask** (`brew install --cask …`).
+- **Toolchain note:** [mise.toml](mise.toml) and [.github/workflows/release.yml](.github/workflows/release.yml) pin **GoReleaser v2.15.3**. `homebrew_casks` uses **`binaries: [llml]`** (the old `binary:` key is deprecated). **`homebrew_casks.ids`** must reference the **archive id** (here **`default`** from [`.goreleaser.yaml`](.goreleaser.yaml)), not the Go **`builds`** id. **`skip_upload`** uses **`eq (index .Env "GITHUB_TOKEN") ""`** (built-in `index` only; the **`env`** helper is gone in 2.15 and Sprig helpers like **`empty`/`default`** are not available in this template context on CI). Local **`mise run check`** runs **`scripts/goreleaser-check.sh`** so the pinned GoReleaser wins over a stray **`go install`** copy on `PATH`.
+- **homebrew-core** is not targeted; the supported Brew path is **this tap + cask** (`brew install --cask …`).
 
 #### Maintainer automation
 
-| What                       | How                                                                                                                  |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Validate GoReleaser config | `mise run goreleaser-check` (also runs as part of `mise run lint` / CI). Covers `homebrew_casks`, Scoop, and builds. |
+| What                       | How                                                                                                          |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Validate GoReleaser config | `mise run goreleaser-check` (also runs as part of `mise run lint` / CI). Covers `homebrew_casks` and builds. |
 
 ### Start
 
