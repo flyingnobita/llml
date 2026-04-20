@@ -66,7 +66,9 @@ scripts/             # gofmt-check.sh, precommit-docs-fix.sh
 
 ### Configuration
 
-- **On-disk config** lives at **`{UserConfigDir}/llml/config.toml`** (see `internal/config`). It stores **`[runtime]`** (default paths and ports), **`[discovery]`** (extra model roots and last full-scan time), and **`[[models]]`** (cached discovery rows). **`schema_version`** is reserved for future migrations.
+- **On-disk config** lives at **`{UserConfigDir}/llml/config.toml`** (see `internal/config`). It stores **`[runtime]`** (default paths and ports), **`[discovery]`** (extra model roots and last full-scan time), and **`[[models]]`** (cached discovery rows). **`schema_version`** is reserved for future migrations; migrations should backup via existing write paths before transforming.
+
+- **Updates vs user data:** Release packaging (Homebrew formula, archives) ships **only the `llml` binary** — not the config tree. User data stays under **`{UserConfigDir}/llml/`**. **`backups/`** holds timestamped copies before overwrites (pruned to 10 per logical file); **`.last-run-version`** triggers an extra snapshot of `config.toml` and `model-params.json` when the embedded version changes (skipped for `dev` / empty version). See `internal/userdata`, `internal/fsutil.WriteFileAtomic`.
 
 - **Precedence:** **environment variables override** values from `config.toml`; unset env vars fall back to TOML `default_` keys, then built-in defaults.
 - **Startup:** if the cache is valid (`schema_version` matches, at least one cached model path still exists on disk), the UI loads without a full filesystem walk. Otherwise a full scan runs and the file is rewritten.

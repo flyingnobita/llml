@@ -163,6 +163,12 @@ Behavior is driven by **environment variables**, optional **`config.toml`**, and
 | macOS       | `~/Library/Application Support/llml/config.toml`                    |
 | Windows     | `%AppData%\llml\config.toml`                                        |
 
+#### Updates vs your data
+
+Installing or upgrading `llml` (Homebrew, Scoop, `go install`, or dropping a release binary on your `PATH`) **replaces only the executable**. Your data lives under **`{UserConfigDir}/llml/`** (see the tables above), not next to the binary, so routine upgrades do not delete `config.toml` or `model-params.json`.
+
+Before overwriting those files, the app saves a timestamped copy under **`{UserConfigDir}/llml/backups/`** and keeps the newest **10** backups per file. When the built-in version string changes between runs (see `llml -version`), it also snapshots both files once at startup so you have a clear upgrade-boundary copy. The file **`.last-run-version`** in the same directory records the last run version for that behavior.
+
 The file stores **`schema_version`**, **`[runtime]`** (stores `default_` paths and ports used when environment variables are unset), **`[discovery]`** (`extra_model_paths`, `last_scan` timestamp), and **`[[models]]`** (cached rows from the last full scan). Parameter profiles remain in **`model-params.json`** only.
 
 On startup, if the cache is valid, the app skips walking the disk; use **`S`** for a full rescan. **`r`** reloads runtime settings from TOML without rescanning models. Saving the **`c`** runtime panel updates the environment and writes **`[runtime]`** (write failures are ignored).
