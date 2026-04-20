@@ -15,7 +15,7 @@ const (
 	defaultTableHeight = 18
 
 	// appPaddingH is the Lip Gloss horizontal padding per side (app style uses
-	// Padding(1, 2), so 2 on each side = 4 total consumed columns).
+	// Padding(0, appPaddingH): no vertical padding; 2 columns horizontal each side).
 	appPaddingH = 2
 
 	// hScrollStep is the number of columns scrolled per arrow/key press.

@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
+- Apr-20, 2026 - [TUI: short terminals — outer model-table hscroll height tracks live tbl.View(); spare terminal rows grow the table viewport (no blank bands between title/table/preview/footer); strip app/title/footer margins that caused gaps; vertical █/░ track when overflow; disable vertical wheel on table hscroll and reset YOffset on layout; tests]
+
 - Apr-19, 2026 - 11:50 PM +0800 - [v0.2.6 release: fix winget pull_request spurious 403; remove branch protection; simplify brews to direct push]
 - Apr-19, 2026 - [CI: remove winget `pull_request` block (not usable without WINGET_GITHUB_TOKEN secret) to eliminate 403 on PR creation]
 - Apr-19, 2026 - [CI: remove main branch protection rule to allow GoReleaser to push Formula/llml.rb directly]

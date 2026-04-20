@@ -144,6 +144,9 @@ func New() Model {
 	)
 	hv := viewport.New(viewport.WithWidth(96), viewport.WithHeight(defaultTableHeight))
 	hv.SetHorizontalStep(hScrollStep)
+	// Vertical wheel must not scroll this wrapper; it desyncs from the bubbles table cursor.
+	// Horizontal panning uses keys (see keymap); Shift+wheel could be added later if desired.
+	hv.MouseWheelEnabled = false
 	hv.Style = st.splitPaneChromeFocused
 	sv := viewport.New(viewport.WithWidth(96), viewport.WithHeight(1))
 	sv.MouseWheelEnabled = true
@@ -260,30 +263,16 @@ func tableRowAreaHeight(contentAreaH int) int {
 	return contentAreaH - 1
 }
 
-func (m Model) layoutTable() Model {
-	w := m.layout.width
-	if w < minTerminalWidth {
-		w = minTerminalWidth
-	}
-	innerW := m.layout.width - appPaddingH*2
-	if innerW < minInnerWidth {
-		innerW = w - appPaddingH*2
-	}
+// layoutTableAtInnerW builds columns, body height, and hscroll for a given inner body width.
+func (m Model) layoutTableAtInnerW(innerW int) Model {
 	m.layout.bodyInnerW = innerW
-	// Column widths must use the same budget as the table viewport (inner body
-	// width). Using full terminal width here made rows ~4 cells wider than
-	// innerW and triggered empty horizontal scrolling.
 	cols := tableColumns(innerW, m.table.files, m.layout.homeDir, m.table.sortCol, m.table.sortDesc)
 	m.table.tbl.SetColumns(cols)
 	m.table.tbl.SetStyles(m.ui.styles.table)
 	minW := tableContentMinWidth(cols)
 	m.table.tbl.SetWidth(max(minW, innerW))
-	// Column widths do not change when only header labels (sort indicators) change; using
-	// minW keeps the horizontal scroll bar row and table body height stable.
 	m.layout.tableNeedsHScroll = len(m.table.files) > 0 && minW > innerW
 
-	// Determine log h-bar without a heuristic: content wider than viewport inner width → bar shown.
-	// Uses the style frame size directly so no second pass is needed.
 	logFrameH := m.server.viewport.Style.GetHorizontalFrameSize()
 	needsLogHBar := m.server.running && maxAnsiLineWidth(m.server.log) > max(1, innerW-logFrameH)
 
@@ -304,8 +293,40 @@ func (m Model) layoutTable() Model {
 	m.table.hscroll.SetContent(tview)
 	m.table.hscroll.SetWidth(innerW)
 	m.table.hscroll.SetHeight(m.layout.tableBodyH)
+	return m
+}
 
-	m = m.syncLaunchPreviewViewport(innerW)
+// tablePaneShowsVerticalIndicator is true when the model table needs a █/░ track: inner row
+// overflow (more files than fit in the bubbles table body) or outer viewport vertical overflow.
+func (m Model) tablePaneShowsVerticalIndicator() bool {
+	if len(m.table.files) == 0 {
+		return false
+	}
+	if len(m.table.files) > m.table.tbl.Height() {
+		return true
+	}
+	return m.table.hscroll.TotalLineCount() > m.table.hscroll.VisibleLineCount()
+}
+
+func (m Model) layoutTable() Model {
+	w := m.layout.width
+	if w < minTerminalWidth {
+		w = minTerminalWidth
+	}
+	innerBase := m.layout.width - appPaddingH*2
+	if innerBase < minInnerWidth {
+		innerBase = w - appPaddingH*2
+	}
+
+	m = m.layoutTableAtInnerW(innerBase)
+	m.table.hscroll.SetYOffset(0)
+
+	if len(m.table.files) > 0 && innerBase > minInnerWidth && m.tablePaneShowsVerticalIndicator() {
+		m = m.layoutTableAtInnerW(innerBase - 1)
+		m.table.hscroll.SetYOffset(0)
+	}
+
+	m = m.syncLaunchPreviewViewport(m.layout.bodyInnerW)
 	m = m.applyMainPaneFocusStyles()
 	return m
 }

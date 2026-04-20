@@ -96,6 +96,39 @@ func launchPreviewScrollable(m Model) bool {
 		m.preview.viewport.TotalLineCount() > m.preview.viewport.VisibleLineCount()
 }
 
+// modelTablePaneView renders the horizontal-scroll viewport around the model table and, when the
+// list overflows vertically (inner table body or outer wrapped content), a █/░ column beside it.
+func (m Model) modelTablePaneView() string {
+	vp := m.table.hscroll.View()
+	if len(m.table.files) == 0 {
+		return vp
+	}
+	trackH := lipgloss.Height(vp)
+	if trackH < 2 {
+		return vp
+	}
+	var pct float64
+	haveOuter := m.table.hscroll.TotalLineCount() > m.table.hscroll.VisibleLineCount()
+	if haveOuter {
+		pct = viewportVerticalScrollPercent(m.table.hscroll)
+	} else if len(m.table.files) > m.table.tbl.Height() {
+		n := len(m.table.files)
+		if n <= 1 {
+			pct = 0
+		} else {
+			pct = float64(m.table.tbl.Cursor()) / float64(n-1)
+		}
+	} else {
+		return vp
+	}
+	col := verticalScrollBarColumn(pct, trackH)
+	if col == "" {
+		return vp
+	}
+	col = m.ui.styles.scrollBarColumn.Render(col)
+	return lipgloss.JoinHorizontal(lipgloss.Top, vp, col)
+}
+
 // launchPreviewPaneView renders the bordered, scrollable launch command viewport or "".
 func (m Model) launchPreviewPaneView() string {
 	if !launchPreviewVisible(m) {
@@ -220,7 +253,6 @@ func mainChromeLines(m Model, needsTableHBar bool, needsLogHBar bool) int {
 	if strings.TrimSpace(appSubtitle) != "" {
 		n += lipgloss.Height(m.ui.styles.subtitle.Render(appSubtitle))
 	}
-	n += 1
 
 	if needsTableHBar && len(m.table.files) > 0 {
 		if bar := horizontalScrollBarLine(0, iw); bar != "" {
@@ -234,7 +266,6 @@ func mainChromeLines(m Model, needsTableHBar bool, needsLogHBar bool) int {
 		}
 	}
 
-	n += 1
 	n += lipgloss.Height(m.ui.styles.footer.Render(footerHelpLine(m)))
 
 	if m.lastRunNote != "" {
@@ -330,15 +361,67 @@ func (m Model) modalTitleRow(innerW int, titleStyle lipgloss.Style, plain string
 	return m.joinLeftAndToast(innerW, left)
 }
 
+// mainAppModelListBody renders the model-table stack (table viewport, optional h-scroll row,
+// launch preview, optional server log). minTableScrollH is the outer hscroll viewport height;
+// use -1 to size the viewport to the natural height of tbl.View(). Returns the rendered body
+// and the hscroll height applied (for absorbing leftover terminal rows inside the table chrome).
+func (m Model) mainAppModelListBody(iw int, minTableScrollH int) (body string, appliedScrollH int) {
+	tview := m.table.tbl.View()
+	th := strings.Count(tview, "\n") + 1
+	if th < 1 {
+		th = 1
+	}
+	appliedScrollH = th
+	if minTableScrollH > appliedScrollH {
+		appliedScrollH = minTableScrollH
+	}
+	m.table.hscroll.SetContent(tview)
+	m.table.hscroll.SetWidth(iw)
+	m.table.hscroll.SetHeight(appliedScrollH)
+	preview := m.launchPreviewPaneView()
+	var parts []string
+	parts = append(parts, m.modelTablePaneView())
+	if m.layout.tableNeedsHScroll {
+		if line := horizontalScrollBarLine(m.table.hscroll.HorizontalScrollPercent(), iw); line != "" {
+			parts = append(parts, m.ui.styles.footer.Render(line))
+		}
+	}
+	if preview != "" {
+		parts = append(parts, preview)
+	}
+	if m.server.running {
+		if m.server.viewportH > 0 {
+			m.server.viewport.SetHeight(m.server.viewportH)
+		}
+		parts = append(parts, m.serverLogPaneView())
+		if m.serverLogNeedsHorizontalScroll() {
+			if line := horizontalScrollBarLine(m.server.viewport.HorizontalScrollPercent(), iw); line != "" {
+				parts = append(parts, m.ui.styles.footer.Render(line))
+			}
+		}
+		body = lipgloss.JoinVertical(lipgloss.Left, parts...)
+	} else {
+		if len(parts) == 1 {
+			body = parts[0]
+		} else {
+			body = lipgloss.JoinVertical(lipgloss.Left, parts...)
+		}
+	}
+	return body, appliedScrollH
+}
+
 // mainAppPlacedView renders the primary UI (title, model table, server log when
-// running, footer, …) as a full-width, full-height string. Used for the normal
-// view and as the backdrop when a centered modal (parameters, runtime config) is open.
+// running, footer, …) as a full-width string whose height matches the terminal.
+// Extra vertical slack is absorbed inside the bordered table viewport (not as blank
+// rows between title and table or between the preview and footer).
+// Used for the normal view and as the backdrop when a centered modal is open.
 func (m Model) mainAppPlacedView() string {
 	iw := m.innerWidth()
 
 	title := m.appTitleBlock(iw)
 
 	var body string
+	tableScrollBase := 0
 	switch {
 	case m.loading:
 		body = m.ui.styles.body.Render("Scanning for models…")
@@ -347,59 +430,45 @@ func (m Model) mainAppPlacedView() string {
 	case len(m.table.files) == 0:
 		body = m.ui.styles.body.Render(fmt.Sprintf("No GGUF or safetensors models found. Press '%s' to add search paths, or place models under ~/models, ~/.cache/huggingface/hub, etc.", FooterKeyModelPaths))
 	default:
-		m.table.hscroll.SetContent(m.table.tbl.View())
-		th := m.layout.tableBodyH
-		if th < 1 {
-			th = defaultTableHeight
-		}
-		m.table.hscroll.SetWidth(iw)
-		m.table.hscroll.SetHeight(th)
-		preview := m.launchPreviewPaneView()
-		var parts []string
-		parts = append(parts, m.table.hscroll.View())
-		if m.layout.tableNeedsHScroll {
-			if line := horizontalScrollBarLine(m.table.hscroll.HorizontalScrollPercent(), iw); line != "" {
-				parts = append(parts, m.ui.styles.footer.Render(line))
-			}
-		}
-		if preview != "" {
-			parts = append(parts, preview)
-		}
-		if m.server.running {
-			if m.server.viewportH > 0 {
-				m.server.viewport.SetHeight(m.server.viewportH)
-			}
-			parts = append(parts, m.serverLogPaneView())
-			if m.serverLogNeedsHorizontalScroll() {
-				if line := horizontalScrollBarLine(m.server.viewport.HorizontalScrollPercent(), iw); line != "" {
-					parts = append(parts, m.ui.styles.footer.Render(line))
-				}
-			}
-			body = lipgloss.JoinVertical(lipgloss.Left, parts...)
-		} else {
-			if len(parts) == 1 {
-				body = parts[0]
-			} else {
-				body = lipgloss.JoinVertical(lipgloss.Left, parts...)
-			}
-		}
+		var ash int
+		body, ash = m.mainAppModelListBody(iw, -1)
+		tableScrollBase = ash
 	}
 
 	footer := m.ui.styles.footer.Render(footerHelpLine(m))
 
-	rows := []string{title}
+	headerParts := []string{title}
 	if strings.TrimSpace(appSubtitle) != "" {
-		rows = append(rows, m.ui.styles.subtitle.Render(appSubtitle))
+		headerParts = append(headerParts, m.ui.styles.subtitle.Render(appSubtitle))
 	}
-	rows = append(rows, "", body, "", footer)
-	if m.lastRunNote != "" {
-		rows = append(rows, m.lastRunNoteView())
-	}
-	block := lipgloss.JoinVertical(lipgloss.Left, rows...)
-	framed := m.ui.styles.app.Render(block)
+	header := lipgloss.JoinVertical(lipgloss.Left, headerParts...)
 
-	placed := lipgloss.Place(m.layout.width, m.layout.height, lipgloss.Center, lipgloss.Top, framed)
-	return clampRenderedHeightKeepTopBottom(placed, m.layout.height)
+	tailParts := []string{body, footer}
+	if m.lastRunNote != "" {
+		tailParts = append(tailParts, m.lastRunNoteView())
+	}
+	tail := lipgloss.JoinVertical(lipgloss.Left, tailParts...)
+
+	combined := lipgloss.JoinVertical(lipgloss.Left, header, tail)
+	framed := m.ui.styles.app.Render(combined)
+
+	target := m.layout.height
+	if target > 0 && tableScrollBase > 0 {
+		pad := target - lipgloss.Height(framed)
+		if pad > 0 {
+			body, _ = m.mainAppModelListBody(iw, tableScrollBase+pad)
+			tailParts = []string{body, footer}
+			if m.lastRunNote != "" {
+				tailParts = append(tailParts, m.lastRunNoteView())
+			}
+			tail = lipgloss.JoinVertical(lipgloss.Left, tailParts...)
+			combined = lipgloss.JoinVertical(lipgloss.Left, header, tail)
+			framed = m.ui.styles.app.Render(combined)
+		}
+	}
+
+	placed := lipgloss.PlaceHorizontal(m.layout.width, lipgloss.Center, framed)
+	return clampRenderedHeightKeepTopBottom(placed, target)
 }
 
 func clampRenderedHeightKeepTopBottom(s string, maxH int) string {
