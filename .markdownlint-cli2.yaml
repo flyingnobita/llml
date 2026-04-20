@@ -7,4 +7,4 @@ config:
   MD036: false # no-emphasis-as-heading: allow italic for labels
   # Allow `<br>` in tables and `<a id="…">` for GitHub-compatible section anchors (emoji headings).
   MD033:
-    allowed_elements: [ "br", "a" ]
+    allowed_elements: ["br", "a"]
