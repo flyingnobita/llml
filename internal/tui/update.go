@@ -213,7 +213,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		m = m.withLastRunCleared()
 		params, _ := loadModelParamsForRun(p)
-		spec, err := buildServerSpec(be, p, params, m.runtime)
+		spec, err := buildServerSpec(be, p, params, m.runtime, true)
 		if err != nil {
 			return m.flashError(err.Error())
 		}
