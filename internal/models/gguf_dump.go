@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strings"
 
 	"github.com/abrander/gguf"
 )
@@ -22,7 +23,10 @@ func DumpGGUF(w io.Writer, path string, opts DumpGGUFOptions) error {
 	if err != nil {
 		return err
 	}
+	return writeGGUFReport(w, r, opts)
+}
 
+func writeGGUFReport(w io.Writer, r *gguf.Reader, opts DumpGGUFOptions) error {
 	fmt.Fprintf(w, "gguf_version: %d\n", r.Version)
 	fmt.Fprintf(w, "byte_order: %s\n", byteOrderLabel(r.ByteOrder))
 
@@ -59,7 +63,7 @@ func byteOrderLabel(o binary.ByteOrder) string {
 
 // formatGGUFMetadataValue renders a metadata value read by abrander/gguf. Large arrays
 // (e.g. tokenizer vocab) are summarized instead of printed in full.
-func formatGGUFMetadataValue(v interface{}) string {
+func formatGGUFMetadataValue(v any) string {
 	if v == nil {
 		return "<nil>"
 	}
@@ -93,7 +97,7 @@ func formatGGUFMetadataValue(v interface{}) string {
 	case []bool:
 		return formatGGUFSlice("bool", len(vv), func(i int) string { return fmt.Sprintf("%t", vv[i]) })
 	case []uint8:
-		return formatGGUFNumSlice(vv)
+		return formatGGUFSlice("uint8", len(vv), func(i int) string { return fmt.Sprintf("%d", vv[i]) })
 	case []int8:
 		return formatGGUFSlice("int8", len(vv), func(i int) string { return fmt.Sprintf("%d", vv[i]) })
 	case []uint16:
@@ -130,34 +134,30 @@ func formatGGUFStringScalar(s string) string {
 	return fmt.Sprintf("%q… (%d runes, truncated)", string(r[:maxScalarStringRunes]), len(r))
 }
 
+// renderSliceHead builds the opening "[elem0, elem1, …, elemN" portion (no closing bracket)
+// for the first min(n, head) elements using at(i). The caller appends the closing.
+func renderSliceHead(n, head int, at func(int) string) string {
+	var b strings.Builder
+	b.WriteByte('[')
+	for i := 0; i < n && i < head; i++ {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(at(i))
+	}
+	return b.String()
+}
+
 func formatGGUFStringSlice(vv []string) string {
 	const head = 6
 	if len(vv) == 0 {
 		return "[]"
 	}
+	body := renderSliceHead(len(vv), head, func(i int) string { return fmt.Sprintf("%q", vv[i]) })
 	if len(vv) <= head {
-		out := "["
-		for i := range vv {
-			if i > 0 {
-				out += ", "
-			}
-			out += fmt.Sprintf("%q", vv[i])
-		}
-		return out + "]"
+		return body + "]"
 	}
-	var b []byte
-	b = append(b, '[')
-	for i := 0; i < head; i++ {
-		if i > 0 {
-			b = append(b, ", "...)
-		}
-		b = append(b, fmt.Sprintf("%q", vv[i])...)
-	}
-	return fmt.Sprintf("%s, …] (len=%d strings)", string(b), len(vv))
-}
-
-func formatGGUFNumSlice(vv []uint8) string {
-	return formatGGUFSlice("uint8", len(vv), func(i int) string { return fmt.Sprintf("%d", vv[i]) })
+	return fmt.Sprintf("%s, …] (len=%d strings)", body, len(vv))
 }
 
 func formatGGUFSlice(elemName string, n int, at func(i int) string) string {
@@ -165,22 +165,9 @@ func formatGGUFSlice(elemName string, n int, at func(i int) string) string {
 	if n == 0 {
 		return "[]"
 	}
+	body := renderSliceHead(n, head, at)
 	if n <= head {
-		out := "["
-		for i := 0; i < n; i++ {
-			if i > 0 {
-				out += ", "
-			}
-			out += at(i)
-		}
-		return out + "]"
+		return body + "]"
 	}
-	out := "["
-	for i := 0; i < head; i++ {
-		if i > 0 {
-			out += ", "
-		}
-		out += at(i)
-	}
-	return fmt.Sprintf("%s, …] (%s[len=%d])", out, elemName, n)
+	return fmt.Sprintf("%s, …] (%s[len=%d])", body, elemName, n)
 }

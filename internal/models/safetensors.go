@@ -41,6 +41,24 @@ func hfParamsSummary(dir string) string {
 	return strings.Join(parts, " · ")
 }
 
+// scanSafetensorsWeights returns the total size, latest mod time, and whether any
+// *.safetensors files were found among entries in dir.
+func scanSafetensorsWeights(dir string, entries []os.DirEntry) (size int64, latest time.Time, ok bool) {
+	for _, ent := range entries {
+		if ent.IsDir() || !strings.EqualFold(filepath.Ext(ent.Name()), ".safetensors") {
+			continue
+		}
+		ok = true
+		if fi, err := os.Stat(filepath.Join(dir, ent.Name())); err == nil {
+			size += fi.Size()
+			if fi.ModTime().After(latest) {
+				latest = fi.ModTime()
+			}
+		}
+	}
+	return
+}
+
 // tryVLLMModelDir builds a [ModelFile] if dir contains config.json and at least one
 // *.safetensors file. It returns false if the directory is not a usable HF weights folder.
 func tryVLLMModelDir(dir string) (ModelFile, bool) {
@@ -48,36 +66,14 @@ func tryVLLMModelDir(dir string) (ModelFile, bool) {
 	if st, err := os.Stat(cfgPath); err != nil || st.IsDir() {
 		return ModelFile{}, false
 	}
-
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return ModelFile{}, false
 	}
-
-	var totalSize int64
-	var latest time.Time
-	var hasWeights bool
-	for _, ent := range entries {
-		if ent.IsDir() {
-			continue
-		}
-		name := ent.Name()
-		if !strings.EqualFold(filepath.Ext(name), ".safetensors") {
-			continue
-		}
-		hasWeights = true
-		full := filepath.Join(dir, name)
-		if fi, err := os.Stat(full); err == nil {
-			totalSize += fi.Size()
-			if fi.ModTime().After(latest) {
-				latest = fi.ModTime()
-			}
-		}
-	}
+	totalSize, latest, hasWeights := scanSafetensorsWeights(dir, entries)
 	if !hasWeights {
 		return ModelFile{}, false
 	}
-
 	return ModelFile{
 		Backend:    BackendVLLM,
 		Path:       filepath.Clean(dir),

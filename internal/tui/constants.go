@@ -15,11 +15,14 @@ const (
 	defaultTableHeight = 18
 
 	// appPaddingH is the Lip Gloss horizontal padding per side (app style uses
-	// Padding(1, 2), so 2 on each side = 4 total consumed columns).
+	// Padding(0, appPaddingH): no vertical padding; 2 columns horizontal each side).
 	appPaddingH = 2
 
 	// hScrollStep is the number of columns scrolled per arrow/key press.
 	hScrollStep = 4
+
+	// appTitle is the primary application name rendered in the title bar.
+	appTitle = "LLM Launcher"
 
 	// appSubtitle is the optional subtitle line below the app title (empty = hidden).
 	appSubtitle = ""
@@ -46,6 +49,10 @@ const (
 	// command preview (the bordered viewport outer height adds the frame; see syncLaunchPreviewViewport).
 	launchPreviewVisibleLines = 4
 
+	// mainPaneTitleLines is the caption row above each titled pane. Lip Gloss v2 does not
+	// expose border-embedded titles; see launchPreviewPaneView and serverLogPaneView.
+	mainPaneTitleLines = 1
+
 	// shellDisplayArgIndent is the leading spaces for multiline shell display lines after
 	// the first argv line (launch preview and clipboard; split-pane log uses "+ " instead).
 	shellDisplayArgIndent = "  "
@@ -53,6 +60,12 @@ const (
 	// lastRunNoteVisibleDuration is how long the status line below the footer
 	// stays visible before clearing (e.g. copy feedback, scan results).
 	lastRunNoteVisibleDuration = 5 * time.Second
+)
+
+// Main view pane captions (Title Case). Shown above the launch preview and server log only.
+const (
+	MainPaneTitleLaunchCommand = "Launch Command"
+	MainPaneTitleServerOutput  = "Server Output"
 )
 
 // Column-width defaults for the model table.

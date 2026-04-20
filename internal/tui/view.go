@@ -2,117 +2,122 @@ package tui
 
 import (
 	"fmt"
+	"image/color"
 	"strings"
 	"time"
 
-	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/flyingnobita/llml/internal/models"
 )
 
-// serverLogPaneView renders the bordered server log viewport and, when vertical
-// scrolling is possible, a text-mode scroll track beside it (█/░).
-func (m Model) serverLogPaneView() string {
-	vp := m.server.viewport.View()
-	if m.server.viewport.TotalLineCount() <= m.server.viewport.VisibleLineCount() {
-		return vp
+// mainPaneCaptionLine renders a full-width pane caption (lipgloss v2 has no border Title API).
+func (m Model) mainPaneCaptionLine(title string, titleStyle lipgloss.Style) string {
+	iw := m.innerWidth()
+	if iw < minInnerWidth {
+		iw = minInnerWidth
 	}
-	trackH := lipgloss.Height(vp)
+	return titleStyle.Width(iw).Render(title)
+}
+
+// titledPaneStyle returns a bold title style using focusedColor when focused, else dimColor.
+func titledPaneStyle(focused bool, focusedColor, dimColor color.Color) lipgloss.Style {
+	st := lipgloss.NewStyle().Bold(true)
+	if focused {
+		return st.Foreground(focusedColor)
+	}
+	return st.Foreground(dimColor)
+}
+
+func (m Model) launchPreviewPaneTitleStyle() lipgloss.Style {
+	return titledPaneStyle(m.preview.focused, m.ui.theme.SplitPaneBorderFocused, m.ui.theme.Border)
+}
+
+func (m Model) serverLogPaneTitleStyle() lipgloss.Style {
+	return titledPaneStyle(m.server.splitFocused, m.ui.theme.SplitPaneBorderFocused, m.ui.theme.SplitPaneBorderDim)
+}
+
+// serverLogPaneView renders the bordered server log viewport and, when vertical
+// withVScrollBar appends a vertical scroll-bar column to content at the given scroll percent.
+// Returns content unchanged when the bar would be empty (trackH < 2).
+func (m Model) withVScrollBar(content string, pct float64) string {
+	trackH := lipgloss.Height(content)
 	if trackH < 1 {
 		trackH = 1
 	}
-	col := verticalScrollBarColumn(viewportVerticalScrollPercent(m.server.viewport), trackH)
+	col := verticalScrollBarColumn(pct, trackH)
+	if col == "" {
+		return content
+	}
 	col = m.ui.styles.scrollBarColumn.Render(col)
-	return lipgloss.JoinHorizontal(lipgloss.Top, vp, col)
+	return lipgloss.JoinHorizontal(lipgloss.Top, content, col)
 }
 
-// viewportVerticalScrollPercent returns [0,1] for vertical scroll position. The
-// upstream [viewport.Model.ScrollPercent] compares outer Height to total line count
-// and divides by (total−Height), which is wrong for bordered viewports (the maximum
-// Y offset uses total−Height+frameSize) and breaks when SoftWrap inflates total.
-func viewportVerticalScrollPercent(vp viewport.Model) float64 {
-	total := vp.TotalLineCount()
-	if total == 0 {
-		return 0
+// scrolling is possible, a text-mode scroll track beside it (█/░).
+func (m Model) serverLogPaneView() string {
+	title := m.mainPaneCaptionLine(MainPaneTitleServerOutput, m.serverLogPaneTitleStyle())
+	vp := m.server.viewport.View()
+	if m.server.viewport.TotalLineCount() <= m.server.viewport.VisibleLineCount() {
+		return lipgloss.JoinVertical(lipgloss.Left, title, vp)
 	}
-	vs := vp.Style.GetVerticalFrameSize()
-	maxY := total - vp.Height() + vs
-	if maxY <= 0 {
-		return 0
-	}
-	y := float64(vp.YOffset())
-	p := y / float64(maxY)
-	if p < 0 {
-		return 0
-	}
-	if p > 1 {
-		return 1
-	}
-	return p
-}
-
-// verticalScrollBarColumn renders a single-column scroll indicator: filled cells
-// from the top grow with scroll position ([viewportVerticalScrollPercent]).
-func verticalScrollBarColumn(pct float64, trackH int) string {
-	if trackH < 2 {
-		return ""
-	}
-	if pct < 0 {
-		pct = 0
-	}
-	if pct > 1 {
-		pct = 1
-	}
-	filled := int(pct * float64(trackH))
-	if filled > trackH {
-		filled = trackH
-	}
-	var b strings.Builder
-	for i := 0; i < trackH; i++ {
-		if i > 0 {
-			b.WriteByte('\n')
-		}
-		if i < filled {
-			b.WriteString("█")
-		} else {
-			b.WriteString("░")
-		}
-	}
-	return b.String()
+	row := m.withVScrollBar(vp, viewportVerticalScrollPercent(m.server.viewport))
+	return lipgloss.JoinVertical(lipgloss.Left, title, row)
 }
 
 // launchPreviewVisible is true when the main table lists models and a launch preview can be shown.
-func launchPreviewVisible(m Model) bool {
-	if m.loading || m.loadErr != nil || len(m.table.files) == 0 {
-		return false
-	}
-	return true
+func (m Model) launchPreviewVisible() bool {
+	return !m.loading && m.loadErr == nil && len(m.table.files) > 0
 }
 
 // launchPreviewScrollable is true when the launch command has more lines than the fixed preview height.
-func launchPreviewScrollable(m Model) bool {
-	return launchPreviewVisible(m) &&
+func (m Model) launchPreviewScrollable() bool {
+	return m.launchPreviewVisible() &&
 		m.preview.viewport.TotalLineCount() > m.preview.viewport.VisibleLineCount()
+}
+
+// modelTablePaneView renders the horizontal-scroll viewport around the model table and, when the
+// list overflows vertically (inner table body or outer wrapped content), a █/░ column beside it.
+func (m Model) modelTablePaneView() string {
+	vp := m.table.hscroll.View()
+	if len(m.table.files) == 0 {
+		return vp
+	}
+	trackH := lipgloss.Height(vp)
+	if trackH < 2 {
+		return vp
+	}
+	var pct float64
+	haveOuter := m.table.hscroll.TotalLineCount() > m.table.hscroll.VisibleLineCount()
+	if haveOuter {
+		pct = viewportVerticalScrollPercent(m.table.hscroll)
+	} else if len(m.table.files) > m.table.tbl.Height() {
+		n := len(m.table.files)
+		if n <= 1 {
+			pct = 0
+		} else {
+			pct = float64(m.table.tbl.Cursor()) / float64(n-1)
+		}
+	} else {
+		return vp
+	}
+	return m.withVScrollBar(vp, pct)
 }
 
 // launchPreviewPaneView renders the bordered, scrollable launch command viewport or "".
 func (m Model) launchPreviewPaneView() string {
-	if !launchPreviewVisible(m) {
+	if !m.launchPreviewVisible() {
 		return ""
 	}
+	title := m.mainPaneCaptionLine(MainPaneTitleLaunchCommand, m.launchPreviewPaneTitleStyle())
 	vp := m.preview.viewport.View()
-	if !launchPreviewScrollable(m) {
-		return m.ui.styles.launchPreview.Render(vp)
+	var inner string
+	if !m.launchPreviewScrollable() {
+		inner = vp
+	} else {
+		inner = m.withVScrollBar(vp, viewportVerticalScrollPercent(m.preview.viewport))
 	}
-	trackH := lipgloss.Height(vp)
-	if trackH < 1 {
-		trackH = 1
-	}
-	col := verticalScrollBarColumn(viewportVerticalScrollPercent(m.preview.viewport), trackH)
-	col = m.ui.styles.scrollBarColumn.Render(col)
-	row := lipgloss.JoinHorizontal(lipgloss.Top, vp, col)
-	return m.ui.styles.launchPreview.Render(row)
+	stack := lipgloss.JoinVertical(lipgloss.Left, title, inner)
+	return m.ui.styles.launchPreview.Render(stack)
 }
 
 // runtimePanelView renders the runtimes summary (label = value per line) for the runtime
@@ -137,8 +142,6 @@ func runtimePanelView(m Model, contentWidth int) string {
 	inner := m.ui.styles.paramSectionHeading.Render("Active Configuration") + "\n" + block
 	return m.ui.styles.runtimePanel.Width(contentWidth).Render(inner)
 }
-
-const appTitle = "LLM Launcher"
 
 // lastRunNoteView renders lastRunNote as one styled line per newline-separated
 // segment below the main footer (not shown inside the runtime-environment modal).
@@ -220,7 +223,6 @@ func mainChromeLines(m Model, needsTableHBar bool, needsLogHBar bool) int {
 	if strings.TrimSpace(appSubtitle) != "" {
 		n += lipgloss.Height(m.ui.styles.subtitle.Render(appSubtitle))
 	}
-	n += 1
 
 	if needsTableHBar && len(m.table.files) > 0 {
 		if bar := horizontalScrollBarLine(0, iw); bar != "" {
@@ -234,7 +236,6 @@ func mainChromeLines(m Model, needsTableHBar bool, needsLogHBar bool) int {
 		}
 	}
 
-	n += 1
 	n += lipgloss.Height(m.ui.styles.footer.Render(footerHelpLine(m)))
 
 	if m.lastRunNote != "" {
@@ -330,15 +331,67 @@ func (m Model) modalTitleRow(innerW int, titleStyle lipgloss.Style, plain string
 	return m.joinLeftAndToast(innerW, left)
 }
 
+// mainAppModelListBody renders the model-table stack (table viewport, optional h-scroll row,
+// launch preview, optional server log). minTableScrollH is the outer hscroll viewport height;
+// use -1 to size the viewport to the natural height of tbl.View(). Returns the rendered body
+// and the hscroll height applied (for absorbing leftover terminal rows inside the table chrome).
+func (m Model) mainAppModelListBody(iw int, minTableScrollH int) (body string, appliedScrollH int) {
+	tview := m.table.tbl.View()
+	th := strings.Count(tview, "\n") + 1
+	if th < 1 {
+		th = 1
+	}
+	appliedScrollH = th
+	if minTableScrollH > appliedScrollH {
+		appliedScrollH = minTableScrollH
+	}
+	m.table.hscroll.SetContent(tview)
+	m.table.hscroll.SetWidth(iw)
+	m.table.hscroll.SetHeight(appliedScrollH)
+	preview := m.launchPreviewPaneView()
+	var parts []string
+	parts = append(parts, m.modelTablePaneView())
+	if m.layout.tableNeedsHScroll {
+		if line := horizontalScrollBarLine(m.table.hscroll.HorizontalScrollPercent(), iw); line != "" {
+			parts = append(parts, m.ui.styles.footer.Render(line))
+		}
+	}
+	if preview != "" {
+		parts = append(parts, preview)
+	}
+	if m.server.running {
+		if m.server.viewportH > 0 {
+			m.server.viewport.SetHeight(m.server.viewportH)
+		}
+		parts = append(parts, m.serverLogPaneView())
+		if m.serverLogNeedsHorizontalScroll() {
+			if line := horizontalScrollBarLine(m.server.viewport.HorizontalScrollPercent(), iw); line != "" {
+				parts = append(parts, m.ui.styles.footer.Render(line))
+			}
+		}
+		body = lipgloss.JoinVertical(lipgloss.Left, parts...)
+	} else {
+		if len(parts) == 1 {
+			body = parts[0]
+		} else {
+			body = lipgloss.JoinVertical(lipgloss.Left, parts...)
+		}
+	}
+	return body, appliedScrollH
+}
+
 // mainAppPlacedView renders the primary UI (title, model table, server log when
-// running, footer, …) as a full-width, full-height string. Used for the normal
-// view and as the backdrop when a centered modal (parameters, runtime config) is open.
+// running, footer, …) as a full-width string whose height matches the terminal.
+// Extra vertical slack is absorbed inside the bordered table viewport (not as blank
+// rows between title and table or between the preview and footer).
+// Used for the normal view and as the backdrop when a centered modal is open.
 func (m Model) mainAppPlacedView() string {
 	iw := m.innerWidth()
 
 	title := m.appTitleBlock(iw)
 
 	var body string
+	tableScrollBase := 0
 	switch {
 	case m.loading:
 		body = m.ui.styles.body.Render("Scanning for models…")
@@ -347,80 +400,61 @@ func (m Model) mainAppPlacedView() string {
 	case len(m.table.files) == 0:
 		body = m.ui.styles.body.Render(fmt.Sprintf("No GGUF or safetensors models found. Press '%s' to add search paths, or place models under ~/models, ~/.cache/huggingface/hub, etc.", FooterKeyModelPaths))
 	default:
-		m.table.hscroll.SetContent(m.table.tbl.View())
-		th := m.layout.tableBodyH
-		if th < 1 {
-			th = defaultTableHeight
-		}
-		m.table.hscroll.SetWidth(iw)
-		m.table.hscroll.SetHeight(th)
-		preview := m.launchPreviewPaneView()
-		var parts []string
-		parts = append(parts, m.table.hscroll.View())
-		if m.layout.tableNeedsHScroll {
-			if line := horizontalScrollBarLine(m.table.hscroll.HorizontalScrollPercent(), iw); line != "" {
-				parts = append(parts, m.ui.styles.footer.Render(line))
-			}
-		}
-		if preview != "" {
-			parts = append(parts, preview)
-		}
-		if m.server.running {
-			if m.server.viewportH > 0 {
-				m.server.viewport.SetHeight(m.server.viewportH)
-			}
-			parts = append(parts, m.serverLogPaneView())
-			if m.serverLogNeedsHorizontalScroll() {
-				if line := horizontalScrollBarLine(m.server.viewport.HorizontalScrollPercent(), iw); line != "" {
-					parts = append(parts, m.ui.styles.footer.Render(line))
-				}
-			}
-			body = lipgloss.JoinVertical(lipgloss.Left, parts...)
-		} else {
-			if len(parts) == 1 {
-				body = parts[0]
-			} else {
-				body = lipgloss.JoinVertical(lipgloss.Left, parts...)
-			}
-		}
+		var ash int
+		body, ash = m.mainAppModelListBody(iw, -1)
+		tableScrollBase = ash
 	}
 
 	footer := m.ui.styles.footer.Render(footerHelpLine(m))
 
-	rows := []string{title}
+	headerParts := []string{title}
 	if strings.TrimSpace(appSubtitle) != "" {
-		rows = append(rows, m.ui.styles.subtitle.Render(appSubtitle))
+		headerParts = append(headerParts, m.ui.styles.subtitle.Render(appSubtitle))
 	}
-	rows = append(rows, "", body, "", footer)
-	if m.lastRunNote != "" {
-		rows = append(rows, m.lastRunNoteView())
-	}
-	block := lipgloss.JoinVertical(lipgloss.Left, rows...)
-	framed := m.ui.styles.app.Render(block)
+	header := lipgloss.JoinVertical(lipgloss.Left, headerParts...)
 
-	placed := lipgloss.Place(m.layout.width, m.layout.height, lipgloss.Center, lipgloss.Top, framed)
-	return clampRenderedHeightKeepTopBottom(placed, m.layout.height)
+	tailParts := []string{body, footer}
+	if m.lastRunNote != "" {
+		tailParts = append(tailParts, m.lastRunNoteView())
+	}
+	tail := lipgloss.JoinVertical(lipgloss.Left, tailParts...)
+
+	combined := lipgloss.JoinVertical(lipgloss.Left, header, tail)
+	framed := m.ui.styles.app.Render(combined)
+
+	target := m.layout.height
+	if target > 0 && tableScrollBase > 0 {
+		pad := target - lipgloss.Height(framed)
+		if pad > 0 {
+			body, _ = m.mainAppModelListBody(iw, tableScrollBase+pad)
+			tailParts = []string{body, footer}
+			if m.lastRunNote != "" {
+				tailParts = append(tailParts, m.lastRunNoteView())
+			}
+			tail = lipgloss.JoinVertical(lipgloss.Left, tailParts...)
+			combined = lipgloss.JoinVertical(lipgloss.Left, header, tail)
+			framed = m.ui.styles.app.Render(combined)
+		}
+	}
+
+	placed := lipgloss.PlaceHorizontal(m.layout.width, lipgloss.Center, framed)
+	return clampRenderedHeightKeepTopBottom(placed, target)
 }
 
-func clampRenderedHeightKeepTopBottom(s string, maxH int) string {
-	if maxH <= 0 {
-		return s
+// modalBlock returns the overlay content for whichever modal is currently open,
+// and true when any modal is open.
+func (m Model) modalBlock() (string, bool) {
+	switch {
+	case m.params.open:
+		return m.paramPanelModalBlock(), true
+	case m.helpOpen:
+		return m.helpPanelModalBlock(), true
+	case m.rc.open:
+		return m.runtimeConfigModalBlock(), true
+	case m.discovery.open:
+		return m.discoveryPathsModalBlock(), true
 	}
-	lines := strings.Split(s, "\n")
-	if len(lines) <= maxH {
-		return s
-	}
-	topKeep := maxH / 2
-	if topKeep < 1 {
-		topKeep = 1
-	}
-	bottomKeep := maxH - topKeep
-	if bottomKeep < 1 {
-		bottomKeep = 1
-	}
-	out := append([]string{}, lines[:topKeep]...)
-	out = append(out, lines[len(lines)-bottomKeep:]...)
-	return strings.Join(out, "\n")
+	return "", false
 }
 
 // View implements tea.Model.
@@ -428,34 +462,29 @@ func (m Model) View() tea.View {
 	if m.layout.width == 0 {
 		return tea.NewView("\n  Initializing…\n")
 	}
-	if m.params.open {
-		s := overlayCentered(m.mainAppPlacedView(), m.paramPanelModalBlock(), m.layout.width, m.layout.height)
-		v := tea.NewView(s)
-		v.AltScreen = true
-		return v
+	base := m.mainAppPlacedView()
+	if block, ok := m.modalBlock(); ok {
+		base = overlayCentered(base, block, m.layout.width, m.layout.height)
 	}
-	if m.helpOpen {
-		s := overlayCentered(m.mainAppPlacedView(), m.helpPanelModalBlock(), m.layout.width, m.layout.height)
-		v := tea.NewView(s)
-		v.AltScreen = true
-		return v
-	}
-	if m.rc.open {
-		s := overlayCentered(m.mainAppPlacedView(), m.runtimeConfigModalBlock(), m.layout.width, m.layout.height)
-		v := tea.NewView(s)
-		v.AltScreen = true
-		return v
-	}
-	if m.discovery.open {
-		s := overlayCentered(m.mainAppPlacedView(), m.discoveryPathsModalBlock(), m.layout.width, m.layout.height)
-		v := tea.NewView(s)
-		v.AltScreen = true
-		return v
-	}
-
-	v := tea.NewView(m.mainAppPlacedView())
+	v := tea.NewView(base)
 	v.AltScreen = true
 	return v
+}
+
+// discoveryRow renders one editable path row (with inline edit input when active).
+func (m Model) discoveryRow(i int, p string) string {
+	prefix := "  "
+	if i == m.discovery.cursor {
+		prefix = "› "
+	}
+	if m.discovery.editOpen && i == m.discovery.cursor {
+		return m.ui.styles.body.Render(prefix) + m.discovery.editInput.View()
+	}
+	style := m.ui.styles.body
+	if i == m.discovery.cursor {
+		style = m.ui.styles.bodyBold
+	}
+	return style.Render(prefix + p)
 }
 
 // discoveryPathsModalBlock returns the framed discovery paths configuration panel.
@@ -466,95 +495,59 @@ func (m Model) discoveryPathsModalBlock() string {
 		m.ui.styles.subtitle.Width(cw).Render(discoveryPathsModalSubtitle),
 		"",
 	}
-
 	for i, p := range m.discovery.paths {
-		prefix := "  "
-		if i == m.discovery.cursor {
-			prefix = "› "
-		}
-		if m.discovery.editOpen && i == m.discovery.cursor {
-			rows = append(rows, m.ui.styles.body.Render(prefix)+m.discovery.editInput.View())
-		} else {
-			style := m.ui.styles.body
-			if i == m.discovery.cursor {
-				style = m.ui.styles.bodyBold
-			}
-			rows = append(rows, style.Render(prefix+p))
-		}
+		rows = append(rows, m.discoveryRow(i, p))
 	}
-
 	if m.discovery.editOpen && m.discovery.cursor == len(m.discovery.paths) {
 		rows = append(rows, m.ui.styles.body.Render("› ")+m.discovery.editInput.View())
 	}
-
 	if len(m.discovery.paths) == 0 && !m.discovery.editOpen {
 		rows = append(rows, m.ui.styles.bodyDim.Render("  (No extra paths configured)"))
 	}
-
-	rows = append(rows, "")
-	rows = append(rows, m.ui.styles.body.Render("Defaults (Read-Only):"))
-
+	rows = append(rows, "", m.ui.styles.body.Render("Defaults (Read-Only):"))
 	for _, p := range models.DefaultSearchRoots() {
 		rows = append(rows, m.ui.styles.bodyDim.Render("  "+p))
 	}
-
-	rows = append(rows, "")
-	rows = append(rows, m.ui.styles.footer.Render(FooterDiscoveryPathsHints))
-
+	rows = append(rows, "", m.ui.styles.footer.Render(FooterDiscoveryPathsHints))
 	block := lipgloss.JoinVertical(lipgloss.Left, rows...)
 	return m.ui.styles.portConfigBox.Render(block)
+}
+
+// runtimeFieldRow renders a label + input pair for one runtime config field.
+func (m Model) runtimeFieldRow(fieldID runtimeField, label string) []string {
+	prefix := "  "
+	if m.rc.focus == fieldID {
+		prefix = "› "
+	}
+	return []string{
+		m.ui.styles.body.Render(prefix + label),
+		m.rc.inputs[fieldID].View(),
+	}
 }
 
 // runtimeConfigModalBlock returns the framed runtime configuration panel only
 // (no full-screen placement). Composed over the main view via [overlayCentered].
 // [runtimePanelView] is shown under the title.
 func (m Model) runtimeConfigModalBlock() string {
-	label := func(focused bool, name string) string {
-		prefix := "  "
-		if focused {
-			prefix = "› "
-		}
-		return m.ui.styles.body.Render(prefix + name)
-	}
-	header := func(text string) string {
-		return m.ui.styles.bodyBold.Render(text)
-	}
 	cw := m.paramPanelContentWidth()
+	header := func(text string) string { return m.ui.styles.bodyBold.Render(text) }
 
-	// Build the llama.cpp column
-	llamaRows := []string{
-		header(runtimeConfigHeaderLlama),
-		"",
-		label(m.rc.focus == runtimeFieldLlamaCppPath, runtimeConfigLabelLlamaCppPath),
-		m.rc.inputs[runtimeFieldLlamaCppPath].View(),
-		"",
-		label(m.rc.focus == runtimeFieldLlamaPort, runtimeConfigLabelLlamaPort),
-		m.rc.inputs[runtimeFieldLlamaPort].View(),
-	}
+	llamaRows := append([]string{header(runtimeConfigHeaderLlama), ""},
+		append(m.runtimeFieldRow(runtimeFieldLlamaCppPath, runtimeConfigLabelLlamaCppPath),
+			append([]string{""}, m.runtimeFieldRow(runtimeFieldLlamaPort, runtimeConfigLabelLlamaPort)...)...)...)
 	llamaBlock := lipgloss.JoinVertical(lipgloss.Left, llamaRows...)
 
-	// Build the vLLM column
-	vllmRows := []string{
-		header(runtimeConfigHeaderVLLM),
-		"",
-		label(m.rc.focus == runtimeFieldVLLMPath, runtimeConfigLabelVLLMPath),
-		m.rc.inputs[runtimeFieldVLLMPath].View(),
-		"",
-		label(m.rc.focus == runtimeFieldVLLMVenv, runtimeConfigLabelVLLMVenv),
-		m.rc.inputs[runtimeFieldVLLMVenv].View(),
-		"",
-		label(m.rc.focus == runtimeFieldVLLMPort, runtimeConfigLabelVLLMPort),
-		m.rc.inputs[runtimeFieldVLLMPort].View(),
-	}
+	vllmRows := append([]string{header(runtimeConfigHeaderVLLM), ""},
+		append(m.runtimeFieldRow(runtimeFieldVLLMPath, runtimeConfigLabelVLLMPath),
+			append([]string{""},
+				append(m.runtimeFieldRow(runtimeFieldVLLMVenv, runtimeConfigLabelVLLMVenv),
+					append([]string{""}, m.runtimeFieldRow(runtimeFieldVLLMPort, runtimeConfigLabelVLLMPort)...)...)...)...)...)
 	vllmBlock := lipgloss.JoinVertical(lipgloss.Left, vllmRows...)
 
 	var inputBlock string
 	if cw >= 80 {
-		// Side-by-side layout: llama on left, vLLM on right
-		vllmBlock = m.ui.styles.body.PaddingLeft(4).Render(vllmBlock)
-		inputBlock = lipgloss.JoinHorizontal(lipgloss.Top, llamaBlock, vllmBlock)
+		inputBlock = lipgloss.JoinHorizontal(lipgloss.Top, llamaBlock, m.ui.styles.body.PaddingLeft(4).Render(vllmBlock))
 	} else {
-		// Stacked layout: llama then vLLM
 		inputBlock = lipgloss.JoinVertical(lipgloss.Left, llamaBlock, "", vllmBlock)
 	}
 
@@ -571,41 +564,4 @@ func (m Model) runtimeConfigModalBlock() string {
 	}
 	block := lipgloss.JoinVertical(lipgloss.Left, rows...)
 	return m.ui.styles.portConfigBox.Render(block)
-}
-
-// SelectedModel returns the filesystem path and backend for the highlighted row.
-func (m Model) SelectedModel() (path string, backend models.ModelBackend) {
-	if len(m.table.tbl.Rows()) == 0 || m.table.tbl.Cursor() < 0 {
-		return "", models.BackendLlama
-	}
-	i := m.table.tbl.Cursor()
-	if i < 0 || i >= len(m.table.files) {
-		return "", models.BackendLlama
-	}
-	return m.table.files[i].Path, m.table.files[i].Backend
-}
-
-// SelectedPath returns the full path of the highlighted row, or empty if none.
-func (m Model) SelectedPath() string {
-	p, _ := m.SelectedModel()
-	return p
-}
-
-// horizontalScrollBarLine renders a filled track (█) and remainder (░) for horizontal scroll position.
-func horizontalScrollBarLine(pct float64, maxWidth int) string {
-	if maxWidth < 14 {
-		return ""
-	}
-	inner := maxWidth - 4
-	if inner < 8 {
-		return ""
-	}
-	filled := int(pct * float64(inner))
-	if filled > inner {
-		filled = inner
-	}
-	if filled < 0 {
-		filled = 0
-	}
-	return "  " + strings.Repeat("█", filled) + strings.Repeat("░", inner-filled) + "  "
 }

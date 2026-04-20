@@ -42,11 +42,14 @@ func themeToastText(pick int, resolved Theme) string {
 // Theme holds semantic colors for the TUI. All values are image/color.Color
 // values, typically created via lipgloss.Color("ANSI-or-hex-string").
 type Theme struct {
-	Title        color.Color
-	Subtitle     color.Color
-	Body         color.Color
-	Footer       color.Color
-	Error        color.Color
+	Title    color.Color
+	Subtitle color.Color
+	Body     color.Color
+	Footer   color.Color
+	Error    color.Color
+	// Border is the default pane and modal border color. In split-server mode it
+	// is also the inactive split-pane chrome (dim model table, launch preview,
+	// server log borders) when keyboard focus is on another pane.
 	Border       color.Color
 	RuntimePanel color.Color
 	ModalTitle   color.Color
@@ -61,21 +64,24 @@ type Theme struct {
 	ParamProfileName color.Color
 	// ParamProfileInactive is used for non-active profile names in the params modal list.
 	ParamProfileInactive color.Color
-	// SplitPaneBorderFocused / SplitPaneBorderDim frame the table and log panes in
-	// split-server mode so the keyboard-focused pane reads brighter than the other.
+	// SplitPaneBorderFocused accents the keyboard-focused pane in split-server mode.
 	SplitPaneBorderFocused color.Color
-	SplitPaneBorderDim     color.Color
+	// SplitPaneBorderDim matches Border (same lipgloss.Color in theme constructors)
+	// so dim split panes and inactive launch preview use one grey; kept separate so
+	// splitPaneChromeDim in styles stays semantically named.
+	SplitPaneBorderDim color.Color
 }
 
 // DarkTheme returns the default dark-terminal palette (original llml colors).
 func DarkTheme() Theme {
+	border := lipgloss.Color("240")
 	return Theme{
 		Title:        lipgloss.Color("99"),
 		Subtitle:     lipgloss.Color("241"),
 		Body:         lipgloss.Color("252"),
 		Footer:       lipgloss.Color("240"),
 		Error:        lipgloss.Color("203"),
-		Border:       lipgloss.Color("240"),
+		Border:       border,
 		RuntimePanel: lipgloss.Color("246"),
 		// Brighter orchid than main Title (99); modal chrome reads as its own layer.
 		ModalTitle: lipgloss.Color("183"),
@@ -90,19 +96,20 @@ func DarkTheme() Theme {
 		ParamProfileName:       lipgloss.Color("178"),
 		ParamProfileInactive:   lipgloss.Color("246"),
 		SplitPaneBorderFocused: lipgloss.Color("51"),
-		SplitPaneBorderDim:     lipgloss.Color("238"),
+		SplitPaneBorderDim:     border,
 	}
 }
 
 // LightTheme returns a palette tuned for light terminal backgrounds.
 func LightTheme() Theme {
+	border := lipgloss.Color("249")
 	return Theme{
 		Title:        lipgloss.Color("55"),
 		Subtitle:     lipgloss.Color("243"),
 		Body:         lipgloss.Color("235"),
 		Footer:       lipgloss.Color("249"),
 		Error:        lipgloss.Color("160"),
-		Border:       lipgloss.Color("249"),
+		Border:       border,
 		RuntimePanel: lipgloss.Color("238"),
 		// Richer purple than main Title (55); dialogs stand out from the header.
 		ModalTitle: lipgloss.Color("99"),
@@ -117,7 +124,7 @@ func LightTheme() Theme {
 		ParamProfileName:       lipgloss.Color("30"),
 		ParamProfileInactive:   lipgloss.Color("238"),
 		SplitPaneBorderFocused: lipgloss.Color("27"),
-		SplitPaneBorderDim:     lipgloss.Color("243"),
+		SplitPaneBorderDim:     border,
 	}
 }
 

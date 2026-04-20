@@ -58,37 +58,19 @@ func DefaultSearchRoots() []string {
 // If skipDefaults is true, default home directories are omitted (tests, isolated scans).
 // Entries that do not exist are skipped later during discovery.
 func MergeSearchRoots(extra []string, skipDefaults bool) []string {
-	seen := make(map[string]struct{})
-	var out []string
-
-	add := func(p string) {
-		p = filepath.Clean(ExpandTildePath(p))
-		if p == "" || p == "." {
-			return
-		}
-		if _, ok := seen[p]; ok {
-			return
-		}
-		seen[p] = struct{}{}
-		out = append(out, p)
-	}
+	ps := NewPathSet()
 	if !skipDefaults {
 		for _, p := range DefaultSearchRoots() {
-			add(p)
+			ps.Add(p)
 		}
 	}
 	if v := os.Getenv(EnvModelPaths); v != "" {
-		for _, part := range strings.Split(v, ",") {
-			part = strings.TrimSpace(part)
-			if part != "" {
-				add(part)
-			}
+		for part := range strings.SplitSeq(v, ",") {
+			ps.Add(part)
 		}
 	}
 	for _, p := range extra {
-		if p != "" {
-			add(p)
-		}
+		ps.Add(p)
 	}
-	return out
+	return ps.Slice()
 }

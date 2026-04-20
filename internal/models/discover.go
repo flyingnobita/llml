@@ -44,25 +44,17 @@ type Options struct {
 	SkipDefaultRoots bool
 }
 
-// Discover scans configured paths for .gguf files and Hugging Face-style safetensors directories
-// (config.json + *.safetensors) in a single filesystem walk, dedupes, sorts by path, and fills
-// Parameters. isAuxiliaryModel is applied to both backends after Parameters is populated.
-func Discover(opts Options) ([]ModelFile, error) {
-	maxD := opts.MaxDepth
-	if maxD <= 0 {
-		maxD = DefaultMaxDepth
-	}
-	roots := MergeSearchRoots(opts.ExtraRoots, opts.SkipDefaultRoots)
+// candidate is an internal (source-index, path) pair used during filesystem scan.
+type candidate struct {
+	srcIdx int
+	path   string
+}
 
-	sources := []modelSource{ggufSource{}, safetensorsSource{}}
-
-	type candidate struct {
-		srcIdx int
-		path   string
-	}
+// collectCandidates walks all roots and returns deduplicated (source, path) pairs in
+// walk order. Non-existent roots are silently skipped.
+func collectCandidates(roots []string, sources []modelSource, maxD int) ([]candidate, error) {
 	seen := make(map[candidate]struct{})
 	var ordered []candidate
-
 	for _, root := range roots {
 		if st, err := os.Stat(root); err != nil || !st.IsDir() {
 			continue
@@ -82,9 +74,13 @@ func Discover(opts Options) ([]ModelFile, error) {
 			return nil, err
 		}
 	}
+	return ordered, nil
+}
 
+// buildModelFiles converts candidates to ModelFile values, filtering auxiliary models.
+func buildModelFiles(candidates []candidate, sources []modelSource) []ModelFile {
 	var out []ModelFile
-	for _, c := range ordered {
+	for _, c := range candidates {
 		mf, ok := sources[c.srcIdx].build(c.path)
 		if !ok {
 			continue
@@ -94,7 +90,26 @@ func Discover(opts Options) ([]ModelFile, error) {
 		}
 		out = append(out, mf)
 	}
+	return out
+}
 
+// Discover scans configured paths for .gguf files and Hugging Face-style safetensors directories
+// (config.json + *.safetensors) in a single filesystem walk, dedupes, sorts by path, and fills
+// Parameters. isAuxiliaryModel is applied to both backends after Parameters is populated.
+func Discover(opts Options) ([]ModelFile, error) {
+	maxD := opts.MaxDepth
+	if maxD <= 0 {
+		maxD = DefaultMaxDepth
+	}
+	roots := MergeSearchRoots(opts.ExtraRoots, opts.SkipDefaultRoots)
+	sources := []modelSource{ggufSource{}, safetensorsSource{}}
+
+	candidates, err := collectCandidates(roots, sources, maxD)
+	if err != nil {
+		return nil, err
+	}
+
+	out := buildModelFiles(candidates, sources)
 	sort.Slice(out, func(i, j int) bool {
 		return out[i].Path < out[j].Path
 	})

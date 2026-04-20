@@ -18,8 +18,16 @@ func TestShellSingleQuoted(t *testing.T) {
 	}
 }
 
+func llamaSpec(bin, modelPath string, port int, params ModelParams) serverSpec {
+	return serverSpec{backend: models.BackendLlama, bin: bin, port: port, modelPath: modelPath, params: params}
+}
+
+func vllmSpec(bin, modelPath string, port int, activateScript string, params ModelParams) serverSpec {
+	return serverSpec{backend: models.BackendVLLM, bin: bin, port: port, modelPath: modelPath, params: params, activateScript: activateScript}
+}
+
 func TestFormatLlamaServerInvocation(t *testing.T) {
-	got := formatLlamaServerInvocation("/bin/llama-server", "/m/a.gguf", 9090, ModelParams{})
+	got := llamaSpec("/bin/llama-server", "/m/a.gguf", 9090, ModelParams{}).invocationEcho()
 	want := "" +
 		"+ '/bin/llama-server' \\\n" +
 		"  --model '/m/a.gguf' \\\n" +
@@ -32,14 +40,14 @@ func TestFormatLlamaServerInvocation(t *testing.T) {
 		Env:  []EnvVar{{Key: "FOO", Value: "bar"}},
 		Args: []string{"--n-gpu-layers", "99"},
 	}
-	got2 := formatLlamaServerInvocation("/bin/llama-server", "/m/a.gguf", 9090, p)
+	got2 := llamaSpec("/bin/llama-server", "/m/a.gguf", 9090, p).invocationEcho()
 	if !strings.Contains(got2, "FOO='bar'") || !strings.Contains(got2, "--n-gpu-layers") {
 		t.Fatalf("expected env and args: %q", got2)
 	}
 }
 
 func TestFormatVLLMServerInvocation(t *testing.T) {
-	got := formatVLLMServerInvocation("/bin/vllm", "/m/hf-model", 9090, "", ModelParams{})
+	got := vllmSpec("/bin/vllm", "/m/hf-model", 9090, "", ModelParams{}).invocationEcho()
 	want := "" +
 		"+ '/bin/vllm' \\\n" +
 		"  serve \\\n" +
@@ -49,7 +57,7 @@ func TestFormatVLLMServerInvocation(t *testing.T) {
 	if got != want {
 		t.Fatalf("got %q want %q", got, want)
 	}
-	got2 := formatVLLMServerInvocation("/bin/vllm", "/m/hf-model", 9090, "/proj/.venv/bin/activate", ModelParams{})
+	got2 := vllmSpec("/bin/vllm", "/m/hf-model", 9090, "/proj/.venv/bin/activate", ModelParams{}).invocationEcho()
 	want2 := "" +
 		"+ . '/proj/.venv/bin/activate' && \\\n" +
 		"  '/bin/vllm' \\\n" +
@@ -81,7 +89,7 @@ func TestSplitServerInvocationEcho_matchesLlamaSplitLogLine(t *testing.T) {
 		Env:  []EnvVar{{Key: "FOO", Value: "bar"}},
 		Args: []string{"--n-gpu-layers", "99"},
 	}
-	want := formatLlamaServerInvocation("/bin/llama-server", modelPath, 9090, p)
+	want := llamaSpec("/bin/llama-server", modelPath, 9090, p).invocationEcho()
 	ent := modelEntry{
 		Profiles: []ParameterProfile{
 			{Name: "default", Env: p.Env, Args: p.Args},
@@ -97,7 +105,7 @@ func TestSplitServerInvocationEcho_matchesLlamaSplitLogLine(t *testing.T) {
 		t.Fatalf("got %q want %q", got, want)
 	}
 
-	wantPreview := shellCommandDisplayMultiline(false, "", p.Env, llamaCommandWords("/bin/llama-server", modelPath, 9090, p))
+	wantPreview := llamaSpec("/bin/llama-server", modelPath, 9090, p).previewLine()
 	if g := launchPreviewCommandLine(m); g != wantPreview {
 		t.Fatalf("launchPreviewCommandLine got %q want %q", g, wantPreview)
 	}
@@ -126,7 +134,8 @@ func TestLaunchPreviewCommandLine_vllmOmitsActivateWrapper(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := shellCommandDisplayMultiline(false, "", p.Env, vllmCommandWords("/proj/.venv/bin/vllm", modelPath, 8000, p))
+	// previewLine omits the activate wrapper — use a spec with no activateScript
+	want := vllmSpec("/proj/.venv/bin/vllm", modelPath, 8000, "", p).previewLine()
 	g := launchPreviewCommandLine(m)
 	if g != want {
 		t.Fatalf("got %q want %q", g, want)
@@ -137,21 +146,21 @@ func TestLaunchPreviewCommandLine_vllmOmitsActivateWrapper(t *testing.T) {
 }
 
 func TestUnixVLLMServerScript_containsRead(t *testing.T) {
-	s := unixVLLMServerScript("/bin/vllm", "/m/model-dir", 8080, "", ModelParams{})
+	s := vllmSpec("/bin/vllm", "/m/model-dir", 8080, "", ModelParams{}).unixForegroundScript()
 	if !strings.Contains(s, "read -r _") {
 		t.Fatalf("expected read pause: %q", s)
 	}
 	if !strings.Contains(s, "'/bin/vllm' serve") {
 		t.Fatalf("expected vllm serve: %q", s)
 	}
-	s2 := unixVLLMServerScript("/bin/vllm", "/m/model-dir", 8080, "/x/.venv/bin/activate", ModelParams{})
+	s2 := vllmSpec("/bin/vllm", "/m/model-dir", 8080, "/x/.venv/bin/activate", ModelParams{}).unixForegroundScript()
 	if !strings.Contains(s2, ". '/x/.venv/bin/activate'") {
 		t.Fatalf("expected venv source: %q", s2)
 	}
 }
 
 func TestUnixLlamaServerScript_containsRead(t *testing.T) {
-	s := unixLlamaServerScript("/bin/llama-server", "/m/model.gguf", 8080, ModelParams{})
+	s := llamaSpec("/bin/llama-server", "/m/model.gguf", 8080, ModelParams{}).unixForegroundScript()
 	if !strings.Contains(s, "read -r _") {
 		t.Fatalf("expected read pause: %q", s)
 	}
@@ -164,7 +173,7 @@ func TestUnixLlamaServerScript_containsRead(t *testing.T) {
 }
 
 func TestUnixVLLMSplitScript_mergesStderr(t *testing.T) {
-	s := unixVLLMSplitScript("/bin/vllm", "/m/model-dir", 8080, "", ModelParams{})
+	s := vllmSpec("/bin/vllm", "/m/model-dir", 8080, "", ModelParams{}).unixSplitScript()
 	if !strings.HasSuffix(strings.TrimSpace(s), "2>&1") {
 		t.Fatalf("expected 2>&1 suffix: %q", s)
 	}

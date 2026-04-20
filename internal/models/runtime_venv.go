@@ -33,6 +33,21 @@ func isRegularFile(path string) bool {
 	return err == nil && !st.IsDir() && st.Mode().IsRegular()
 }
 
+// pickExistingFile returns unixPath on non-Windows or windowsPath on Windows, if the
+// chosen path is a regular file. Returns "" if the file does not exist.
+func pickExistingFile(unixPath, windowsPath string) string {
+	if runtime.GOOS == "windows" {
+		if isRegularFile(windowsPath) {
+			return windowsPath
+		}
+		return ""
+	}
+	if isRegularFile(unixPath) {
+		return unixPath
+	}
+	return ""
+}
+
 // activateAdjacentToVLLM returns the activate script in the same directory as the vllm
 // executable (standard layout: .venv/bin/vllm next to .venv/bin/activate).
 func activateAdjacentToVLLM(vllmBin string) string {
@@ -40,18 +55,10 @@ func activateAdjacentToVLLM(vllmBin string) string {
 		return ""
 	}
 	dir := filepath.Dir(vllmBin)
-	if runtime.GOOS == "windows" {
-		p := filepath.Join(dir, "activate.bat")
-		if isRegularFile(p) {
-			return p
-		}
-		return ""
-	}
-	p := filepath.Join(dir, "activate")
-	if isRegularFile(p) {
-		return p
-	}
-	return ""
+	return pickExistingFile(
+		filepath.Join(dir, "activate"),
+		filepath.Join(dir, "activate.bat"),
+	)
 }
 
 // ResolveVLLMActivateScript returns an activate script path to source before `vllm serve`, or ""
@@ -92,18 +99,10 @@ func ResolveVLLMActivateScript(vllmBin string) string {
 // vllmBinaryInVenvRoot returns $venvRoot/bin/vllm (Unix) or $venvRoot/Scripts/vllm.exe (Windows) if present.
 func vllmBinaryInVenvRoot(venvRoot string) string {
 	venvRoot = filepath.Clean(venvRoot)
-	if runtime.GOOS == "windows" {
-		p := filepath.Join(venvRoot, "Scripts", "vllm.exe")
-		if isRegularFile(p) {
-			return p
-		}
-		return ""
-	}
-	p := filepath.Join(venvRoot, "bin", "vllm")
-	if isRegularFile(p) {
-		return p
-	}
-	return ""
+	return pickExistingFile(
+		filepath.Join(venvRoot, "bin", "vllm"),
+		filepath.Join(venvRoot, "Scripts", "vllm.exe"),
+	)
 }
 
 // vllmBinaryInProjectDotVenv returns $project/.venv/bin/vllm when that file exists.

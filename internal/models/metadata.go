@@ -9,30 +9,39 @@ import (
 	"github.com/abrander/gguf"
 )
 
+// withGGUFMetadata opens path as a GGUF file and calls fn with its metadata.
+// The file is closed before returning.
+func withGGUFMetadata(path string, fn func(gguf.Metadata) error) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	r, err := gguf.Open(f)
+	if err != nil {
+		return err
+	}
+	return fn(r.Metadata)
+}
+
 // GGUFGeneralName returns trimmed general.name from the GGUF file's KV metadata.
 // It returns an error if the file cannot be read, is not valid GGUF, the key is absent,
 // or the value is empty after trimming.
 func GGUFGeneralName(path string) (string, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return "", err
-	}
-	defer f.Close()
-
-	r, err := gguf.Open(f)
-	if err != nil {
-		return "", err
-	}
-
-	s, err := r.Metadata.String("general.name")
-	if err != nil {
-		return "", fmt.Errorf("general.name: %w", err)
-	}
-	s = strings.TrimSpace(s)
-	if s == "" {
-		return "", fmt.Errorf("general.name empty or missing")
-	}
-	return s, nil
+	var name string
+	err := withGGUFMetadata(path, func(meta gguf.Metadata) error {
+		s, err := meta.String("general.name")
+		if err != nil {
+			return fmt.Errorf("general.name: %w", err)
+		}
+		s = strings.TrimSpace(s)
+		if s == "" {
+			return fmt.Errorf("general.name empty or missing")
+		}
+		name = s
+		return nil
+	})
+	return name, err
 }
 
 var contextLengthKeys = []string{
@@ -47,37 +56,33 @@ var contextLengthKeys = []string{
 
 // ggufParamsSummary reads GGUF metadata for a compact Parameters cell.
 func ggufParamsSummary(path string) string {
-	f, err := os.Open(path)
-	if err != nil {
-		return "—"
-	}
-	defer f.Close()
-
-	r, err := gguf.Open(f)
-	if err != nil {
-		return "—"
-	}
-
-	var parts []string
-
-	if arch, err := r.Metadata.String("general.architecture"); err == nil && arch != "" {
-		parts = append(parts, arch)
-	}
-
-	for _, key := range contextLengthKeys {
-		if ctx, err := r.Metadata.Int(key); err == nil && ctx > 0 {
-			parts = append(parts, "ctx "+strconv.Itoa(ctx))
-			break
+	var result string
+	_ = withGGUFMetadata(path, func(meta gguf.Metadata) error {
+		var parts []string
+		if arch, err := meta.String("general.architecture"); err == nil && arch != "" {
+			parts = append(parts, arch)
 		}
-	}
-
-	if len(parts) == 0 {
-		if name, err := r.Metadata.String("general.name"); err == nil && name != "" {
-			return truncateMeta(name, 48)
+		for _, key := range contextLengthKeys {
+			if ctx, err := meta.Int(key); err == nil && ctx > 0 {
+				parts = append(parts, "ctx "+strconv.Itoa(ctx))
+				break
+			}
 		}
-		return "—"
+		if len(parts) == 0 {
+			if name, err := meta.String("general.name"); err == nil && name != "" {
+				result = truncateMeta(name, 48)
+				return nil
+			}
+			result = "—"
+			return nil
+		}
+		result = strings.Join(parts, " · ")
+		return nil
+	})
+	if result == "" {
+		result = "—"
 	}
-	return strings.Join(parts, " · ")
+	return result
 }
 
 // truncateMeta limits long general.name strings.

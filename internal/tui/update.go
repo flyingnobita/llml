@@ -5,7 +5,6 @@ import (
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
-	"github.com/atotto/clipboard"
 )
 
 // Update implements tea.Model.
@@ -36,70 +35,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case startupCacheHitMsg:
-		m.loading = false
-		m.loadErr = nil
-		m.runtime = msg.runtime
-		m.runtimeScanned = true
-		m.table.files = msg.files
-		m.table.lastScan = msg.lastScan
-		m.discovery.paths = msg.configPaths
-		sortModelFiles(m.table.files, m.table.sortCol, m.table.sortDesc)
-		m = m.layoutTable()
-		m.table.hscroll.SetXOffset(0)
-		if len(m.table.files) > 0 {
-			m.table.tbl.SetCursor(0)
-			m = m.withLaunchPreviewSynced()
-		}
-		return m.maybeSetMissingRuntimeFooterNote()
+		return m.applyScanResult(&msg.runtime, msg.files, msg.lastScan, msg.configPaths, nil, true)
 
 	case startupNeedFullScanMsg:
 		return m, applyAndFullScanCmd()
 
 	case fullScanDoneMsg:
-		m.loading = false
-		m.loadErr = nil
-		m.runtime = msg.runtime
-		m.runtimeScanned = true
-		m.table.files = msg.files
-		m.table.lastScan = msg.lastScan
-		m.discovery.paths = msg.configPaths
-		sortModelFiles(m.table.files, m.table.sortCol, m.table.sortDesc)
-		m = m.layoutTable()
-		m.table.hscroll.SetXOffset(0)
-		if len(m.table.files) > 0 {
-			m.table.tbl.SetCursor(0)
-			m = m.withLaunchPreviewSynced()
-		}
-		if msg.writeErr != nil {
-			m = m.withLastRunError("Could not save config: " + msg.writeErr.Error())
-			return m.maybeSetMissingRuntimeFooterNoteBatch(clearLastRunNoteAfterCmd())
-		}
-		m = m.withLastRunCleared()
-		return m.maybeSetMissingRuntimeFooterNote()
+		return m.applyScanResult(&msg.runtime, msg.files, msg.lastScan, msg.configPaths, msg.writeErr, true)
 
 	case modelRescanDoneMsg:
-		m.loading = false
-		m.loadErr = nil
-		m.table.files = msg.files
-		m.table.lastScan = msg.lastScan
-		m.discovery.paths = msg.configPaths
-		sortModelFiles(m.table.files, m.table.sortCol, m.table.sortDesc)
-		m = m.layoutTable()
-		m.table.hscroll.SetXOffset(0)
-		if len(m.table.files) > 0 && m.table.tbl.Cursor() >= len(m.table.files) {
-			m.table.tbl.SetCursor(len(m.table.files) - 1)
-			m = m.withLaunchPreviewSynced()
-		}
-		if msg.writeErr != nil {
-			m = m.withLastRunError("Could not save config: " + msg.writeErr.Error())
-			return m.maybeSetMissingRuntimeFooterNoteBatch(clearLastRunNoteAfterCmd())
-		}
-		m = m.withLastRunCleared()
-		return m.maybeSetMissingRuntimeFooterNote()
+		return m.applyScanResult(nil, msg.files, msg.lastScan, msg.configPaths, msg.writeErr, false)
 
 	case runtimeReloadErrMsg:
-		m = m.withLastRunError(msg.err.Error())
-		return m, clearLastRunNoteAfterCmd()
+		return m.flashError(msg.err.Error())
 
 	case modelsLoadedMsg:
 		m.loading = false
@@ -120,8 +68,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case runServerErrMsg:
-		m = m.withLastRunError(msg.err.Error())
-		return m, clearLastRunNoteAfterCmd()
+		return m.flashError(msg.err.Error())
 
 	case llamaServerExitedMsg:
 		if m.server.running {
@@ -250,45 +197,25 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m2, cmd
 	}
 	if key.Matches(msg, m.keys.RescanModels) {
-		if m.loading {
-			return m, nil
-		}
-		if m.server.running {
-			m = m.withLastRunError("Stop the server before re-scanning models.")
-			return m, clearLastRunNoteAfterCmd()
-		}
-		m.loading = true
-		m.loadErr = nil
-		m = m.withLastRunCleared()
-		return m, rescanModelsCmd()
+		return m.tryRescan(false)
 	}
 	if key.Matches(msg, m.keys.Refresh) {
-		if m.loading {
-			return m, nil
-		}
-		if m.server.running {
-			m = m.withLastRunError("Stop the server before reloading runtime.")
-			return m, clearLastRunNoteAfterCmd()
-		}
-		m = m.withLastRunCleared()
-		return m, reloadRuntimeCmd()
+		return m.tryReloadRuntime(false)
 	}
 	mode := runServerKeyMode(msg)
 	if mode != runServerModeNone {
 		if m.loading {
-			m = m.withLastRunError("Wait for the model scan to finish.")
-			return m, clearLastRunNoteAfterCmd()
+			return m.flashError("Wait for the model scan to finish.")
 		}
 		p, be := m.SelectedModel()
 		if p == "" {
-			m = m.withLastRunError("Select a model row first.")
-			return m, clearLastRunNoteAfterCmd()
+			return m.flashError("Select a model row first.")
 		}
 		m = m.withLastRunCleared()
 		params, _ := loadModelParamsForRun(p)
-		spec, err := buildServerSpec(be, p, params, m.runtime)
+		spec, err := buildServerSpec(be, p, params, m.runtime, true)
 		if err != nil {
-			return m.withLastRunError(err.Error()), clearLastRunNoteAfterCmd()
+			return m.flashError(err.Error())
 		}
 		if mode == runServerModeFullscreen {
 			return m, runForegroundServerCmd(spec)
@@ -300,7 +227,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.preview.viewport, cmd = m.preview.viewport.Update(msg)
 		return m, cmd
 	}
-	if launchPreviewVisible(m) && isTabKey(msg) {
+	if m.launchPreviewVisible() && isTabKey(msg) {
 		m.preview.focused = true
 		m.table.tbl.Blur()
 		m = m.applyMainPaneFocusStyles()
@@ -321,13 +248,15 @@ func (m Model) tableNavKeys(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 		return m2, cmd, true
 	case key.Matches(msg, m.keys.Parameters):
 		if m.loading {
-			return m.withLastRunError("Wait for the model scan to finish."), clearLastRunNoteAfterCmd(), true
+			m2, cmd := m.flashError("Wait for the model scan to finish.")
+			return m2, cmd, true
 		}
 		m2, cmd := m.openParamPanel()
 		return m2, cmd, true
 	case key.Matches(msg, m.keys.ModelPaths):
 		if m.loading {
-			return m.withLastRunError("Wait for the model scan to finish."), clearLastRunNoteAfterCmd(), true
+			m2, cmd := m.flashError("Wait for the model scan to finish.")
+			return m2, cmd, true
 		}
 		m2, cmd := m.openDiscoveryPathsModal()
 		return m2, cmd, true
@@ -368,36 +297,16 @@ func (m Model) tableNavKeys(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 // and focus is on the model table (navigation, refresh, horizontal scroll, etc.).
 func (m Model) updateServerSplitTableKeys(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	if key.Matches(msg, m.keys.RescanModels) {
-		if m.loading {
-			return m, nil
-		}
-		if m.server.running && !m.server.exited {
-			m = m.withLastRunError("Stop the server before re-scanning models.")
-			return m, clearLastRunNoteAfterCmd()
-		}
-		m.loading = true
-		m.loadErr = nil
-		m = m.withLastRunCleared()
-		return m, rescanModelsCmd()
+		return m.tryRescan(true)
 	}
 	if key.Matches(msg, m.keys.Refresh) {
-		if m.loading {
-			return m, nil
-		}
-		if m.server.running && !m.server.exited {
-			m = m.withLastRunError("Stop the server before reloading runtime.")
-			return m, clearLastRunNoteAfterCmd()
-		}
-		m = m.withLastRunCleared()
-		return m, reloadRuntimeCmd()
+		return m.tryReloadRuntime(true)
 	}
 	if runServerKeyMode(msg) != runServerModeNone {
 		if m.server.exited {
-			m = m.withLastRunError("Dismiss the log (enter, esc, or q) before starting another.")
-		} else {
-			m = m.withLastRunError("Stop the server (esc or q) before starting another.")
+			return m.flashError("Dismiss the log (enter, esc, or q) before starting another.")
 		}
-		return m, clearLastRunNoteAfterCmd()
+		return m.flashError("Stop the server (esc or q) before starting another.")
 	}
 	if m2, cmd, handled := m.tableNavKeys(msg); handled {
 		return m2, cmd
@@ -408,14 +317,42 @@ func (m Model) updateServerSplitTableKeys(msg tea.KeyPressMsg) (Model, tea.Cmd) 
 	return m, cmd
 }
 
-// copyLaunchCommandToClipboard writes the launch preview command and sets lastRunNote feedback.
-func copyLaunchCommandToClipboard(m Model) (Model, tea.Cmd) {
-	cmd := launchPreviewCommandLine(m)
-	if cmd == "" {
-		return m.withLastRunError(CopyCommandFeedbackFailure), clearLastRunNoteAfterCmd()
+// serverBlocksAction returns true when a running server should prevent rescan/reload.
+// When allowWhileExited is true, an exited-but-not-dismissed server does not block.
+func serverBlocksAction(m Model, allowWhileExited bool) bool {
+	if !m.server.running {
+		return false
 	}
-	if err := clipboard.WriteAll(cmd); err != nil {
-		return m.withLastRunError(CopyCommandFeedbackFailure), clearLastRunNoteAfterCmd()
+	if allowWhileExited {
+		return !m.server.exited
 	}
-	return m.withLastRunSuccess(CopyCommandFeedbackSuccess), clearLastRunNoteAfterCmd()
+	return true
+}
+
+// tryRescan initiates a model re-scan if preconditions allow.
+// allowWhileExited controls whether an exited split-pane server blocks the scan.
+func (m Model) tryRescan(allowWhileExited bool) (Model, tea.Cmd) {
+	if m.loading {
+		return m, nil
+	}
+	if serverBlocksAction(m, allowWhileExited) {
+		return m.flashError("Stop the server before re-scanning models.")
+	}
+	m.loading = true
+	m.loadErr = nil
+	m = m.withLastRunCleared()
+	return m, rescanModelsCmd()
+}
+
+// tryReloadRuntime initiates a runtime reload if preconditions allow.
+// allowWhileExited controls whether an exited split-pane server blocks the reload.
+func (m Model) tryReloadRuntime(allowWhileExited bool) (Model, tea.Cmd) {
+	if m.loading {
+		return m, nil
+	}
+	if serverBlocksAction(m, allowWhileExited) {
+		return m.flashError("Stop the server before reloading runtime.")
+	}
+	m = m.withLastRunCleared()
+	return m, reloadRuntimeCmd()
 }

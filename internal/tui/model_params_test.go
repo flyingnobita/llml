@@ -120,7 +120,7 @@ func TestNormalizeModelParams_splitsFlagValueLines(t *testing.T) {
 
 func TestCollapseArgsForDisplay_and_flattenRoundTrip(t *testing.T) {
 	tok := []string{"--max-model-len", "8192", "--max-num-seqs", "4", "--enable-auto-tool-choice", "--tool-call-parser", "gemma4"}
-	lines := collapseArgsForDisplay(tok)
+	lines := pairFlagValueForShellDisplay(tok)
 	if len(lines) != 4 {
 		t.Fatalf("collapsed %v (len %d)", lines, len(lines))
 	}

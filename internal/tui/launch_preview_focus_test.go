@@ -41,7 +41,7 @@ func setupPreviewVisibleModel() Model {
 
 func TestLaunchPreviewFocus_TabFocusesWhenScrollable(t *testing.T) {
 	m := setupPreviewScrollableModel()
-	if !launchPreviewScrollable(m) {
+	if !m.launchPreviewScrollable() {
 		t.Skip("preview not scrollable in this terminal size; skipping focus test")
 	}
 	m.preview.focused = false
@@ -58,7 +58,7 @@ func TestLaunchPreviewFocus_TabFocusesWhenScrollable(t *testing.T) {
 
 func TestLaunchPreviewFocus_TabUnfocuses(t *testing.T) {
 	m := setupPreviewScrollableModel()
-	if !launchPreviewScrollable(m) {
+	if !m.launchPreviewScrollable() {
 		t.Skip("preview not scrollable in this terminal size; skipping focus test")
 	}
 	m.preview.focused = true
@@ -75,10 +75,10 @@ func TestLaunchPreviewFocus_TabUnfocuses(t *testing.T) {
 
 func TestLaunchPreviewFocus_TabFocusesWhenVisible(t *testing.T) {
 	m := setupPreviewVisibleModel()
-	if !launchPreviewVisible(m) {
+	if !m.launchPreviewVisible() {
 		t.Fatal("expected preview to be visible")
 	}
-	if launchPreviewScrollable(m) {
+	if m.launchPreviewScrollable() {
 		t.Fatal("expected preview to be non-scrollable for this test")
 	}
 	m.preview.focused = false

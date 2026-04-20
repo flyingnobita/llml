@@ -112,24 +112,23 @@ func ListenPort() int { return portFromEnv(EnvLlamaServerPort, defaultLlamaServe
 // VLLMPort returns the TCP port from VLLM_SERVER_PORT, or 8000 if unset or invalid.
 func VLLMPort() int { return portFromEnv(EnvVLLMServerPort, defaultVLLMServerPort) }
 
-// ResolveLlamaServerPath returns the detected llama-server binary path, or the first match on PATH.
-func ResolveLlamaServerPath(r RuntimeInfo) string {
-	if r.LlamaServerPath != "" {
-		return r.LlamaServerPath
+// resolvePath returns existing if non-empty, otherwise the first match for cmdName on PATH.
+func resolvePath(existing, cmdName string) string {
+	if existing != "" {
+		return existing
 	}
-	if p, err := exec.LookPath("llama-server"); err == nil {
+	if p, err := exec.LookPath(cmdName); err == nil {
 		return p
 	}
 	return ""
 }
 
+// ResolveLlamaServerPath returns the detected llama-server binary path, or the first match on PATH.
+func ResolveLlamaServerPath(r RuntimeInfo) string {
+	return resolvePath(r.LlamaServerPath, "llama-server")
+}
+
 // ResolveVLLMPath returns the detected vllm binary path, or the first match on PATH.
 func ResolveVLLMPath(r RuntimeInfo) string {
-	if r.VLLMPath != "" {
-		return r.VLLMPath
-	}
-	if p, err := exec.LookPath("vllm"); err == nil {
-		return p
-	}
-	return ""
+	return resolvePath(r.VLLMPath, "vllm")
 }

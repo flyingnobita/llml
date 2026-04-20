@@ -17,7 +17,7 @@ type styles struct {
 	bodyBold          lipgloss.Style
 	bodyDim           lipgloss.Style
 	footer            lipgloss.Style
-	// scrollBarColumn colors the █/░ track beside viewports; no margin (unlike footer).
+	// scrollBarColumn colors the █/░ track beside viewports (no margin).
 	scrollBarColumn        lipgloss.Style
 	errLine                lipgloss.Style
 	runtimePanel           lipgloss.Style
@@ -49,19 +49,16 @@ type styles struct {
 // would double-pad and shift the content.
 func newStyles(theme Theme) styles {
 	return styles{
-		app: lipgloss.NewStyle().Padding(1, appPaddingH),
+		app: lipgloss.NewStyle().Padding(0, appPaddingH),
 		title: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(theme.Title).
-			MarginBottom(1),
+			Foreground(theme.Title),
 		titleBoldLeft: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(theme.Title),
-		titleToastRowWrap: lipgloss.NewStyle().
-			MarginBottom(1),
+		titleToastRowWrap: lipgloss.NewStyle(),
 		subtitle: lipgloss.NewStyle().
-			Foreground(theme.Subtitle).
-			MarginBottom(1),
+			Foreground(theme.Subtitle),
 		body: lipgloss.NewStyle().
 			Foreground(theme.Body),
 		bodyBold: lipgloss.NewStyle().
@@ -70,8 +67,7 @@ func newStyles(theme Theme) styles {
 		bodyDim: lipgloss.NewStyle().
 			Foreground(theme.Subtitle),
 		footer: lipgloss.NewStyle().
-			Foreground(theme.Footer).
-			MarginTop(1),
+			Foreground(theme.Footer),
 		scrollBarColumn: lipgloss.NewStyle().
 			Foreground(theme.Footer),
 		errLine: lipgloss.NewStyle().Foreground(theme.Error),

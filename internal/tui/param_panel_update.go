@@ -23,7 +23,7 @@ func (ps *paramsState) loadCurrentProfileIn() {
 	}
 	p := ps.profiles[ps.profileIndex]
 	ps.env = append([]EnvVar(nil), p.Env...)
-	ps.args = collapseArgsForDisplay(p.Args)
+	ps.args = pairFlagValueForShellDisplay(p.Args)
 	ps.envCursor = 0
 	ps.argsCursor = 0
 }
@@ -258,58 +258,79 @@ func (m Model) closeParamPanelWithPersist() (Model, tea.Cmd) {
 	return m, cmd
 }
 
-// updateParamPanelKey handles keys while the parameters panel is open.
-func (m Model) updateParamPanelKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	if m.params.confirmDelete != paramConfirmNone {
-		switch msg.String() {
-		case "y", "Y":
-			k := m.params.confirmDelete
-			m.params.confirmDelete = paramConfirmNone
-			switch k {
-			case paramConfirmProfile:
-				m = m.deleteProfile()
-			case paramConfirmEnvRow, paramConfirmArgRow:
-				m = m.deleteParamRow()
-			}
-			return m.persistParamPanel()
-		case "n", "N":
-			m.params.confirmDelete = paramConfirmNone
-			return m, nil
-		default:
-			return m, nil
+// moveParamCursor moves the cursor by delta in the current focus section.
+// Profile movement also persists; env/args movement returns no cmd.
+func (m Model) moveParamCursor(delta int) (Model, tea.Cmd) {
+	switch m.params.focus {
+	case paramFocusProfiles:
+		m = m.moveProfile(delta)
+		return m.persistParamPanel()
+	case paramFocusEnv:
+		n := m.paramEnvLen()
+		if n > 0 {
+			m.params.envCursor = clampInt(m.params.envCursor+delta, 0, n-1)
+		}
+	case paramFocusArgs:
+		n := m.paramArgsLen()
+		if n > 0 {
+			m.params.argsCursor = clampInt(m.params.argsCursor+delta, 0, n-1)
 		}
 	}
+	return m, nil
+}
 
-	if m.params.editKind != paramEditNone {
-		switch msg.String() {
-		case "esc":
-			m = m.cancelParamLineEdit()
-			return m, nil
-		case "enter":
-			m = m.commitParamLineEdit()
-			return m.persistParamPanel()
-		case "tab":
-			m = m.commitParamLineEdit()
-			m = m.cycleParamFocus(1)
-			return m.persistParamPanel()
-		case "shift+tab":
-			m = m.commitParamLineEdit()
-			m = m.cycleParamFocus(-1)
-			return m.persistParamPanel()
-		default:
-			var cmd tea.Cmd
-			m.params.editInput, cmd = m.params.editInput.Update(msg)
-			return m, cmd
+// handleConfirmKey handles y/n for pending delete confirmations.
+func (m Model) handleConfirmKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	switch msg.String() {
+	case "y", "Y":
+		k := m.params.confirmDelete
+		m.params.confirmDelete = paramConfirmNone
+		switch k {
+		case paramConfirmProfile:
+			m = m.deleteProfile()
+		case paramConfirmEnvRow, paramConfirmArgRow:
+			m = m.deleteParamRow()
 		}
+		return m.persistParamPanel()
+	case "n", "N":
+		m.params.confirmDelete = paramConfirmNone
+		return m, nil
+	default:
+		return m, nil
 	}
+}
 
+// handleEditKey handles keys while a param line edit is active.
+func (m Model) handleEditKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m = m.cancelParamLineEdit()
+		return m, nil
+	case "enter":
+		m = m.commitParamLineEdit()
+		return m.persistParamPanel()
+	case "tab":
+		m = m.commitParamLineEdit()
+		m = m.cycleParamFocus(1)
+		return m.persistParamPanel()
+	case "shift+tab":
+		m = m.commitParamLineEdit()
+		m = m.cycleParamFocus(-1)
+		return m.persistParamPanel()
+	default:
+		var cmd tea.Cmd
+		m.params.editInput, cmd = m.params.editInput.Update(msg)
+		return m, cmd
+	}
+}
+
+// handleNavKey handles navigation and action keys in the param panel idle state.
+func (m Model) handleNavKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
 		return m.closeParamPanelWithPersist()
 	case "t":
-		var cmd tea.Cmd
-		m, cmd = m.cycleTheme()
-		return m, cmd
+		return m.cycleTheme()
 	case "tab":
 		m = m.cycleParamFocus(1)
 		return m, nil
@@ -317,35 +338,9 @@ func (m Model) updateParamPanelKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		m = m.cycleParamFocus(-1)
 		return m, nil
 	case "up", "k":
-		switch m.params.focus {
-		case paramFocusProfiles:
-			m = m.moveProfile(-1)
-			return m.persistParamPanel()
-		case paramFocusEnv:
-			if m.params.envCursor > 0 {
-				m.params.envCursor--
-			}
-		case paramFocusArgs:
-			if m.params.argsCursor > 0 {
-				m.params.argsCursor--
-			}
-		}
-		return m, nil
+		return m.moveParamCursor(-1)
 	case "down", "j":
-		switch m.params.focus {
-		case paramFocusProfiles:
-			m = m.moveProfile(1)
-			return m.persistParamPanel()
-		case paramFocusEnv:
-			if m.params.envCursor < m.paramEnvLen()-1 {
-				m.params.envCursor++
-			}
-		case paramFocusArgs:
-			if m.params.argsCursor < m.paramArgsLen()-1 {
-				m.params.argsCursor++
-			}
-		}
-		return m, nil
+		return m.moveParamCursor(1)
 	case "c":
 		if m.params.focus == paramFocusProfiles {
 			m = m.duplicateProfile()
@@ -399,4 +394,15 @@ func (m Model) updateParamPanelKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	default:
 		return m, nil
 	}
+}
+
+// updateParamPanelKey handles keys while the parameters panel is open.
+func (m Model) updateParamPanelKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	if m.params.confirmDelete != paramConfirmNone {
+		return m.handleConfirmKey(msg)
+	}
+	if m.params.editKind != paramEditNone {
+		return m.handleEditKey(msg)
+	}
+	return m.handleNavKey(msg)
 }

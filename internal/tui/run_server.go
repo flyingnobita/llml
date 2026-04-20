@@ -6,126 +6,14 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/atotto/clipboard"
 	"github.com/flyingnobita/llml/internal/models"
 )
-
-// shellSingleQuoted returns s wrapped in single quotes for POSIX sh (safe for paths with spaces).
-func shellSingleQuoted(s string) string {
-	return "'" + strings.ReplaceAll(s, "'", `'"'"'`) + "'"
-}
-
-// llamaServerAlias returns the API model id alias: leaf name of the GGUF path (matches File Name column).
-func llamaServerAlias(modelPath string) string {
-	return filepath.Base(filepath.Clean(modelPath))
-}
-
-// llamaCommandWords returns escaped shell tokens for llama-server (same order as the executed argv).
-func llamaCommandWords(bin, modelPath string, port int, params ModelParams) []string {
-	alias := llamaServerAlias(modelPath)
-	words := []string{
-		shellSingleQuoted(bin),
-		"--model", shellSingleQuoted(modelPath),
-		"--alias", shellSingleQuoted(alias),
-		"--port", fmt.Sprintf("%d", port),
-	}
-	for _, a := range params.Args {
-		words = append(words, shellWord(a))
-	}
-	return words
-}
-
-func llamaCommandLine(bin, modelPath string, port int, params ModelParams) string {
-	envP := shellEnvPrefix(params.Env)
-	words := llamaCommandWords(bin, modelPath, port, params)
-	return strings.TrimSpace(envP + strings.Join(words, " "))
-}
-
-// vllmCommandWords returns escaped shell tokens for vllm serve (same order as the executed argv).
-func vllmCommandWords(bin, modelDir string, port int, params ModelParams) []string {
-	served := models.InferModelID(modelDir)
-	words := []string{
-		shellSingleQuoted(bin), "serve",
-		shellSingleQuoted(modelDir),
-		"--served-model-name",
-		shellSingleQuoted(served),
-		"--port",
-		fmt.Sprintf("%d", port),
-	}
-	for _, a := range params.Args {
-		words = append(words, shellWord(a))
-	}
-	return words
-}
-
-// vllmCommandLine builds the vllm serve invocation: model dir, --served-model-name from
-// [models.InferModelID] (same as the Model ID column), --port, then profile argv.
-func vllmCommandLine(bin, modelDir string, port int, params ModelParams) string {
-	envP := shellEnvPrefix(params.Env)
-	words := vllmCommandWords(bin, modelDir, port, params)
-	return strings.TrimSpace(envP + strings.Join(words, " "))
-}
-
-// errVLLMNotFound is returned when ResolveVLLMPath finds no vllm binary.
-func errVLLMNotFound() error {
-	return fmt.Errorf(MissingVLLMFooterNote)
-}
-
-// formatLlamaServerInvocation is a multi-line, copy-paste safe command (with a leading "+ " on the
-// first line) printed before launch and in the split-pane log.
-func formatLlamaServerInvocation(bin, modelPath string, port int, params ModelParams) string {
-	return shellCommandDisplayMultiline(true, "", params.Env, llamaCommandWords(bin, modelPath, port, params))
-}
-
-// formatVLLMServerInvocation is a multi-line command printed before vllm serve. If activateScript is
-// non-empty, the block starts with `. '/path/activate' && \` on its own line.
-func formatVLLMServerInvocation(bin, modelDir string, port int, activateScript string, params ModelParams) string {
-	return shellCommandDisplayMultiline(true, activateScript, params.Env, vllmCommandWords(bin, modelDir, port, params))
-}
-
-// unixLlamaServerScript echoes the invocation, runs llama-server, then waits for Enter so logs stay readable before the TUI redraws.
-func unixLlamaServerScript(bin, modelPath string, port int, params ModelParams) string {
-	inv := formatLlamaServerInvocation(bin, modelPath, port, params)
-	runLine := llamaCommandLine(bin, modelPath, port, params)
-	return fmt.Sprintf(`printf '%%s\n' %s
-%s
-echo
-echo 'Press Enter to return to LLM Launcher...'
-read -r _ </dev/tty || read -r _
-`, shellSingleQuoted(inv), runLine)
-}
-
-// unixVLLMServerScript echoes the invocation, runs vllm serve, then waits for Enter.
-// If activateScript is non-empty, it is sourced with `.` before vllm (typical Python venv).
-func unixVLLMServerScript(bin, modelDir string, port int, activateScript string, params ModelParams) string {
-	inv := formatVLLMServerInvocation(bin, modelDir, port, activateScript, params)
-	var runLine string
-	if activateScript != "" {
-		runLine = fmt.Sprintf(". %s\n", shellSingleQuoted(activateScript))
-	}
-	runLine += vllmCommandLine(bin, modelDir, port, params)
-	return fmt.Sprintf(`printf '%%s\n' %s
-%s
-echo
-echo 'Press Enter to return to LLM Launcher...'
-read -r _ </dev/tty || read -r _
-`, shellSingleQuoted(inv), runLine)
-}
-
-// unixVLLMSplitScript runs vllm under sh with merged stderr for split-pane log streaming (no pause/read).
-func unixVLLMSplitScript(bin, modelDir string, port int, activateScript string, params ModelParams) string {
-	var runLine string
-	if activateScript != "" {
-		runLine = fmt.Sprintf(". %s && ", shellSingleQuoted(activateScript))
-	}
-	runLine += vllmCommandLine(bin, modelDir, port, params)
-	return runLine + " 2>&1"
-}
 
 // serverSpec holds the resolved parameters needed to build server commands for one launch.
 type serverSpec struct {
@@ -138,17 +26,22 @@ type serverSpec struct {
 }
 
 // buildServerSpec resolves the binary, port, and venv for launching a server.
-// Returns an error if the binary is missing or the platform rejects the config (e.g. Windows + venv).
-func buildServerSpec(backend models.ModelBackend, modelPath string, params ModelParams, rt models.RuntimeInfo) (serverSpec, error) {
+// When strict is true it returns an error if the binary is missing; when false it substitutes
+// a placeholder name so display functions show a plausible command even before the runtime is configured.
+func buildServerSpec(backend models.ModelBackend, modelPath string, params ModelParams, rt models.RuntimeInfo, strict bool) (serverSpec, error) {
 	switch backend {
 	case models.BackendVLLM:
 		bin := models.ResolveVLLMPath(rt)
-		if bin == "" {
-			return serverSpec{}, errVLLMNotFound()
-		}
 		activate := models.ResolveVLLMActivateScript(bin)
-		if runtime.GOOS == "windows" && activate != "" {
-			return serverSpec{}, fmt.Errorf("vLLM venv activation is not supported on Windows from this app; run vllm from an activated shell or add vllm to PATH (detected %s)", activate)
+		if strict {
+			if bin == "" {
+				return serverSpec{}, fmt.Errorf(MissingVLLMFooterNote)
+			}
+			if runtime.GOOS == "windows" && activate != "" {
+				return serverSpec{}, fmt.Errorf("vLLM venv activation is not supported on Windows from this app; run vllm from an activated shell or add vllm to PATH (detected %s)", activate)
+			}
+		} else if bin == "" {
+			bin = "vllm"
 		}
 		return serverSpec{
 			backend:        models.BackendVLLM,
@@ -160,8 +53,11 @@ func buildServerSpec(backend models.ModelBackend, modelPath string, params Model
 		}, nil
 	default: // BackendLlama
 		bin := models.ResolveLlamaServerPath(rt)
-		if bin == "" {
+		if strict && bin == "" {
 			return serverSpec{}, fmt.Errorf(MissingLlamaServerFooterNote)
+		}
+		if bin == "" {
+			bin = "llama-server"
 		}
 		return serverSpec{
 			backend:   models.BackendLlama,
@@ -173,38 +69,34 @@ func buildServerSpec(backend models.ModelBackend, modelPath string, params Model
 	}
 }
 
-// buildPreviewSpec is like buildServerSpec but substitutes placeholder bin names when not found,
-// so display functions (launch preview, invocation echo) show a plausible command even before
-// the runtime is configured.
-func buildPreviewSpec(backend models.ModelBackend, modelPath string, params ModelParams, rt models.RuntimeInfo) serverSpec {
-	switch backend {
+// commandWords returns the escaped shell tokens for the server invocation (same order as directArgs).
+func (s serverSpec) commandWords() []string {
+	var words []string
+	switch s.backend {
 	case models.BackendVLLM:
-		bin := models.ResolveVLLMPath(rt)
-		activate := models.ResolveVLLMActivateScript(bin)
-		if bin == "" {
-			bin = "vllm"
+		words = []string{
+			shellSingleQuoted(s.bin), "serve",
+			shellSingleQuoted(s.modelPath),
+			"--served-model-name", shellSingleQuoted(models.InferModelID(s.modelPath)),
+			"--port", fmt.Sprintf("%d", s.port),
 		}
-		return serverSpec{
-			backend:        models.BackendVLLM,
-			bin:            bin,
-			port:           models.VLLMPort(),
-			modelPath:      modelPath,
-			params:         params,
-			activateScript: activate,
-		}
-	default: // BackendLlama
-		bin := models.ResolveLlamaServerPath(rt)
-		if bin == "" {
-			bin = "llama-server"
-		}
-		return serverSpec{
-			backend:   models.BackendLlama,
-			bin:       bin,
-			port:      models.ListenPort(),
-			modelPath: modelPath,
-			params:    params,
+	default:
+		words = []string{
+			shellSingleQuoted(s.bin),
+			"--model", shellSingleQuoted(s.modelPath),
+			"--alias", shellSingleQuoted(llamaServerAlias(s.modelPath)),
+			"--port", fmt.Sprintf("%d", s.port),
 		}
 	}
+	for _, a := range s.params.Args {
+		words = append(words, shellWord(a))
+	}
+	return words
+}
+
+// commandLine returns the single-line shell form of the invocation (env prefix + argv).
+func (s serverSpec) commandLine() string {
+	return strings.TrimSpace(shellEnvPrefix(s.params.Env) + strings.Join(s.commandWords(), " "))
 }
 
 // directArgs builds the argv slice for direct binary execution (no sh wrapper).
@@ -227,6 +119,29 @@ func (s serverSpec) directArgs() []string {
 	return append(args, s.params.Args...)
 }
 
+// unixForegroundScript returns the sh -c script used for foreground launch on Unix:
+// echoes the invocation, runs the server, then pauses for Enter.
+func (s serverSpec) unixForegroundScript() string {
+	inv := s.invocationEcho()
+	var runLine string
+	if s.backend == models.BackendVLLM && s.activateScript != "" {
+		runLine = fmt.Sprintf(". %s\n", shellSingleQuoted(s.activateScript))
+	}
+	runLine += s.commandLine()
+	return fmt.Sprintf("printf '%%s\n' %s\n%s\necho\necho 'Press Enter to return to LLM Launcher...'\nread -r _ </dev/tty || read -r _\n",
+		shellSingleQuoted(inv), runLine)
+}
+
+// unixSplitScript returns the sh -c script for split-pane log streaming on Unix (vLLM only;
+// llama-server uses directArgs). Merges stderr and sources the venv activate script if present.
+func (s serverSpec) unixSplitScript() string {
+	var runLine string
+	if s.activateScript != "" {
+		runLine = fmt.Sprintf(". %s && ", shellSingleQuoted(s.activateScript))
+	}
+	return runLine + s.commandLine() + " 2>&1"
+}
+
 // foregroundCmd returns an *exec.Cmd for tea.ExecProcess (TUI suspends while server runs).
 // On Unix, wraps in sh -c with printf echo and read-pause so logs stay readable before the TUI redraws.
 // On Windows, runs the binary directly with merged env (no pause support).
@@ -236,14 +151,7 @@ func (s serverSpec) foregroundCmd() *exec.Cmd {
 		c.Env = mergeEnv(os.Environ(), s.params.Env)
 		return c
 	}
-	var script string
-	switch s.backend {
-	case models.BackendVLLM:
-		script = unixVLLMServerScript(s.bin, s.modelPath, s.port, s.activateScript, s.params)
-	default:
-		script = unixLlamaServerScript(s.bin, s.modelPath, s.port, s.params)
-	}
-	return exec.Command("sh", "-c", script)
+	return exec.Command("sh", "-c", s.unixForegroundScript())
 }
 
 // splitCmd returns an *exec.Cmd for split-pane log streaming.
@@ -252,8 +160,7 @@ func (s serverSpec) foregroundCmd() *exec.Cmd {
 // All other cases run the binary directly with merged env.
 func (s serverSpec) splitCmd() *exec.Cmd {
 	if s.backend == models.BackendVLLM && runtime.GOOS != "windows" {
-		script := unixVLLMSplitScript(s.bin, s.modelPath, s.port, s.activateScript, s.params)
-		c := exec.Command("sh", "-c", script)
+		c := exec.Command("sh", "-c", s.unixSplitScript())
 		c.Env = mergeEnv(os.Environ(), s.params.Env)
 		return c
 	}
@@ -264,23 +171,13 @@ func (s serverSpec) splitCmd() *exec.Cmd {
 
 // invocationEcho returns the multi-line "+ ..." display string for the split-pane log header.
 func (s serverSpec) invocationEcho() string {
-	switch s.backend {
-	case models.BackendVLLM:
-		return formatVLLMServerInvocation(s.bin, s.modelPath, s.port, s.activateScript, s.params)
-	default:
-		return formatLlamaServerInvocation(s.bin, s.modelPath, s.port, s.params)
-	}
+	return shellCommandDisplayMultiline(true, s.activateScript, s.params.Env, s.commandWords())
 }
 
 // previewLine returns the multi-line command for the launch preview and clipboard
 // (no "+ " prefix, no activate wrapper — shows the raw executable invocation).
 func (s serverSpec) previewLine() string {
-	switch s.backend {
-	case models.BackendVLLM:
-		return shellCommandDisplayMultiline(false, "", s.params.Env, vllmCommandWords(s.bin, s.modelPath, s.port, s.params))
-	default:
-		return shellCommandDisplayMultiline(false, "", s.params.Env, llamaCommandWords(s.bin, s.modelPath, s.port, s.params))
-	}
+	return shellCommandDisplayMultiline(false, "", s.params.Env, s.commandWords())
 }
 
 // splitServerInvocationEcho returns the first line written to the split-pane log when R is pressed.
@@ -294,7 +191,8 @@ func splitServerInvocationEcho(m Model) string {
 	if !ok {
 		return ""
 	}
-	return buildPreviewSpec(be, modelPath, params, m.runtime).invocationEcho()
+	spec, _ := buildServerSpec(be, modelPath, params, m.runtime, false)
+	return spec.invocationEcho()
 }
 
 // launchPreviewCommandLine returns the shell form of the server command for the table preview and
@@ -309,7 +207,8 @@ func launchPreviewCommandLine(m Model) string {
 	if !ok {
 		return ""
 	}
-	return buildPreviewSpec(be, modelPath, params, m.runtime).previewLine()
+	spec, _ := buildServerSpec(be, modelPath, params, m.runtime, false)
+	return spec.previewLine()
 }
 
 func scanReaderLines(r io.Reader, ch chan<- tea.Msg, wg *sync.WaitGroup) {
@@ -320,24 +219,26 @@ func scanReaderLines(r io.Reader, ch chan<- tea.Msg, wg *sync.WaitGroup) {
 	}
 }
 
+func sendErrAndClose(ch chan tea.Msg, err error) {
+	ch <- llamaServerExitedMsg{err: err}
+	close(ch)
+}
+
 // streamSplitServerCmd starts cmd with stdout/stderr pipes, streams lines as [serverLogMsg], then sends [llamaServerExitedMsg] and closes ch.
 func streamSplitServerCmd(cmd *exec.Cmd, ch chan tea.Msg) {
 	applySplitCmdSysProcAttr(cmd)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		ch <- llamaServerExitedMsg{err: err}
-		close(ch)
+		sendErrAndClose(ch, err)
 		return
 	}
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		ch <- llamaServerExitedMsg{err: err}
-		close(ch)
+		sendErrAndClose(ch, err)
 		return
 	}
 	if err := cmd.Start(); err != nil {
-		ch <- llamaServerExitedMsg{err: err}
-		close(ch)
+		sendErrAndClose(ch, err)
 		return
 	}
 	var wg sync.WaitGroup
@@ -380,4 +281,16 @@ func readNextServerMsg(ch chan tea.Msg) tea.Cmd {
 		}
 		return msg
 	}
+}
+
+// copyLaunchCommandToClipboard writes the launch preview command and sets lastRunNote feedback.
+func copyLaunchCommandToClipboard(m Model) (Model, tea.Cmd) {
+	cmd := launchPreviewCommandLine(m)
+	if cmd == "" {
+		return m.flashError(CopyCommandFeedbackFailure)
+	}
+	if err := clipboard.WriteAll(cmd); err != nil {
+		return m.flashError(CopyCommandFeedbackFailure)
+	}
+	return m.flashSuccess(CopyCommandFeedbackSuccess)
 }
