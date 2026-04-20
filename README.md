@@ -204,9 +204,9 @@ If both binaries are still missing, the app may probe a **running** llama.cpp se
 
 1. **`VLLM_PATH`**: `{VLLM_PATH}/vllm` or `{VLLM_PATH}/.venv/bin/vllm`.
 2. **`VLLM_VENV`**: `{VLLM_VENV}/bin/vllm` if present.
-3. Common directories as above, then **`PATH`**.
+3. Common directories: `/usr/local/bin`, `/opt/homebrew/bin`, `~/.local/bin`, and on **macOS** also `~/.venv-vllm-metal/bin`, then **`PATH`**.
 
-On **Linux/macOS**, if vLLM lives in a venv, **`R`** may source `activate` before `vllm serve` (next to the resolved binary, or via `VLLM_VENV` / `.venv` heuristics). On **Windows**, use an activated shell or put `vllm` on `PATH`.
+On **Linux/macOS**, if vLLM lives in a venv, **`R`** may source `activate` before `vllm serve` (next to the resolved binary, e.g. `~/.venv-vllm-metal/bin/activate` with `~/.venv-vllm-metal/bin/vllm` on macOS, or via `VLLM_VENV` / `.venv` heuristics). On **Windows**, use an activated shell or put `vllm` on `PATH`.
 
 ### Model configuration and discovery
 

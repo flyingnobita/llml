@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
+- Apr-20, 2026 - [Runtime: macOS vLLM binary discovery includes `~/.venv-vllm-metal/bin` (before `PATH`); `activate` resolves next to that `vllm` via existing venv rules; README detection order]
+
 - Apr-20, 2026 - [Config safety: timestamped backups under `{UserConfigDir}/llml/backups/` (prune 10 per file) before overwriting config and model-params; atomic write for `model-params.json`; version-change snapshot at startup via `.last-run-version`; README/AGENTS “Updates vs your data”]
 
 - Apr-20, 2026 - [TUI: unified inactive split-pane border grey — model table dim, launch preview, and server log use the same color as general Border; SplitPaneBorderDim matches Border in theme constructors]
