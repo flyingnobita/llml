@@ -227,7 +227,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.preview.viewport, cmd = m.preview.viewport.Update(msg)
 		return m, cmd
 	}
-	if launchPreviewVisible(m) && isTabKey(msg) {
+	if m.launchPreviewVisible() && isTabKey(msg) {
 		m.preview.focused = true
 		m.table.tbl.Blur()
 		m = m.applyMainPaneFocusStyles()

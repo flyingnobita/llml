@@ -199,6 +199,24 @@ func (m Model) Init() tea.Cmd {
 	return startupCmd()
 }
 
+// SelectedModel returns the filesystem path and backend for the highlighted row.
+func (m Model) SelectedModel() (path string, backend models.ModelBackend) {
+	if len(m.table.tbl.Rows()) == 0 || m.table.tbl.Cursor() < 0 {
+		return "", models.BackendLlama
+	}
+	i := m.table.tbl.Cursor()
+	if i < 0 || i >= len(m.table.files) {
+		return "", models.BackendLlama
+	}
+	return m.table.files[i].Path, m.table.files[i].Backend
+}
+
+// SelectedPath returns the full path of the highlighted row, or empty if none.
+func (m Model) SelectedPath() string {
+	p, _ := m.SelectedModel()
+	return p
+}
+
 // innerWidth returns the usable inner body width for rendering. It falls back
 // to a computed value when bodyInnerW has not yet been set by layoutTable.
 func (m Model) innerWidth() int {
@@ -393,7 +411,7 @@ func (m Model) applyTableAndLogHeights(bodyH, innerW, previewH int) Model {
 // launchPreviewPaneLayoutHeight returns vertical rows consumed by the launch command preview
 // (margin + pane title + bordered viewport) when models are listed.
 func (m Model) launchPreviewPaneLayoutHeight() int {
-	if !launchPreviewVisible(m) {
+	if !m.launchPreviewVisible() {
 		return 0
 	}
 	// MarginTop(1) on [styles.launchPreview], caption row, then the fixed-height bordered viewport.
@@ -408,7 +426,7 @@ func (m Model) syncLaunchPreviewViewport(innerW int) Model {
 	if innerW < minInnerWidth {
 		innerW = minInnerWidth
 	}
-	if !launchPreviewVisible(m) {
+	if !m.launchPreviewVisible() {
 		m.preview.viewport.SetContent("")
 		m.preview.lastCmd = ""
 		return m

@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/flyingnobita/llml/internal/models"
@@ -63,72 +62,14 @@ func (m Model) serverLogPaneView() string {
 	return lipgloss.JoinVertical(lipgloss.Left, title, row)
 }
 
-// viewportVerticalScrollPercent returns [0,1] for vertical scroll position. The
-// upstream [viewport.Model.ScrollPercent] compares outer Height to total line count
-// and divides by (total−Height), which is wrong for bordered viewports (the maximum
-// Y offset uses total−Height+frameSize) and breaks when SoftWrap inflates total.
-func viewportVerticalScrollPercent(vp viewport.Model) float64 {
-	total := vp.TotalLineCount()
-	if total == 0 {
-		return 0
-	}
-	vs := vp.Style.GetVerticalFrameSize()
-	maxY := total - vp.Height() + vs
-	if maxY <= 0 {
-		return 0
-	}
-	y := float64(vp.YOffset())
-	p := y / float64(maxY)
-	if p < 0 {
-		return 0
-	}
-	if p > 1 {
-		return 1
-	}
-	return p
-}
-
-// verticalScrollBarColumn renders a single-column scroll indicator: filled cells
-// from the top grow with scroll position ([viewportVerticalScrollPercent]).
-func verticalScrollBarColumn(pct float64, trackH int) string {
-	if trackH < 2 {
-		return ""
-	}
-	if pct < 0 {
-		pct = 0
-	}
-	if pct > 1 {
-		pct = 1
-	}
-	filled := int(pct * float64(trackH))
-	if filled > trackH {
-		filled = trackH
-	}
-	var b strings.Builder
-	for i := 0; i < trackH; i++ {
-		if i > 0 {
-			b.WriteByte('\n')
-		}
-		if i < filled {
-			b.WriteString("█")
-		} else {
-			b.WriteString("░")
-		}
-	}
-	return b.String()
-}
-
 // launchPreviewVisible is true when the main table lists models and a launch preview can be shown.
-func launchPreviewVisible(m Model) bool {
-	if m.loading || m.loadErr != nil || len(m.table.files) == 0 {
-		return false
-	}
-	return true
+func (m Model) launchPreviewVisible() bool {
+	return !m.loading && m.loadErr == nil && len(m.table.files) > 0
 }
 
 // launchPreviewScrollable is true when the launch command has more lines than the fixed preview height.
-func launchPreviewScrollable(m Model) bool {
-	return launchPreviewVisible(m) &&
+func (m Model) launchPreviewScrollable() bool {
+	return m.launchPreviewVisible() &&
 		m.preview.viewport.TotalLineCount() > m.preview.viewport.VisibleLineCount()
 }
 
@@ -162,13 +103,13 @@ func (m Model) modelTablePaneView() string {
 
 // launchPreviewPaneView renders the bordered, scrollable launch command viewport or "".
 func (m Model) launchPreviewPaneView() string {
-	if !launchPreviewVisible(m) {
+	if !m.launchPreviewVisible() {
 		return ""
 	}
 	title := m.mainPaneCaptionLine(MainPaneTitleLaunchCommand, m.launchPreviewPaneTitleStyle())
 	vp := m.preview.viewport.View()
 	var inner string
-	if !launchPreviewScrollable(m) {
+	if !m.launchPreviewScrollable() {
 		inner = vp
 	} else {
 		inner = m.withVScrollBar(vp, viewportVerticalScrollPercent(m.preview.viewport))
@@ -199,8 +140,6 @@ func runtimePanelView(m Model, contentWidth int) string {
 	inner := m.ui.styles.paramSectionHeading.Render("Active Configuration") + "\n" + block
 	return m.ui.styles.runtimePanel.Width(contentWidth).Render(inner)
 }
-
-const appTitle = "LLM Launcher"
 
 // lastRunNoteView renders lastRunNote as one styled line per newline-separated
 // segment below the main footer (not shown inside the runtime-environment modal).
@@ -500,27 +439,6 @@ func (m Model) mainAppPlacedView() string {
 	return clampRenderedHeightKeepTopBottom(placed, target)
 }
 
-func clampRenderedHeightKeepTopBottom(s string, maxH int) string {
-	if maxH <= 0 {
-		return s
-	}
-	lines := strings.Split(s, "\n")
-	if len(lines) <= maxH {
-		return s
-	}
-	topKeep := maxH / 2
-	if topKeep < 1 {
-		topKeep = 1
-	}
-	bottomKeep := maxH - topKeep
-	if bottomKeep < 1 {
-		bottomKeep = 1
-	}
-	out := append([]string{}, lines[:topKeep]...)
-	out = append(out, lines[len(lines)-bottomKeep:]...)
-	return strings.Join(out, "\n")
-}
-
 // modalBlock returns the overlay content for whichever modal is currently open,
 // and true when any modal is open.
 func (m Model) modalBlock() (string, bool) {
@@ -644,41 +562,4 @@ func (m Model) runtimeConfigModalBlock() string {
 	}
 	block := lipgloss.JoinVertical(lipgloss.Left, rows...)
 	return m.ui.styles.portConfigBox.Render(block)
-}
-
-// SelectedModel returns the filesystem path and backend for the highlighted row.
-func (m Model) SelectedModel() (path string, backend models.ModelBackend) {
-	if len(m.table.tbl.Rows()) == 0 || m.table.tbl.Cursor() < 0 {
-		return "", models.BackendLlama
-	}
-	i := m.table.tbl.Cursor()
-	if i < 0 || i >= len(m.table.files) {
-		return "", models.BackendLlama
-	}
-	return m.table.files[i].Path, m.table.files[i].Backend
-}
-
-// SelectedPath returns the full path of the highlighted row, or empty if none.
-func (m Model) SelectedPath() string {
-	p, _ := m.SelectedModel()
-	return p
-}
-
-// horizontalScrollBarLine renders a filled track (█) and remainder (░) for horizontal scroll position.
-func horizontalScrollBarLine(pct float64, maxWidth int) string {
-	if maxWidth < 14 {
-		return ""
-	}
-	inner := maxWidth - 4
-	if inner < 8 {
-		return ""
-	}
-	filled := int(pct * float64(inner))
-	if filled > inner {
-		filled = inner
-	}
-	if filled < 0 {
-		filled = 0
-	}
-	return "  " + strings.Repeat("█", filled) + strings.Repeat("░", inner-filled) + "  "
 }

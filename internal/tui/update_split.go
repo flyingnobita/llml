@@ -34,7 +34,7 @@ func isEnterKey(msg tea.KeyPressMsg) bool {
 // cycleSplitPaneFocus shifts focus between the table, launch preview (if visible), and the server log.
 func (m Model) cycleSplitPaneFocus() Model {
 	if !m.server.splitFocused && !m.preview.focused {
-		if launchPreviewVisible(m) {
+		if m.launchPreviewVisible() {
 			m.preview.focused = true
 			m.table.tbl.Blur()
 		} else {
