@@ -4,7 +4,6 @@ package config
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -109,13 +108,18 @@ func ApplyRuntimeFromConfig(r *RuntimeConfig) {
 	}
 }
 
-func applyPathIfUnset(key, value string) {
-	v := strings.TrimSpace(value)
-	if v == "" || os.Getenv(key) != "" {
-		return
+// normalizePath trims, expands tilde, and cleans a filesystem path string.
+// Returns "" for empty or whitespace-only inputs.
+func normalizePath(v string) string {
+	if v = strings.TrimSpace(v); v == "" {
+		return ""
 	}
-	v = filepath.Clean(models.ExpandTildePath(v))
-	if v == "" || v == "." {
+	return filepath.Clean(models.ExpandTildePath(v))
+}
+
+func applyPathIfUnset(key, value string) {
+	v := normalizePath(value)
+	if v == "" || v == "." || os.Getenv(key) != "" {
 		return
 	}
 	os.Setenv(key, v)
@@ -124,14 +128,14 @@ func applyPathIfUnset(key, value string) {
 // RuntimeFromEnv builds a RuntimeConfig from the current process environment (for writing).
 func RuntimeFromEnv() RuntimeConfig {
 	var r RuntimeConfig
-	if v := strings.TrimSpace(os.Getenv(models.EnvLlamaCppPath)); v != "" {
-		r.DefaultLlamaCppPath = filepath.Clean(models.ExpandTildePath(v))
+	if v := normalizePath(os.Getenv(models.EnvLlamaCppPath)); v != "" {
+		r.DefaultLlamaCppPath = v
 	}
-	if v := strings.TrimSpace(os.Getenv(models.EnvVLLMPath)); v != "" {
-		r.DefaultVLLMPath = filepath.Clean(models.ExpandTildePath(v))
+	if v := normalizePath(os.Getenv(models.EnvVLLMPath)); v != "" {
+		r.DefaultVLLMPath = v
 	}
-	if v := strings.TrimSpace(os.Getenv(models.EnvVLLMVenv)); v != "" {
-		r.DefaultVLLMVenv = filepath.Clean(models.ExpandTildePath(v))
+	if v := normalizePath(os.Getenv(models.EnvVLLMVenv)); v != "" {
+		r.DefaultVLLMVenv = v
 	}
 	if v := strings.TrimSpace(os.Getenv(models.EnvLlamaServerPort)); v != "" {
 		if p, err := strconv.Atoi(v); err == nil && p > 0 && p <= 65535 {
@@ -159,7 +163,7 @@ func ExtraModelPathsFromEnv() []string {
 		return nil
 	}
 	var out []string
-	for _, part := range strings.Split(v, ",") {
+	for part := range strings.SplitSeq(v, ",") {
 		part = strings.TrimSpace(part)
 		if part != "" {
 			out = append(out, part)
@@ -171,36 +175,20 @@ func ExtraModelPathsFromEnv() []string {
 // MergeExtraRoots combines discovery extra paths from config with env-only extras for Discover options.
 // Config file paths are merged with env in [models.MergeSearchRoots] via Options.ExtraRoots.
 func MergeExtraRoots(discoveryExtra, envExtra []string) []string {
-	seen := make(map[string]struct{})
-	var out []string
-	add := func(p string) {
-		p = filepath.Clean(models.ExpandTildePath(strings.TrimSpace(p)))
-		if p == "" || p == "." {
-			return
-		}
-		if _, ok := seen[p]; ok {
-			return
-		}
-		seen[p] = struct{}{}
-		out = append(out, p)
-	}
+	ps := models.NewPathSet()
 	for _, p := range discoveryExtra {
-		add(p)
+		ps.Add(p)
 	}
 	for _, p := range envExtra {
-		add(p)
+		ps.Add(p)
 	}
-	return out
+	return ps.Slice()
 }
 
 // ModelEntryFromFile converts a discovered model to a cache entry.
 func ModelEntryFromFile(f models.ModelFile) ModelEntry {
-	be := "llama"
-	if f.Backend == models.BackendVLLM {
-		be = "vllm"
-	}
 	return ModelEntry{
-		Backend:    be,
+		Backend:    f.Backend.String(),
 		Path:       f.Path,
 		Name:       f.Name,
 		Size:       f.Size,
@@ -211,14 +199,9 @@ func ModelEntryFromFile(f models.ModelFile) ModelEntry {
 
 // ToModelFile converts a cache entry to [models.ModelFile].
 func (e ModelEntry) ToModelFile() (models.ModelFile, error) {
-	var be models.ModelBackend
-	switch strings.ToLower(strings.TrimSpace(e.Backend)) {
-	case "llama", "":
-		be = models.BackendLlama
-	case "vllm":
-		be = models.BackendVLLM
-	default:
-		return models.ModelFile{}, fmt.Errorf("unknown backend %q", e.Backend)
+	be, err := models.ParseBackend(e.Backend)
+	if err != nil {
+		return models.ModelFile{}, err
 	}
 	path := filepath.Clean(e.Path)
 	if path == "" || path == "." {
@@ -294,21 +277,9 @@ func DiscoveryConfigForWrite(prev *Config, lastScan time.Time) DiscoveryConfig {
 	}
 }
 
-// WriteFile writes config.toml atomically (write temp + rename).
-func WriteFile(c Config) error {
-	path, err := ConfigPath()
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	c.SchemaVersion = SchemaVersion
-	var buf strings.Builder
-	if err := toml.NewEncoder(&buf).Encode(c); err != nil {
-		return err
-	}
-	data := []byte(buf.String())
+// atomicWriteFile writes data to path atomically via a temp file + rename,
+// applying perm to the destination. The temp file is cleaned up on any error.
+func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
 	tmp, err := os.CreateTemp(filepath.Dir(path), "llml-config-*.toml")
 	if err != nil {
 		return err
@@ -323,7 +294,7 @@ func WriteFile(c Config) error {
 		os.Remove(tmpPath)
 		return err
 	}
-	if err := os.Chmod(tmpPath, 0o644); err != nil {
+	if err := os.Chmod(tmpPath, perm); err != nil {
 		os.Remove(tmpPath)
 		return err
 	}
@@ -332,4 +303,21 @@ func WriteFile(c Config) error {
 		return err
 	}
 	return nil
+}
+
+// WriteFile writes config.toml atomically (write temp + rename).
+func WriteFile(c Config) error {
+	path, err := ConfigPath()
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	c.SchemaVersion = SchemaVersion
+	var buf strings.Builder
+	if err := toml.NewEncoder(&buf).Encode(c); err != nil {
+		return err
+	}
+	return atomicWriteFile(path, []byte(buf.String()), 0o644)
 }
