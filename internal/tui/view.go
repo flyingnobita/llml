@@ -523,37 +523,32 @@ func clampRenderedHeightKeepTopBottom(s string, maxH int) string {
 	return strings.Join(out, "\n")
 }
 
+// modalBlock returns the overlay content for whichever modal is currently open,
+// and true when any modal is open.
+func (m Model) modalBlock() (string, bool) {
+	switch {
+	case m.params.open:
+		return m.paramPanelModalBlock(), true
+	case m.helpOpen:
+		return m.helpPanelModalBlock(), true
+	case m.rc.open:
+		return m.runtimeConfigModalBlock(), true
+	case m.discovery.open:
+		return m.discoveryPathsModalBlock(), true
+	}
+	return "", false
+}
+
 // View implements tea.Model.
 func (m Model) View() tea.View {
 	if m.layout.width == 0 {
 		return tea.NewView("\n  Initializing…\n")
 	}
-	if m.params.open {
-		s := overlayCentered(m.mainAppPlacedView(), m.paramPanelModalBlock(), m.layout.width, m.layout.height)
-		v := tea.NewView(s)
-		v.AltScreen = true
-		return v
+	base := m.mainAppPlacedView()
+	if block, ok := m.modalBlock(); ok {
+		base = overlayCentered(base, block, m.layout.width, m.layout.height)
 	}
-	if m.helpOpen {
-		s := overlayCentered(m.mainAppPlacedView(), m.helpPanelModalBlock(), m.layout.width, m.layout.height)
-		v := tea.NewView(s)
-		v.AltScreen = true
-		return v
-	}
-	if m.rc.open {
-		s := overlayCentered(m.mainAppPlacedView(), m.runtimeConfigModalBlock(), m.layout.width, m.layout.height)
-		v := tea.NewView(s)
-		v.AltScreen = true
-		return v
-	}
-	if m.discovery.open {
-		s := overlayCentered(m.mainAppPlacedView(), m.discoveryPathsModalBlock(), m.layout.width, m.layout.height)
-		v := tea.NewView(s)
-		v.AltScreen = true
-		return v
-	}
-
-	v := tea.NewView(m.mainAppPlacedView())
+	v := tea.NewView(base)
 	v.AltScreen = true
 	return v
 }

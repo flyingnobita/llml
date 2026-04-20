@@ -574,6 +574,49 @@ func (m Model) withLastRunCleared() Model {
 	return m
 }
 
+// flashError sets an error status note and returns the cmd to clear it after a delay.
+func (m Model) flashError(msg string) (Model, tea.Cmd) {
+	return m.withLastRunError(msg), clearLastRunNoteAfterCmd()
+}
+
+// flashSuccess sets a non-error status note and returns the cmd to clear it after a delay.
+func (m Model) flashSuccess(msg string) (Model, tea.Cmd) {
+	return m.withLastRunSuccess(msg), clearLastRunNoteAfterCmd()
+}
+
+// applyScanResult applies the result of a model scan to the model.
+// runtime may be nil (model-only rescan); when non-nil it replaces m.runtime.
+// firstLoad resets the table cursor to 0; otherwise cursor is only adjusted if out of range.
+func (m Model) applyScanResult(runtime *models.RuntimeInfo, files []models.ModelFile, lastScan time.Time, configPaths []string, writeErr error, firstLoad bool) (Model, tea.Cmd) {
+	m.loading = false
+	m.loadErr = nil
+	if runtime != nil {
+		m.runtime = *runtime
+		m.runtimeScanned = true
+	}
+	m.table.files = files
+	m.table.lastScan = lastScan
+	m.discovery.paths = configPaths
+	sortModelFiles(m.table.files, m.table.sortCol, m.table.sortDesc)
+	m = m.layoutTable()
+	m.table.hscroll.SetXOffset(0)
+	if len(m.table.files) > 0 {
+		if firstLoad {
+			m.table.tbl.SetCursor(0)
+			m = m.withLaunchPreviewSynced()
+		} else if m.table.tbl.Cursor() >= len(m.table.files) {
+			m.table.tbl.SetCursor(len(m.table.files) - 1)
+			m = m.withLaunchPreviewSynced()
+		}
+	}
+	if writeErr != nil {
+		m = m.withLastRunError("Could not save config: " + writeErr.Error())
+		return m.maybeSetMissingRuntimeFooterNoteBatch(clearLastRunNoteAfterCmd())
+	}
+	m = m.withLastRunCleared()
+	return m.maybeSetMissingRuntimeFooterNote()
+}
+
 // dismissSplitServer clears split-pane server state after the user dismisses the
 // log (enter/esc/q) or tears down the UI after a non-split llamaServerExitedMsg.
 func (m Model) dismissSplitServer() Model {
