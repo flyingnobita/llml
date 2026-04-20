@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/atotto/clipboard"
 	"github.com/flyingnobita/llml/internal/models"
 )
 
@@ -309,24 +310,26 @@ func scanReaderLines(r io.Reader, ch chan<- tea.Msg, wg *sync.WaitGroup) {
 	}
 }
 
+func sendErrAndClose(ch chan tea.Msg, err error) {
+	ch <- llamaServerExitedMsg{err: err}
+	close(ch)
+}
+
 // streamSplitServerCmd starts cmd with stdout/stderr pipes, streams lines as [serverLogMsg], then sends [llamaServerExitedMsg] and closes ch.
 func streamSplitServerCmd(cmd *exec.Cmd, ch chan tea.Msg) {
 	applySplitCmdSysProcAttr(cmd)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		ch <- llamaServerExitedMsg{err: err}
-		close(ch)
+		sendErrAndClose(ch, err)
 		return
 	}
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		ch <- llamaServerExitedMsg{err: err}
-		close(ch)
+		sendErrAndClose(ch, err)
 		return
 	}
 	if err := cmd.Start(); err != nil {
-		ch <- llamaServerExitedMsg{err: err}
-		close(ch)
+		sendErrAndClose(ch, err)
 		return
 	}
 	var wg sync.WaitGroup
@@ -369,4 +372,16 @@ func readNextServerMsg(ch chan tea.Msg) tea.Cmd {
 		}
 		return msg
 	}
+}
+
+// copyLaunchCommandToClipboard writes the launch preview command and sets lastRunNote feedback.
+func copyLaunchCommandToClipboard(m Model) (Model, tea.Cmd) {
+	cmd := launchPreviewCommandLine(m)
+	if cmd == "" {
+		return m.flashError(CopyCommandFeedbackFailure)
+	}
+	if err := clipboard.WriteAll(cmd); err != nil {
+		return m.flashError(CopyCommandFeedbackFailure)
+	}
+	return m.flashSuccess(CopyCommandFeedbackSuccess)
 }

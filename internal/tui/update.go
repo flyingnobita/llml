@@ -5,7 +5,6 @@ import (
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
-	"github.com/atotto/clipboard"
 )
 
 // Update implements tea.Model.
@@ -356,16 +355,4 @@ func (m Model) tryReloadRuntime(allowWhileExited bool) (Model, tea.Cmd) {
 	}
 	m = m.withLastRunCleared()
 	return m, reloadRuntimeCmd()
-}
-
-// copyLaunchCommandToClipboard writes the launch preview command and sets lastRunNote feedback.
-func copyLaunchCommandToClipboard(m Model) (Model, tea.Cmd) {
-	cmd := launchPreviewCommandLine(m)
-	if cmd == "" {
-		return m.flashError(CopyCommandFeedbackFailure)
-	}
-	if err := clipboard.WriteAll(cmd); err != nil {
-		return m.flashError(CopyCommandFeedbackFailure)
-	}
-	return m.flashSuccess(CopyCommandFeedbackSuccess)
 }
