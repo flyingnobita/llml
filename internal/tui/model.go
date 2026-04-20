@@ -128,12 +128,7 @@ type Model struct {
 	helpOpen           bool // keyboard shortcuts popup
 }
 
-// New returns a model with default key bindings and an empty table; Init triggers discovery.
-func New() Model {
-	homeDir, _ := os.UserHomeDir()
-	pick := initialThemePick()
-	th := resolveTheme()
-	st := newStyles(th)
+func newTableViewport(st styles, homeDir string) (btable.Model, viewport.Model) {
 	t := btable.New(
 		btable.WithColumns(tableColumns(100, nil, homeDir, defaultSortCol, false)),
 		btable.WithRows(nil),
@@ -148,52 +143,54 @@ func New() Model {
 	// Horizontal panning uses keys (see keymap); Shift+wheel could be added later if desired.
 	hv.MouseWheelEnabled = false
 	hv.Style = st.splitPaneChromeFocused
+	return t, hv
+}
+
+func newServerLogViewport(st styles) viewport.Model {
 	sv := viewport.New(viewport.WithWidth(96), viewport.WithHeight(1))
 	sv.MouseWheelEnabled = true
 	sv.Style = st.serverLogViewport
+	return sv
+}
+
+func newLaunchPreviewViewport(st styles) viewport.Model {
 	lpvOuter := launchPreviewVisibleLines + st.launchPreviewViewport.GetVerticalFrameSize()
 	lpv := viewport.New(viewport.WithWidth(96), viewport.WithHeight(lpvOuter))
 	lpv.MouseWheelEnabled = true
 	lpv.MouseWheelDelta = 1
 	lpv.SoftWrap = true
 	lpv.Style = st.launchPreviewViewport
+	return lpv
+}
+
+func newRuntimeConfigInputs() [runtimeFieldCount]textinput.Model {
+	return [runtimeFieldCount]textinput.Model{
+		newPathTextInput(),
+		newPathTextInput(),
+		newPathTextInput(),
+		newPortTextInput(),
+		newPortTextInput(),
+	}
+}
+
+// New returns a model with default key bindings and an empty table; Init triggers discovery.
+func New() Model {
+	homeDir, _ := os.UserHomeDir()
+	pick := initialThemePick()
+	th := resolveTheme()
+	st := newStyles(th)
+	t, hv := newTableViewport(st, homeDir)
 	return Model{
-		layout: layoutState{
-			homeDir: homeDir,
-		},
-		ui: themeState{
-			theme:     th,
-			themePick: pick,
-			styles:    st,
-		},
-		table: tableState{
-			sortCol: defaultSortCol,
-			tbl:     t,
-			hscroll: hv,
-		},
-		server: serverPaneState{
-			viewport: sv,
-		},
-		preview: launchPreviewState{
-			viewport: lpv,
-		},
-		rc: runtimeConfigState{
-			inputs: [runtimeFieldCount]textinput.Model{
-				newPathTextInput(),
-				newPathTextInput(),
-				newPathTextInput(),
-				newPortTextInput(),
-				newPortTextInput(),
-			},
-		},
-		params: paramsState{
-			editInput: newParamLineTextInput(),
-		},
-		discovery: discoveryPathsState{
-			editInput: newPathTextInput(),
-		},
-		keys:    DefaultKeyMap(),
-		loading: true,
+		layout:    layoutState{homeDir: homeDir},
+		ui:        themeState{theme: th, themePick: pick, styles: st},
+		table:     tableState{sortCol: defaultSortCol, tbl: t, hscroll: hv},
+		server:    serverPaneState{viewport: newServerLogViewport(st)},
+		preview:   launchPreviewState{viewport: newLaunchPreviewViewport(st)},
+		rc:        runtimeConfigState{inputs: newRuntimeConfigInputs()},
+		params:    paramsState{editInput: newParamLineTextInput()},
+		discovery: discoveryPathsState{editInput: newPathTextInput()},
+		keys:      DefaultKeyMap(),
+		loading:   true,
 	}
 }
 
