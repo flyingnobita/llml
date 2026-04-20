@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
+- Apr-20, 2026 - [TUI: unified inactive split-pane border grey — model table dim, launch preview, and server log use the same color as general Border; SplitPaneBorderDim matches Border in theme constructors]
+
 - Apr-20, 2026 - [TUI: pane captions "Launch Command" and "Server Output" above launch preview and server log; colors track keyboard focus; layout reserves one row per caption (lipgloss v2 has no border-embedded titles)]
 
 - Apr-20, 2026 - [TUI: short terminals — outer model-table hscroll height tracks live tbl.View(); spare terminal rows grow the table viewport (no blank bands between title/table/preview/footer); strip app/title/footer margins that caused gaps; vertical █/░ track when overflow; disable vertical wheel on table hscroll and reset YOffset on layout; tests]
