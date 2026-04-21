@@ -23,6 +23,7 @@ Completed backlog items (recent).
 
 Work you intend to do soon.
 
+- [ ] (Models, Runtime, TUI) Add Ollama backend support with API discovery, runtime detection, cached rows, and `ollama run` launch flow
 - [ ] (Runtime Detection) Warn user if no runtimes are detected
 - [ ] (Model Detection) Warn user if no models are detected
 
@@ -30,6 +31,9 @@ Work you intend to do soon.
 
 Queued after “Now,” or medium priority.
 
+- [ ] (Parameter Profiles) Import parameter profiles from pasted real-world launch commands
+- [ ] (Parameter Profiles) Add structured profile metadata for backend, use case, and hardware
+- [ ] (Parameter Profiles) Export and import local parameter profiles as a portable file format
 - [ ] (Parameter Profiles) Allow user to have optional overrides for runtime configuration in parameter profiles
 - [ ] (CLI) Add CLI to run servers with parameter profiles
 - [ ] (Platform) macOS support
@@ -46,6 +50,7 @@ Low priority or blocked.
 
 Exploratory; may never ship.
 
+- [ ] (Profiles, Community) Shared profile catalog by model, backend, use case, and hardware
 - [ ]
 
 ## Known issues (quick refs)

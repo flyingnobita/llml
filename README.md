@@ -9,9 +9,10 @@
 tired of reconstructing launch commands from shell history.
 
 It scans your local filesystem for **GGUF** and **Hugging Face-style safetensors** models,
-detects installed runtimes (**[llama.cpp](https://github.com/ggerganov/llama.cpp)** and
-**[vLLM](https://github.com/vllm-project/vllm)**), and lets you save named parameter profiles
-per model — so the command that worked last time is always one keystroke away.
+detects installed runtimes (**[llama.cpp](https://github.com/ggerganov/llama.cpp)**,
+**[vLLM](https://github.com/vllm-project/vllm)**, and **[Ollama](https://ollama.com/)**),
+and lets you save named parameter profiles per model — so the command that worked
+last time is always one keystroke away.
 
 Browse local models. Detect the right runtime. Launch with one key.
 
@@ -22,12 +23,16 @@ Browse local models. Detect the right runtime. Launch with one key.
   cached under **`{UserConfigDir}/llml/config.toml`** so the next launch can skip the
   filesystem walk when the cache is still valid.
 - **Runtime detection** — finds installed `llama-server` and `vllm` binaries and maps
-  each model to its compatible runtime.
+  installed `ollama` plus the configured Ollama host, then maps each model to its
+  compatible runtime.
 - **Named parameter profiles** — save multiple profiles per model (e.g. `fast-laptop`,
   `quality`, `api-8080`), each storing runtime args, env vars, port, and context
   settings. The active profile is always one key away.
 - **One-keystroke launch** — select a model, select a profile, press `R`. The generated
   command is shown before execution and server output streams directly in the TUI.
+- **Ollama preload flow** — Ollama models are discovered via the Ollama API. Pressing
+  `R` starts `ollama serve` if needed, then preloads the selected model into the
+  shared Ollama service with `keep_alive: -1`.
 - **Zero required setup** — common model directories and binary locations are checked
   automatically; configure only what differs from the defaults.
 
@@ -35,7 +40,9 @@ Browse local models. Detect the right runtime. Launch with one key.
 
 ### Runtime Requirements
 
-- **Runtime engine (at least one)**: **llama.cpp** (`llama-server`) for GGUF models, and/or **vLLM** (`vllm`) for safetensors models are installed (see [Runtime Engines](#runtime-engines)).
+- **Runtime engine (at least one)**: **llama.cpp** (`llama-server`) for GGUF models,
+  **vLLM** (`vllm`) for safetensors models, and/or **Ollama** (`ollama`) for Ollama
+  models are installed (see [Runtime Engines](#runtime-engines)).
 - **Models** in default scan locations, or configure custom roots with `LLML_MODEL_PATHS` (see [Model Discovery](#model-discovery)).
 
 ### Install
@@ -132,6 +139,11 @@ llml
 
 **ctrl+`R`** runs full-screen: the TUI is suspended and the server process is attached directly to your terminal. On Linux/macOS, after the server exits you are prompted to press Enter before the TUI redraws. On Windows there is no Enter prompt; you return when the server process exits.
 
+For **Ollama** rows, `R` and `ctrl`+`R` do not start a dedicated per-model port.
+Instead, `llml` ensures the shared Ollama daemon is running on the configured host
+and preloads the selected model into memory with `keep_alive: -1`. The selected row
+still matters, but the service endpoint remains the shared Ollama host.
+
 ### Parameter profiles (`p`)
 
 Each model path can have **multiple named profiles**. Each profile stores:
@@ -172,14 +184,16 @@ User data and settings are stored in a dedicated folder. Routine app upgrades **
 
 Configure how `llml` finds and launches servers. You can edit these interactively in the UI (**`c`**).
 
-| Feature            | Environment Variable | `config.toml` key (under `[runtime]`) | Default  |
-| :----------------- | :------------------- | :------------------------------------ | :------- |
-| **llama.cpp path** | `LLAMA_CPP_PATH`     | `default_llama_cpp_path`              | _(auto)_ |
-| **llama.cpp port** | `LLAMA_SERVER_PORT`  | `default_llama_server_port`           | `8080`   |
-| **vLLM path**      | `VLLM_PATH`          | `default_vllm_path`                   | _(auto)_ |
-| **vLLM venv**      | `VLLM_VENV`          | `default_vllm_venv`                   | _(auto)_ |
-| **vLLM port**      | `VLLM_SERVER_PORT`   | `default_vllm_server_port`            | `8000`   |
-| **TUI Theme**      | `LLML_THEME`         | -                                     | `auto`   |
+| Feature            | Environment Variable | `config.toml` key (under `[runtime]`) | Default           |
+| :----------------- | :------------------- | :------------------------------------ | :---------------- |
+| **llama.cpp path** | `LLAMA_CPP_PATH`     | `default_llama_cpp_path`              | _(auto)_          |
+| **llama.cpp port** | `LLAMA_SERVER_PORT`  | `default_llama_server_port`           | `8080`            |
+| **vLLM path**      | `VLLM_PATH`          | `default_vllm_path`                   | _(auto)_          |
+| **vLLM venv**      | `VLLM_VENV`          | `default_vllm_venv`                   | _(auto)_          |
+| **vLLM port**      | `VLLM_SERVER_PORT`   | `default_vllm_server_port`            | `8000`            |
+| **Ollama path**    | `OLLAMA_PATH`        | `default_ollama_path`                 | _(auto)_          |
+| **Ollama host**    | `OLLAMA_HOST`        | `default_ollama_host`                 | `127.0.0.1:11434` |
+| **TUI Theme**      | `LLML_THEME`         | -                                     | `auto`            |
 
 **Detection Logic:**
 

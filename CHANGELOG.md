@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
+- Apr-22, 2026 - 12:09 AM +08 - [Ollama: discover models via `/api/tags`; detect `OLLAMA_PATH` and `OLLAMA_HOST`; cache Ollama rows; `R` / `ctrl+R` start `ollama serve` if needed and preload the selected model with `keep_alive: -1`; docs updated]
+
 - Apr-20, 2026 - [Runtime: macOS vLLM binary discovery includes `~/.venv-vllm-metal/bin` (before `PATH`); `activate` resolves next to that `vllm` via existing venv rules; README detection order]
 
 - Apr-20, 2026 - [Config safety: timestamped backups under `{UserConfigDir}/llml/backups/` (prune 10 per file) before overwriting config and model-params; atomic write for `model-params.json`; version-change snapshot at startup via `.last-run-version`; README/AGENTS “Updates vs your data”]
