@@ -63,7 +63,7 @@ go install github.com/flyingnobita/llml/cmd/llml@latest
 #### Homebrew
 
 ```bash
-brew tap flyingnobita/llml
+brew tap flyingnobita/tap
 brew install llml
 ```
 

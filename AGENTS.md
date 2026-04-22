@@ -14,7 +14,7 @@ and launching `llama-server`, `vllm serve`, or Ollama preload flows for a select
 - UI framework: **Bubble Tea v2** (`charm.land/bubbletea/v2`) + **Lip Gloss v2** (`charm.land/lipgloss/v2`) + **Bubbles v2** (`charm.land/bubbles/v2`)
 - GGUF metadata: `abrander/gguf`
 - Tooling: `mise` (tool versions + tasks; includes **GoReleaser** for `mise run goreleaser-check` / lint), `npm` (Prettier + markdownlint only)
-- Releases: see [dev-docs/releases-and-packaging.md](dev-docs/releases-and-packaging.md) for GoReleaser, Homebrew (`brews` → `flyingnobita/homebrew-llml`), optional Actions secrets, and maintainer automation. Summary: push a `v*` tag after updating repo-root `VERSION` to match; `.github/workflows/release.yml` publishes GitHub Release archives. Users install via `brew tap flyingnobita/llml` then `brew install llml`.
+- Releases: see [dev-docs/releases-and-packaging.md](dev-docs/releases-and-packaging.md) for GoReleaser, Homebrew (`brews` → `flyingnobita/homebrew-tap`), optional Actions secrets, and maintainer automation. Summary: push a `v*` tag after updating repo-root `VERSION` to match; `.github/workflows/release.yml` publishes GitHub Release archives. Users install via `brew tap flyingnobita/tap` then `brew install llml`.
 
 ---
 

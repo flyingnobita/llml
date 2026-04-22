@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
+- Apr-22, 2026 - 12:22 PM +08 - [Packaging: switch Homebrew publishing target from `flyingnobita/homebrew-llml` to generic tap repo `flyingnobita/homebrew-tap`; install command is now `brew tap flyingnobita/tap`]
 - Apr-22, 2026 - 12:11 PM +08 - [Packaging: move Homebrew formula publishing to separate tap repo `flyingnobita/homebrew-llml`; release workflow now uses `HOMEBREW_TAP_GITHUB_TOKEN`; remove in-repo `Formula/llml.rb`; README/AGENTS/packaging docs updated]
 - Apr-22, 2026 - 08:48 AM +08 - [v0.2.7 release: Ollama backend support plus persistent current status and alert-history pane]
 - Apr-22, 2026 - 08:48 AM +08 - [TUI: persistent current-status line for active work; `a` toggles bottom alert-history pane with unread counts, timestamped severity/source entries, and help/footer updates; default sort now starts on Runtime]

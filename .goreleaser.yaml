@@ -60,7 +60,7 @@ brews:
     directory: Formula
     repository:
       owner: flyingnobita
-      name: homebrew-llml
+      name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     commit_author:
       name: goreleaserbot
