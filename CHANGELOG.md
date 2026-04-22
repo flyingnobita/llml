@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
+- Apr-22, 2026 - 08:48 AM +08 - [v0.2.7 release: Ollama backend support plus persistent current status and alert-history pane]
 - Apr-22, 2026 - 08:48 AM +08 - [TUI: persistent current-status line for active work; `a` toggles bottom alert-history pane with unread counts, timestamped severity/source entries, and help/footer updates; default sort now starts on Runtime]
 
 - Apr-22, 2026 - 12:09 AM +08 - [Ollama: discover models via `/api/tags`; detect `OLLAMA_PATH` and `OLLAMA_HOST`; cache Ollama rows; `R` / `ctrl+R` start `ollama serve` if needed and preload the selected model with `keep_alive: -1`; docs updated]
