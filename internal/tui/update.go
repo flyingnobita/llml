@@ -37,16 +37,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case startupCacheHitMsg:
-		return m.applyScanResult(&msg.runtime, msg.files, msg.lastScan, msg.configPaths, nil, true)
+		return m.applyScanResult(&msg.runtime, msg.files, msg.lastScan, msg.configPaths, msg.writeErr, true)
 
 	case startupNeedFullScanMsg:
 		return m, applyAndFullScanCmd()
 
 	case fullScanDoneMsg:
-		return m.applyScanResult(&msg.runtime, msg.files, msg.lastScan, msg.configPaths, msg.writeErr, true)
+		m2, cmd := m.applyScanResult(&msg.runtime, msg.files, msg.lastScan, msg.configPaths, msg.writeErr, true)
+		return applyOllamaDiscoveryResult(m2, cmd, msg.ollamaNote, msg.ollamaWarn)
 
 	case modelRescanDoneMsg:
-		return m.applyScanResult(nil, msg.files, msg.lastScan, msg.configPaths, msg.writeErr, false)
+		m2, cmd := m.applyScanResult(nil, msg.files, msg.lastScan, msg.configPaths, msg.writeErr, false)
+		return applyOllamaDiscoveryResult(m2, cmd, msg.ollamaNote, msg.ollamaWarn)
 
 	case runtimeReloadErrMsg:
 		m = m.addAlert(alertSeverityError, "Config", msg.err.Error())
@@ -89,6 +91,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.flashSuccess(msg.note)
 
 	case ollamaLaunchStartedMsg:
+		if strings.TrimSpace(msg.note) == "" {
+			return m, nil
+		}
+		m = m.withLastRunCleared()
+		m = m.setCurrentStatus("Ollama", msg.note)
+		m = m.layoutTable()
+		return m, nil
+
+	case ollamaDiscoveryStartedMsg:
 		if strings.TrimSpace(msg.note) == "" {
 			return m, nil
 		}
@@ -187,6 +198,28 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	m.table.tbl, cmd = m.table.tbl.Update(msg)
 	return m, cmd
+}
+
+func applyOllamaDiscoveryResult(m Model, cmd tea.Cmd, note, warn string) (tea.Model, tea.Cmd) {
+	m = m.clearCurrentStatus()
+	switch {
+	case strings.TrimSpace(warn) != "":
+		m = m.addAlert(alertSeverityWarn, "Ollama", warn)
+		m2, clearCmd := m.flashError(warn)
+		if cmd == nil {
+			return m2, clearCmd
+		}
+		return m2, tea.Batch(cmd, clearCmd)
+	case strings.TrimSpace(note) != "":
+		m = m.addAlert(alertSeverityInfo, "Ollama", note)
+		m2, clearCmd := m.flashSuccess(note)
+		if cmd == nil {
+			return m2, clearCmd
+		}
+		return m2, tea.Batch(cmd, clearCmd)
+	default:
+		return m, cmd
+	}
 }
 
 // handleKey routes key presses in the idle (no server, no modal) state.

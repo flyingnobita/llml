@@ -26,6 +26,7 @@ type startupCacheHitMsg struct {
 	files       []models.ModelFile
 	lastScan    time.Time
 	configPaths []string
+	writeErr    error
 }
 
 // fullScanDoneMsg completes a full discovery pass (startup or refresh-all path).
@@ -35,6 +36,8 @@ type fullScanDoneMsg struct {
 	writeErr    error
 	lastScan    time.Time
 	configPaths []string
+	ollamaNote  string
+	ollamaWarn  string
 }
 
 // modelRescanDoneMsg completes an S-key model-only re-scan.
@@ -43,6 +46,8 @@ type modelRescanDoneMsg struct {
 	writeErr    error
 	lastScan    time.Time
 	configPaths []string
+	ollamaNote  string
+	ollamaWarn  string
 }
 
 // runtimeReloadErrMsg reports failure to reload [runtime] from config.toml (r key).
@@ -103,5 +108,9 @@ type ollamaLaunchDoneMsg struct {
 }
 
 type ollamaLaunchStartedMsg struct {
+	note string
+}
+
+type ollamaDiscoveryStartedMsg struct {
 	note string
 }

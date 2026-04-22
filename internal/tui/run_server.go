@@ -326,15 +326,56 @@ func startOllamaDaemon(spec serverSpec) error {
 	return cmd.Start()
 }
 
+var (
+	startOllamaDaemonFn = startOllamaDaemon
+	waitForOllamaFn     = waitForOllama
+	probeOllamaFn       = models.ProbeOllama
+	preloadOllamaFn     = models.PreloadOllamaModel
+)
+
 func waitForOllama() bool {
 	deadline := time.Now().Add(8 * time.Second)
 	for time.Now().Before(deadline) {
-		if models.ProbeOllama() {
+		if probeOllamaFn() {
 			return true
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
-	return models.ProbeOllama()
+	return probeOllamaFn()
+}
+
+type ollamaReadyResult struct {
+	Started bool
+}
+
+func ensureOllamaReady(spec serverSpec) (ollamaReadyResult, error) {
+	debugf("ensureOllamaReady: probe start bin=%q host=%q", spec.bin, spec.host)
+	if probeOllamaFn() {
+		debugf("ensureOllamaReady: Ollama already reachable")
+		return ollamaReadyResult{}, nil
+	}
+	if err := startOllamaDaemonFn(spec); err != nil {
+		debugf("ensureOllamaReady: start failed: %v", err)
+		return ollamaReadyResult{}, err
+	}
+	if !waitForOllamaFn() {
+		debugf("ensureOllamaReady: waitForOllama timed out")
+		return ollamaReadyResult{}, fmt.Errorf("ollama did not become ready on %s", spec.host)
+	}
+	debugf("ensureOllamaReady: Ollama became ready")
+	return ollamaReadyResult{Started: true}, nil
+}
+
+func discoveryOllamaSpec(rt models.RuntimeInfo) serverSpec {
+	host := rt.OllamaHost
+	if strings.TrimSpace(host) == "" {
+		host = models.OllamaHost()
+	}
+	return serverSpec{
+		backend: models.BackendOllama,
+		bin:     models.ResolveOllamaPath(rt),
+		host:    host,
+	}
 }
 
 func runOllamaLaunchCmd(spec serverSpec) tea.Cmd {
@@ -342,21 +383,15 @@ func runOllamaLaunchCmd(spec serverSpec) tea.Cmd {
 	return tea.Batch(
 		func() tea.Msg { return ollamaLaunchStartedMsg{note: startNote} },
 		func() tea.Msg {
-			started := false
-			if !models.ProbeOllama() {
-				if err := startOllamaDaemon(spec); err != nil {
-					return ollamaLaunchDoneMsg{err: err}
-				}
-				started = true
-				if !waitForOllama() {
-					return ollamaLaunchDoneMsg{err: fmt.Errorf("ollama did not become ready on %s", spec.host)}
-				}
+			ready, err := ensureOllamaReady(spec)
+			if err != nil {
+				return ollamaLaunchDoneMsg{err: err}
 			}
-			if err := models.PreloadOllamaModel(spec.modelPath); err != nil {
+			if err := preloadOllamaFn(spec.modelPath); err != nil {
 				return ollamaLaunchDoneMsg{err: err}
 			}
 			note := fmt.Sprintf("Loaded %s into Ollama on %s", spec.modelPath, spec.host)
-			if started {
+			if ready.Started {
 				note = fmt.Sprintf("Started Ollama and loaded %s on %s", spec.modelPath, spec.host)
 			}
 			return ollamaLaunchDoneMsg{note: note}
