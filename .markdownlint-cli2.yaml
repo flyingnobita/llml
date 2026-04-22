@@ -1,5 +1,7 @@
 # markdownlint-cli2 config - aligned with pre-commit
 gitignore: true
+ignores:
+  - dev-docs/**
 config:
   MD007:
     indent: 4 # match nested list indent (2 is default)

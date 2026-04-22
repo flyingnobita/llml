@@ -11,6 +11,7 @@ build/
 
 # Version control
 .git/
+dev-docs/
 
 # Python / virtual environments
 .uv/
