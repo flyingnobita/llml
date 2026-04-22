@@ -5,20 +5,20 @@
 class Llml < Formula
   desc "Terminal UI to discover local models and launch llama-server or vLLM"
   homepage "https://github.com/flyingnobita/llml"
-  version "0.2.6"
+  version "0.2.7"
 
   on_macos do
     if Hardware::CPU.intel?
-      url "https://github.com/flyingnobita/llml/releases/download/v0.2.6/llml_0.2.6_Darwin_x86_64.tar.gz"
-      sha256 "9010fd41b7687eed29f89d0ebfaaaebeacb6d501c857d0adcbebabf76c82ab47"
+      url "https://github.com/flyingnobita/llml/releases/download/v0.2.7/llml_0.2.7_Darwin_x86_64.tar.gz"
+      sha256 "b73ad8338fb8022f53a5d003a4b3d14293eb78b76422c71c8aa47204e6a7a6a2"
 
       define_method(:install) do
         bin.install "llml"
       end
     end
     if Hardware::CPU.arm?
-      url "https://github.com/flyingnobita/llml/releases/download/v0.2.6/llml_0.2.6_Darwin_arm64.tar.gz"
-      sha256 "a44bb04f8bfb795c7e0f743bfe82c589b9692ab339a5bc7f938fcea9f83a37a8"
+      url "https://github.com/flyingnobita/llml/releases/download/v0.2.7/llml_0.2.7_Darwin_arm64.tar.gz"
+      sha256 "14b8a050417ee0f70ea44c018faaf68b1a5ca8d68332e6bb3347e6b00a7a6580"
 
       define_method(:install) do
         bin.install "llml"
@@ -28,15 +28,15 @@ class Llml < Formula
 
   on_linux do
     if Hardware::CPU.intel? && Hardware::CPU.is_64_bit?
-      url "https://github.com/flyingnobita/llml/releases/download/v0.2.6/llml_0.2.6_Linux_x86_64.tar.gz"
-      sha256 "e0398756296e365e5ba7fe02692f3664295cb34d28bfb283ece13d5ad6051d9d"
+      url "https://github.com/flyingnobita/llml/releases/download/v0.2.7/llml_0.2.7_Linux_x86_64.tar.gz"
+      sha256 "1cfe3b7f8887648e89259d526afe8a720216a1cb4106b2fcf41221d1a80c64fc"
       define_method(:install) do
         bin.install "llml"
       end
     end
     if Hardware::CPU.arm? && Hardware::CPU.is_64_bit?
-      url "https://github.com/flyingnobita/llml/releases/download/v0.2.6/llml_0.2.6_Linux_arm64.tar.gz"
-      sha256 "39e2c3c7dd9d84891787b69352d34e44d1ba0f5a48d66743919400a9c09dc996"
+      url "https://github.com/flyingnobita/llml/releases/download/v0.2.7/llml_0.2.7_Linux_arm64.tar.gz"
+      sha256 "1ab58712d2aee68775cdc740f1e1b958eb98715268e8b8e39627dc2791b570f4"
       define_method(:install) do
         bin.install "llml"
       end
