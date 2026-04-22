@@ -69,9 +69,34 @@ brew install llml
 
 Upgrade later with `brew upgrade llml`.
 
+#### Scoop
+
+`llml` is published to the maintainer bucket, not the default Scoop main bucket.
+
+```powershell
+scoop bucket add flyingnobita https://github.com/flyingnobita/scoop-bucket
+scoop install flyingnobita/llml
+```
+
+Upgrade later with `scoop update llml`.
+
+#### Winget
+
+After the package manifest merges into the public Windows Package Manager catalog:
+
+```powershell
+winget install --id FlyingNobita.llml
+```
+
+Upgrade later with:
+
+```powershell
+winget upgrade --id FlyingNobita.llml
+```
+
 #### Pre-built binaries
 
-For each [GitHub release](https://github.com/flyingnobita/llml/releases), archives are published for Linux and macOS (`tar.gz`) plus Windows (`zip`). Names follow GoReleaser’s pattern, for example `llml_1.2.3_Linux_x86_64.tar.gz`, `llml_1.2.3_Darwin_arm64.tar.gz`, or `llml_1.2.3_Windows_x86_64.zip` (adjust version and OS/arch to match your download). Extract the `llml` binary.
+For each [GitHub release](https://github.com/flyingnobita/llml/releases), archives are published for Linux and macOS (`tar.gz`) plus Windows (`zip`). Names follow GoReleaser’s pattern, for example `llml_1.2.3_Linux_x86_64.tar.gz`, `llml_1.2.3_Darwin_arm64.tar.gz`, or `llml_1.2.3_Windows_x86_64.zip` (adjust version and OS/arch to match your download). Extract the `llml` binary or `llml.exe`.
 
 ```bash
 # Example: Linux x86_64 — use the archive name from the release you downloaded

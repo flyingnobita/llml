@@ -55,7 +55,7 @@ brews:
     ids:
       - llml
     homepage: https://github.com/flyingnobita/llml
-    description: Terminal UI to discover local models and launch llama-server or vLLM
+    description: Terminal UI to discover local models and launch llama-server, vLLM, or Ollama
     skip_upload: '{{ not (isEnvSet "HOMEBREW_TAP_GITHUB_TOKEN") }}'
     directory: Formula
     repository:
@@ -71,7 +71,7 @@ scoops:
     ids:
       - llml
     homepage: https://github.com/flyingnobita/llml
-    description: Terminal UI to discover local models and launch llama-server or vLLM
+    description: Terminal UI to discover local models and launch llama-server, vLLM, or Ollama
     license: MIT
     skip_upload: '{{ not (isEnvSet "SCOOP_BUCKET_GITHUB_TOKEN") }}'
     repository:
@@ -90,8 +90,8 @@ winget:
     publisher_url: https://github.com/flyingnobita
     publisher_support_url: https://github.com/flyingnobita/llml/issues
     package_identifier: FlyingNobita.llml
-    short_description: Terminal UI to discover local models and launch llama-server or vLLM
-    license: mit
+    short_description: Terminal UI to discover local models and launch llama-server, vLLM, or Ollama
+    license: MIT
     homepage: https://github.com/flyingnobita/llml
     skip_upload: '{{ not (isEnvSet "WINGET_GITHUB_TOKEN") }}'
     repository:
@@ -99,6 +99,12 @@ winget:
       name: winget-pkgs
       branch: "llml-{{ .Version }}"
       token: "{{ .Env.WINGET_GITHUB_TOKEN }}"
+      pull_request:
+        enabled: true
+        base:
+          owner: microsoft
+          name: winget-pkgs
+          branch: master
     commit_author:
       name: goreleaserbot
       email: bot@goreleaser.com
