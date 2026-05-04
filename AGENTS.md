@@ -171,6 +171,7 @@ ADRs live in `dev-docs/adr/YYYYMMDD-short-title.md`; index in
 - MCP registered: yes
 - Memory sync: full
 - Current repo policy: read-write
+- To Do list: instead of `TODOS.md`, `use dev-docs/BACKLOG.md`
 
 ### Skill routing
 
