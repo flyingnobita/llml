@@ -286,11 +286,18 @@ func (m Model) persistParamPanel() (Model, tea.Cmd) {
 	m.params.syncCurrentProfileOut()
 	profiles := copyProfiles(m.params.profiles)
 	if !m.paramsModelIsGGUF() {
+		hadBackend := false
 		for i := range profiles {
+			if profiles[i].Backend != "" {
+				hadBackend = true
+			}
 			profiles[i].Backend = ""
 		}
 		for i := range m.params.profiles {
 			m.params.profiles[i].Backend = ""
+		}
+		if hadBackend {
+			m = m.withLastRunError("Backend override cleared: only GGUF models support profile backend selection")
 		}
 	}
 	ent := modelEntry{
@@ -305,7 +312,8 @@ func (m Model) persistParamPanel() (Model, tea.Cmd) {
 	m = m.updateEffectiveBackendForPath(m.params.modelPath)
 	m = m.refreshTableRows()
 	m = m.withLaunchPreviewSynced()
-	return m, nil
+	m, noteCmd := m.maybeSetMissingRuntimeFooterNote()
+	return m, noteCmd
 }
 
 // closeParamPanelWithPersist saves first; on error the panel stays open and lastRunNote is set.

@@ -51,13 +51,15 @@ type RuntimeInfo struct {
 	OllamaHost      string
 	KoboldCppPath   string
 	OllamaRunning   bool
-	ServerRunning   bool
-	ProbePort       int // port used when ServerRunning is true (0 if not probed)
+	ServerRunning       bool
+	ProbePort           int // port used when ServerRunning is true (0 if not probed)
+	KoboldCppRunning    bool
+	KoboldCppProbePort  int // port used when KoboldCppRunning is true
 }
 
 // Available is true if any backend binary was found, or a llama-server responded on the health probe.
 func (r RuntimeInfo) Available() bool {
-	return r.LlamaCLIPath != "" || r.LlamaServerPath != "" || r.VLLMPath != "" || r.OllamaPath != "" || r.KoboldCppPath != "" || r.OllamaRunning || r.ServerRunning
+	return r.LlamaCLIPath != "" || r.LlamaServerPath != "" || r.VLLMPath != "" || r.OllamaPath != "" || r.KoboldCppPath != "" || r.OllamaRunning || r.ServerRunning || r.KoboldCppRunning
 }
 
 func formatBinLabel(abs string) string {
@@ -90,6 +92,17 @@ func (r RuntimeInfo) Summary() string {
 	if r.KoboldCppPath != "" {
 		k = "koboldcpp: ✓"
 	}
+	showKobold := r.KoboldCppPath != "" || r.KoboldCppRunning
+	if showKobold {
+		switch {
+		case r.KoboldCppPath != "" && r.KoboldCppRunning:
+			k = "koboldcpp: ✓ running"
+		case r.KoboldCppPath != "":
+			k = "koboldcpp: ✓ stopped"
+		case r.KoboldCppRunning:
+			k = "koboldcpp: running"
+		}
+	}
 	o := "ollama: —"
 	showOllama := r.OllamaPath != "" || r.OllamaRunning
 	switch {
@@ -100,10 +113,15 @@ func (r RuntimeInfo) Summary() string {
 	case r.OllamaRunning:
 		o = "ollama: running"
 	}
-	if showOllama {
-		return base + " · " + v + " · " + k + " · " + o
+	var parts []string
+	parts = append(parts, base, v)
+	if showKobold {
+		parts = append(parts, k)
 	}
-	return base + " · " + v + " · " + k
+	if showOllama {
+		parts = append(parts, o)
+	}
+	return strings.Join(parts, " · ")
 }
 
 // DiscoverRuntime locates llama-cli and llama-server using LLAMA_CPP_PATH, common install
@@ -129,6 +147,11 @@ func DiscoverRuntime() RuntimeInfo {
 	}
 	if ProbeOllama() {
 		info.OllamaRunning = true
+	}
+	kPort := KoboldCppPort()
+	if probeLlamaServerHealth(kPort) {
+		info.KoboldCppRunning = true
+		info.KoboldCppProbePort = kPort
 	}
 	return info
 }
