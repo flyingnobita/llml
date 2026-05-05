@@ -217,6 +217,14 @@ func TestKoboldCppDirectArgs(t *testing.T) {
 	if len(got) != 3 || got[0] != "/m/a.gguf" || got[1] != "--port" || got[2] != "5001" {
 		t.Fatalf("got %v", got)
 	}
+
+	gotWithArgs := koboldSpec("/bin/koboldcpp", "/m/a.gguf", 5001, ModelParams{Args: []string{"--usecublas", "--gpulayers", "99"}}).directArgs()
+	if len(gotWithArgs) != 6 {
+		t.Fatalf("got len %d want 6: %v", len(gotWithArgs), gotWithArgs)
+	}
+	if gotWithArgs[0] != "/m/a.gguf" || gotWithArgs[1] != "--port" || gotWithArgs[2] != "5001" || gotWithArgs[3] != "--usecublas" || gotWithArgs[4] != "--gpulayers" || gotWithArgs[5] != "99" {
+		t.Fatalf("got %v", gotWithArgs)
+	}
 }
 
 func TestKoboldCppPreviewLine(t *testing.T) {
