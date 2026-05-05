@@ -121,7 +121,8 @@ func koboldcppKnownNames() []string {
 
 // pickFirstKoboldCppInDir returns the best koboldcpp binary from dir, preferring
 // the primary platform variant. Falls back to any regular file with a "koboldcpp"
-// prefix to cover future or renamed variants.
+// prefix to cover future or renamed variants. Uses isRegularFile (os.Stat) so
+// symlinks are followed, matching the other backends.
 func pickFirstKoboldCppInDir(dir string) string {
 	ents, err := os.ReadDir(dir)
 	if err != nil {
@@ -129,17 +130,35 @@ func pickFirstKoboldCppInDir(dir string) string {
 	}
 	for _, pref := range koboldcppKnownNames() {
 		for _, e := range ents {
-			if e.Type().IsRegular() && e.Name() == pref {
-				return filepath.Join(dir, e.Name())
+			p := filepath.Join(dir, e.Name())
+			if isRegularFile(p) && e.Name() == pref {
+				return p
 			}
 		}
 	}
 	for _, e := range ents {
-		if e.Type().IsRegular() && strings.HasPrefix(e.Name(), "koboldcpp") {
-			return filepath.Join(dir, e.Name())
+		p := filepath.Join(dir, e.Name())
+		if isRegularFile(p) && strings.HasPrefix(e.Name(), "koboldcpp") {
+			return p
 		}
 	}
 	return ""
+}
+
+// isExecutableFile reports whether path is a regular file with at least one
+// execute bit (Unix) or is a regular file (Windows).
+func isExecutableFile(path string) bool {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	if !fi.Mode().IsRegular() {
+		return false
+	}
+	if runtime.GOOS == "windows" {
+		return true
+	}
+	return fi.Mode().Perm()&0o111 != 0
 }
 
 func findKoboldCppBinary() string {
@@ -147,16 +166,17 @@ func findKoboldCppBinary() string {
 	if d := os.Getenv(EnvKoboldCppPath); d != "" {
 		envDir = filepath.Clean(d)
 	}
-	// 1) $KOBOLDCPP_PATH points directly to an executable — use it as-is.
+	// 1) $KOBOLDCPP_PATH points directly to a file — use it only when the
+	//    base name matches a known koboldcpp pattern.
 	if envDir != "" {
 		clean := filepath.Clean(envDir)
-		if fi, err := os.Stat(clean); err == nil && fi.Mode().IsRegular() {
+		if isRegularFile(clean) && strings.HasPrefix(filepath.Base(clean), "koboldcpp") && isExecutableFile(clean) {
 			return clean
 		}
 	}
 	// 2) $KOBOLDCPP_PATH points to a directory — look for a koboldcpp binary.
 	if envDir != "" {
-		if p := pickFirstKoboldCppInDir(envDir); p != "" {
+		if p := pickFirstKoboldCppInDir(envDir); p != "" && isExecutableFile(p) {
 			return p
 		}
 	}
@@ -166,11 +186,11 @@ func findKoboldCppBinary() string {
 		common = append(common, filepath.Join(home, ".local", "bin"))
 	}
 	for _, dir := range common {
-		if p := pickFirstKoboldCppInDir(dir); p != "" {
+		if p := pickFirstKoboldCppInDir(dir); p != "" && isExecutableFile(p) {
 			return p
 		}
 	}
-	// 4) PATH fallback (exact name only).
+	// 4) PATH fallback (already checks executability via LookPath).
 	if p, err := exec.LookPath("koboldcpp"); err == nil {
 		return p
 	}

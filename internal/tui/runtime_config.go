@@ -175,7 +175,9 @@ func (m Model) maybeSetMissingRuntimeFooterNote() (Model, tea.Cmd) {
 		switch f.Backend {
 		case models.BackendLlama:
 			wantLlama = true
-			wantKobold = true
+			if m.table.effectiveBackends[f.Identity()] == models.BackendKobold {
+				wantKobold = true
+			}
 		case models.BackendVLLM:
 			wantVLLM = true
 		case models.BackendOllama:
@@ -252,16 +254,6 @@ func (m Model) commitRuntimeConfig() (Model, tea.Cmd) {
 		m = m.withLastRunError(fmt.Sprintf("%s: %v", models.EnvKoboldCppPort, err))
 		return m, clearLastRunNoteAfterCmd()
 	}
-	applyPathEnv(models.EnvLlamaCppPath, m.rc.inputs[runtimeFieldLlamaCppPath].Value())
-	applyPathEnv(models.EnvVLLMPath, m.rc.inputs[runtimeFieldVLLMPath].Value())
-	applyPathEnv(models.EnvVLLMVenv, m.rc.inputs[runtimeFieldVLLMVenv].Value())
-	applyPathEnv(models.EnvOllamaPath, m.rc.inputs[runtimeFieldOllamaPath].Value())
-	applyPathEnv(models.EnvKoboldCppPath, m.rc.inputs[runtimeFieldKoboldCppPath].Value())
-	if host := strings.TrimSpace(m.rc.inputs[runtimeFieldOllamaHost].Value()); host == "" {
-		os.Unsetenv(models.EnvOllamaHost)
-	} else {
-		os.Setenv(models.EnvOllamaHost, host)
-	}
 	if err := applyListenPortEnv(m.rc.inputs[runtimeFieldLlamaPort].Value()); err != nil {
 		m = m.withLastRunError(err.Error())
 		return m, clearLastRunNoteAfterCmd()
@@ -273,6 +265,17 @@ func (m Model) commitRuntimeConfig() (Model, tea.Cmd) {
 	if err := applyKoboldCppPortEnv(m.rc.inputs[runtimeFieldKoboldCppPort].Value()); err != nil {
 		m = m.withLastRunError(err.Error())
 		return m, clearLastRunNoteAfterCmd()
+	}
+	// Only apply path env vars after all port applications succeed.
+	applyPathEnv(models.EnvLlamaCppPath, m.rc.inputs[runtimeFieldLlamaCppPath].Value())
+	applyPathEnv(models.EnvVLLMPath, m.rc.inputs[runtimeFieldVLLMPath].Value())
+	applyPathEnv(models.EnvVLLMVenv, m.rc.inputs[runtimeFieldVLLMVenv].Value())
+	applyPathEnv(models.EnvOllamaPath, m.rc.inputs[runtimeFieldOllamaPath].Value())
+	applyPathEnv(models.EnvKoboldCppPath, m.rc.inputs[runtimeFieldKoboldCppPath].Value())
+	if host := strings.TrimSpace(m.rc.inputs[runtimeFieldOllamaHost].Value()); host == "" {
+		os.Unsetenv(models.EnvOllamaHost)
+	} else {
+		os.Setenv(models.EnvOllamaHost, host)
 	}
 	m.runtime = models.DiscoverRuntime()
 	var cmd tea.Cmd

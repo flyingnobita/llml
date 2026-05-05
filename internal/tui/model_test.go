@@ -423,6 +423,8 @@ func TestMaybeSetMissingRuntimeFooterNote_koboldCpp(t *testing.T) {
 	m.table.files = []models.ModelFile{
 		{Backend: models.BackendLlama, Path: "/a.gguf", Name: "a", Size: 1},
 	}
+	// Only rows with a koboldcpp active profile should trigger the missing note.
+	m.table.effectiveBackends[modelParamsKey("/a.gguf")] = models.BackendKobold
 	m, _ = m.maybeSetMissingRuntimeFooterNote()
 	if !strings.Contains(m.lastRunNote, MissingKoboldCppFooterNote) {
 		t.Fatalf("expected missing koboldcpp note, got %q", m.lastRunNote)

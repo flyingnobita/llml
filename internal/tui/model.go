@@ -264,6 +264,21 @@ func (m Model) resolveEffectiveBackend() models.ModelBackend {
 	if rowBackend != models.BackendLlama {
 		return rowBackend
 	}
+	// When the param panel is open, read from in-memory state so unsaved
+	// edits affect the launch preview immediately.
+	if m.params.open {
+		profileBackend := m.activeProfileBackendForSelected()
+		if profileBackend == models.BackendKobold {
+			return models.BackendKobold
+		}
+		return models.BackendLlama
+	}
+	// Otherwise use the cached effective-backend map (no disk I/O per cursor move).
+	key := modelParamsKey(m.SelectedPath())
+	if b, ok := m.table.effectiveBackends[key]; ok {
+		return b
+	}
+	// Cache miss (e.g. before first scan): fall back to disk read.
 	profileBackend := m.activeProfileBackendForSelected()
 	if profileBackend == models.BackendKobold {
 		return models.BackendKobold
@@ -302,19 +317,7 @@ func (m Model) populateEffectiveBackends() Model {
 		if f.Backend != models.BackendLlama {
 			continue
 		}
-		key := modelParamsKey(f.Identity())
-		ent, err := loadModelEntry(key)
-		if err != nil || len(ent.Profiles) == 0 {
-			delete(m.table.effectiveBackends, key)
-			continue
-		}
-		idx := clampInt(ent.ActiveIndex, 0, len(ent.Profiles)-1)
-		b, _ := models.ParseBackend(ent.Profiles[idx].Backend)
-		if b != models.BackendLlama {
-			m.table.effectiveBackends[key] = b
-		} else {
-			delete(m.table.effectiveBackends, key)
-		}
+		m = m.loadEffectiveBackendForIdentity(f.Identity())
 	}
 	return m
 }
@@ -322,7 +325,13 @@ func (m Model) populateEffectiveBackends() Model {
 // updateEffectiveBackendForPath updates or removes the cached effective backend for
 // the given model identity after a profile save.
 func (m Model) updateEffectiveBackendForPath(modelPath string) Model {
-	key := modelParamsKey(modelPath)
+	return m.loadEffectiveBackendForIdentity(modelPath)
+}
+
+// loadEffectiveBackendForIdentity reads the active profile for identity and
+// sets or deletes the effectiveBackends map entry accordingly.
+func (m Model) loadEffectiveBackendForIdentity(identity string) Model {
+	key := modelParamsKey(identity)
 	ent, err := loadModelEntry(key)
 	if err != nil || len(ent.Profiles) == 0 {
 		delete(m.table.effectiveBackends, key)
