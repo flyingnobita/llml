@@ -44,17 +44,17 @@ const defaultKoboldCppPort = 5001
 
 // RuntimeInfo describes detected llama-cli / llama-server binaries, optional vLLM CLI, and optional running server.
 type RuntimeInfo struct {
-	LlamaCLIPath    string
-	LlamaServerPath string
-	VLLMPath        string
-	OllamaPath      string
-	OllamaHost      string
-	KoboldCppPath   string
-	OllamaRunning   bool
-	ServerRunning       bool
-	ProbePort           int // port used when ServerRunning is true (0 if not probed)
-	KoboldCppRunning    bool
-	KoboldCppProbePort  int // port used when KoboldCppRunning is true
+	LlamaCLIPath       string
+	LlamaServerPath    string
+	VLLMPath           string
+	OllamaPath         string
+	OllamaHost         string
+	KoboldCppPath      string
+	OllamaRunning      bool
+	ServerRunning      bool
+	ProbePort          int // port used when ServerRunning is true (0 if not probed)
+	KoboldCppRunning   bool
+	KoboldCppProbePort int // port used when KoboldCppRunning is true
 }
 
 // Available is true if any backend binary was found, or a llama-server responded on the health probe.

@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
+- May-05, 2026 - 11:30 PM +0800 - [v0.3.0 release: KoboldCpp backend support]
+- May-05, 2026 - 11:30 PM +0800 - [KoboldCpp: binary discovery with platform-specific name variants and CUDA preference; health probe on port 5001 for running instances; effective backend resolver that respects profile selection while preventing non-GGUF rows from using KoboldCpp]
+- May-05, 2026 - 11:30 PM +0800 - [KoboldCpp: runtime config fields (KOBOLDCPP_PATH, KOBOLDCPP_PORT) with env/TOML precedence; runtime panel rows; port validation; missing-runtime footer note aware of effective backends]
+- May-05, 2026 - 11:30 PM +0800 - [KoboldCpp: server launch via buildServerSpec with commandWords, directArgs, previewLine, splitCmd, foregroundCmd; preview parity across launch pane, clipboard, split run, and fullscreen run]
+- May-05, 2026 - 11:30 PM +0800 - [TUI: param panel backend cycling restricted by model type (GGUF gets llama.cpp + KoboldCpp; safetensors/Ollama get runtime-native only); in-memory preview updates immediately on backend toggle before save]
+- May-05, 2026 - 11:30 PM +0800 - [Profiles: normalizeBackend handles koboldcpp; clearNonGGUFBackend guardrail prevents non-GGUF rows from storing KoboldCpp in persisted profiles]
 - May-02, 2026 - 11:00 PM +0800 - [Dev: `mise run worktree-setup` runs `sync_gitignore_agents.sh` with import from the primary checkout by default; script syncs gitignored agent paths plus `mise.local.toml`; `AGENT_PATHS` moved to top of script for editing]
 
 - May-01, 2026 - 10:40 PM +0800 - [Profiles: portable profile-format moves to schema v2 with structured `use_case` and `hardware` metadata; `llml-import` maps portable metadata into canonical local profile fields and writes local file version 3]
