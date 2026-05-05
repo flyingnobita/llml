@@ -190,3 +190,11 @@ Key routing rules:
 - Ship/deploy/PR → invoke /ship or /land-and-deploy
 - Save progress → invoke /context-save
 - Resume context → invoke /context-restore
+
+## Health Stack
+
+- typecheck: go vet ./...
+- lint: scripts/gofmt-check.sh
+- test: go test -race ./...
+- umbrella: mise run check
+- gbrain: timeout 5s gbrain doctor --json
