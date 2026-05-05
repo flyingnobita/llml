@@ -271,10 +271,30 @@ func (m Model) moveProfile(delta int) Model {
 }
 
 // persistParamPanel writes the current parameter profiles to disk without closing the panel.
+// paramsModelIsGGUF reports whether the param panel's model is a GGUF row
+// (the only kind where profile backend overrides matter).
+func (m Model) paramsModelIsGGUF() bool {
+	for _, f := range m.table.files {
+		if f.Identity() == m.params.modelPath {
+			return f.Backend == models.BackendLlama
+		}
+	}
+	return false
+}
+
 func (m Model) persistParamPanel() (Model, tea.Cmd) {
 	m.params.syncCurrentProfileOut()
+	profiles := copyProfiles(m.params.profiles)
+	if !m.paramsModelIsGGUF() {
+		for i := range profiles {
+			profiles[i].Backend = ""
+		}
+		for i := range m.params.profiles {
+			m.params.profiles[i].Backend = ""
+		}
+	}
 	ent := modelEntry{
-		Profiles:    copyProfiles(m.params.profiles),
+		Profiles:    profiles,
 		ActiveIndex: m.params.profileIndex,
 	}
 	if err := saveModelEntry(m.params.modelPath, ent); err != nil {
@@ -282,6 +302,8 @@ func (m Model) persistParamPanel() (Model, tea.Cmd) {
 		return m, clearLastRunNoteAfterCmd()
 	}
 	m = m.withLastRunCleared()
+	m = m.updateEffectiveBackendForPath(m.params.modelPath)
+	m = m.refreshTableRows()
 	m = m.withLaunchPreviewSynced()
 	return m, nil
 }

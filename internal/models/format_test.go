@@ -51,10 +51,34 @@ func TestFormatRuntimeLabel(t *testing.T) {
 	}{
 		{BackendLlama, "llama.cpp"},
 		{BackendVLLM, "vllm"},
+		{BackendKobold, "koboldcpp"},
 	}
 	for _, tt := range tests {
 		if got := FormatRuntimeLabel(tt.b); got != tt.want {
 			t.Fatalf("FormatRuntimeLabel(%v): got %q want %q", tt.b, got, tt.want)
 		}
+	}
+}
+
+func TestParseBackend_koboldcpp(t *testing.T) {
+	b, err := ParseBackend("koboldcpp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b != BackendKobold {
+		t.Fatalf("got %v", b)
+	}
+	if b.String() != "koboldcpp" {
+		t.Fatalf("String: got %q", b.String())
+	}
+}
+
+func TestParseBackend_emptyIsLlama(t *testing.T) {
+	b, err := ParseBackend("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b != BackendLlama {
+		t.Fatalf("got %v", b)
 	}
 }

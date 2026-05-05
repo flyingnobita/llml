@@ -145,6 +145,7 @@ const (
 	MissingLlamaServerFooterNote = "llama-server not found - press " + FooterKeyConfigPort + " to set path manually"
 	MissingVLLMFooterNote        = "vllm not found - press " + FooterKeyConfigPort + " to set path manually"
 	MissingOllamaFooterNote      = "ollama not found or not reachable - press " + FooterKeyConfigPort + " to set path or host"
+	MissingKoboldCppFooterNote   = "koboldcpp not found - press " + FooterKeyConfigPort + " to set path manually"
 
 	FooterKeySortColumn   = ","
 	FooterDescSortColumn  = "sort"
@@ -170,17 +171,20 @@ const (
 	// Runtime config modal.
 	FooterRuntimeConfigHints = "tab: fields · enter: save · esc: back"
 	// runtimeConfigModalSubtitle appears below the modal title (values here override startup discovery).
-	runtimeConfigModalSubtitle     = "Overrides saved to config.toml. Shell environment variables take precedence."
-	runtimeConfigHeaderLlama       = "Llama.cpp"
-	runtimeConfigHeaderVLLM        = "vLLM"
-	runtimeConfigHeaderOllama      = "Ollama"
-	runtimeConfigLabelLlamaCppPath = "Path (llama-cli / llama-server)"
-	runtimeConfigLabelVLLMPath     = "Path (vllm binary)"
-	runtimeConfigLabelVLLMVenv     = "Venv Root (Optional)"
-	runtimeConfigLabelLlamaPort    = "Server Port"
-	runtimeConfigLabelVLLMPort     = "Server Port"
-	runtimeConfigLabelOllamaPath   = "Path (ollama binary)"
-	runtimeConfigLabelOllamaHost   = "Host"
+	runtimeConfigModalSubtitle      = "Overrides saved to config.toml. Shell environment variables take precedence."
+	runtimeConfigHeaderLlama        = "Llama.cpp"
+	runtimeConfigHeaderVLLM         = "vLLM"
+	runtimeConfigHeaderOllama       = "Ollama"
+	runtimeConfigHeaderKoboldCpp    = "KoboldCpp"
+	runtimeConfigLabelLlamaCppPath  = "Path (llama-cli / llama-server)"
+	runtimeConfigLabelVLLMPath      = "Path (vllm binary)"
+	runtimeConfigLabelVLLMVenv      = "Venv Root (Optional)"
+	runtimeConfigLabelLlamaPort     = "Server Port"
+	runtimeConfigLabelVLLMPort      = "Server Port"
+	runtimeConfigLabelOllamaPath    = "Path (ollama binary)"
+	runtimeConfigLabelOllamaHost    = "Host"
+	runtimeConfigLabelKoboldCppPath = "Path (koboldcpp binary)"
+	runtimeConfigLabelKoboldCppPort = "Server Port"
 
 	// FooterHintTabSections is the shared "tab: sections" fragment used by split-pane
 	// and parameter modal footers.

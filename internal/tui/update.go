@@ -58,6 +58,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.loading = false
 		m.loadErr = nil
 		m.table.files = msg.files
+		m = m.populateEffectiveBackends()
 		sortModelFiles(m.table.files, m.table.sortCol, m.table.sortDesc)
 		m = m.layoutTable()
 		m.table.hscroll.SetXOffset(0)
@@ -283,12 +284,13 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if m.loading {
 			return m.flashError("Wait for the model scan to finish.")
 		}
-		p, be := m.SelectedModel()
+		p, _ := m.SelectedModel()
 		if p == "" {
 			return m.flashError("Select a model row first.")
 		}
 		m = m.withLastRunCleared()
 		params, _ := loadModelParamsForRun(p)
+		be := m.resolveEffectiveBackend()
 		spec, err := buildServerSpec(be, p, params, m.runtime, true)
 		if err != nil {
 			return m.flashError(err.Error())

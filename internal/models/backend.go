@@ -16,6 +16,8 @@ const (
 	BackendVLLM
 	// BackendOllama is a daemon-managed Ollama model identified by model[:tag].
 	BackendOllama
+	// BackendKobold is a GGUF weight file launched with KoboldCpp instead of llama-server.
+	BackendKobold
 )
 
 // String returns the canonical lowercase name for the backend.
@@ -25,6 +27,8 @@ func (b ModelBackend) String() string {
 		return "ollama"
 	case BackendVLLM:
 		return "vllm"
+	case BackendKobold:
+		return "koboldcpp"
 	default:
 		return "llama"
 	}
@@ -39,6 +43,8 @@ func ParseBackend(s string) (ModelBackend, error) {
 		return BackendVLLM, nil
 	case "ollama":
 		return BackendOllama, nil
+	case "koboldcpp":
+		return BackendKobold, nil
 	default:
 		return 0, fmt.Errorf("unknown backend %q", s)
 	}

@@ -33,12 +33,16 @@ func TestCloneProfileName(t *testing.T) {
 
 func TestParamPanelCloneProfile(t *testing.T) {
 	m := New()
+	m.table.files = []models.ModelFile{
+		{Path: "/m/a.gguf", Backend: models.BackendLlama},
+	}
+	m.params.modelPath = "/m/a.gguf"
 	m.params.open = true
 	m.params.focus = paramFocusProfiles
 	m.params.profiles = []ParameterProfile{
 		{
 			Name:     "cuda",
-			Backend:  "vllm",
+			Backend:  "koboldcpp",
 			UseCase:  profiles.UseCaseMetadata{Primary: profiles.UseCaseChat, Tags: []string{"interactive"}},
 			Hardware: profiles.HardwareMetadata{Class: profiles.HardwareClassGPU},
 			Env:      []EnvVar{{Key: "FOO", Value: "bar"}},
@@ -66,7 +70,7 @@ func TestParamPanelCloneProfile(t *testing.T) {
 	if len(clone.Args) != 1 || clone.Args[0] != "--x" {
 		t.Fatalf("clone args: %+v", clone.Args)
 	}
-	if clone.Backend != "vllm" || clone.UseCase.Primary != profiles.UseCaseChat || clone.Hardware.Class != profiles.HardwareClassGPU {
+	if clone.Backend != "koboldcpp" || clone.UseCase.Primary != profiles.UseCaseChat || clone.Hardware.Class != profiles.HardwareClassGPU {
 		t.Fatalf("clone metadata: %+v", clone)
 	}
 	if m.params.profiles[0].Name != "cuda" {
@@ -420,6 +424,9 @@ func TestParamPanelMetadataEditsPersistAndSwitchProfiles(t *testing.T) {
 	}
 
 	m := New()
+	m.table.files = []models.ModelFile{
+		{Path: filepath.Clean(modelPath), Backend: models.BackendLlama},
+	}
 	m.params.open = true
 	m.params.modelPath = filepath.Clean(modelPath)
 	m.params.modelDisplayName = "meta-edit.gguf"

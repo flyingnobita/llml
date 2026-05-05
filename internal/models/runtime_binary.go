@@ -104,6 +104,79 @@ func findOllamaBinary() string {
 	return findBinaryInEnvAndCommonDirs("ollama", envDir, common)
 }
 
+// koboldcppKnownNames lists every binary name published in upstream releases, in
+// preference order for the current platform (primary CUDA variant first).
+//
+// Source: https://github.com/LostRuins/koboldcpp/releases
+func koboldcppKnownNames() []string {
+	switch runtime.GOOS {
+	case "windows":
+		return []string{"koboldcpp.exe", "koboldcpp-nocuda.exe", "koboldcpp-oldpc.exe"}
+	case "darwin":
+		return []string{"koboldcpp-mac-arm64"}
+	default:
+		return []string{"koboldcpp-linux-x64", "koboldcpp-linux-x64-nocuda", "koboldcpp-linux-x64-oldpc"}
+	}
+}
+
+// pickFirstKoboldCppInDir returns the best koboldcpp binary from dir, preferring
+// the primary platform variant. Falls back to any regular file with a "koboldcpp"
+// prefix to cover future or renamed variants.
+func pickFirstKoboldCppInDir(dir string) string {
+	ents, err := os.ReadDir(dir)
+	if err != nil {
+		return ""
+	}
+	for _, pref := range koboldcppKnownNames() {
+		for _, e := range ents {
+			if e.Type().IsRegular() && e.Name() == pref {
+				return filepath.Join(dir, e.Name())
+			}
+		}
+	}
+	for _, e := range ents {
+		if e.Type().IsRegular() && strings.HasPrefix(e.Name(), "koboldcpp") {
+			return filepath.Join(dir, e.Name())
+		}
+	}
+	return ""
+}
+
+func findKoboldCppBinary() string {
+	var envDir string
+	if d := os.Getenv(EnvKoboldCppPath); d != "" {
+		envDir = filepath.Clean(d)
+	}
+	// 1) $KOBOLDCPP_PATH points directly to an executable — use it as-is.
+	if envDir != "" {
+		clean := filepath.Clean(envDir)
+		if fi, err := os.Stat(clean); err == nil && fi.Mode().IsRegular() {
+			return clean
+		}
+	}
+	// 2) $KOBOLDCPP_PATH points to a directory — look for a koboldcpp binary.
+	if envDir != "" {
+		if p := pickFirstKoboldCppInDir(envDir); p != "" {
+			return p
+		}
+	}
+	// 3) Common directories.
+	common := []string{"/usr/local/bin", "/opt/homebrew/bin"}
+	if home, err := os.UserHomeDir(); err == nil {
+		common = append(common, filepath.Join(home, ".local", "bin"))
+	}
+	for _, dir := range common {
+		if p := pickFirstKoboldCppInDir(dir); p != "" {
+			return p
+		}
+	}
+	// 4) PATH fallback (exact name only).
+	if p, err := exec.LookPath("koboldcpp"); err == nil {
+		return p
+	}
+	return ""
+}
+
 // probeLlamaServerHealth GETs /health on 127.0.0.1 (avoids localhost IPv6/IPv4 ambiguity).
 func probeLlamaServerHealth(port int) bool {
 	url := fmt.Sprintf("http://127.0.0.1:%d/health", port)

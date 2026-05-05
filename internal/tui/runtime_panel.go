@@ -12,6 +12,8 @@ import (
 
 // Runtime panel row labels (sorted alphabetically in [RuntimePanelLines]).
 const (
+	runtimePanelLabelKoboldCppPath   = "koboldcpp path"
+	runtimePanelLabelKoboldCppPort   = "koboldcpp port"
 	runtimePanelLabelLlamaServerPath = "llama-server path"
 	runtimePanelLabelLlamaServerPort = "llama-server port"
 	runtimePanelLabelOllamaHost      = "ollama host"
@@ -87,6 +89,15 @@ func vllmVenvPanelDisplay(r models.RuntimeInfo) string {
 	return "—"
 }
 
+func koboldCppPathPanelDisplay(r models.RuntimeInfo) string {
+	p := models.ResolveKoboldCppPath(r)
+	if p == "" {
+		return "—"
+	}
+	home, _ := os.UserHomeDir()
+	return FormatPathDisplay(p, home)
+}
+
 func ollamaPathPanelDisplay(r models.RuntimeInfo) string {
 	p := models.ResolveOllamaPath(r)
 	if p == "" {
@@ -118,6 +129,8 @@ func RuntimePanelLines(maxWidth int, r models.RuntimeInfo) []string {
 		key   string
 		value string
 	}{
+		{runtimePanelLabelKoboldCppPath, koboldCppPathPanelDisplay(r)},
+		{runtimePanelLabelKoboldCppPort, portEnvDisplay(models.EnvKoboldCppPort, models.KoboldCppPort())},
 		{runtimePanelLabelLlamaServerPath, llamaServerPathPanelDisplay(r)},
 		{runtimePanelLabelLlamaServerPort, portEnvDisplay(models.EnvLlamaServerPort, models.ListenPort())},
 		{runtimePanelLabelOllamaHost, models.OllamaHost()},

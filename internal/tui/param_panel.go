@@ -66,7 +66,26 @@ var paramMetadataFieldLabels = [...]string{
 	"Hardware Notes",
 }
 
-var paramBackendOptions = []string{"", "llama", "vllm", "ollama"}
+var (
+	paramBackendOptionsAll  = []string{"", "llama", "vllm", "ollama", "koboldcpp"}
+	paramBackendOptionsGGUF = []string{"", "llama", "koboldcpp"}
+)
+
+// paramBackendOptionsForModel returns the valid backend options for the given
+// model path. GGUF rows can choose llama or koboldcpp; non-GGUF rows are
+// locked to their discovery backend (the profile override is ignored at
+// launch time).
+func (m Model) paramBackendOptionsForModel() []string {
+	for _, f := range m.table.files {
+		if f.Identity() == m.params.modelPath {
+			if f.Backend == models.BackendLlama {
+				return paramBackendOptionsGGUF
+			}
+			return nil // non-GGUF: no cycling
+		}
+	}
+	return paramBackendOptionsAll // fallback (shouldn't happen)
+}
 
 var paramUseCasePrimaryOptions = []profilepkg.UseCasePrimary{
 	profilepkg.UseCaseUnspecified,
@@ -330,7 +349,11 @@ func (m Model) cycleMetadataEnum(delta int) (Model, tea.Cmd) {
 	p := m.params.profiles[m.params.profileIndex]
 	switch paramMetadataField(m.params.metadataCursor) {
 	case paramMetadataBackend:
-		p.Backend = cycleStringOption(paramBackendOptions, p.Backend, delta)
+		opts := m.paramBackendOptionsForModel()
+		if len(opts) == 0 {
+			return m, nil
+		}
+		p.Backend = cycleStringOption(opts, p.Backend, delta)
 	case paramMetadataUseCasePrimary:
 		p.UseCase.Primary = cycleUseCaseOption(paramUseCasePrimaryOptions, p.UseCase.Primary, delta)
 	case paramMetadataHardwareClass:

@@ -154,6 +154,84 @@ func TestDiscoveryConfigForWrite_merge(t *testing.T) {
 	}
 }
 
+func TestConfigRoundTrip_koboldCpp(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("HOME", dir)
+	t.Setenv("AppData", dir)
+
+	p1 := 8080
+	p2 := 8000
+	kp := 5001
+	c := Config{
+		SchemaVersion: 3,
+		Runtime: RuntimeConfig{
+			DefaultLlamaCppPath:    "/opt/llama",
+			DefaultKoboldCppPath:   "/opt/koboldcpp",
+			DefaultLlamaServerPort: &p1,
+			DefaultVLLMServerPort:  &p2,
+			DefaultKoboldCppPort:   &kp,
+		},
+		Discovery: DiscoveryConfig{
+			ExtraModelPaths: []string{"/extra/models"},
+			LastScan:        time.Unix(1700000000, 0).UTC(),
+		},
+		Models: []ModelEntry{
+			{
+				Backend:    "llama",
+				Path:       "/models/a.gguf",
+				Name:       "a.gguf",
+				Size:       100,
+				ModTime:    time.Unix(1600000000, 0).UTC(),
+				Parameters: "llama · 4096 ctx",
+			},
+		},
+	}
+	if err := WriteFile(c); err != nil {
+		t.Fatal(err)
+	}
+	got, err := ReadFile()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Runtime.DefaultKoboldCppPath != "/opt/koboldcpp" {
+		t.Fatalf("koboldcpp path: got %q", got.Runtime.DefaultKoboldCppPath)
+	}
+	if got.Runtime.DefaultKoboldCppPort == nil || *got.Runtime.DefaultKoboldCppPort != 5001 {
+		t.Fatalf("koboldcpp port: got %v", got.Runtime.DefaultKoboldCppPort)
+	}
+}
+
+func TestApplyRuntimeFromConfig_koboldCppEnvWins(t *testing.T) {
+	t.Setenv(models.EnvKoboldCppPath, "/from-env")
+	t.Cleanup(func() { _ = os.Unsetenv(models.EnvKoboldCppPath) })
+
+	ApplyRuntimeFromConfig(&RuntimeConfig{DefaultKoboldCppPath: "/from-toml"})
+	if os.Getenv(models.EnvKoboldCppPath) != "/from-env" {
+		t.Fatalf("env should win, got %q", os.Getenv(models.EnvKoboldCppPath))
+	}
+}
+
+func TestApplyRuntimeFromConfig_koboldCppTomlFallback(t *testing.T) {
+	_ = os.Unsetenv(models.EnvKoboldCppPath)
+	t.Cleanup(func() { _ = os.Unsetenv(models.EnvKoboldCppPath) })
+
+	ApplyRuntimeFromConfig(&RuntimeConfig{DefaultKoboldCppPath: "/from-toml"})
+	got := os.Getenv(models.EnvKoboldCppPath)
+	if !filepath.IsAbs(got) {
+		t.Fatalf("want absolute path, got %q", got)
+	}
+}
+
+func TestApplyRuntimeFromConfig_koboldCppPort(t *testing.T) {
+	t.Setenv(models.EnvKoboldCppPort, "")
+	p := 6000
+	ApplyRuntimeFromConfig(&RuntimeConfig{DefaultKoboldCppPort: &p})
+	if os.Getenv(models.EnvKoboldCppPort) != "6000" {
+		t.Fatalf("got %q", os.Getenv(models.EnvKoboldCppPort))
+	}
+}
+
 func TestDiscoveryConfigFromInputs(t *testing.T) {
 	t.Setenv(models.EnvModelPaths, "/env/ignored") // should not be used
 	t.Cleanup(func() { _ = os.Unsetenv(models.EnvModelPaths) })

@@ -15,7 +15,7 @@ func setupPreviewScrollableModel() Model {
 		{Path: "/tmp/test.gguf", Name: "test.gguf", Backend: models.BackendLlama},
 	}
 	cols := tableColumns(100, m.table.files, m.layout.homeDir, m.table.sortCol, m.table.sortDesc)
-	m.table.tbl.SetRows(buildTableRows(m.table.files, cols, m.layout.homeDir))
+	m.table.tbl.SetRows(buildTableRows(m.table.files, cols, m.layout.homeDir, nil))
 	m = m.layoutTable()
 	// Make the preview scrollable by setting launchPreviewLastCmd to something
 	// that the preview won't fit in launchPreviewVisibleLines lines.
@@ -31,7 +31,7 @@ func setupPreviewVisibleModel() Model {
 		{Path: "/tmp/test.gguf", Name: "test.gguf", Backend: models.BackendLlama},
 	}
 	cols := tableColumns(100, m.table.files, m.layout.homeDir, m.table.sortCol, m.table.sortDesc)
-	m.table.tbl.SetRows(buildTableRows(m.table.files, cols, m.layout.homeDir))
+	m.table.tbl.SetRows(buildTableRows(m.table.files, cols, m.layout.homeDir, nil))
 	m = m.layoutTable()
 	cmd := "llama-server --model /tmp/test.gguf --port 8080"
 	m.preview.viewport.SetContent(cmd)

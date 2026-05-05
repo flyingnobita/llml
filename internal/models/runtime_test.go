@@ -12,15 +12,15 @@ func TestRuntimeInfo_Summary(t *testing.T) {
 	}{
 		{
 			r:    RuntimeInfo{LlamaCLIPath: "/a/llama-cli", LlamaServerPath: "/b/llama-server"},
-			want: "llama.cpp: cli ✓ · server ✓ · vllm: —",
+			want: "llama.cpp: cli ✓ · server ✓ · vllm: — · koboldcpp: —",
 		},
 		{
 			r:    RuntimeInfo{LlamaCLIPath: "/a/llama-cli", LlamaServerPath: "/b/llama-server", VLLMPath: "/c/vllm"},
-			want: "llama.cpp: cli ✓ · server ✓ · vllm: ✓",
+			want: "llama.cpp: cli ✓ · server ✓ · vllm: ✓ · koboldcpp: —",
 		},
 		{
 			r:    RuntimeInfo{ServerRunning: true, ProbePort: 8000},
-			want: "llama.cpp: binaries not on PATH — server running :8000 · vllm: —",
+			want: "llama.cpp: binaries not on PATH — server running :8000 · vllm: — · koboldcpp: —",
 		},
 	}
 	for _, tc := range cases {
@@ -48,6 +48,17 @@ func TestVLLMPort_default(t *testing.T) {
 	}
 	t.Setenv(EnvVLLMServerPort, "8000")
 	if p := VLLMPort(); p != 8000 {
+		t.Fatalf("got %d", p)
+	}
+}
+
+func TestKoboldCppPort_default(t *testing.T) {
+	os.Unsetenv(EnvKoboldCppPort)
+	if p := KoboldCppPort(); p != defaultKoboldCppPort {
+		t.Fatalf("got %d want %d", p, defaultKoboldCppPort)
+	}
+	t.Setenv(EnvKoboldCppPort, "6000")
+	if p := KoboldCppPort(); p != 6000 {
 		t.Fatalf("got %d", p)
 	}
 }

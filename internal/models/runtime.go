@@ -23,6 +23,10 @@ const (
 	EnvOllamaPath = "OLLAMA_PATH"
 	// EnvOllamaHost is the Ollama API bind/listen host (host:port by default).
 	EnvOllamaHost = "OLLAMA_HOST"
+	// EnvKoboldCppPath is an optional directory or absolute binary path for the koboldcpp executable.
+	EnvKoboldCppPath = "KOBOLDCPP_PATH"
+	// EnvKoboldCppPort is the TCP port for KoboldCpp (default 5001 when unset or invalid).
+	EnvKoboldCppPort = "KOBOLDCPP_PORT"
 
 	// EnvModelPaths is the env var for extra model search roots (comma-separated).
 	EnvModelPaths = "LLML_MODEL_PATHS"
@@ -36,6 +40,8 @@ const defaultLlamaServerPort = 8080
 
 const defaultVLLMServerPort = 8000
 
+const defaultKoboldCppPort = 5001
+
 // RuntimeInfo describes detected llama-cli / llama-server binaries, optional vLLM CLI, and optional running server.
 type RuntimeInfo struct {
 	LlamaCLIPath    string
@@ -43,14 +49,15 @@ type RuntimeInfo struct {
 	VLLMPath        string
 	OllamaPath      string
 	OllamaHost      string
+	KoboldCppPath   string
 	OllamaRunning   bool
 	ServerRunning   bool
 	ProbePort       int // port used when ServerRunning is true (0 if not probed)
 }
 
-// Available is true if either binary was found, vLLM was found, or a llama-server responded on the health probe.
+// Available is true if any backend binary was found, or a llama-server responded on the health probe.
 func (r RuntimeInfo) Available() bool {
-	return r.LlamaCLIPath != "" || r.LlamaServerPath != "" || r.VLLMPath != "" || r.OllamaPath != "" || r.OllamaRunning || r.ServerRunning
+	return r.LlamaCLIPath != "" || r.LlamaServerPath != "" || r.VLLMPath != "" || r.OllamaPath != "" || r.KoboldCppPath != "" || r.OllamaRunning || r.ServerRunning
 }
 
 func formatBinLabel(abs string) string {
@@ -79,6 +86,10 @@ func (r RuntimeInfo) Summary() string {
 	if r.VLLMPath != "" {
 		v = "vllm: ✓"
 	}
+	k := "koboldcpp: —"
+	if r.KoboldCppPath != "" {
+		k = "koboldcpp: ✓"
+	}
 	o := "ollama: —"
 	showOllama := r.OllamaPath != "" || r.OllamaRunning
 	switch {
@@ -90,9 +101,9 @@ func (r RuntimeInfo) Summary() string {
 		o = "ollama: running"
 	}
 	if showOllama {
-		return base + " · " + v + " · " + o
+		return base + " · " + v + " · " + k + " · " + o
 	}
-	return base + " · " + v
+	return base + " · " + v + " · " + k
 }
 
 // DiscoverRuntime locates llama-cli and llama-server using LLAMA_CPP_PATH, common install
@@ -108,6 +119,7 @@ func DiscoverRuntime() RuntimeInfo {
 		VLLMPath:        findVLLMBinary(),
 		OllamaPath:      findOllamaBinary(),
 		OllamaHost:      OllamaHost(),
+		KoboldCppPath:   findKoboldCppBinary(),
 		ProbePort:       port,
 	}
 	if cli == "" && srv == "" {
@@ -137,6 +149,9 @@ func ListenPort() int { return portFromEnv(EnvLlamaServerPort, defaultLlamaServe
 // VLLMPort returns the TCP port from VLLM_SERVER_PORT, or 8000 if unset or invalid.
 func VLLMPort() int { return portFromEnv(EnvVLLMServerPort, defaultVLLMServerPort) }
 
+// KoboldCppPort returns the TCP port from KOBOLDCPP_PORT, or 5001 if unset or invalid.
+func KoboldCppPort() int { return portFromEnv(EnvKoboldCppPort, defaultKoboldCppPort) }
+
 // resolvePath returns existing if non-empty, otherwise the first match for cmdName on PATH.
 func resolvePath(existing, cmdName string) string {
 	if existing != "" {
@@ -161,4 +176,9 @@ func ResolveVLLMPath(r RuntimeInfo) string {
 // ResolveOllamaPath returns the detected ollama binary path, or the first match on PATH.
 func ResolveOllamaPath(r RuntimeInfo) string {
 	return resolvePath(r.OllamaPath, "ollama")
+}
+
+// ResolveKoboldCppPath returns the detected koboldcpp binary path, or the first match on PATH.
+func ResolveKoboldCppPath(r RuntimeInfo) string {
+	return resolvePath(r.KoboldCppPath, "koboldcpp")
 }

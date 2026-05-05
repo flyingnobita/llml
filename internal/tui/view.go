@@ -650,12 +650,18 @@ func (m Model) runtimeConfigModalBlock() string {
 			append([]string{""}, m.runtimeFieldRow(runtimeFieldOllamaHost, runtimeConfigLabelOllamaHost)...)...)...)
 	ollamaBlock := lipgloss.JoinVertical(lipgloss.Left, ollamaRows...)
 
+	koboldRows := append([]string{header(runtimeConfigHeaderKoboldCpp), ""},
+		append(m.runtimeFieldRow(runtimeFieldKoboldCppPath, runtimeConfigLabelKoboldCppPath),
+			append([]string{""}, m.runtimeFieldRow(runtimeFieldKoboldCppPort, runtimeConfigLabelKoboldCppPort)...)...)...)
+	koboldBlock := lipgloss.JoinVertical(lipgloss.Left, koboldRows...)
+
 	var inputBlock string
 	if cw >= 80 {
 		leftBlock := lipgloss.JoinVertical(lipgloss.Left, llamaBlock, "", ollamaBlock)
-		inputBlock = lipgloss.JoinHorizontal(lipgloss.Top, leftBlock, m.ui.styles.body.PaddingLeft(4).Render(vllmBlock))
+		rightBlock := lipgloss.JoinVertical(lipgloss.Left, vllmBlock, "", koboldBlock)
+		inputBlock = lipgloss.JoinHorizontal(lipgloss.Top, leftBlock, m.ui.styles.body.PaddingLeft(4).Render(rightBlock))
 	} else {
-		inputBlock = lipgloss.JoinVertical(lipgloss.Left, llamaBlock, "", ollamaBlock, "", vllmBlock)
+		inputBlock = lipgloss.JoinVertical(lipgloss.Left, llamaBlock, "", ollamaBlock, "", vllmBlock, "", koboldBlock)
 	}
 
 	rows := []string{

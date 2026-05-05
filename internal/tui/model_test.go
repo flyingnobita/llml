@@ -1,10 +1,12 @@
 package tui
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	btable "charm.land/bubbles/v2/table"
 	tea "charm.land/bubbletea/v2"
 	"github.com/flyingnobita/llml/internal/models"
 	"github.com/mattn/go-runewidth"
@@ -303,6 +305,128 @@ func trimToColumns(s string, width int) string {
 		used += w
 	}
 	return b.String()
+}
+
+func TestResolveEffectiveBackend_GGUFWithKoboldProfile(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	modelPath := filepath.Join(dir, "a.gguf")
+	m := New()
+	m.loading = false
+	m.table.files = []models.ModelFile{
+		{Backend: models.BackendLlama, Path: modelPath, Name: "a", Size: 1},
+	}
+	m.table.tbl.SetRows([]btable.Row{{"a", "a", "llama.cpp", "1 B", "", modelPath}})
+	m.table.tbl.SetCursor(0)
+	ent := modelEntry{
+		Profiles: []ParameterProfile{
+			{Name: "kobold", Backend: "koboldcpp"},
+		},
+		ActiveIndex: 0,
+	}
+	if err := saveModelEntry(modelPath, ent); err != nil {
+		t.Fatal(err)
+	}
+
+	got := m.resolveEffectiveBackend()
+	if got != models.BackendKobold {
+		t.Fatalf("got %v want BackendKobold", got)
+	}
+}
+
+func TestResolveEffectiveBackend_GGUFWithLlamaProfile(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	modelPath := filepath.Join(dir, "a.gguf")
+	m := New()
+	m.loading = false
+	m.table.files = []models.ModelFile{
+		{Backend: models.BackendLlama, Path: modelPath, Name: "a", Size: 1},
+	}
+	m.table.tbl.SetRows([]btable.Row{{"a", "a", "llama.cpp", "1 B", "", modelPath}})
+	m.table.tbl.SetCursor(0)
+	ent := modelEntry{
+		Profiles: []ParameterProfile{
+			{Name: "default", Backend: ""},
+		},
+		ActiveIndex: 0,
+	}
+	if err := saveModelEntry(modelPath, ent); err != nil {
+		t.Fatal(err)
+	}
+
+	got := m.resolveEffectiveBackend()
+	if got != models.BackendLlama {
+		t.Fatalf("got %v want BackendLlama", got)
+	}
+}
+
+func TestResolveEffectiveBackend_VLLMIgnoresProfileOverride(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	modelPath := filepath.Join(dir, "hf-model")
+	m := New()
+	m.loading = false
+	m.table.files = []models.ModelFile{
+		{Backend: models.BackendVLLM, Path: modelPath, Name: "m", Size: 1},
+	}
+	m.table.tbl.SetRows([]btable.Row{{"m", "hf-model", "vllm", "1 B", "", modelPath}})
+	m.table.tbl.SetCursor(0)
+	ent := modelEntry{
+		Profiles: []ParameterProfile{
+			{Name: "kobold", Backend: "koboldcpp"},
+		},
+		ActiveIndex: 0,
+	}
+	if err := saveModelEntry(modelPath, ent); err != nil {
+		t.Fatal(err)
+	}
+
+	got := m.resolveEffectiveBackend()
+	if got != models.BackendVLLM {
+		t.Fatalf("vLLM row should ignore profile koboldcpp override, got %v", got)
+	}
+}
+
+func TestResolveEffectiveBackend_OllamaIgnoresProfileOverride(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	m := New()
+	m.loading = false
+	m.table.files = []models.ModelFile{
+		{Backend: models.BackendOllama, ID: "qwen:latest", Location: "ollama://qwen:latest", Name: "qwen:latest", Size: 1},
+	}
+	m.table.tbl.SetRows([]btable.Row{{"qwen:latest", "qwen:latest", "ollama", "1 B", "", "ollama://qwen:latest"}})
+	m.table.tbl.SetCursor(0)
+	ent := modelEntry{
+		Profiles: []ParameterProfile{
+			{Name: "kobold", Backend: "koboldcpp"},
+		},
+		ActiveIndex: 0,
+	}
+	if err := saveModelEntry("ollama://qwen:latest", ent); err != nil {
+		t.Fatal(err)
+	}
+
+	got := m.resolveEffectiveBackend()
+	if got != models.BackendOllama {
+		t.Fatalf("Ollama row should ignore profile koboldcpp override, got %v", got)
+	}
+}
+
+func TestMaybeSetMissingRuntimeFooterNote_koboldCpp(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	m := New()
+	m.layout.width = 120
+	m.layout.height = 40
+	m.runtime = models.RuntimeInfo{}
+	m.table.files = []models.ModelFile{
+		{Backend: models.BackendLlama, Path: "/a.gguf", Name: "a", Size: 1},
+	}
+	m, _ = m.maybeSetMissingRuntimeFooterNote()
+	if !strings.Contains(m.lastRunNote, MissingKoboldCppFooterNote) {
+		t.Fatalf("expected missing koboldcpp note, got %q", m.lastRunNote)
+	}
 }
 
 // TestSelectedStyleHasBackground verifies that the table Selected style carries

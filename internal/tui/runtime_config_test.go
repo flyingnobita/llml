@@ -109,6 +109,35 @@ func TestApplyPathEnv(t *testing.T) {
 	}
 }
 
+func TestApplyKoboldCppPortEnv(t *testing.T) {
+	t.Run("empty unsets", func(t *testing.T) {
+		t.Setenv(models.EnvKoboldCppPort, "6000")
+		if err := applyKoboldCppPortEnv(""); err != nil {
+			t.Fatal(err)
+		}
+		if os.Getenv(models.EnvKoboldCppPort) != "" {
+			t.Fatal("expected unset")
+		}
+	})
+	t.Run("valid sets", func(t *testing.T) {
+		t.Setenv(models.EnvKoboldCppPort, "")
+		if err := applyKoboldCppPortEnv("5001"); err != nil {
+			t.Fatal(err)
+		}
+		if os.Getenv(models.EnvKoboldCppPort) != "5001" {
+			t.Fatalf("got %q", os.Getenv(models.EnvKoboldCppPort))
+		}
+	})
+	t.Run("reject out of range", func(t *testing.T) {
+		if applyKoboldCppPortEnv("0") == nil {
+			t.Fatal("expected error")
+		}
+		if applyKoboldCppPortEnv("65536") == nil {
+			t.Fatal("expected error")
+		}
+	})
+}
+
 func TestApplyPathEnv_tilde(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

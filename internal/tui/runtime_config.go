@@ -22,6 +22,8 @@ const (
 	runtimeFieldVLLMPort
 	runtimeFieldOllamaPath
 	runtimeFieldOllamaHost
+	runtimeFieldKoboldCppPath
+	runtimeFieldKoboldCppPort
 	runtimeFieldCount
 )
 
@@ -54,6 +56,22 @@ func applyVLLMPortEnv(raw string) error {
 		return fmt.Errorf("port must be 1-65535 or empty for default 8000")
 	}
 	os.Setenv(models.EnvVLLMServerPort, v)
+	return nil
+}
+
+// applyKoboldCppPortEnv sets KOBOLDCPP_PORT from user input, or unsets it when empty
+// (default port 5001 via models.KoboldCppPort).
+func applyKoboldCppPortEnv(raw string) error {
+	v := strings.TrimSpace(raw)
+	if v == "" {
+		os.Unsetenv(models.EnvKoboldCppPort)
+		return nil
+	}
+	p, err := strconv.Atoi(v)
+	if err != nil || p < 1 || p > 65535 {
+		return fmt.Errorf("port must be 1-65535 or empty for default 5001")
+	}
+	os.Setenv(models.EnvKoboldCppPort, v)
 	return nil
 }
 
@@ -143,6 +161,8 @@ func (m Model) openRuntimeConfigFocused(focus runtimeField) (Model, tea.Cmd) {
 	m.rc.inputs[runtimeFieldVLLMPort].SetValue(prefillPort(models.EnvVLLMServerPort, models.VLLMPort()))
 	m.rc.inputs[runtimeFieldOllamaPath].SetValue(os.Getenv(models.EnvOllamaPath))
 	m.rc.inputs[runtimeFieldOllamaHost].SetValue(models.OllamaHost())
+	m.rc.inputs[runtimeFieldKoboldCppPath].SetValue(os.Getenv(models.EnvKoboldCppPath))
+	m.rc.inputs[runtimeFieldKoboldCppPort].SetValue(prefillPort(models.EnvKoboldCppPort, models.KoboldCppPort()))
 	return m.focusRuntimeField(focus)
 }
 
@@ -150,11 +170,12 @@ func (m Model) openRuntimeConfigFocused(focus runtimeField) (Model, tea.Cmd) {
 // backend binary, but [models.ResolveLlamaServerPath] or [models.ResolveVLLMPath] is empty.
 // GGUF rows require llama-server; vLLM rows require vllm. Clears the footer line when neither applies.
 func (m Model) maybeSetMissingRuntimeFooterNote() (Model, tea.Cmd) {
-	var wantLlama, wantVLLM, wantOllama bool
+	var wantLlama, wantVLLM, wantOllama, wantKobold bool
 	for _, f := range m.table.files {
 		switch f.Backend {
 		case models.BackendLlama:
 			wantLlama = true
+			wantKobold = true
 		case models.BackendVLLM:
 			wantVLLM = true
 		case models.BackendOllama:
@@ -164,6 +185,7 @@ func (m Model) maybeSetMissingRuntimeFooterNote() (Model, tea.Cmd) {
 	haveLlama := models.ResolveLlamaServerPath(m.runtime) != ""
 	haveVLLM := models.ResolveVLLMPath(m.runtime) != ""
 	haveOllama := models.ResolveOllamaPath(m.runtime) != "" || m.runtime.OllamaRunning
+	haveKobold := models.ResolveKoboldCppPath(m.runtime) != ""
 
 	var msgs []string
 	if wantLlama && !haveLlama {
@@ -174,6 +196,9 @@ func (m Model) maybeSetMissingRuntimeFooterNote() (Model, tea.Cmd) {
 	}
 	if wantOllama && !haveOllama {
 		msgs = append(msgs, MissingOllamaFooterNote)
+	}
+	if wantKobold && !haveKobold {
+		msgs = append(msgs, MissingKoboldCppFooterNote)
 	}
 	if len(msgs) > 0 {
 		m = m.withLastRunError(strings.Join(msgs, "\n"))
@@ -223,10 +248,15 @@ func (m Model) commitRuntimeConfig() (Model, tea.Cmd) {
 		m = m.withLastRunError(fmt.Sprintf("%s: %v", models.EnvVLLMServerPort, err))
 		return m, clearLastRunNoteAfterCmd()
 	}
+	if err := validatePortCommit(m.rc.inputs[runtimeFieldKoboldCppPort].Value()); err != nil {
+		m = m.withLastRunError(fmt.Sprintf("%s: %v", models.EnvKoboldCppPort, err))
+		return m, clearLastRunNoteAfterCmd()
+	}
 	applyPathEnv(models.EnvLlamaCppPath, m.rc.inputs[runtimeFieldLlamaCppPath].Value())
 	applyPathEnv(models.EnvVLLMPath, m.rc.inputs[runtimeFieldVLLMPath].Value())
 	applyPathEnv(models.EnvVLLMVenv, m.rc.inputs[runtimeFieldVLLMVenv].Value())
 	applyPathEnv(models.EnvOllamaPath, m.rc.inputs[runtimeFieldOllamaPath].Value())
+	applyPathEnv(models.EnvKoboldCppPath, m.rc.inputs[runtimeFieldKoboldCppPath].Value())
 	if host := strings.TrimSpace(m.rc.inputs[runtimeFieldOllamaHost].Value()); host == "" {
 		os.Unsetenv(models.EnvOllamaHost)
 	} else {
@@ -237,6 +267,10 @@ func (m Model) commitRuntimeConfig() (Model, tea.Cmd) {
 		return m, clearLastRunNoteAfterCmd()
 	}
 	if err := applyVLLMPortEnv(m.rc.inputs[runtimeFieldVLLMPort].Value()); err != nil {
+		m = m.withLastRunError(err.Error())
+		return m, clearLastRunNoteAfterCmd()
+	}
+	if err := applyKoboldCppPortEnv(m.rc.inputs[runtimeFieldKoboldCppPort].Value()); err != nil {
 		m = m.withLastRunError(err.Error())
 		return m, clearLastRunNoteAfterCmd()
 	}

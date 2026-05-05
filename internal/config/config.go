@@ -37,8 +37,10 @@ type RuntimeConfig struct {
 	DefaultVLLMVenv        string `toml:"default_vllm_venv"`
 	DefaultOllamaPath      string `toml:"default_ollama_path"`
 	DefaultOllamaHost      string `toml:"default_ollama_host"`
+	DefaultKoboldCppPath   string `toml:"default_koboldcpp_path"`
 	DefaultLlamaServerPort *int   `toml:"default_llama_server_port,omitempty"`
 	DefaultVLLMServerPort  *int   `toml:"default_vllm_server_port,omitempty"`
+	DefaultKoboldCppPort   *int   `toml:"default_koboldcpp_port,omitempty"`
 }
 
 // DiscoveryConfig holds extra search roots and the last full filesystem scan time.
@@ -109,6 +111,7 @@ func ApplyRuntimeFromConfig(r *RuntimeConfig) {
 	applyPathIfUnset(models.EnvVLLMPath, r.DefaultVLLMPath)
 	applyPathIfUnset(models.EnvVLLMVenv, r.DefaultVLLMVenv)
 	applyPathIfUnset(models.EnvOllamaPath, r.DefaultOllamaPath)
+	applyPathIfUnset(models.EnvKoboldCppPath, r.DefaultKoboldCppPath)
 	if v := strings.TrimSpace(r.DefaultOllamaHost); v != "" && os.Getenv(models.EnvOllamaHost) == "" {
 		os.Setenv(models.EnvOllamaHost, v)
 	}
@@ -117,6 +120,9 @@ func ApplyRuntimeFromConfig(r *RuntimeConfig) {
 	}
 	if r.DefaultVLLMServerPort != nil && os.Getenv(models.EnvVLLMServerPort) == "" {
 		os.Setenv(models.EnvVLLMServerPort, strconv.Itoa(*r.DefaultVLLMServerPort))
+	}
+	if r.DefaultKoboldCppPort != nil && os.Getenv(models.EnvKoboldCppPort) == "" {
+		os.Setenv(models.EnvKoboldCppPort, strconv.Itoa(*r.DefaultKoboldCppPort))
 	}
 }
 
@@ -152,6 +158,9 @@ func RuntimeFromEnv() RuntimeConfig {
 	if v := normalizePath(os.Getenv(models.EnvOllamaPath)); v != "" {
 		r.DefaultOllamaPath = v
 	}
+	if v := normalizePath(os.Getenv(models.EnvKoboldCppPath)); v != "" {
+		r.DefaultKoboldCppPath = v
+	}
 	if v := strings.TrimSpace(os.Getenv(models.EnvOllamaHost)); v != "" {
 		r.DefaultOllamaHost = v
 	} else {
@@ -172,6 +181,14 @@ func RuntimeFromEnv() RuntimeConfig {
 	} else {
 		p := models.VLLMPort()
 		r.DefaultVLLMServerPort = &p
+	}
+	if v := strings.TrimSpace(os.Getenv(models.EnvKoboldCppPort)); v != "" {
+		if p, err := strconv.Atoi(v); err == nil && p > 0 && p <= 65535 {
+			r.DefaultKoboldCppPort = &p
+		}
+	} else {
+		p := models.KoboldCppPort()
+		r.DefaultKoboldCppPort = &p
 	}
 	return r
 }

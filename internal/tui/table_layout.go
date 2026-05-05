@@ -111,15 +111,23 @@ func tableContentMinWidth(cols []btable.Column) int {
 
 // buildTableRows converts ModelFile entries into display rows using the
 // column widths computed by tableColumns. Cells are truncated to fit.
-func buildTableRows(files []models.ModelFile, cols []btable.Column, homeDir string) []btable.Row {
+// effectiveBackends maps model identity → profile-overridden backend; nil entries
+// default to the file's discovery backend.
+func buildTableRows(files []models.ModelFile, cols []btable.Column, homeDir string, effectiveBackends map[string]models.ModelBackend) []btable.Row {
 	if len(cols) < 6 {
 		return nil
 	}
 	rows := make([]btable.Row, len(files))
 	for i, f := range files {
+		be := f.Backend
+		if f.Backend == models.BackendLlama {
+			if b, ok := effectiveBackends[f.Identity()]; ok {
+				be = b
+			}
+		}
 		rows[i] = btable.Row{
 			TruncateRunes(modelIDForRow(f), cols[0].Width-1),
-			TruncateRunes(models.FormatRuntimeLabel(f.Backend), cols[1].Width-1),
+			TruncateRunes(models.FormatRuntimeLabel(be), cols[1].Width-1),
 			models.FormatSize(f.Size),
 			TruncateRunes(formatLocationForRow(f, homeDir), cols[3].Width-1),
 			TruncateRunes(f.Name, cols[4].Width-1),

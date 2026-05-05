@@ -181,6 +181,25 @@ func TestNormalizeMetadataInputsFromTUIStrings(t *testing.T) {
 	}
 }
 
+func TestNormalizeBackendKoboldCpp(t *testing.T) {
+	got := normalizeBackend("koboldcpp")
+	if got != "koboldcpp" {
+		t.Fatalf("got %q want koboldcpp", got)
+	}
+	got2 := normalizeBackend("KOBOLDCPP")
+	if got2 != "koboldcpp" {
+		t.Fatalf("case-insensitive: got %q", got2)
+	}
+	got3 := normalizeBackend("")
+	if got3 != "" {
+		t.Fatalf("empty: got %q", got3)
+	}
+	got4 := normalizeBackend("unknown")
+	if got4 != "" {
+		t.Fatalf("unknown: got %q", got4)
+	}
+}
+
 func TestParseOptionalPositiveIntAndUnknownMetadataFallback(t *testing.T) {
 	if got := ParseOptionalPositiveInt(""); got != nil {
 		t.Fatalf("blank parse = %#v", got)

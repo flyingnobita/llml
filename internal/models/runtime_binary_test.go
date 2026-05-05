@@ -52,6 +52,80 @@ func TestFindVLLMBinary_ExecutablePathWins(t *testing.T) {
 	}
 }
 
+func TestFindKoboldCppBinary_envPathWins(t *testing.T) {
+	dir := t.TempDir()
+	bin := makeFakeExecutable(t, dir, "koboldcpp")
+	t.Setenv(EnvKoboldCppPath, dir)
+	t.Setenv("PATH", "/nonexistent")
+
+	got := findKoboldCppBinary()
+	if got != bin {
+		t.Fatalf("got %q want %q", got, bin)
+	}
+}
+
+func TestFindKoboldCppBinary_executablePathWins(t *testing.T) {
+	dir := t.TempDir()
+	bin := makeFakeExecutable(t, dir, "koboldcpp")
+	t.Setenv(EnvKoboldCppPath, bin)
+	t.Setenv("PATH", "/nonexistent")
+
+	got := findKoboldCppBinary()
+	if got != bin {
+		t.Fatalf("got %q want %q", got, bin)
+	}
+}
+
+func TestFindKoboldCppBinary_platformSpecificName(t *testing.T) {
+	dir := t.TempDir()
+	bin := makeFakeExecutable(t, dir, "koboldcpp-linux-x64")
+	t.Setenv(EnvKoboldCppPath, dir)
+	t.Setenv("PATH", "/nonexistent")
+
+	got := findKoboldCppBinary()
+	if got != bin {
+		t.Fatalf("got %q want %q", got, bin)
+	}
+}
+
+func TestFindKoboldCppBinary_platformSpecificFullPath(t *testing.T) {
+	dir := t.TempDir()
+	bin := makeFakeExecutable(t, dir, "koboldcpp-linux-x64")
+	t.Setenv(EnvKoboldCppPath, bin)
+	t.Setenv("PATH", "/nonexistent")
+
+	got := findKoboldCppBinary()
+	if got != bin {
+		t.Fatalf("got %q want %q", got, bin)
+	}
+}
+
+func TestFindKoboldCppBinary_prefersPrimaryVariant(t *testing.T) {
+	dir := t.TempDir()
+	primary := makeFakeExecutable(t, dir, "koboldcpp-linux-x64")
+	makeFakeExecutable(t, dir, "koboldcpp-linux-x64-nocuda")
+	makeFakeExecutable(t, dir, "koboldcpp-linux-x64-oldpc")
+	t.Setenv(EnvKoboldCppPath, dir)
+	t.Setenv("PATH", "/nonexistent")
+
+	got := findKoboldCppBinary()
+	if got != primary {
+		t.Fatalf("got %q want primary %q", got, primary)
+	}
+}
+
+func TestFindKoboldCppBinary_pathFallback(t *testing.T) {
+	dir := t.TempDir()
+	bin := makeFakeExecutable(t, dir, "koboldcpp")
+	t.Setenv(EnvKoboldCppPath, "")
+	t.Setenv("PATH", dir)
+
+	got := findKoboldCppBinary()
+	if got != bin {
+		t.Fatalf("got %q want %q", got, bin)
+	}
+}
+
 func TestProbeLlamaServerHealth(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/health" {

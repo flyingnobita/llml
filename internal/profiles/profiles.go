@@ -516,6 +516,8 @@ func normalizeBackend(v string) string {
 		return "vllm"
 	case "ollama":
 		return "ollama"
+	case "koboldcpp":
+		return "koboldcpp"
 	default:
 		return ""
 	}

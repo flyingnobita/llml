@@ -72,6 +72,21 @@ func buildServerSpec(backend models.ModelBackend, modelPath string, params Model
 			params:         params,
 			activateScript: activate,
 		}, nil
+	case models.BackendKobold:
+		bin := models.ResolveKoboldCppPath(rt)
+		if strict && bin == "" {
+			return serverSpec{}, fmt.Errorf(MissingKoboldCppFooterNote)
+		}
+		if bin == "" {
+			bin = "koboldcpp"
+		}
+		return serverSpec{
+			backend:   models.BackendKobold,
+			bin:       bin,
+			port:      models.KoboldCppPort(),
+			modelPath: modelPath,
+			params:    params,
+		}, nil
 	default: // BackendLlama
 		bin := models.ResolveLlamaServerPath(rt)
 		if strict && bin == "" {
@@ -105,6 +120,12 @@ func (s serverSpec) commandWords() []string {
 			"--served-model-name", shellSingleQuoted(models.InferModelID(s.modelPath)),
 			"--port", fmt.Sprintf("%d", s.port),
 		}
+	case models.BackendKobold:
+		words = []string{
+			shellSingleQuoted(s.bin),
+			shellSingleQuoted(s.modelPath),
+			"--port", fmt.Sprintf("%d", s.port),
+		}
 	default:
 		words = []string{
 			shellSingleQuoted(s.bin),
@@ -134,6 +155,11 @@ func (s serverSpec) directArgs() []string {
 		args = []string{
 			"serve", s.modelPath,
 			"--served-model-name", models.InferModelID(s.modelPath),
+			"--port", fmt.Sprintf("%d", s.port),
+		}
+	case models.BackendKobold:
+		args = []string{
+			s.modelPath,
 			"--port", fmt.Sprintf("%d", s.port),
 		}
 	default:
@@ -223,7 +249,7 @@ func (s serverSpec) previewLine() string {
 // splitServerInvocationEcho returns the first line written to the split-pane log when R is pressed.
 // It uses the selected model, active parameter profile, and runtime info exactly as runSplitServerCmd.
 func splitServerInvocationEcho(m Model) string {
-	modelPath, be := m.SelectedModel()
+	modelPath, _ := m.SelectedModel()
 	if modelPath == "" {
 		return ""
 	}
@@ -231,6 +257,7 @@ func splitServerInvocationEcho(m Model) string {
 	if !ok {
 		return ""
 	}
+	be := m.resolveEffectiveBackend()
 	spec, _ := buildServerSpec(be, modelPath, params, m.runtime, false)
 	return spec.invocationEcho()
 }
@@ -239,7 +266,7 @@ func splitServerInvocationEcho(m Model) string {
 // clipboard: same tokens as the split-pane subprocess, formatted on multiple lines, but without the
 // "+ " log marker or the ". /path/activate &&" venv wrapper used when launching vLLM.
 func launchPreviewCommandLine(m Model) string {
-	modelPath, be := m.SelectedModel()
+	modelPath, _ := m.SelectedModel()
 	if modelPath == "" {
 		return ""
 	}
@@ -247,6 +274,7 @@ func launchPreviewCommandLine(m Model) string {
 	if !ok {
 		return ""
 	}
+	be := m.resolveEffectiveBackend()
 	spec, _ := buildServerSpec(be, modelPath, params, m.runtime, false)
 	return spec.previewLine()
 }

@@ -37,12 +37,13 @@ type themeState struct {
 
 // tableState holds the file list, sort state, table component, and scroll viewport.
 type tableState struct {
-	tbl      btable.Model
-	hscroll  viewport.Model
-	files    []models.ModelFile
-	sortCol  tableSortCol // default Runtime ascending
-	sortDesc bool         // false = ascending
-	lastScan time.Time
+	tbl               btable.Model
+	hscroll           viewport.Model
+	files             []models.ModelFile
+	sortCol           tableSortCol // default Runtime ascending
+	sortDesc          bool         // false = ascending
+	lastScan          time.Time
+	effectiveBackends map[string]models.ModelBackend // keyed by model identity
 }
 
 // runtimeConfigState holds the runtime-config modal's open/focus/input state.
@@ -196,6 +197,8 @@ func newRuntimeConfigInputs() [runtimeFieldCount]textinput.Model {
 		newPortTextInput(),
 		newPathTextInput(),
 		newPathTextInput(),
+		newPathTextInput(),
+		newPortTextInput(),
 	}
 }
 
@@ -209,7 +212,7 @@ func New() Model {
 	return Model{
 		layout:    layoutState{homeDir: homeDir},
 		ui:        themeState{theme: th, themePick: pick, styles: st},
-		table:     tableState{sortCol: defaultSortCol, tbl: t, hscroll: hv},
+		table:     tableState{sortCol: defaultSortCol, tbl: t, hscroll: hv, effectiveBackends: make(map[string]models.ModelBackend)},
 		server:    serverPaneState{viewport: newServerLogViewport(st)},
 		preview:   launchPreviewState{viewport: newLaunchPreviewViewport(st)},
 		alerts:    alertsState{viewport: newAlertViewport(st)},
@@ -245,6 +248,103 @@ func (m Model) SelectedModel() (target string, backend models.ModelBackend) {
 		return "", models.BackendLlama
 	}
 	return f.LaunchTarget(), f.Backend
+}
+
+// resolveEffectiveBackend returns the launch backend for the selected row, factoring in
+// the active profile's backend override for GGUF rows.
+//
+//	GGUF row
+//	  + profile=koboldcpp -> koboldcpp
+//	  + profile=llama/""  -> llama-server
+//
+//	vllm row   -> vllm
+//	ollama row -> ollama
+func (m Model) resolveEffectiveBackend() models.ModelBackend {
+	_, rowBackend := m.SelectedModel()
+	if rowBackend != models.BackendLlama {
+		return rowBackend
+	}
+	profileBackend := m.activeProfileBackendForSelected()
+	if profileBackend == models.BackendKobold {
+		return models.BackendKobold
+	}
+	return models.BackendLlama
+}
+
+// activeProfileBackendForSelected returns the backend stored in the active profile for
+// the selected model, or BackendLlama when no profile backend is set.
+func (m Model) activeProfileBackendForSelected() models.ModelBackend {
+	sel := m.SelectedPath()
+	if sel == "" {
+		return models.BackendLlama
+	}
+	if m.params.open {
+		if modelParamsKey(m.params.modelPath) == modelParamsKey(sel) {
+			if m.params.profileIndex >= 0 && m.params.profileIndex < len(m.params.profiles) {
+				b, _ := models.ParseBackend(m.params.profiles[m.params.profileIndex].Backend)
+				return b
+			}
+		}
+	}
+	ent, err := loadModelEntry(modelParamsKey(sel))
+	if err != nil || len(ent.Profiles) == 0 {
+		return models.BackendLlama
+	}
+	idx := clampInt(ent.ActiveIndex, 0, len(ent.Profiles)-1)
+	b, _ := models.ParseBackend(ent.Profiles[idx].Backend)
+	return b
+}
+
+// populateEffectiveBackends reloads every model's active-profile backend from disk
+// into m.table.effectiveBackends.
+func (m Model) populateEffectiveBackends() Model {
+	for _, f := range m.table.files {
+		if f.Backend != models.BackendLlama {
+			continue
+		}
+		key := modelParamsKey(f.Identity())
+		ent, err := loadModelEntry(key)
+		if err != nil || len(ent.Profiles) == 0 {
+			delete(m.table.effectiveBackends, key)
+			continue
+		}
+		idx := clampInt(ent.ActiveIndex, 0, len(ent.Profiles)-1)
+		b, _ := models.ParseBackend(ent.Profiles[idx].Backend)
+		if b != models.BackendLlama {
+			m.table.effectiveBackends[key] = b
+		} else {
+			delete(m.table.effectiveBackends, key)
+		}
+	}
+	return m
+}
+
+// updateEffectiveBackendForPath updates or removes the cached effective backend for
+// the given model identity after a profile save.
+func (m Model) updateEffectiveBackendForPath(modelPath string) Model {
+	key := modelParamsKey(modelPath)
+	ent, err := loadModelEntry(key)
+	if err != nil || len(ent.Profiles) == 0 {
+		delete(m.table.effectiveBackends, key)
+		return m
+	}
+	idx := clampInt(ent.ActiveIndex, 0, len(ent.Profiles)-1)
+	b, _ := models.ParseBackend(ent.Profiles[idx].Backend)
+	if b != models.BackendLlama {
+		m.table.effectiveBackends[key] = b
+	} else {
+		delete(m.table.effectiveBackends, key)
+	}
+	return m
+}
+
+// refreshTableRows rebuilds the table rows from m.table.files and the effective
+// backend cache. It does not recalculate columns or body heights — use layoutTable
+// for a full relayout (e.g. after terminal resize or sort change).
+func (m Model) refreshTableRows() Model {
+	cols := tableColumns(m.innerWidth(), m.table.files, m.layout.homeDir, m.table.sortCol, m.table.sortDesc)
+	m.table.tbl.SetRows(buildTableRows(m.table.files, cols, m.layout.homeDir, m.table.effectiveBackends))
+	return m
 }
 
 // SelectedPath returns the stable identity of the highlighted row, or empty if none.
@@ -334,7 +434,7 @@ func (m Model) layoutTableAtInnerW(innerW int) Model {
 	h := m.computeBodyHeight(needsLogHBar)
 	m = m.applyTableAndLogHeights(h, innerW, previewH)
 
-	m.table.tbl.SetRows(buildTableRows(m.table.files, cols, m.layout.homeDir))
+	m.table.tbl.SetRows(buildTableRows(m.table.files, cols, m.layout.homeDir, m.table.effectiveBackends))
 	tview := m.table.tbl.View()
 	m.layout.tableBodyH = max(1, strings.Count(tview, "\n")+1)
 	lines := strings.Split(tview, "\n")
@@ -741,6 +841,7 @@ func (m Model) applyScanResult(runtime *models.RuntimeInfo, files []models.Model
 		m.runtimeScanned = true
 	}
 	m.table.files = files
+	m = m.populateEffectiveBackends()
 	m.table.lastScan = lastScan
 	m.discovery.paths = configPaths
 	sortModelFiles(m.table.files, m.table.sortCol, m.table.sortDesc)
