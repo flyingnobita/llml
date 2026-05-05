@@ -5,11 +5,11 @@ All notable changes to this project will be documented in this file.
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
 - May-05, 2026 - 11:30 PM +0800 - [v0.3.0 release: KoboldCpp backend support]
-- May-05, 2026 - 11:30 PM +0800 - [KoboldCpp: binary discovery with platform-specific name variants and CUDA preference; health probe on port 5001 for running instances; effective backend resolver that respects profile selection while preventing non-GGUF rows from using KoboldCpp]
-- May-05, 2026 - 11:30 PM +0800 - [KoboldCpp: runtime config fields (KOBOLDCPP_PATH, KOBOLDCPP_PORT) with env/TOML precedence; runtime panel rows; port validation; missing-runtime footer note aware of effective backends]
-- May-05, 2026 - 11:30 PM +0800 - [KoboldCpp: server launch via buildServerSpec with commandWords, directArgs, previewLine, splitCmd, foregroundCmd; preview parity across launch pane, clipboard, split run, and fullscreen run]
-- May-05, 2026 - 11:30 PM +0800 - [TUI: param panel backend cycling restricted by model type (GGUF gets llama.cpp + KoboldCpp; safetensors/Ollama get runtime-native only); in-memory preview updates immediately on backend toggle before save]
-- May-05, 2026 - 11:30 PM +0800 - [Profiles: normalizeBackend handles koboldcpp; clearNonGGUFBackend guardrail prevents non-GGUF rows from storing KoboldCpp in persisted profiles]
+- May-05, 2026 - 11:30 PM +0800 - [KoboldCpp: you can now launch GGUF models with KoboldCpp — select it in a model's parameter profile and press R; auto-detects installed koboldcpp with CUDA variant preference on Linux; respects KOBOLDCPP_PATH and KOBOLDCPP_PORT env vars]
+- May-05, 2026 - 11:30 PM +0800 - [KoboldCpp: runtime panel shows KoboldCpp path and port; edit both via c modal; detects already-running instances on port 5001; missing-runtime warnings reflect the backend selected in your active profile]
+- May-05, 2026 - 11:30 PM +0800 - [KoboldCpp: launch command preview, clipboard copy, split-pane server logs, and fullscreen mode all work identically — what you see in the preview is exactly what runs]
+- May-05, 2026 - 11:30 PM +0800 - [TUI: parameter profile panel lets you toggle between llama.cpp and KoboldCpp for GGUF models; preview updates instantly on toggle — no save needed to see the new launch command]
+- May-05, 2026 - 11:30 PM +0800 - [Profiles: non-GGUF models (vLLM, Ollama) stay locked to their native runtime — switching a safetensors model's profile to KoboldCpp is prevented so you can't accidentally misconfigure a launch]
 - May-02, 2026 - 11:00 PM +0800 - [Dev: `mise run worktree-setup` runs `sync_gitignore_agents.sh` with import from the primary checkout by default; script syncs gitignored agent paths plus `mise.local.toml`; `AGENT_PATHS` moved to top of script for editing]
 
 - May-01, 2026 - 10:40 PM +0800 - [Profiles: portable profile-format moves to schema v2 with structured `use_case` and `hardware` metadata; `llml-import` maps portable metadata into canonical local profile fields and writes local file version 3]

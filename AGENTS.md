@@ -8,7 +8,7 @@ AI coding instructions for this project.
 
 **LLM Launcher** (`llml`) is a terminal UI (TUI) for discovering GGUF and Hugging Face-style
 safetensors models on the local filesystem, plus Ollama models via the Ollama API,
-and launching `llama-server`, `vllm serve`, or Ollama preload flows for a selected row.
+and launching `llama-server`, `koboldcpp`, `vllm serve`, or Ollama preload flows for a selected row.
 
 - Language: **Go 1.26+**
 - UI framework: **Bubble Tea v2** (`charm.land/bubbletea/v2`) + **Lip Gloss v2** (`charm.land/lipgloss/v2`) + **Bubbles v2** (`charm.land/bubbles/v2`)
@@ -51,7 +51,7 @@ scripts/             # gofmt-check.sh, precommit-docs-fix.sh
 - Key dispatch in `Update` delegates to `handleKey` (idle/modal routing) → `tableNavKeys` (shared bindings for both idle and split-pane table focus: config, params, theme, scroll, copy, sort). Split-pane key handling is in `update_split.go`.
 - Layout recalculation lives in `layoutTable()` on `Model`, with helpers `computeBodyHeight` and `applyTableAndLogHeights`. Log h-bar visibility is determined from exact style frame sizes (no guess-and-redo second pass). Table row height is chosen so the full `View()` fits the terminal (Bubble Tea otherwise keeps only the **bottom** lines and clips the header).
 - Alert history uses a dedicated bottom `viewport` pane toggled with **`a`**. Active work should use the persistent current-status line; meaningful warnings/errors/lifecycle events should append to alert history instead of relying only on transient footer notes.
-- **Server launch** (`run_server.go`): `buildServerSpec` resolves backend-specific launch state into a `serverSpec` value; spec methods `foregroundCmd`, `splitCmd`, `invocationEcho`, `previewLine` generate backend- and platform-specific commands. For Ollama, `R` / `ctrl+R` start `ollama serve` if needed and preload the selected model with `keep_alive: -1` on the shared Ollama host rather than starting a per-model port.
+- **Server launch** (`run_server.go`): `buildServerSpec` resolves backend-specific launch state into a `serverSpec` value; spec methods `foregroundCmd`, `splitCmd`, `invocationEcho`, `previewLine` generate backend- and platform-specific commands. For KoboldCpp, the effective backend comes from the active parameter profile and GGUF rows can switch between llama.cpp and KoboldCpp. For Ollama, `R` / `ctrl+R` start `ollama serve` if needed and preload the selected model with `keep_alive: -1` on the shared Ollama host rather than starting a per-model port.
 - Theme palettes live in `theme.go` (`DarkTheme`, `LightTheme`; startup via `LLML_THEME`, runtime cycle with **`t`**: dark → light → auto). The transient confirmation is a **compact chip on the title row** (not an extra banner line) so the layout does not jump.
   Lip Gloss styles are built in `styles.go` via `newStyles`. Do not call `lipgloss.NewStyle()` inline
   inside `View()` — extend `Theme` / `newStyles` instead.
@@ -89,11 +89,13 @@ scripts/             # gofmt-check.sh, precommit-docs-fix.sh
 | `VLLM_SERVER_PORT`                  | TCP port for `vllm serve` (default 8000)                                                                                      |
 | `OLLAMA_PATH`                       | Directory containing the `ollama` executable, or the absolute executable path                                                 |
 | `OLLAMA_HOST`                       | Ollama API host (default `127.0.0.1:11434`); `R` / `ctrl+R` ensure the daemon is running there and preload the selected model |
+| `KOBOLDCPP_PATH`                    | Directory containing the `koboldcpp` executable, or the absolute executable path                                              |
+| `KOBOLDCPP_PORT`                    | TCP port for KoboldCpp and `/api/extra/generate/check` health probe (default 5001)                                            |
 | `LLML_MODEL_PATHS`                  | Extra model search roots (comma-separated); merged with `discovery.extra_model_paths` in TOML for scans                       |
 | `HUGGINGFACE_HUB_CACHE` / `HF_HOME` | Hugging Face hub cache location                                                                                               |
 | `LLML_THEME`                        | Initial TUI palette (`dark` / `light` / `auto`); **`t`** cycles while running (not in runtime `c` text fields)                |
 
-**Parameter profiles** (per-model extra env + argv for `llama-server`, `vllm`, and backend-specific launch helpers, edited with **`p`**) are **not** in `config.toml`: they are stored in **`{UserConfigDir}/llml/model-params.json`** (see `internal/tui/model_params.go`). Keys are stable model identities: cleaned filesystem paths for local rows, model IDs for Ollama rows. Each entry has named profiles and `activeIndex` for which profile **`R`** uses. In the `p` modal, **`c`** duplicates the highlighted profile (clone env + args).
+**Parameter profiles** (per-model extra env + argv for `llama-server`, `koboldcpp`, `vllm`, and backend-specific launch helpers, edited with **`p`**) are **not** in `config.toml`: they are stored in **`{UserConfigDir}/llml/model-params.json`** (see `internal/tui/model_params.go`). Keys are stable model identities: cleaned filesystem paths for local rows, model IDs for Ollama rows. Each entry has named profiles and `activeIndex` for which profile **`R`** uses. In the `p` modal, **`c`** duplicates the highlighted profile (clone env + args).
 
 **Portable profile format** lives in **`docs/profile-format.md`**. The canonical
 repo-managed `llml-import` skill lives at **`.agents/skills/llml-import/SKILL.md`**.

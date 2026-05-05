@@ -10,7 +10,9 @@ tired of reconstructing launch commands from shell history.
 
 It scans your local filesystem for **GGUF** and **Hugging Face-style safetensors** models,
 detects installed runtimes (**[llama.cpp](https://github.com/ggerganov/llama.cpp)**,
-**[vLLM](https://github.com/vllm-project/vllm)**, and **[Ollama](https://ollama.com/)**),
+**[vLLM](https://github.com/vllm-project/vllm)**,
+**[Ollama](https://ollama.com/)**, and
+**[KoboldCpp](https://github.com/LostRuins/koboldcpp)**),
 and lets you save named parameter profiles per model — so the command that worked
 last time is always one keystroke away.
 
@@ -22,9 +24,9 @@ Browse local models. Detect the right runtime. Launch with one key.
   directories; add extra roots via `LLML_MODEL_PATHS` and/or `config.toml`. Results are
   cached under **`{UserConfigDir}/llml/config.toml`** so the next launch can skip the
   filesystem walk when the cache is still valid.
-- **Runtime detection** — finds installed `llama-server` and `vllm` binaries and maps
+- **Runtime detection** — finds installed `llama-server`, `vllm`, and `koboldcpp` binaries and maps
   installed `ollama` plus the configured Ollama host, then maps each model to its
-  compatible runtime.
+  compatible runtime. GGUF models can use llama.cpp or KoboldCpp via profile selection.
 - **Named parameter profiles** — save multiple profiles per model (e.g. `fast-laptop`,
   `quality`, `api-8080`), each storing runtime args, env vars, port, and context
   settings. The active profile is always one key away.
@@ -45,7 +47,7 @@ Browse local models. Detect the right runtime. Launch with one key.
 
 ### Runtime Requirements
 
-- **Runtime engine (at least one)**: **llama.cpp** (`llama-server`) for GGUF models,
+- **Runtime engine (at least one)**: **llama.cpp** (`llama-server`) or **KoboldCpp** (`koboldcpp`) for GGUF models,
   **vLLM** (`vllm`) for safetensors models, and/or **Ollama** (`ollama`) for Ollama
   models are installed (see [Runtime Engines](#runtime-engines)).
 - **Models** in default scan locations, or configure custom roots with `LLML_MODEL_PATHS` (see [Model Discovery](#model-discovery)).
@@ -291,6 +293,8 @@ Configure how `llml` finds and launches servers. You can edit these interactivel
 | **vLLM port**      | `VLLM_SERVER_PORT`   | `default_vllm_server_port`            | `8000`            |
 | **Ollama path**    | `OLLAMA_PATH`        | `default_ollama_path`                 | _(auto)_          |
 | **Ollama host**    | `OLLAMA_HOST`        | `default_ollama_host`                 | `127.0.0.1:11434` |
+| **KoboldCpp path** | `KOBOLDCPP_PATH`     | `default_koboldcpp_path`              | _(auto)_          |
+| **KoboldCpp port** | `KOBOLDCPP_PORT`     | `default_koboldcpp_port`              | `5001`            |
 | **TUI Theme**      | `LLML_THEME`         | -                                     | `auto`            |
 
 **Detection Logic:**
@@ -300,6 +304,7 @@ Configure how `llml` finds and launches servers. You can edit these interactivel
 3. Binary names available on your system `PATH`.
 4. (llama.cpp only) Probing for an already-running server on the configured port.
 5. (vLLM only) Common venv locations (e.g., `~/.venv-vllm-metal/bin` on macOS).
+6. (KoboldCpp only) Platform-specific name variants with CUDA preference on Linux; probes port for already-running instances.
 
 ---
 
