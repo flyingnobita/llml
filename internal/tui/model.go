@@ -339,7 +339,7 @@ func (m Model) updateEffectiveBackendForPath(modelPath string) Model {
 }
 
 // refreshTableRows rebuilds the table rows from m.table.files and the effective
-// backend cache. It does not recalculate columns or body heights — use layoutTable
+// backend cache. It recalculates columns from current files and cache. It does not relayout body heights — use layoutTable
 // for a full relayout (e.g. after terminal resize or sort change).
 func (m Model) refreshTableRows() Model {
 	cols := tableColumns(m.innerWidth(), m.table.files, m.layout.homeDir, m.table.sortCol, m.table.sortDesc)

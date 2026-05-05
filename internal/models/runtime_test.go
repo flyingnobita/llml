@@ -53,7 +53,6 @@ func TestVLLMPort_default(t *testing.T) {
 }
 
 func TestKoboldCppPort_default(t *testing.T) {
-	os.Unsetenv(EnvKoboldCppPort)
 	if p := KoboldCppPort(); p != defaultKoboldCppPort {
 		t.Fatalf("got %d want %d", p, defaultKoboldCppPort)
 	}

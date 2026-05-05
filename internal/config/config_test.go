@@ -204,7 +204,6 @@ func TestConfigRoundTrip_koboldCpp(t *testing.T) {
 
 func TestApplyRuntimeFromConfig_koboldCppEnvWins(t *testing.T) {
 	t.Setenv(models.EnvKoboldCppPath, "/from-env")
-	t.Cleanup(func() { _ = os.Unsetenv(models.EnvKoboldCppPath) })
 
 	ApplyRuntimeFromConfig(&RuntimeConfig{DefaultKoboldCppPath: "/from-toml"})
 	if os.Getenv(models.EnvKoboldCppPath) != "/from-env" {
@@ -213,8 +212,7 @@ func TestApplyRuntimeFromConfig_koboldCppEnvWins(t *testing.T) {
 }
 
 func TestApplyRuntimeFromConfig_koboldCppTomlFallback(t *testing.T) {
-	_ = os.Unsetenv(models.EnvKoboldCppPath)
-	t.Cleanup(func() { _ = os.Unsetenv(models.EnvKoboldCppPath) })
+	t.Setenv(models.EnvKoboldCppPath, "")
 
 	ApplyRuntimeFromConfig(&RuntimeConfig{DefaultKoboldCppPath: "/from-toml"})
 	got := os.Getenv(models.EnvKoboldCppPath)
