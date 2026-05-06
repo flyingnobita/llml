@@ -244,7 +244,7 @@ Typical flow:
 
 What it imports:
 
-- portable runtime args and env vars for `llama.cpp`, `vLLM`, or Ollama
+- portable runtime args and env vars for `llama.cpp`, `vLLM`, Ollama, or KoboldCpp
 - profile names, model hints, and optional one-line descriptions
 
 What it does not keep:
@@ -302,7 +302,7 @@ Configure how `llml` finds and launches servers. You can edit these interactivel
 1. Explicitly configured paths (Env/TOML).
 2. Common system directories (e.g., `/usr/local/bin`, `/opt/homebrew/bin`, `~/.local/bin`).
 3. Binary names available on your system `PATH`.
-4. (llama.cpp only) Probing for an already-running server on the configured port.
+4. (llama.cpp) Probing for an already-running server on the configured port.
 5. (vLLM only) Common venv locations (e.g., `~/.venv-vllm-metal/bin` on macOS).
 6. (KoboldCpp only) Platform-specific name variants with CUDA preference on Linux; probes port for already-running instances.
 

@@ -58,7 +58,7 @@ Rules (from the spec's LLM extraction section):
 - Each `--flag value` pair becomes one string in `args` (e.g. `"--n-gpu-layers 80"`).
 - Standalone flags (e.g. `--flash-attn`) are single-element strings.
 - Environment variables become `[[profiles.env]]` entries.
-- Set `backend` to `llama`, `vllm`, or `ollama` based on the source context.
+- Set `backend` to `llama`, `vllm`, `ollama`, or `koboldcpp` based on the source context.
 - Set `model_hint` to the model name or family from the source.
 - Derive `name` from the section heading or context (e.g. `"default"`, `"4-bit-gpu"`,
   `"cpu-only"`).
@@ -78,7 +78,7 @@ Rules (from the spec's LLM extraction section):
 
 If no valid profiles can be extracted, stop and report: "No recognizable inference
 parameters found in the source. Try a model card, README, or a page with llama.cpp,
-vLLM, or Ollama launch commands."
+vLLM, Ollama, or KoboldCpp launch commands."
 
 Before presenting the list, run this script to classify each distinct `model_hint`
 against the local model list:
@@ -227,7 +227,7 @@ use the Step 4 classification result to determine whether a fuzzy match was foun
   If the user answers 'skip', omit those profiles from the import.
 
 If config.toml is missing or has no models, ask the user to paste the model path
-directly (file path for llama.cpp/vLLM, `ollama://model-name` for Ollama).
+directly (file path for llama.cpp/vLLM/KoboldCpp, `ollama://model-name` for Ollama).
 
 Build a mapping `{ model_hint: local_model_path }` from the answers. Two different
 `model_hint` values may map to the same local path — that is valid and handled in
@@ -279,6 +279,40 @@ MODEL_PARAMS_PATH = os.path.expanduser('~/.config/llml/model-params.json')
 # the model path itself at launch. Ollama is omitted — it uses API discovery.
 MODEL_LOCATION_PARAMS = {
     'llama': {
+        'env': {
+            'LLAMA_CACHE',
+            'LLAMA_ARG_MODEL', 'LLAMA_ARG_MODEL_URL', 'LLAMA_ARG_MODEL_DRAFT',
+            'LLAMA_ARG_HF_REPO', 'LLAMA_ARG_HF_FILE',
+            'LLAMA_ARG_HFD_REPO',
+            'LLAMA_ARG_HF_REPO_V', 'LLAMA_ARG_HF_FILE_V',
+            'LLAMA_ARG_DOCKER_REPO',
+            'LLAMA_ARG_MMPROJ', 'LLAMA_ARG_MMPROJ_URL',
+            'LLAMA_ARG_MODELS_DIR', 'LLAMA_ARG_MODELS_PRESET',
+            'HF_TOKEN',
+        },
+        'args': {
+            '-m', '--model',
+            '-mu', '--model-url',
+            '-md', '--model-draft',
+            '-mv', '--model-vocoder',
+            '-hf', '-hfr', '--hf-repo',
+            '-hff', '--hf-file',
+            '-hfd', '-hfrd', '--hf-repo-draft',
+            '-hfv', '-hfrv', '--hf-repo-v',
+            '-hffv', '--hf-file-v',
+            '-hft', '--hf-token',
+            '-dr', '--docker-repo',
+            '-mm', '--mmproj',
+            '-mmu', '--mmproj-url',
+            '--lora', '--lora-scaled', '--lora-init-without-apply',
+            '--control-vector', '--control-vector-scaled',
+            '--models-dir', '--models-preset',
+            '-lcs', '--lookup-cache-static',
+            '-lcd', '--lookup-cache-dynamic',
+        },
+    },
+    'koboldcpp': {
+        # KoboldCpp wraps llama.cpp and inherits the same model-location parameters.
         'env': {
             'LLAMA_CACHE',
             'LLAMA_ARG_MODEL', 'LLAMA_ARG_MODEL_URL', 'LLAMA_ARG_MODEL_DRAFT',
@@ -388,6 +422,8 @@ def normalize_backend(v):
         return 'vllm'
     if s == 'ollama':
         return 'ollama'
+    if s in ('koboldcpp', 'kobold'):
+        return 'koboldcpp'
     return ''
 
 def normalize_use_case_primary(v):
@@ -640,7 +676,7 @@ Required fields:
 
 - `schema_version = 2`
 - `[[profiles]].name`
-- `[[profiles]].backend` (`llama`, `vllm`, or `ollama`)
+- `[[profiles]].backend` (`llama`, `vllm`, `ollama`, or `koboldcpp`)
 
 Optional fields:
 

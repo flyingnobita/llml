@@ -28,11 +28,11 @@ profile schema, and writes the resulting profiles into `model-params.json`.
 
 ## Scope
 
-- Covers llama.cpp, vLLM, and Ollama backends.
+- Covers llama.cpp, vLLM, Ollama, and KoboldCpp backends.
 - One file may contain multiple profiles, for multiple backends, targeting one or
   more model families.
-- Cross-backend translation (for example converting a llama.cpp profile to an
-  Ollama equivalent) is out of scope for this format version.
+- Cross-backend translation (for example converting a llama.cpp profile to a
+  KoboldCpp or Ollama equivalent) is out of scope for this format version.
 
 ## Schema
 
@@ -49,7 +49,7 @@ Each entry in `[[profiles]]` is one parameter profile.
 | Field        | Type            | Required | Description                                                                                                                |
 | ------------ | --------------- | -------- | -------------------------------------------------------------------------------------------------------------------------- |
 | `name`       | string          | yes      | Short human-readable name for this profile. Used as the profile name inside llml.                                          |
-| `backend`    | string          | yes      | One of: `llama`, `vllm`, `ollama`. Semantics match llml's local canonical profile schema.                                  |
+| `backend`    | string          | yes      | One of: `llama`, `vllm`, `ollama`, `koboldcpp`. Semantics match llml's local canonical profile schema.                     |
 | `model_hint` | string          | no       | Free-text hint for which local model these profiles should attach to (for example `"Llama-3-8B-GGUF"` or `"Qwen2.5-72B"`). |
 | `args`       | array of string | no       | Command-line arguments in panel-row format (see below). Defaults to empty.                                                 |
 | `env`        | array of table  | no       | Environment variables as `{key, value}` pairs. Defaults to empty.                                                          |
@@ -218,6 +218,43 @@ key = "OLLAMA_NUM_CTX"
 value = "8192"
 ```
 
+## Example: KoboldCpp profiles
+
+```toml
+schema_version = 2
+
+[[profiles]]
+name = "gpu-full"
+backend = "koboldcpp"
+model_hint = "Llama-3-8B-GGUF"
+args = ["--gpulayers 80", "--contextsize 4096", "--threads 8", "--flashattention"]
+use_case.primary = "chat"
+use_case.tags = ["interactive", "balanced"]
+hardware.class = "gpu"
+hardware.gpu_count = 1
+hardware.min_vram_gb = 24
+hardware.notes = "CUDA GPU layers, 4k context."
+
+[[profiles]]
+name = "cpu-only"
+backend = "koboldcpp"
+model_hint = "Llama-3-8B-GGUF"
+args = ["--gpulayers 0", "--contextsize 2048", "--threads 4"]
+use_case.primary = "completion"
+use_case.tags = ["low-memory"]
+hardware.class = "cpu"
+
+[[profiles]]
+name = "vulkan"
+backend = "koboldcpp"
+model_hint = "Llama-3-8B-GGUF"
+args = ["--gpulayers 80", "--contextsize 4096", "--usevulkan"]
+use_case.primary = "chat"
+use_case.tags = ["interactive"]
+hardware.class = "gpu"
+hardware.notes = "Vulkan backend for AMD GPUs."
+```
+
 ## Compatibility
 
 `schema_version = 1` was the earlier portable draft. It used `description` as a
@@ -232,10 +269,10 @@ When importing older material, tools may map a useful legacy `description` into
 If you are an LLM reading this document in order to extract profiles from a source,
 follow these rules:
 
-1. **Backend detection:** Identify whether the source describes llama.cpp, vLLM, or
-   Ollama invocations. Use the `backend` field accordingly (`llama`, `vllm`,
-   `ollama`). If the source covers multiple backends, emit one `[[profiles]]` entry
-   per backend variant.
+1. **Backend detection:** Identify whether the source describes llama.cpp, vLLM,
+   Ollama, or KoboldCpp invocations. Use the `backend` field accordingly (`llama`,
+   `vllm`, `ollama`, `koboldcpp`). If the source covers multiple backends, emit one
+   `[[profiles]]` entry per backend variant.
 
 2. **Args extraction:** Extract only flags and values that appear explicitly in the
    source. Do not infer or invent values. Place each `--flag value` pair as a single
@@ -269,7 +306,11 @@ follow these rules:
    flags and env vars that identify where to load the model from, because llml
    supplies the model path itself. Examples to exclude: `LLAMA_CACHE`, `-hf`,
    `--model`, `--lora`, `HF_HOME`, `--tokenizer`, and similar source-location or
-   cache-location settings.
+   cache-location settings. For `koboldcpp`, exclude `--model`, `--lora`,
+   `--mmproj`, `--tokenizer`, `--models-dir`, and any `-hf*` / `--hf-*` flags,
+   as well as `LLAMA_CACHE`, `LLAMA_ARG_MODEL`, and `LLAMA_ARG_*` env vars
+   that specify model file paths — the same model-location parameters that
+   apply to `llama` also apply to `koboldcpp`.
 
 9. **Output:** Emit valid TOML matching this schema. Set `schema_version = 2`. Do
    not include fields not listed in this spec. Do not include the model path or
