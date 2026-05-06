@@ -72,28 +72,19 @@ func formatGGUFMetadataValue(v any) string {
 		return formatGGUFStringScalar(vv)
 	case bool:
 		return fmt.Sprintf("%t", vv)
-	case uint8:
+	case uint8, int8, uint16, int16, uint32, int32, uint64, int64:
 		return fmt.Sprintf("%d", vv)
-	case int8:
-		return fmt.Sprintf("%d", vv)
-	case uint16:
-		return fmt.Sprintf("%d", vv)
-	case int16:
-		return fmt.Sprintf("%d", vv)
-	case uint32:
-		return fmt.Sprintf("%d", vv)
-	case int32:
-		return fmt.Sprintf("%d", vv)
-	case uint64:
-		return fmt.Sprintf("%d", vv)
-	case int64:
-		return fmt.Sprintf("%d", vv)
-	case float32:
-		return fmt.Sprintf("%g", vv)
-	case float64:
+	case float32, float64:
 		return fmt.Sprintf("%g", vv)
 	case []string:
 		return formatGGUFStringSlice(vv)
+	default:
+		return formatGGUFSliceValue(v)
+	}
+}
+
+func formatGGUFSliceValue(v any) string {
+	switch vv := v.(type) {
 	case []bool:
 		return formatGGUFSlice("bool", len(vv), func(i int) string { return fmt.Sprintf("%t", vv[i]) })
 	case []uint8:

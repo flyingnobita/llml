@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -190,8 +191,8 @@ func findKoboldCppBinary() string {
 	return ""
 }
 
-// probeLlamaServerHealth GETs /health on 127.0.0.1 (avoids localhost IPv6/IPv4 ambiguity).
-func probeLlamaServerHealth(port int) bool {
+// probeHealthEndpoint GETs /health on 127.0.0.1 (avoids localhost IPv6/IPv4 ambiguity). Used by both llama-server and KoboldCpp.
+func probeHealthEndpoint(port int) bool {
 	url := fmt.Sprintf("http://127.0.0.1:%d/health", port)
 	client := &http.Client{Timeout: 2 * time.Second}
 	req, err := http.NewRequest(http.MethodGet, url, nil)
@@ -204,4 +205,58 @@ func probeLlamaServerHealth(port int) bool {
 	}
 	defer resp.Body.Close()
 	return resp.StatusCode == http.StatusOK
+}
+
+const defaultLlamaServerPort = 8080
+const defaultVLLMServerPort = 8000
+const defaultKoboldCppPort = 5001
+
+// portFromEnv reads a port number from the named env var, returning def if unset or invalid.
+func portFromEnv(key string, def int) int {
+	if v := os.Getenv(key); v != "" {
+		if p, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && p > 0 && p <= 65535 {
+			return p
+		}
+	}
+	return def
+}
+
+// ListenPort returns the TCP port from LLAMA_SERVER_PORT, or 8080 if unset or invalid.
+func ListenPort() int { return portFromEnv(EnvLlamaServerPort, defaultLlamaServerPort) }
+
+// VLLMPort returns the TCP port from VLLM_SERVER_PORT, or 8000 if unset or invalid.
+func VLLMPort() int { return portFromEnv(EnvVLLMServerPort, defaultVLLMServerPort) }
+
+// KoboldCppPort returns the TCP port from KOBOLDCPP_PORT, or 5001 if unset or invalid.
+func KoboldCppPort() int { return portFromEnv(EnvKoboldCppPort, defaultKoboldCppPort) }
+
+// resolvePath returns existing if non-empty, otherwise the first match for cmdName on PATH.
+func resolvePath(existing, cmdName string) string {
+	if existing != "" {
+		return existing
+	}
+	if p, err := exec.LookPath(cmdName); err == nil {
+		return p
+	}
+	return ""
+}
+
+// ResolveLlamaServerPath returns the detected llama-server binary path, or the first match on PATH.
+func ResolveLlamaServerPath(r RuntimeInfo) string {
+	return resolvePath(r.LlamaServerPath, "llama-server")
+}
+
+// ResolveVLLMPath returns the detected vllm binary path, or the first match on PATH.
+func ResolveVLLMPath(r RuntimeInfo) string {
+	return resolvePath(r.VLLMPath, "vllm")
+}
+
+// ResolveOllamaPath returns the detected ollama binary path, or the first match on PATH.
+func ResolveOllamaPath(r RuntimeInfo) string {
+	return resolvePath(r.OllamaPath, "ollama")
+}
+
+// ResolveKoboldCppPath returns the detected koboldcpp binary path, or the first match on PATH.
+func ResolveKoboldCppPath(r RuntimeInfo) string {
+	return resolvePath(r.KoboldCppPath, "koboldcpp")
 }

@@ -126,7 +126,7 @@ func TestFindKoboldCppBinary_pathFallback(t *testing.T) {
 	}
 }
 
-func TestProbeLlamaServerHealth(t *testing.T) {
+func TestProbeHealthEndpoint(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/health" {
 			http.NotFound(w, r)
@@ -143,7 +143,7 @@ func TestProbeLlamaServerHealth(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !probeLlamaServerHealth(port) {
+	if !probeHealthEndpoint(port) {
 		t.Fatal("expected health probe success")
 	}
 }
