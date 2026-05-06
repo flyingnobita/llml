@@ -22,6 +22,7 @@ type KeyMap struct {
 	SortColumn   key.Binding
 	SortReverse  key.Binding
 	RescanModels key.Binding
+	Export       key.Binding
 	Help         key.Binding
 }
 
@@ -112,6 +113,10 @@ func DefaultKeyMap() KeyMap {
 		ToggleTheme: key.NewBinding(
 			key.WithKeys(FooterKeyToggleTheme),
 			key.WithHelp(FooterKeyToggleTheme, FooterDescToggleTheme),
+		),
+		Export: key.NewBinding(
+			key.WithKeys("E"),
+			key.WithHelp("E", "export profiles"),
 		),
 		SortColumn: key.NewBinding(
 			key.WithKeys(FooterKeySortColumn),

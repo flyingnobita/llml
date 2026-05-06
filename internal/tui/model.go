@@ -111,6 +111,52 @@ type discoveryPathsState struct {
 	editInput textinput.Model
 }
 
+// exportViewState holds the profile export modal state.
+type exportViewState struct {
+	open            bool
+	focus           exportFocus
+	items           []exportProfileItem
+	cursor          int
+	scrollOffset    int
+	outputPath      string
+	pathInput       textinput.Model
+	filterInput     textinput.Model
+	filteredIndices []int
+}
+
+// collisionState holds the file-collision sub-modal state.
+type collisionState struct {
+	open       bool
+	dest       string
+	suffixPath string
+	profiles   []exportProfileItem
+}
+
+type exportFocus int
+
+const (
+	exportFocusList exportFocus = iota
+	exportFocusFilter
+	exportFocusPath
+)
+
+type exportItemKind int
+
+const (
+	exportItemProfile exportItemKind = iota
+	exportItemHeader
+)
+
+// exportProfileItem is one profile entry in the export checkbox list.
+type exportProfileItem struct {
+	kind         exportItemKind
+	modelKey     string
+	modelDisplay string
+	backend      string
+	profileName  string
+	checked      bool
+}
+
 // mainPaneFocusSnap stores keyboard focus among the model table, launch preview, and
 // split-pane server log before a full-screen modal opens. At most one modal uses it at a time.
 type mainPaneFocusSnap struct {
@@ -130,6 +176,8 @@ type Model struct {
 	preview   launchPreviewState
 	alerts    alertsState
 	discovery discoveryPathsState
+	export    exportViewState
+	collision collisionState
 	paneFocus mainPaneFocusSnap
 
 	keys               KeyMap
@@ -218,6 +266,7 @@ func New() Model {
 		rc:        runtimeConfigState{inputs: newRuntimeConfigInputs()},
 		params:    paramsState{editInput: newParamLineTextInput()},
 		discovery: discoveryPathsState{editInput: newPathTextInput()},
+		export:    exportViewState{pathInput: newPathTextInput(), filterInput: newFilterTextInput()},
 		keys:      DefaultKeyMap(),
 		loading:   true,
 	}
@@ -800,10 +849,7 @@ func (m Model) syncAlertViewport() Model {
 		iw = minInnerWidth
 	}
 	fr := m.alerts.viewport.Style.GetHorizontalFrameSize()
-	textW := iw - fr
-	if textW < MinTextDisplayWidth {
-		textW = MinTextDisplayWidth
-	}
+	textW := max(iw-fr, MinTextDisplayWidth)
 	outerH := alertPaneVisibleLines + m.alerts.viewport.Style.GetVerticalFrameSize()
 	content := m.renderAlertHistoryContent(textW)
 	if content != m.alerts.lastContent {
@@ -817,10 +863,7 @@ func (m Model) syncAlertViewport() Model {
 	m.alerts.viewport.SetHeight(outerH)
 	if m.alerts.viewport.TotalLineCount() > m.alerts.viewport.VisibleLineCount() {
 		m.alerts.viewport.SetWidth(iw - 1)
-		textW = iw - 1 - fr
-		if textW < MinTextDisplayWidth {
-			textW = MinTextDisplayWidth
-		}
+		textW = max(iw-1-fr, MinTextDisplayWidth)
 		content = m.renderAlertHistoryContent(textW)
 		m.alerts.lastContent = content
 		m.alerts.viewport.SetContent(content)

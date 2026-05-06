@@ -34,6 +34,8 @@ type styles struct {
 	paramPanelBox          lipgloss.Style
 	paramSectionBox        lipgloss.Style
 	paramSectionBoxFocused lipgloss.Style
+	exportListBox          lipgloss.Style
+	exportListBoxFocused   lipgloss.Style
 	paramConfirmDialog     lipgloss.Style
 	paramSectionHeading    lipgloss.Style
 	themeToastInline       lipgloss.Style
@@ -122,6 +124,15 @@ func newStyles(theme Theme) styles {
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(theme.SplitPaneBorderFocused).
 			Padding(0, 1),
+		// Export modal list section; border bright when list or filter has focus.
+		exportListBox: lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(theme.Border).
+			Padding(0, 0),
+		exportListBoxFocused: lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(theme.SplitPaneBorderFocused).
+			Padding(0, 0),
 		paramConfirmDialog: lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(theme.Error).

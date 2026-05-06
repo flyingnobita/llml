@@ -185,6 +185,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	var cmd tea.Cmd
+	if m.export.open && m.export.focus == exportFocusFilter {
+		m.export.filterInput, cmd = m.export.filterInput.Update(msg)
+		return m, cmd
+	}
+	if m.export.open && m.export.focus == exportFocusPath {
+		m.export.pathInput, cmd = m.export.pathInput.Update(msg)
+		return m, cmd
+	}
 	if m.params.open && m.params.editKind != paramEditNone {
 		m.params.editInput, cmd = m.params.editInput.Update(msg)
 		return m, cmd
@@ -232,6 +240,12 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		return m, nil
+	}
+	if m.collision.open {
+		return m.updateCollisionKey(msg)
+	}
+	if m.export.open {
+		return m.updateExportKey(msg)
 	}
 	if m.params.open {
 		return m.updateParamPanelKey(msg)
@@ -344,6 +358,8 @@ func (m Model) tableNavKeys(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 		}
 		m2, cmd := m.openParamPanel()
 		return m2, cmd, true
+	case key.Matches(msg, m.keys.Export):
+		return m.openExportView(), nil, true
 	case key.Matches(msg, m.keys.ModelPaths):
 		if m.loading {
 			m2, cmd := m.flashError("Wait for the model scan to finish.")

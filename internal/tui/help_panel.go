@@ -43,6 +43,7 @@ func helpSections() []struct {
 			entries: []helpEntry{
 				{"c", "Runtime Environment"},
 				{"p", "Parameter Profiles"},
+				{"E", "Export profiles"},
 				{"m", "Model Paths"},
 				{"r", "Reload runtime"},
 				{"S", "Rescan models"},

@@ -85,6 +85,12 @@ const (
 	// PathTextInputWidth is the textinput width for path fields.
 	PathTextInputWidth = 38
 
+	// FilterInputCharLimit is the max characters for the export filter text input.
+	FilterInputCharLimit = 128
+
+	// FilterTextInputWidth is the textinput width for the export filter.
+	FilterTextInputWidth = 30
+
 	// MinParamEditInnerWidth is the minimum inner width for a parameter edit text input.
 	MinParamEditInnerWidth = 32
 )
@@ -170,6 +176,10 @@ const (
 
 	FooterHintHelp = "?: more"
 
+	FooterKeyExport  = "E"
+	FooterDescExport = "export"
+	FooterHintExport = FooterKeyExport + ": " + FooterDescExport
+
 	FooterKeyCopyPath  = "enter"
 	FooterDescCopyPath = "copy cmd"
 	FooterHintCopyPath = FooterKeyCopyPath + ": " + FooterDescCopyPath
@@ -246,4 +256,9 @@ const (
 	FooterParamFooterMetadata    = FooterHintTabSections + FooterHintSep + FooterNavHint + FooterHintSep + FooterParamHintCycle + FooterHintSep + FooterParamHintEnterEdit + FooterHintSep + FooterParamHintBack
 	FooterParamFooterDetailEmpty = FooterHintTabSections + FooterHintSep + FooterNavHint + FooterHintSep + FooterParamHintAdd + FooterHintSep + FooterParamHintDelete + FooterHintSep + FooterParamHintBack
 	FooterParamFooterDetailRows  = FooterHintTabSections + FooterHintSep + FooterNavHint + FooterHintSep + FooterParamHintAdd + FooterHintSep + FooterParamHintDelete + FooterHintSep + FooterParamHintEnterEdit + FooterHintSep + FooterParamHintBack
+
+	// Export modal.
+	FooterExportHints    = FooterHintExport + FooterHintSep + "tab: focus · /: filter · space: toggle · ctrl+u/d: page · a: select all · A: select none · enter: export · esc: back"
+	FooterExportNoMatch  = "(no matches)"
+	FooterCollisionHints = "o: overwrite · n: new name · esc: cancel"
 )

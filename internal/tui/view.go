@@ -546,6 +546,10 @@ func (m Model) mainAppPlacedView() string {
 // and true when any modal is open.
 func (m Model) modalBlock() (string, bool) {
 	switch {
+	case m.collision.open:
+		return m.collisionModalBlock(), true
+	case m.export.open:
+		return m.exportModalBlock(), true
 	case m.params.open:
 		return m.paramPanelModalBlock(), true
 	case m.helpOpen:
