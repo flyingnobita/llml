@@ -392,6 +392,7 @@ You can support this project in a few simple ways:
 - 🐛 [Report bugs](https://github.com/flyingnobita/llml/issues)
 - 💡 [Suggest features](https://github.com/flyingnobita/llml/issues)
 - 📝 [Contribute code](https://github.com/flyingnobita/llml/pulls)
+- 📦 [Contribute a profile to the catalog](https://github.com/flyingnobita/llml-catalog) — share a working parameter set with others who run the same model
 
 ## 📄 License
 

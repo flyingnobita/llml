@@ -17,6 +17,7 @@ and launching `llama-server`, `koboldcpp`, `vllm serve`, or Ollama preload flows
 - GGUF metadata: `abrander/gguf`
 - Tooling: `mise` (tool versions + tasks; includes **GoReleaser** for `mise run goreleaser-check` / lint), `npm` (Prettier + markdownlint only)
 - Releases: see [dev-docs/releases-and-packaging.md](dev-docs/releases-and-packaging.md) for GoReleaser, Homebrew (`brews` -> `flyingnobita/homebrew-tap`), Scoop (`scoops` -> `flyingnobita/scoop-bucket`), Winget (`winget` -> `flyingnobita/winget-pkgs` -> `microsoft/winget-pkgs` PR), required secrets, and maintainer automation. Summary: push a `v*` tag after updating repo-root `VERSION` to match; `.github/workflows/release.yml` publishes GitHub Release archives. Users install via `brew tap flyingnobita/tap && brew install llml`, `scoop bucket add flyingnobita https://github.com/flyingnobita/scoop-bucket && scoop install flyingnobita/llml`, or `winget install --id FlyingNobita.llml` after the Winget PR merges.
+- **Profile catalog (separate repo):** [`flyingnobita/llml-catalog`](https://github.com/flyingnobita/llml-catalog) holds the community TOML profile store and its static index site. Work on the catalog, site, and design system belongs in that repo, not here. The portable profile schema defined in `docs/profile-format.md` is the one-way contract between the two repos.
 
 ---
 
