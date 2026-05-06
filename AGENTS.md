@@ -2,6 +2,8 @@
 
 AI coding instructions for this project.
 
+This instruction lives in `AGENTS.md`. Update it here, not in `CLAUDE.md`.
+
 ---
 
 ## Project Overview
@@ -230,3 +232,10 @@ Key routing rules:
 - test: go test -race ./...
 - umbrella: mise run check
 - gbrain: timeout 5s gbrain doctor --json
+
+## Design System
+
+Always read `dev-docs/DESIGN.md` before making any visual or UI decisions.
+All font choices, colors, spacing, and aesthetic direction are defined there.
+Do not deviate without explicit user approval.
+In QA mode, flag any code that doesn't match `dev-docs/DESIGN.md`.
