@@ -11,6 +11,11 @@ import (
 	"time"
 )
 
+var commonBinaryDirs = []string{
+	"/usr/local/bin",
+	"/opt/homebrew/bin",
+}
+
 // findBinaryInEnvAndCommonDirs resolves name as $envDir/name, then each of commonDirs/name,
 // then [exec.LookPath]. envDir may be empty (skip that step).
 func findBinaryInEnvAndCommonDirs(name, envDir string, commonDirs []string) string {
@@ -56,11 +61,7 @@ func findVLLMBinary() string {
 			return p
 		}
 	}
-	var common []string
-	common = append(common,
-		"/usr/local/bin",
-		"/opt/homebrew/bin",
-	)
+	common := commonBinaryDirs
 	if home, err := os.UserHomeDir(); err == nil {
 		common = append(common, filepath.Join(home, ".local", "bin"))
 		if runtime.GOOS == "darwin" {
@@ -76,12 +77,8 @@ func findLlamaBinary(name string) string {
 	if d := os.Getenv(EnvLlamaCppPath); d != "" {
 		envDir = filepath.Clean(d)
 	}
-	var common []string
-	common = append(common,
-		"/usr/local/bin",
-		"/opt/homebrew/bin",
-		"/opt/llama.cpp/build/bin",
-	)
+	common := append([]string{}, commonBinaryDirs...)
+	common = append(common, "/opt/llama.cpp/build/bin")
 	if home, err := os.UserHomeDir(); err == nil {
 		common = append(common, filepath.Join(home, ".local", "bin"))
 	}
@@ -93,11 +90,7 @@ func findOllamaBinary() string {
 	if d := os.Getenv(EnvOllamaPath); d != "" {
 		envDir = filepath.Clean(d)
 	}
-	var common []string
-	common = append(common,
-		"/usr/local/bin",
-		"/opt/homebrew/bin",
-	)
+	common := commonBinaryDirs
 	if home, err := os.UserHomeDir(); err == nil {
 		common = append(common, filepath.Join(home, ".local", "bin"))
 	}
@@ -181,7 +174,7 @@ func findKoboldCppBinary() string {
 		}
 	}
 	// 3) Common directories.
-	common := []string{"/usr/local/bin", "/opt/homebrew/bin"}
+	common := commonBinaryDirs
 	if home, err := os.UserHomeDir(); err == nil {
 		common = append(common, filepath.Join(home, ".local", "bin"))
 	}

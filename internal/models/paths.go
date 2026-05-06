@@ -4,7 +4,26 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 )
+
+var (
+	cachedHomeDir     string
+	cachedHomeDirOnce sync.Once
+)
+
+// HomeDir returns the current user's home directory, cached after the first call.
+// Returns "" when the home directory cannot be determined.
+func HomeDir() string {
+	cachedHomeDirOnce.Do(func() {
+		d, err := os.UserHomeDir()
+		if err != nil {
+			return
+		}
+		cachedHomeDir = d
+	})
+	return cachedHomeDir
+}
 
 // ExpandTildePath trims s and, if it is "~" or begins with "~/", replaces that prefix with the
 // current user's home directory from [os.UserHomeDir]. If the home directory cannot be resolved,

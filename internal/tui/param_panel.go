@@ -107,7 +107,7 @@ var paramHardwareClassOptions = []profilepkg.HardwareClass{
 func newParamLineTextInput() textinput.Model {
 	ti := textinput.New()
 	ti.Placeholder = ""
-	ti.CharLimit = 4096
+	ti.CharLimit = ParamEditCharLimit
 	ti.SetWidth(64)
 	ti.Blur()
 	return ti
@@ -192,8 +192,8 @@ func (m Model) paramEditInnerWidth() int {
 	cw := m.paramPanelContentWidth()
 	frame := m.ui.styles.paramSectionBox.GetHorizontalFrameSize()
 	w := cw - frame
-	if w < 32 {
-		w = 32
+	if w < MinParamEditInnerWidth {
+		w = MinParamEditInnerWidth
 	}
 	return w
 }
@@ -291,41 +291,7 @@ func (m Model) startMetadataValueEdit() (Model, tea.Cmd) {
 	}
 }
 
-func cycleStringOption(options []string, current string, delta int) string {
-	if len(options) == 0 {
-		return current
-	}
-	cur := -1
-	for i := range options {
-		if options[i] == current {
-			cur = i
-			break
-		}
-	}
-	if cur < 0 {
-		cur = 0
-	}
-	return options[(cur+delta+len(options))%len(options)]
-}
-
-func cycleUseCaseOption(options []profilepkg.UseCasePrimary, current profilepkg.UseCasePrimary, delta int) profilepkg.UseCasePrimary {
-	if len(options) == 0 {
-		return current
-	}
-	cur := -1
-	for i := range options {
-		if options[i] == current {
-			cur = i
-			break
-		}
-	}
-	if cur < 0 {
-		cur = 0
-	}
-	return options[(cur+delta+len(options))%len(options)]
-}
-
-func cycleHardwareClassOption(options []profilepkg.HardwareClass, current profilepkg.HardwareClass, delta int) profilepkg.HardwareClass {
+func cycleOption[T comparable](options []T, current T, delta int) T {
 	if len(options) == 0 {
 		return current
 	}
@@ -353,11 +319,11 @@ func (m Model) cycleMetadataEnum(delta int) (Model, tea.Cmd) {
 		if len(opts) == 0 {
 			return m, nil
 		}
-		p.Backend = cycleStringOption(opts, p.Backend, delta)
+		p.Backend = cycleOption(opts, p.Backend, delta)
 	case paramMetadataUseCasePrimary:
-		p.UseCase.Primary = cycleUseCaseOption(paramUseCasePrimaryOptions, p.UseCase.Primary, delta)
+		p.UseCase.Primary = cycleOption(paramUseCasePrimaryOptions, p.UseCase.Primary, delta)
 	case paramMetadataHardwareClass:
-		p.Hardware.Class = cycleHardwareClassOption(paramHardwareClassOptions, p.Hardware.Class, delta)
+		p.Hardware.Class = cycleOption(paramHardwareClassOptions, p.Hardware.Class, delta)
 	default:
 		return m, nil
 	}

@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -149,10 +148,10 @@ func newTableViewport(st styles, homeDir string) (btable.Model, viewport.Model) 
 		btable.WithRows(nil),
 		btable.WithFocused(true),
 		btable.WithStyles(st.table),
-		btable.WithWidth(96),
+		btable.WithWidth(DefaultViewportWidth),
 		btable.WithHeight(defaultTableHeight),
 	)
-	hv := viewport.New(viewport.WithWidth(96), viewport.WithHeight(defaultTableHeight))
+	hv := viewport.New(viewport.WithWidth(DefaultViewportWidth), viewport.WithHeight(defaultTableHeight))
 	hv.SetHorizontalStep(hScrollStep)
 	// Vertical wheel must not scroll this wrapper; it desyncs from the bubbles table cursor.
 	// Horizontal panning uses keys (see keymap); Shift+wheel could be added later if desired.
@@ -162,7 +161,7 @@ func newTableViewport(st styles, homeDir string) (btable.Model, viewport.Model) 
 }
 
 func newServerLogViewport(st styles) viewport.Model {
-	sv := viewport.New(viewport.WithWidth(96), viewport.WithHeight(1))
+	sv := viewport.New(viewport.WithWidth(DefaultViewportWidth), viewport.WithHeight(1))
 	sv.MouseWheelEnabled = true
 	sv.Style = st.serverLogViewport
 	return sv
@@ -170,7 +169,7 @@ func newServerLogViewport(st styles) viewport.Model {
 
 func newLaunchPreviewViewport(st styles) viewport.Model {
 	lpvOuter := launchPreviewVisibleLines + st.launchPreviewViewport.GetVerticalFrameSize()
-	lpv := viewport.New(viewport.WithWidth(96), viewport.WithHeight(lpvOuter))
+	lpv := viewport.New(viewport.WithWidth(DefaultViewportWidth), viewport.WithHeight(lpvOuter))
 	lpv.MouseWheelEnabled = true
 	lpv.MouseWheelDelta = 1
 	lpv.SoftWrap = true
@@ -180,7 +179,7 @@ func newLaunchPreviewViewport(st styles) viewport.Model {
 
 func newAlertViewport(st styles) viewport.Model {
 	avOuter := alertPaneVisibleLines + st.alertPaneViewport.GetVerticalFrameSize()
-	av := viewport.New(viewport.WithWidth(96), viewport.WithHeight(avOuter))
+	av := viewport.New(viewport.WithWidth(DefaultViewportWidth), viewport.WithHeight(avOuter))
 	av.MouseWheelEnabled = true
 	av.MouseWheelDelta = 1
 	av.SoftWrap = true
@@ -204,7 +203,7 @@ func newRuntimeConfigInputs() [runtimeFieldCount]textinput.Model {
 
 // New returns a model with default key bindings and an empty table; Init triggers discovery.
 func New() Model {
-	homeDir, _ := os.UserHomeDir()
+	homeDir := models.HomeDir()
 	pick := initialThemePick()
 	th := resolveTheme()
 	st := newStyles(th)
@@ -598,8 +597,8 @@ func (m Model) syncLaunchPreviewViewport(innerW int) Model {
 	m.preview.activeProfileName = activeProfileNameForPreview(m)
 	fr := m.preview.viewport.Style.GetHorizontalFrameSize()
 	textW := innerW - fr
-	if textW < 8 {
-		textW = 8
+	if textW < MinTextDisplayWidth {
+		textW = MinTextDisplayWidth
 	}
 	pvFrV := m.preview.viewport.Style.GetVerticalFrameSize()
 	outerH := launchPreviewVisibleLines + pvFrV
@@ -611,8 +610,8 @@ func (m Model) syncLaunchPreviewViewport(innerW int) Model {
 	if m.preview.viewport.TotalLineCount() > m.preview.viewport.VisibleLineCount() {
 		m.preview.viewport.SetWidth(innerW - 1)
 		textW = innerW - 1 - fr
-		if textW < 8 {
-			textW = 8
+		if textW < MinTextDisplayWidth {
+			textW = MinTextDisplayWidth
 		}
 		rendered = m.ui.styles.launchPreviewContent.Width(textW).Render(cmd)
 		m.preview.viewport.SetContent(rendered)
@@ -802,8 +801,8 @@ func (m Model) syncAlertViewport() Model {
 	}
 	fr := m.alerts.viewport.Style.GetHorizontalFrameSize()
 	textW := iw - fr
-	if textW < 8 {
-		textW = 8
+	if textW < MinTextDisplayWidth {
+		textW = MinTextDisplayWidth
 	}
 	outerH := alertPaneVisibleLines + m.alerts.viewport.Style.GetVerticalFrameSize()
 	content := m.renderAlertHistoryContent(textW)
@@ -819,8 +818,8 @@ func (m Model) syncAlertViewport() Model {
 	if m.alerts.viewport.TotalLineCount() > m.alerts.viewport.VisibleLineCount() {
 		m.alerts.viewport.SetWidth(iw - 1)
 		textW = iw - 1 - fr
-		if textW < 8 {
-			textW = 8
+		if textW < MinTextDisplayWidth {
+			textW = MinTextDisplayWidth
 		}
 		content = m.renderAlertHistoryContent(textW)
 		m.alerts.lastContent = content

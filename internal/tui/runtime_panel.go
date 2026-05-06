@@ -40,7 +40,7 @@ func pathEnvDisplay(envKey string) string {
 	if v == "" {
 		return "—"
 	}
-	home, _ := os.UserHomeDir()
+	home := models.HomeDir()
 	return FormatPathDisplay(v, home)
 }
 
@@ -50,7 +50,7 @@ func pathEnvDisplay(envKey string) string {
 func llamaServerPathPanelDisplay(r models.RuntimeInfo) string {
 	p := models.ResolveLlamaServerPath(r)
 	if p != "" {
-		home, _ := os.UserHomeDir()
+		home := models.HomeDir()
 		return FormatPathDisplay(p, home)
 	}
 	if r.ServerRunning {
@@ -69,7 +69,7 @@ func vllmPathPanelDisplay(r models.RuntimeInfo) string {
 	if p == "" {
 		return "—"
 	}
-	home, _ := os.UserHomeDir()
+	home := models.HomeDir()
 	return FormatPathDisplay(p, home)
 }
 
@@ -83,7 +83,7 @@ func vllmVenvPanelDisplay(r models.RuntimeInfo) string {
 	vllmBin := models.ResolveVLLMPath(r)
 	act := models.ResolveVLLMActivateScript(vllmBin)
 	if root := models.VenvRootFromActivateScript(act); root != "" {
-		home, _ := os.UserHomeDir()
+		home := models.HomeDir()
 		return FormatPathDisplay(root, home)
 	}
 	return "—"
@@ -94,7 +94,7 @@ func koboldCppPathPanelDisplay(r models.RuntimeInfo) string {
 	if p == "" {
 		return "—"
 	}
-	home, _ := os.UserHomeDir()
+	home := models.HomeDir()
 	return FormatPathDisplay(p, home)
 }
 
@@ -103,7 +103,7 @@ func ollamaPathPanelDisplay(r models.RuntimeInfo) string {
 	if p == "" {
 		return "—"
 	}
-	home, _ := os.UserHomeDir()
+	home := models.HomeDir()
 	return FormatPathDisplay(p, home)
 }
 
@@ -113,8 +113,8 @@ func ollamaPathPanelDisplay(r models.RuntimeInfo) string {
 // ([models.ListenPort] / [models.VLLMPort]). The venv row shows VLLM_VENV when set, otherwise
 // the inferred venv root when activation would run. Lines are truncated to maxWidth display width.
 func RuntimePanelLines(maxWidth int, r models.RuntimeInfo) []string {
-	if maxWidth < 24 {
-		maxWidth = 24
+	if maxWidth < MinModalInnerWidth {
+		maxWidth = MinModalInnerWidth
 	}
 	valW := maxWidth - runtimePanelEnvLabelWidth - 1
 	if valW < 8 {

@@ -330,7 +330,7 @@ func runForegroundServerCmd(spec serverSpec) tea.Cmd {
 func runSplitServerCmd(spec serverSpec) tea.Cmd {
 	return func() tea.Msg {
 		cmd := spec.splitCmd()
-		ch := make(chan tea.Msg, 64)
+		ch := make(chan tea.Msg, ServerSplitChannelBuffer)
 		inv := spec.invocationEcho()
 		go func() {
 			ch <- serverLogMsg{line: inv}
@@ -362,12 +362,12 @@ var (
 )
 
 func waitForOllama() bool {
-	deadline := time.Now().Add(8 * time.Second)
+	deadline := time.Now().Add(OllamaStartupTimeout)
 	for time.Now().Before(deadline) {
 		if probeOllamaFn() {
 			return true
 		}
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(OllamaPollInterval)
 	}
 	return probeOllamaFn()
 }

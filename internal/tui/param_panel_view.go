@@ -41,7 +41,7 @@ func (m Model) renderConfirmBlock(cw int) string {
 		return ""
 	}
 	confirmBox := m.ui.styles.paramConfirmDialog
-	confirmInner := max(cw-confirmBox.GetHorizontalFrameSize(), 24)
+	confirmInner := max(cw-confirmBox.GetHorizontalFrameSize(), MinModalInnerWidth)
 	var confirmRows []string
 	switch k {
 	case paramConfirmProfile:
@@ -230,7 +230,7 @@ func (m Model) paramPanelModalBlock() string {
 	if m.params.focus == paramFocusEnv || m.params.focus == paramFocusArgs {
 		detailBox = m.ui.styles.paramSectionBoxFocused
 	}
-	maxSec := max(cw-detailBox.GetHorizontalFrameSize(), 24)
+	maxSec := max(cw-detailBox.GetHorizontalFrameSize(), MinModalInnerWidth)
 
 	rows := []string{m.modalTitleRow(cw, m.ui.styles.portConfigTitle, "Parameter Profiles — "+m.params.modelDisplayName)}
 	if block := m.renderConfirmBlock(cw); block != "" {
@@ -238,8 +238,8 @@ func (m Model) paramPanelModalBlock() string {
 	}
 	rows = append(rows,
 		"",
-		m.renderProfileSection(cw, max(cw-profilesBox.GetHorizontalFrameSize(), 24), profilesBox),
-		m.renderMetadataSection(cw, max(cw-metaBox.GetHorizontalFrameSize(), 24), metaBox),
+		m.renderProfileSection(cw, max(cw-profilesBox.GetHorizontalFrameSize(), MinModalInnerWidth), profilesBox),
+		m.renderMetadataSection(cw, max(cw-metaBox.GetHorizontalFrameSize(), MinModalInnerWidth), metaBox),
 		m.renderDetailSections(cw, maxSec, detailBox),
 	)
 

@@ -27,51 +27,18 @@ const (
 	runtimeFieldCount
 )
 
-// applyListenPortEnv sets LLAMA_SERVER_PORT from user input, or unsets it when empty
-// (default port 8080 via models.ListenPort). Input should be digits only or empty.
-func applyListenPortEnv(raw string) error {
+// applyPortEnv sets an env var from user input (port number or empty to unset).
+func applyPortEnv(envKey string, raw string, defaultPort int) error {
 	v := strings.TrimSpace(raw)
 	if v == "" {
-		os.Unsetenv(models.EnvLlamaServerPort)
+		os.Unsetenv(envKey)
 		return nil
 	}
 	p, err := strconv.Atoi(v)
 	if err != nil || p < 1 || p > 65535 {
-		return fmt.Errorf("port must be 1-65535 or empty for default 8080")
+		return fmt.Errorf("port must be 1-65535 or empty for default %d", defaultPort)
 	}
-	os.Setenv(models.EnvLlamaServerPort, v)
-	return nil
-}
-
-// applyVLLMPortEnv sets VLLM_SERVER_PORT from user input, or unsets it when empty
-// (default port 8000 via models.VLLMPort).
-func applyVLLMPortEnv(raw string) error {
-	v := strings.TrimSpace(raw)
-	if v == "" {
-		os.Unsetenv(models.EnvVLLMServerPort)
-		return nil
-	}
-	p, err := strconv.Atoi(v)
-	if err != nil || p < 1 || p > 65535 {
-		return fmt.Errorf("port must be 1-65535 or empty for default 8000")
-	}
-	os.Setenv(models.EnvVLLMServerPort, v)
-	return nil
-}
-
-// applyKoboldCppPortEnv sets KOBOLDCPP_PORT from user input, or unsets it when empty
-// (default port 5001 via models.KoboldCppPort).
-func applyKoboldCppPortEnv(raw string) error {
-	v := strings.TrimSpace(raw)
-	if v == "" {
-		os.Unsetenv(models.EnvKoboldCppPort)
-		return nil
-	}
-	p, err := strconv.Atoi(v)
-	if err != nil || p < 1 || p > 65535 {
-		return fmt.Errorf("port must be 1-65535 or empty for default 5001")
-	}
-	os.Setenv(models.EnvKoboldCppPort, v)
+	os.Setenv(envKey, v)
 	return nil
 }
 
@@ -137,8 +104,8 @@ func newPortTextInput() textinput.Model {
 func newPathTextInput() textinput.Model {
 	ti := textinput.New()
 	ti.Placeholder = ""
-	ti.CharLimit = 2048
-	ti.SetWidth(38)
+	ti.CharLimit = PathInputCharLimit
+	ti.SetWidth(PathTextInputWidth)
 	ti.Blur()
 	return ti
 }
@@ -254,15 +221,15 @@ func (m Model) commitRuntimeConfig() (Model, tea.Cmd) {
 		m = m.withLastRunError(fmt.Sprintf("%s: %v", models.EnvKoboldCppPort, err))
 		return m, clearLastRunNoteAfterCmd()
 	}
-	if err := applyListenPortEnv(m.rc.inputs[runtimeFieldLlamaPort].Value()); err != nil {
+	if err := applyPortEnv(models.EnvLlamaServerPort, m.rc.inputs[runtimeFieldLlamaPort].Value(), models.ListenPort()); err != nil {
 		m = m.withLastRunError(err.Error())
 		return m, clearLastRunNoteAfterCmd()
 	}
-	if err := applyVLLMPortEnv(m.rc.inputs[runtimeFieldVLLMPort].Value()); err != nil {
+	if err := applyPortEnv(models.EnvVLLMServerPort, m.rc.inputs[runtimeFieldVLLMPort].Value(), models.VLLMPort()); err != nil {
 		m = m.withLastRunError(err.Error())
 		return m, clearLastRunNoteAfterCmd()
 	}
-	if err := applyKoboldCppPortEnv(m.rc.inputs[runtimeFieldKoboldCppPort].Value()); err != nil {
+	if err := applyPortEnv(models.EnvKoboldCppPort, m.rc.inputs[runtimeFieldKoboldCppPort].Value(), models.KoboldCppPort()); err != nil {
 		m = m.withLastRunError(err.Error())
 		return m, clearLastRunNoteAfterCmd()
 	}

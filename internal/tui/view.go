@@ -207,8 +207,8 @@ func runtimePanelView(m Model, contentWidth int) string {
 	if m.layout.width == 0 {
 		return ""
 	}
-	if contentWidth < 24 {
-		contentWidth = 24
+	if contentWidth < MinModalInnerWidth {
+		contentWidth = MinModalInnerWidth
 	}
 	var block string
 	if !m.runtimeScanned && m.loading {

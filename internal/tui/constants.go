@@ -63,6 +63,43 @@ const (
 
 	// alertPaneVisibleLines is the number of visible rows inside the alert-history viewport.
 	alertPaneVisibleLines = 6
+
+	// DefaultViewportWidth is the fallback viewport width used before the first
+	// WindowSizeMsg arrives.
+	DefaultViewportWidth = 96
+
+	// MinTextDisplayWidth is the minimum content width for viewport text after
+	// frame subtraction. Narrower terminals get this floor.
+	MinTextDisplayWidth = 8
+
+	// MinModalInnerWidth is the minimum width for modal content panels
+	// (runtime config, parameter profiles).
+	MinModalInnerWidth = 24
+
+	// ParamEditCharLimit is the textinput.CharLimit for parameter env/arg/value editing.
+	ParamEditCharLimit = 4096
+
+	// PathInputCharLimit is the textinput.CharLimit for path text inputs.
+	PathInputCharLimit = 2048
+
+	// PathTextInputWidth is the textinput width for path fields.
+	PathTextInputWidth = 38
+
+	// MinParamEditInnerWidth is the minimum inner width for a parameter edit text input.
+	MinParamEditInnerWidth = 32
+)
+
+// Server and process constants.
+const (
+	// ServerSplitChannelBuffer is the buffer size for the server stdout/stderr channel
+	// in split-pane mode.
+	ServerSplitChannelBuffer = 64
+
+	// OllamaStartupTimeout is how long to wait for ollama serve to accept connections.
+	OllamaStartupTimeout = 8 * time.Second
+
+	// OllamaPollInterval is the delay between /api/tags health probes during startup.
+	OllamaPollInterval = 200 * time.Millisecond
 )
 
 // Main view pane captions (Title Case). Shown above the launch preview and server log only.

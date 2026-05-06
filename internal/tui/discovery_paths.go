@@ -1,7 +1,7 @@
 package tui
 
 import (
-	"reflect"
+	"slices"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -109,7 +109,7 @@ func (m Model) saveDiscoveryPaths() (Model, tea.Cmd) {
 		newNorm = nil
 	}
 
-	if reflect.DeepEqual(oldNorm, newNorm) {
+	if slices.Equal(oldNorm, newNorm) {
 		m = m.closeDiscoveryPathsModal()
 		m = m.withLastRunSuccess("Model Paths Unchanged.")
 		return m, clearLastRunNoteAfterCmd()

@@ -8,51 +8,74 @@ import (
 	"github.com/flyingnobita/llml/internal/models"
 )
 
-func TestApplyVLLMPortEnv(t *testing.T) {
-	t.Run("empty unsets", func(t *testing.T) {
+func TestApplyPortEnv(t *testing.T) {
+	t.Run("VLLM empty unsets", func(t *testing.T) {
 		t.Setenv(models.EnvVLLMServerPort, "9000")
-		if err := applyVLLMPortEnv(""); err != nil {
+		if err := applyPortEnv(models.EnvVLLMServerPort, "", models.VLLMPort()); err != nil {
 			t.Fatal(err)
 		}
 		if os.Getenv(models.EnvVLLMServerPort) != "" {
 			t.Fatal("expected unset")
 		}
 	})
-	t.Run("valid sets", func(t *testing.T) {
+	t.Run("VLLM valid sets", func(t *testing.T) {
 		t.Setenv(models.EnvVLLMServerPort, "")
-		if err := applyVLLMPortEnv("8000"); err != nil {
+		if err := applyPortEnv(models.EnvVLLMServerPort, "8000", models.VLLMPort()); err != nil {
 			t.Fatal(err)
 		}
 		if os.Getenv(models.EnvVLLMServerPort) != "8000" {
 			t.Fatalf("got %q", os.Getenv(models.EnvVLLMServerPort))
 		}
 	})
-}
-
-func TestApplyListenPortEnv(t *testing.T) {
-	t.Run("empty unsets", func(t *testing.T) {
+	t.Run("llama empty unsets", func(t *testing.T) {
 		t.Setenv(models.EnvLlamaServerPort, "9000")
-		if err := applyListenPortEnv(""); err != nil {
+		if err := applyPortEnv(models.EnvLlamaServerPort, "", models.ListenPort()); err != nil {
 			t.Fatal(err)
 		}
 		if os.Getenv(models.EnvLlamaServerPort) != "" {
 			t.Fatal("expected unset")
 		}
 	})
-	t.Run("valid sets", func(t *testing.T) {
+	t.Run("llama valid sets", func(t *testing.T) {
 		t.Setenv(models.EnvLlamaServerPort, "")
-		if err := applyListenPortEnv("9090"); err != nil {
+		if err := applyPortEnv(models.EnvLlamaServerPort, "9090", models.ListenPort()); err != nil {
 			t.Fatal(err)
 		}
 		if os.Getenv(models.EnvLlamaServerPort) != "9090" {
 			t.Fatalf("got %q", os.Getenv(models.EnvLlamaServerPort))
 		}
 	})
-	t.Run("reject out of range", func(t *testing.T) {
-		if applyListenPortEnv("0") == nil {
+	t.Run("llama reject out of range", func(t *testing.T) {
+		if applyPortEnv(models.EnvLlamaServerPort, "0", models.ListenPort()) == nil {
 			t.Fatal("expected error")
 		}
-		if applyListenPortEnv("65536") == nil {
+		if applyPortEnv(models.EnvLlamaServerPort, "65536", models.ListenPort()) == nil {
+			t.Fatal("expected error")
+		}
+	})
+	t.Run("kobold empty unsets", func(t *testing.T) {
+		t.Setenv(models.EnvKoboldCppPort, "6000")
+		if err := applyPortEnv(models.EnvKoboldCppPort, "", models.KoboldCppPort()); err != nil {
+			t.Fatal(err)
+		}
+		if os.Getenv(models.EnvKoboldCppPort) != "" {
+			t.Fatal("expected unset")
+		}
+	})
+	t.Run("kobold valid sets", func(t *testing.T) {
+		t.Setenv(models.EnvKoboldCppPort, "")
+		if err := applyPortEnv(models.EnvKoboldCppPort, "5001", models.KoboldCppPort()); err != nil {
+			t.Fatal(err)
+		}
+		if os.Getenv(models.EnvKoboldCppPort) != "5001" {
+			t.Fatalf("got %q", os.Getenv(models.EnvKoboldCppPort))
+		}
+	})
+	t.Run("kobold reject out of range", func(t *testing.T) {
+		if applyPortEnv(models.EnvKoboldCppPort, "0", models.KoboldCppPort()) == nil {
+			t.Fatal("expected error")
+		}
+		if applyPortEnv(models.EnvKoboldCppPort, "65536", models.KoboldCppPort()) == nil {
 			t.Fatal("expected error")
 		}
 	})
@@ -107,35 +130,6 @@ func TestApplyPathEnv(t *testing.T) {
 	if os.Getenv(models.EnvLlamaCppPath) != "" {
 		t.Fatal("expected unset for whitespace-only")
 	}
-}
-
-func TestApplyKoboldCppPortEnv(t *testing.T) {
-	t.Run("empty unsets", func(t *testing.T) {
-		t.Setenv(models.EnvKoboldCppPort, "6000")
-		if err := applyKoboldCppPortEnv(""); err != nil {
-			t.Fatal(err)
-		}
-		if os.Getenv(models.EnvKoboldCppPort) != "" {
-			t.Fatal("expected unset")
-		}
-	})
-	t.Run("valid sets", func(t *testing.T) {
-		t.Setenv(models.EnvKoboldCppPort, "")
-		if err := applyKoboldCppPortEnv("5001"); err != nil {
-			t.Fatal(err)
-		}
-		if os.Getenv(models.EnvKoboldCppPort) != "5001" {
-			t.Fatalf("got %q", os.Getenv(models.EnvKoboldCppPort))
-		}
-	})
-	t.Run("reject out of range", func(t *testing.T) {
-		if applyKoboldCppPortEnv("0") == nil {
-			t.Fatal("expected error")
-		}
-		if applyKoboldCppPortEnv("65536") == nil {
-			t.Fatal("expected error")
-		}
-	})
 }
 
 func TestApplyPathEnv_tilde(t *testing.T) {
