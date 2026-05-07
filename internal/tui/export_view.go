@@ -24,8 +24,11 @@ func newFilterTextInput() textinput.Model {
 // openExportView populates the export view from model-params.json and opens it.
 func (m Model) openExportView() Model {
 	groups, err := profiles.AllToPortableGrouped()
-	if err != nil || len(groups) == 0 {
-		return m
+	if err != nil {
+		return m.addAlert(alertSeverityError, "Export", err.Error())
+	}
+	if len(groups) == 0 {
+		return m.addAlert(alertSeverityInfo, "Export", "No profiles to export")
 	}
 
 	var items []exportProfileItem
