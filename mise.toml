@@ -24,7 +24,11 @@ goreleaser-check = "goreleaser check"
 format = "mise run fmt && mise run prettier-fix && mise run markdownlint-fix"
 lint = "mise run fmt-check && mise run vet && mise run prettier-check && mise run markdownlint-check && mise run goreleaser-check"
 check = "mise run lint && mise run test"
+# Align submodule remotes and checkout their pinned commits.
 sync = "git submodule sync --recursive && git submodule update --init --recursive"
+# Sync and update the dev-docs submodule from its remote (see scripts/dev_docs_pull.sh).
 dev-docs-pull = "scripts/dev_docs_pull.sh"
+# Rebase on origin/main, then run dev-docs-pull.
 pull-latest = "git pull --rebase origin main && mise run dev-docs-pull"
+# Install JS/Go deps, init submodules, import gitignored agent paths for a linked worktree.
 worktree-setup = "npm ci && go mod download && git submodule update --init --recursive && LLML_AGENTS_SYNC=import ./scripts/sync_gitignore_agents.sh"
