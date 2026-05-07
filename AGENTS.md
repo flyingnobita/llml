@@ -177,11 +177,12 @@ ADRs live in `dev-docs/llml/adr/YYYYMMDD-short-title.md`; index in
 
 ## GBrain Configuration (configured by /setup-gbrain)
 
+- Mode: local-stdio
 - Engine: postgres
 - Config file: ~/.gbrain/config.json (mode 0600)
-- Setup date: 2026-05-02
+- Setup date: 2026-05-07
 - MCP registered: yes
-- Memory sync: full
+- Artifacts sync: full
 - Current repo policy: read-write
 - To Do list: instead of `TODOS.md`, use `dev-docs/llml/BACKLOG.md`
 
