@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
+- May-06, 2026 - 11:30 PM +0800 - [Catalog: created flyingnobita/llml-catalog — separate repo for the shared parameter-profile catalog (TOML store + static index site); migrated design system; updated AGENTS.md, README.md, and dev-docs/PROJECT-STATUS.md with cross-repo pointers]
 - May-05, 2026 - 11:30 PM +0800 - [v0.3.0 release: KoboldCpp backend support]
 - May-05, 2026 - 11:30 PM +0800 - [KoboldCpp: you can now launch GGUF models with KoboldCpp — select it in a model's parameter profile and press R; auto-detects installed koboldcpp with CUDA variant preference on Linux; respects KOBOLDCPP_PATH and KOBOLDCPP_PORT env vars]
 - May-05, 2026 - 11:30 PM +0800 - [KoboldCpp: runtime panel shows KoboldCpp path and port; edit both via c modal; detects already-running instances on port 5001; missing-runtime warnings reflect the backend selected in your active profile]
