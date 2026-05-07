@@ -683,4 +683,94 @@ func TestAllToPortableGrouped_ProfilesConverted(t *testing.T) {
 	}
 }
 
+func TestAllToPortable_SkipParseEntryError(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+	llmlDir := filepath.Join(dir, "Library", "Application Support", "llml")
+	if err := os.MkdirAll(llmlDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	paramsPath := filepath.Join(llmlDir, "model-params.json")
+
+	// Version 2 model with one valid entry and one that will fail ParseEntry (null).
+	data := []byte(`{
+	  "version": 2,
+	  "models": {
+	    "/models/Valid.gguf": {
+	      "profiles": [{"name": "default", "env": [], "args": []}],
+	      "activeIndex": 0
+	    },
+	    "/models/Invalid.gguf": [1, 2, 3]
+	  }
+	}`)
+	if err := os.WriteFile(paramsPath, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	profiles, err := AllToPortable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Should skip the invalid entry and only return the valid one.
+	if len(profiles) != 1 {
+		t.Fatalf("len(profiles) = %d, want 1 (invalid entry skipped)", len(profiles))
+	}
+	if profiles[0].ModelHint != "Valid" {
+		t.Errorf("ModelHint = %q, want Valid", profiles[0].ModelHint)
+	}
+}
+
+func TestAllToPortableGrouped_SkipParseEntryError(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+	llmlDir := filepath.Join(dir, "Library", "Application Support", "llml")
+	if err := os.MkdirAll(llmlDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	paramsPath := filepath.Join(llmlDir, "model-params.json")
+
+	data := []byte(`{
+	  "version": 2,
+	  "models": {
+	    "/models/Valid.gguf": {
+	      "profiles": [{"name": "default", "env": [], "args": []}],
+	      "activeIndex": 0
+	    },
+	    "/models/Invalid.gguf": [1, 2, 3]
+	  }
+	}`)
+	if err := os.WriteFile(paramsPath, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	groups, err := AllToPortableGrouped()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(groups) != 1 {
+		t.Fatalf("len(groups) = %d, want 1 (invalid entry skipped)", len(groups))
+	}
+}
+
+func TestNextAvailablePath_FirstExists(t *testing.T) {
+	dir := t.TempDir()
+	dest := filepath.Join(dir, "export.toml")
+
+	// Create first file.
+	if err := os.WriteFile(dest, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	path, existed, err := NextAvailablePath(dest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !existed {
+		t.Error("expected existed=true")
+	}
+	if path != filepath.Join(dir, "export-2.toml") {
+		t.Errorf("path = %q, want export-2.toml", path)
+	}
+}
+
 func intPtr(v int) *int { return &v }
