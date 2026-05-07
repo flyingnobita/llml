@@ -109,7 +109,6 @@ func (m Model) closeExportView() Model {
 
 func (m Model) closeCollision() Model {
 	m.collision.open = false
-	m.collision.profiles = nil
 	m.collision.dest = ""
 	m.collision.suffixPath = ""
 	return m

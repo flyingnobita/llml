@@ -130,7 +130,6 @@ type collisionState struct {
 	open       bool
 	dest       string
 	suffixPath string
-	profiles   []exportProfileItem
 }
 
 type exportFocus int

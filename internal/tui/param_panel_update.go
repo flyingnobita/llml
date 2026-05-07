@@ -412,10 +412,6 @@ func (m Model) handleEditKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 func (m Model) handleNavKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
-		if m.export.open {
-			m = m.closeExportView()
-			return m, nil
-		}
 		return m.closeParamPanelWithPersist()
 	case "E":
 		m = m.openExportView()

@@ -187,10 +187,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	if m.export.open && m.export.focus == exportFocusFilter {
 		m.export.filterInput, cmd = m.export.filterInput.Update(msg)
+		m.rebuildExportFilter()
 		return m, cmd
 	}
 	if m.export.open && m.export.focus == exportFocusPath {
 		m.export.pathInput, cmd = m.export.pathInput.Update(msg)
+		m.export.outputPath = m.export.pathInput.Value()
 		return m, cmd
 	}
 	if m.params.open && m.params.editKind != paramEditNone {
