@@ -5,14 +5,16 @@ Status: Proposed
 
 ## Purpose
 
-This document defines the portable parameter profile format for llml. It serves two
-purposes:
+This document defines the portable parameter profile format for llml. It serves
+three purposes:
 
 1. **Human documentation** - describes what a shareable profile file looks like and
    how to write one by hand.
 2. **Machine prompt context** - an LLM pointed at this document and a source URL
    (model card, blog post, README) can extract structured profiles without
    additional instructions.
+3. **Export contract** - `llml export` (TUI `E` or CLI) writes profiles in this
+   same format so you can share, review, or import them on another machine.
 
 ## Background
 
@@ -22,9 +24,11 @@ metadata for backend, use case, and hardware expectations. That internal format 
 not portable - it is keyed by local model path and not designed for sharing.
 
 The portable profile format defined here is a separate, self-contained TOML file
-intended for sharing and importing. Import tooling (for example the `/llml-import`
-agent skill) reads this format, maps its metadata into llml's canonical local
-profile schema, and writes the resulting profiles into `model-params.json`.
+intended for sharing — both importing and exporting. Import tooling (for example
+the `/llml-import` agent skill) reads this format, maps its metadata into llml's
+canonical local profile schema, and writes the resulting profiles into
+`model-params.json`. The `E` key or `llml export` CLI writes profiles from
+`model-params.json` back into this same portable format.
 
 ## Scope
 
@@ -325,8 +329,10 @@ here. Import tooling should reject unrecognized schema versions with a clear err
 ## Relation to internal model-params.json
 
 The portable format and `model-params.json` are separate. The portable format is for
-sharing and importing; `model-params.json` is the internal per-model storage keyed
-by local model path. Import tooling bridges the two: it reads a portable file, asks
-the user which local model to attach the profiles to, maps portable metadata into
-the canonical local profile schema, and writes into `model-params.json` under that
-model's key.
+sharing — importing and exporting; `model-params.json` is the internal per-model
+storage keyed by local model path. Import tooling bridges the two: it reads a
+portable file, asks the user which local model to attach the profiles to, maps
+portable metadata into the canonical local profile schema, and writes into
+`model-params.json` under that model's key. Export tooling (the `E` TUI modal or
+`llml export` CLI) reverses the direction — it reads `model-params.json` and
+writes profiles into the portable TOML format defined here.

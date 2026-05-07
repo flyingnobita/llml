@@ -28,6 +28,7 @@ cmd/llml/            # Binary entrypoint (main.go)
 internal/
   config/            # TOML persistence ({UserConfigDir}/llml/config.toml): runtime, discovery cache, [[models]]
   models/            # GGUF + safetensors discovery, metadata, runtime detection, formatting; also Ollama API discovery and HF-hub support. Filesystem discovery uses the `modelSource` interface (`ggufSource`, `safetensorsSource`) and Ollama rows are merged from the daemon API.
+  profiles/          # Profile export: reads model-params.json, filters profiles, writes portable TOML files (schema v2); also hosts tests for the export pipeline
   tui/               # Bubble Tea model, update, view, styles, keymaps
 .agents/skills/     # Canonical repo-managed agent skills; llml-import lives here
 .claude/skills/     # Tracked Claude compatibility copies for repo-managed skills
@@ -48,7 +49,7 @@ scripts/             # gofmt-check.sh, precommit-docs-fix.sh
 
 ### Bubble Tea pattern
 
-- `Model` in `model.go` is a **coordinator** holding 8 sub-state structs (`layoutState`, `themeState`, `tableState`, `runtimeConfigState`, `paramsState`, `serverPaneState`, `launchPreviewState`, `alertsState`) plus top-level fields (`keys`, `runtime`, `loading`, `lastRunNote`, …). `New()` returns an initialized model. Access state via `m.layout.width`, `m.ui.styles`, `m.table.tbl`, `m.server.running`, `m.preview.focused`, `m.alerts.open`, etc.
+- `Model` in `model.go` is a **coordinator** holding 11 sub-state structs (`layoutState`, `themeState`, `tableState`, `runtimeConfigState`, `paramsState`, `serverPaneState`, `launchPreviewState`, `alertsState`, `discoveryPathsState`, `exportViewState`, `collisionState`) plus top-level fields (`keys`, `runtime`, `loading`, `lastRunNote`, …). `New()` returns an initialized model. Access state via `m.layout.width`, `m.ui.styles`, `m.table.tbl`, `m.server.running`, `m.preview.focused`, `m.alerts.open`, `m.export.open`, etc.
 - `Init()`, `Update()`, `View()` implement `tea.Model`.
 - Messages are defined in `messages.go`; commands in `cmd.go`.
 - Key dispatch in `Update` delegates to `handleKey` (idle/modal routing) → `tableNavKeys` (shared bindings for both idle and split-pane table focus: config, params, theme, scroll, copy, sort). Split-pane key handling is in `update_split.go`.
