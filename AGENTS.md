@@ -1,4 +1,4 @@
-# AGENTS.md — LLM Launcher (llml)
+# AGENTS.md / CLAUDE.md — LLM Launcher (llml)
 
 AI coding instructions for this project.
 
@@ -16,7 +16,7 @@ and launching `llama-server`, `koboldcpp`, `vllm serve`, or Ollama preload flows
 - UI framework: **Bubble Tea v2** (`charm.land/bubbletea/v2`) + **Lip Gloss v2** (`charm.land/lipgloss/v2`) + **Bubbles v2** (`charm.land/bubbles/v2`)
 - GGUF metadata: `abrander/gguf`
 - Tooling: `mise` (tool versions + tasks; includes **GoReleaser** for `mise run goreleaser-check` / lint), `npm` (Prettier + markdownlint only)
-- Releases: see [dev-docs/releases-and-packaging.md](dev-docs/releases-and-packaging.md) for GoReleaser, Homebrew (`brews` -> `flyingnobita/homebrew-tap`), Scoop (`scoops` -> `flyingnobita/scoop-bucket`), Winget (`winget` -> `flyingnobita/winget-pkgs` -> `microsoft/winget-pkgs` PR), required secrets, and maintainer automation. Summary: push a `v*` tag after updating repo-root `VERSION` to match; `.github/workflows/release.yml` publishes GitHub Release archives. Users install via `brew tap flyingnobita/tap && brew install llml`, `scoop bucket add flyingnobita https://github.com/flyingnobita/scoop-bucket && scoop install flyingnobita/llml`, or `winget install --id FlyingNobita.llml` after the Winget PR merges.
+- Releases: see [dev-docs/llml/releases-and-packaging.md](dev-docs/llml/releases-and-packaging.md) for GoReleaser, Homebrew (`brews` -> `flyingnobita/homebrew-tap`), Scoop (`scoops` -> `flyingnobita/scoop-bucket`), Winget (`winget` -> `flyingnobita/winget-pkgs` -> `microsoft/winget-pkgs` PR), required secrets, and maintainer automation. Summary: push a `v*` tag after updating repo-root `VERSION` to match; `.github/workflows/release.yml` publishes GitHub Release archives. Users install via `brew tap flyingnobita/tap && brew install llml`, `scoop bucket add flyingnobita https://github.com/flyingnobita/scoop-bucket && scoop install flyingnobita/llml`, or `winget install --id FlyingNobita.llml` after the Winget PR merges.
 - **Profile catalog (separate repo):** [`flyingnobita/llml-catalog`](https://github.com/flyingnobita/llml-catalog) holds the community TOML profile store and its static index site. Work on the catalog, site, and design system belongs in that repo, not here. The portable profile schema defined in `docs/profile-format.md` is the one-way contract between the two repos.
 
 ---
@@ -165,15 +165,15 @@ The pre-commit hook handles staged files automatically.
 
 ---
 
-## Local-only docs (`dev-docs/`)
+## Local-only docs (`dev-docs/llml/`)
 
-The `dev-docs/` directory is gitignored. Use it for notes that should not be
-committed (e.g. `dev-docs/BACKLOG.md` for a personal backlog).
+The `dev-docs/llml/` directory is gitignored. Use it for notes that should not be
+committed (e.g. `dev-docs/llml/BACKLOG.md` for a personal backlog).
 
 ## Architecture Decision Records
 
-ADRs live in `dev-docs/adr/YYYYMMDD-short-title.md`; index in
-`dev-docs/DECISIONS.md`. Add an ADR for any significant design choice.
+ADRs live in `dev-docs/llml/adr/YYYYMMDD-short-title.md`; index in
+`dev-docs/llml/DECISIONS.md`. Add an ADR for any significant design choice.
 
 ## GBrain Configuration (configured by /setup-gbrain)
 
@@ -183,7 +183,7 @@ ADRs live in `dev-docs/adr/YYYYMMDD-short-title.md`; index in
 - MCP registered: yes
 - Memory sync: full
 - Current repo policy: read-write
-- To Do list: instead of `TODOS.md`, `use dev-docs/BACKLOG.md`
+- To Do list: instead of `TODOS.md`, use `dev-docs/llml/BACKLOG.md`
 
 ### GBrain Search Guidance (configured by /sync-gbrain)
 
@@ -243,7 +243,7 @@ Key routing rules:
 
 ## Design System
 
-Always read `dev-docs/DESIGN.md` before making any visual or UI decisions.
+Always read `dev-docs/llml/DESIGN.md` before making any visual or UI decisions.
 All font choices, colors, spacing, and aesthetic direction are defined there.
 Do not deviate without explicit user approval.
-In QA mode, flag any code that doesn't match `dev-docs/DESIGN.md`.
+In QA mode, flag any code that doesn't match `dev-docs/llml/DESIGN.md`.
