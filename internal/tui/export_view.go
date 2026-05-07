@@ -42,19 +42,11 @@ func (m Model) openExportView() Model {
 			return sorted[i].Name < sorted[j].Name
 		})
 
-		// Check if all profiles in group are checked (initially all false, so header is false).
-		allChecked := len(sorted) > 0
-		for _, pp := range sorted {
-			// All start unchecked.
-			_ = pp
-		}
-		allChecked = false
-
 		items = append(items, exportProfileItem{
 			kind:         exportItemHeader,
 			modelKey:     g.ModelKey,
 			modelDisplay: modelDisplay,
-			checked:      allChecked,
+			checked:      false,
 		})
 
 		for _, pp := range sorted {
@@ -69,6 +61,7 @@ func (m Model) openExportView() Model {
 				backend:      backend,
 				profileName:  pp.Name,
 				checked:      false,
+				pp:           pp,
 			})
 		}
 	}
@@ -136,11 +129,7 @@ func (m Model) buildExportProfiles() []profiles.PortableProfile {
 	var out []profiles.PortableProfile
 	for _, it := range m.export.items {
 		if it.kind == exportItemProfile && it.checked {
-			out = append(out, profiles.PortableProfile{
-				Name:      it.profileName,
-				Backend:   it.backend,
-				ModelHint: it.modelDisplay,
-			})
+			out = append(out, it.pp)
 		}
 	}
 	return out
@@ -299,10 +288,11 @@ func (m *Model) syncHeaderStates() {
 // toggleGroup sets all profiles in the same group as the header at cursor
 // to the given checked state.
 func (m *Model) toggleGroup(checked bool) {
-	if m.export.cursor < 0 || m.export.cursor >= len(m.export.items) {
+	idx := m.exportRealCursorIndex()
+	if idx < 0 || idx >= len(m.export.items) {
 		return
 	}
-	header := m.export.items[m.export.cursor]
+	header := m.export.items[idx]
 	if header.kind != exportItemHeader {
 		return
 	}
@@ -532,7 +522,7 @@ func (m Model) exportModalBlock() string {
 	} else {
 		m.adjustExportScroll()
 		contentW := listInnerW - 2 // 1 for scrollbar glyph + 1 spacer
-		rowStyle := lipgloss.NewStyle().Width(contentW)
+		rowStyle := m.ui.styles.exportScrollRow.Width(contentW)
 
 		for i := 0; i < maxVis; i++ {
 			actualIdx := m.export.scrollOffset + i

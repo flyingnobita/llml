@@ -13,6 +13,7 @@ import (
 	"charm.land/lipgloss/v2/compat"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/flyingnobita/llml/internal/models"
+	"github.com/flyingnobita/llml/internal/profiles"
 )
 
 // layoutState holds terminal geometry and derived table dimensions.
@@ -155,6 +156,7 @@ type exportProfileItem struct {
 	backend      string
 	profileName  string
 	checked      bool
+	pp           profiles.PortableProfile // full portable profile for export
 }
 
 // mainPaneFocusSnap stores keyboard focus among the model table, launch preview, and

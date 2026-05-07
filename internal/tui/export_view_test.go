@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/flyingnobita/llml/internal/profiles"
 )
 
 func TestExportOpenClose(t *testing.T) {
@@ -238,7 +239,8 @@ func TestCollisionOverwrite(t *testing.T) {
 	m.collision.dest = dest
 	m.collision.suffixPath = filepath.Join(dir, "export-2.toml")
 	m.export.items = []exportProfileItem{
-		{kind: exportItemProfile, modelDisplay: "A", backend: "llama", profileName: "p1", checked: true},
+		{kind: exportItemProfile, modelDisplay: "A", backend: "llama", profileName: "p1", checked: true,
+			pp: profiles.PortableProfile{Name: "p1", Backend: "llama", ModelHint: "A"}},
 	}
 	m.export.outputPath = dest
 
@@ -263,7 +265,8 @@ func TestCollisionSaveAs(t *testing.T) {
 	m.collision.dest = dest
 	m.collision.suffixPath = suffix
 	m.export.items = []exportProfileItem{
-		{kind: exportItemProfile, modelDisplay: "A", backend: "llama", profileName: "p1", checked: true},
+		{kind: exportItemProfile, modelDisplay: "A", backend: "llama", profileName: "p1", checked: true,
+			pp: profiles.PortableProfile{Name: "p1", Backend: "llama", ModelHint: "A"}},
 	}
 	m.export.outputPath = suffix
 
@@ -285,9 +288,12 @@ func TestCollisionSaveAs(t *testing.T) {
 func TestBuildExportProfiles(t *testing.T) {
 	m := New()
 	m.export.items = []exportProfileItem{
-		{kind: exportItemProfile, modelDisplay: "Model-A", backend: "llama", profileName: "p1", checked: true},
-		{kind: exportItemProfile, modelDisplay: "Model-B", backend: "vllm", profileName: "p2", checked: false},
-		{kind: exportItemProfile, modelDisplay: "Model-C", backend: "ollama", profileName: "p3", checked: true},
+		{kind: exportItemProfile, modelDisplay: "Model-A", backend: "llama", profileName: "p1", checked: true,
+			pp: profiles.PortableProfile{Name: "p1", Backend: "llama", ModelHint: "Model-A"}},
+		{kind: exportItemProfile, modelDisplay: "Model-B", backend: "vllm", profileName: "p2", checked: false,
+			pp: profiles.PortableProfile{Name: "p2", Backend: "vllm", ModelHint: "Model-B"}},
+		{kind: exportItemProfile, modelDisplay: "Model-C", backend: "ollama", profileName: "p3", checked: true,
+			pp: profiles.PortableProfile{Name: "p3", Backend: "ollama", ModelHint: "Model-C"}},
 	}
 
 	pps := m.buildExportProfiles()
@@ -549,8 +555,10 @@ func TestBuildExportProfilesExcludesHeaders(t *testing.T) {
 	m := New()
 	m.export.items = []exportProfileItem{
 		{kind: exportItemHeader, modelKey: "/models/A.gguf", modelDisplay: "Model-A", checked: true},
-		{kind: exportItemProfile, modelKey: "/models/A.gguf", modelDisplay: "Model-A", backend: "llama", profileName: "p1", checked: true},
-		{kind: exportItemProfile, modelKey: "/models/A.gguf", modelDisplay: "Model-A", backend: "vllm", profileName: "p2", checked: true},
+		{kind: exportItemProfile, modelKey: "/models/A.gguf", modelDisplay: "Model-A", backend: "llama", profileName: "p1", checked: true,
+			pp: profiles.PortableProfile{Name: "p1", Backend: "llama", ModelHint: "Model-A"}},
+		{kind: exportItemProfile, modelKey: "/models/A.gguf", modelDisplay: "Model-A", backend: "vllm", profileName: "p2", checked: true,
+			pp: profiles.PortableProfile{Name: "p2", Backend: "vllm", ModelHint: "Model-A"}},
 	}
 
 	pps := m.buildExportProfiles()

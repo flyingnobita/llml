@@ -36,6 +36,7 @@ type styles struct {
 	paramSectionBoxFocused lipgloss.Style
 	exportListBox          lipgloss.Style
 	exportListBoxFocused   lipgloss.Style
+	exportScrollRow        lipgloss.Style
 	paramConfirmDialog     lipgloss.Style
 	paramSectionHeading    lipgloss.Style
 	themeToastInline       lipgloss.Style
@@ -133,6 +134,7 @@ func newStyles(theme Theme) styles {
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(theme.SplitPaneBorderFocused).
 			Padding(0, 0),
+		exportScrollRow: lipgloss.NewStyle(),
 		paramConfirmDialog: lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(theme.Error).
