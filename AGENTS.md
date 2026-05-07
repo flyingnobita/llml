@@ -156,6 +156,12 @@ The pre-commit hook handles staged files automatically.
   install flows and parity between the canonical `.agents` skill and the tracked
   Claude compatibility copy.
 - Do not mark a feature complete until `mise run check` passes.
+- **Platform portability:** When tests control `os.UserConfigDir()` or
+  `os.UserHomeDir()`, set the relevant env vars (`HOME`, `XDG_CONFIG_HOME`)
+  and call the stdlib function to resolve the path — never hardcode
+  platform-specific directories like `Library/Application Support` or `.config`.
+  CI runs Linux, but development happens on macOS; hardcoded paths pass
+  locally and fail in CI.
 
 ---
 
