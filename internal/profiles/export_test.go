@@ -9,6 +9,22 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
+// testLlmlDir returns the llml config directory for a temp $HOME.
+// Uses os.UserConfigDir so the path is correct on macOS and Linux.
+func testLlmlDir(t *testing.T, homeDir string) string {
+	t.Helper()
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(homeDir, ".config"))
+	cfgDir, err := os.UserConfigDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	llmlDir := filepath.Join(cfgDir, "llml")
+	if err := os.MkdirAll(llmlDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return llmlDir
+}
+
 func TestRecombineArgs(t *testing.T) {
 	tests := []struct {
 		name string
@@ -547,10 +563,7 @@ func TestPortableFileRoundTripWithEnv(t *testing.T) {
 func TestAllToPortableGrouped(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", dir)
-	llmlDir := filepath.Join(dir, "Library", "Application Support", "llml")
-	if err := os.MkdirAll(llmlDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
+	llmlDir := testLlmlDir(t, dir)
 	paramsPath := filepath.Join(llmlDir, "model-params.json")
 
 	// Write a model-params.json with two models, each with multiple profiles.
@@ -599,10 +612,7 @@ func TestAllToPortableGrouped(t *testing.T) {
 func TestAllToPortableGrouped_GroupKeysPreserved(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", dir)
-	llmlDir := filepath.Join(dir, "Library", "Application Support", "llml")
-	if err := os.MkdirAll(llmlDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
+	llmlDir := testLlmlDir(t, dir)
 	paramsPath := filepath.Join(llmlDir, "model-params.json")
 
 	data := []byte(`{
@@ -635,10 +645,7 @@ func TestAllToPortableGrouped_GroupKeysPreserved(t *testing.T) {
 func TestAllToPortableGrouped_ProfilesConverted(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", dir)
-	llmlDir := filepath.Join(dir, "Library", "Application Support", "llml")
-	if err := os.MkdirAll(llmlDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
+	llmlDir := testLlmlDir(t, dir)
 	paramsPath := filepath.Join(llmlDir, "model-params.json")
 
 	// Verify that profiles within a group are properly converted to portable form.
@@ -686,10 +693,7 @@ func TestAllToPortableGrouped_ProfilesConverted(t *testing.T) {
 func TestAllToPortable_SkipParseEntryError(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", dir)
-	llmlDir := filepath.Join(dir, "Library", "Application Support", "llml")
-	if err := os.MkdirAll(llmlDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
+	llmlDir := testLlmlDir(t, dir)
 	paramsPath := filepath.Join(llmlDir, "model-params.json")
 
 	// Version 2 model with one valid entry and one that will fail ParseEntry (null).
@@ -723,10 +727,7 @@ func TestAllToPortable_SkipParseEntryError(t *testing.T) {
 func TestAllToPortableGrouped_SkipParseEntryError(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", dir)
-	llmlDir := filepath.Join(dir, "Library", "Application Support", "llml")
-	if err := os.MkdirAll(llmlDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
+	llmlDir := testLlmlDir(t, dir)
 	paramsPath := filepath.Join(llmlDir, "model-params.json")
 
 	data := []byte(`{

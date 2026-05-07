@@ -10,6 +10,21 @@ import (
 	"github.com/flyingnobita/llml/internal/profiles"
 )
 
+// testLlmlDir returns the llml config directory for a temp $HOME.
+func testLlmlDir(t *testing.T, homeDir string) string {
+	t.Helper()
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(homeDir, ".config"))
+	cfgDir, err := os.UserConfigDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := filepath.Join(cfgDir, "llml")
+	if err := os.MkdirAll(d, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return d
+}
+
 func TestExportOpenClose(t *testing.T) {
 	m := New()
 
@@ -1052,10 +1067,7 @@ func TestExportFilterHeaderCheckboxReflectsVisible(t *testing.T) {
 func TestOpenExportView_PopulatesItems(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", dir)
-	llmlDir := filepath.Join(dir, "Library", "Application Support", "llml")
-	if err := os.MkdirAll(llmlDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
+	llmlDir := testLlmlDir(t, dir)
 	paramsPath := filepath.Join(llmlDir, "model-params.json")
 
 	data := []byte(`{
@@ -1634,10 +1646,7 @@ func TestToggleGroup_ProfileCursorNoop(t *testing.T) {
 func TestOpenExportView_DefaultBackendForEmpty(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", dir)
-	llmlDir := filepath.Join(dir, "Library", "Application Support", "llml")
-	if err := os.MkdirAll(llmlDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
+	llmlDir := testLlmlDir(t, dir)
 	paramsPath := filepath.Join(llmlDir, "model-params.json")
 
 	// Profile with empty backend should default to "llama".
@@ -1818,10 +1827,7 @@ func TestExportModalBlock_LastRunNote(t *testing.T) {
 func TestOpenExportView_SameBackendSortByName(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", dir)
-	llmlDir := filepath.Join(dir, "Library", "Application Support", "llml")
-	if err := os.MkdirAll(llmlDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
+	llmlDir := testLlmlDir(t, dir)
 	paramsPath := filepath.Join(llmlDir, "model-params.json")
 
 	data := []byte(`{
