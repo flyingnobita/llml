@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
+- May-07, 2026 - 08:00 PM +0800 - [v0.4.0 release: profile export]
+- May-07, 2026 - 08:00 PM +0800 - [Export: you can now export parameter profiles to a portable TOML file shared across machines — press E in the TUI or run `llml export`; includes filter, scrollbar, collision handling, and group toggles]
+- May-07, 2026 - 08:00 PM +0800 - [Export: TUI modal shows profiles grouped by model with checkboxes — select individual profiles or toggle entire groups; `/` filters by name, model, or backend; `a`/`A` selects/deselects all visible profiles]
+- May-07, 2026 - 08:00 PM +0800 - [Export: CLI supports `--model`, `--profile`, `--output`, `--force`, and `--all` flags; exports to the same portable TOML schema version 2 as the TUI]
+- May-07, 2026 - 08:00 PM +0800 - [Export: file-collision sub-modal offers overwrite or auto-suffixed save when the target file already exists]
 - May-06, 2026 - 11:30 PM +0800 - [Catalog: created flyingnobita/llml-catalog — separate repo for the shared parameter-profile catalog (TOML store + static index site); migrated design system; updated AGENTS.md, README.md, and dev-docs/PROJECT-STATUS.md with cross-repo pointers]
 - May-05, 2026 - 11:30 PM +0800 - [v0.3.0 release: KoboldCpp backend support]
 - May-05, 2026 - 11:30 PM +0800 - [KoboldCpp: you can now launch GGUF models with KoboldCpp — select it in a model's parameter profile and press R; auto-detects installed koboldcpp with CUDA variant preference on Linux; respects KOBOLDCPP_PATH and KOBOLDCPP_PORT env vars]

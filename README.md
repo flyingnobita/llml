@@ -30,6 +30,11 @@ Browse local models. Detect the right runtime. Launch with one key.
 - **Named parameter profiles** — save multiple profiles per model (e.g. `fast-laptop`,
   `quality`, `api-8080`), each storing runtime args, env vars, port, and context
   settings. The active profile is always one key away.
+- **Profile export** — share your parameter profiles with others via the TUI
+  (**`E`**) or CLI (`llml export`). Profiles are written to a portable TOML file
+  matching the same schema the `llml-import` skill reads. Filter by model or
+  profile name, toggle individual profiles or entire model groups, and handle
+  file collisions (overwrite or auto-suffixed save).
 - **Portable profile format** — the shared import/export contract is documented in
   **`docs/profile-format.md`** and used by the repo-managed `llml-import` agent skill.
 - **One-keystroke launch** — select a model, select a profile, press `R`. The generated
@@ -149,22 +154,23 @@ llml
 
 ## ⌨️ Usage
 
-| Key         | Action                                                                             |
-| ----------- | ---------------------------------------------------------------------------------- |
-| `hjkl/↑↓←→` | Move selection; horizontal scroll when the path column is wider than the terminal  |
-| `r`         | Reload **`[runtime]`** from `config.toml` and re-detect binaries (no model rescan) |
-| `S`         | Full model filesystem rescan; refresh cached **`[[models]]`** in `config.toml`     |
-| `R`         | Run server (split view: table + log pane)                                          |
-| `ctrl`+`R`  | Run server full-screen                                                             |
-| `c`         | Edit runtime environment (paths, ports)                                            |
-| `p`         | Edit parameter profiles for the selected model                                     |
-| `m`         | Edit extra model search paths (saved in `config.toml`)                             |
-| `,` / `.`   | Change sort column / reverse sort direction                                        |
-| `enter`     | Copy the launch command for the selected row to the clipboard                      |
-| `a`         | Toggle alert history pane                                                          |
-| `t`         | Cycle theme (`dark` → `light` → `auto` → …)                                        |
-| `?`         | Toggle the full shortcut help overlay                                              |
-| `q`         | Quit                                                                               |
+| Key         | Action                                                                                                                                                |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `hjkl/↑↓←→` | Move selection; horizontal scroll when the path column is wider than the terminal                                                                     |
+| `E`         | Open profile export modal — select profiles by model group, filter by name or backend, and save to a portable TOML file you can share across machines |
+| `r`         | Reload **`[runtime]`** from `config.toml` and re-detect binaries (no model rescan)                                                                    |
+| `S`         | Full model filesystem rescan; refresh cached **`[[models]]`** in `config.toml`                                                                        |
+| `R`         | Run server (split view: table + log pane)                                                                                                             |
+| `ctrl`+`R`  | Run server full-screen                                                                                                                                |
+| `c`         | Edit runtime environment (paths, ports)                                                                                                               |
+| `p`         | Edit parameter profiles for the selected model                                                                                                        |
+| `m`         | Edit extra model search paths (saved in `config.toml`)                                                                                                |
+| `,` / `.`   | Change sort column / reverse sort direction                                                                                                           |
+| `enter`     | Copy the launch command for the selected row to the clipboard                                                                                         |
+| `a`         | Toggle alert history pane                                                                                                                             |
+| `t`         | Cycle theme (`dark` → `light` → `auto` → …)                                                                                                           |
+| `?`         | Toggle the full shortcut help overlay                                                                                                                 |
+| `q`         | Quit                                                                                                                                                  |
 
 ### Server output
 
