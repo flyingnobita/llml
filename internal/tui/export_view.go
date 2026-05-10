@@ -27,10 +27,6 @@ func (m Model) openExportView() Model {
 	if err != nil {
 		return m.addAlert(alertSeverityError, "Export", err.Error())
 	}
-	if len(groups) == 0 {
-		return m.addAlert(alertSeverityInfo, "Export", "No profiles to export")
-	}
-
 	var items []exportProfileItem
 	for _, g := range groups {
 		modelDisplay := profiles.ModelHint(g.ModelKey)
@@ -506,7 +502,9 @@ func (m Model) exportModalBlock() string {
 	var listRows []string
 	listRows = append(listRows, m.renderExportFilterRow(bodyStyle, dimStyle))
 
-	if m.export.filteredIndices != nil && len(m.export.filteredIndices) == 0 {
+	if len(m.export.items) == 0 {
+		listRows = append(listRows, dimStyle.Render("  No profiles to export"))
+	} else if m.export.filteredIndices != nil && len(m.export.filteredIndices) == 0 {
 		listRows = append(listRows, dimStyle.Render("  "+FooterExportNoMatch))
 	}
 

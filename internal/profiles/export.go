@@ -116,6 +116,15 @@ func ModelHint(key string) string {
 	if after, ok := strings.CutPrefix(key, "ollama://"); ok {
 		return after
 	}
+	// HF hub paths: .../models--{org}--{name}/snapshots/{hash}[/{file}]
+	// Extract the human-readable model name from the models-- segment.
+	for _, part := range strings.Split(filepath.ToSlash(key), "/") {
+		if strings.HasPrefix(part, "models--") {
+			if sub := strings.SplitN(part, "--", 3); len(sub) == 3 && sub[2] != "" {
+				return sub[2]
+			}
+		}
+	}
 	base := filepath.Base(key)
 	hint := strings.TrimSuffix(base, filepath.Ext(base))
 	if hint == "" || hint == "." {
@@ -186,11 +195,16 @@ func ProfileToPortable(p Profile, modelKey string) PortableProfile {
 	return pp
 }
 
-// EntryToPortable converts all profiles in one model entry.
+// EntryToPortable converts all profiles in one model entry, skipping profiles
+// that carry no args and no env vars (nothing portable to share).
 func EntryToPortable(modelKey string, ent Entry) []PortableProfile {
 	var out []PortableProfile
 	for _, p := range ent.Profiles {
-		out = append(out, ProfileToPortable(p, modelKey))
+		pp := ProfileToPortable(p, modelKey)
+		if len(pp.Args) == 0 && len(pp.Env) == 0 {
+			continue
+		}
+		out = append(out, pp)
 	}
 	return out
 }

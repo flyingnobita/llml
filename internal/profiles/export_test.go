@@ -116,6 +116,10 @@ func TestModelHint(t *testing.T) {
 		{"ollama://qwen2.5:72b", "qwen2.5:72b"},
 		{".gguf", ".gguf"},
 		{"/home/user/.hidden.gguf", ".hidden"},
+		// HF hub snapshot directories
+		{"/home/user/.cache/huggingface/hub/models--google--gemma-4-E4B-it/snapshots/83df0a889143b1dbfc61b591bbc639540fd9ce4c", "gemma-4-E4B-it"},
+		{"/home/user/.cache/huggingface/hub/models--opendatalab--MinerU2.5-2509-1.2B/snapshots/879e58bdd9566632b27a8a81f0e2961873311f67", "MinerU2.5-2509-1.2B"},
+		{"/home/user/.cache/huggingface/hub/models--unsloth--Qwen3.6-35B-A3B-GGUF/snapshots/abc123/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf", "Qwen3.6-35B-A3B-GGUF"},
 	}
 
 	for _, tt := range tests {
@@ -573,7 +577,7 @@ func TestAllToPortableGrouped(t *testing.T) {
     "/models/Mistral-7B.gguf": {
       "profiles": [
         {"name": "default", "backend": "llama", "env": [], "args": ["--ctx-size", "4096"]},
-        {"name": "koboldcpp", "backend": "koboldcpp", "env": [], "args": []}
+        {"name": "koboldcpp", "backend": "koboldcpp", "env": [], "args": ["--usecublas"]}
       ],
       "activeIndex": 0
     },
@@ -620,7 +624,7 @@ func TestAllToPortableGrouped_GroupKeysPreserved(t *testing.T) {
   "models": {
     "ollama://llama3.2": {
       "profiles": [
-        {"name": "default", "backend": "ollama", "env": [], "args": []}
+        {"name": "default", "backend": "ollama", "env": [{"key": "OLLAMA_NUM_GPU", "value": "1"}], "args": []}
       ],
       "activeIndex": 0
     }
@@ -701,7 +705,7 @@ func TestAllToPortable_SkipParseEntryError(t *testing.T) {
 	  "version": 2,
 	  "models": {
 	    "/models/Valid.gguf": {
-	      "profiles": [{"name": "default", "env": [], "args": []}],
+	      "profiles": [{"name": "default", "env": [], "args": ["--ctx-size", "4096"]}],
 	      "activeIndex": 0
 	    },
 	    "/models/Invalid.gguf": [1, 2, 3]
@@ -734,7 +738,7 @@ func TestAllToPortableGrouped_SkipParseEntryError(t *testing.T) {
 	  "version": 2,
 	  "models": {
 	    "/models/Valid.gguf": {
-	      "profiles": [{"name": "default", "env": [], "args": []}],
+	      "profiles": [{"name": "default", "env": [], "args": ["--ctx-size", "4096"]}],
 	      "activeIndex": 0
 	    },
 	    "/models/Invalid.gguf": [1, 2, 3]

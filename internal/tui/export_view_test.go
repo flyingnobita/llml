@@ -1076,7 +1076,7 @@ func TestOpenExportView_PopulatesItems(t *testing.T) {
 	    "/models/Alpha.gguf": {
 	      "profiles": [
 	        {"name": "default", "backend": "llama", "env": [], "args": ["--ctx-size", "4096"]},
-	        {"name": "kobold", "backend": "koboldcpp", "env": [], "args": []}
+	        {"name": "kobold", "backend": "koboldcpp", "env": [], "args": ["--usecublas"]}
 	      ],
 	      "activeIndex": 0
 	    },
@@ -1156,16 +1156,19 @@ func TestOpenExportView_PopulatesItems(t *testing.T) {
 	}
 }
 
-func TestOpenExportView_NoFileReturnsUnchanged(t *testing.T) {
+func TestOpenExportView_NoFileOpensEmpty(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", dir)
 
 	m := New()
 	m = m.openExportView()
 
-	// With no model-params.json, openExportView should leave export closed.
-	if m.export.open {
-		t.Error("export should remain closed when no profiles exist")
+	// With no model-params.json the modal still opens so the user gets feedback.
+	if !m.export.open {
+		t.Error("export should open even when no profiles exist")
+	}
+	if len(m.export.items) != 0 {
+		t.Errorf("expected 0 items, got %d", len(m.export.items))
 	}
 }
 
@@ -1655,7 +1658,7 @@ func TestOpenExportView_DefaultBackendForEmpty(t *testing.T) {
 	  "models": {
 	    "/models/Test.gguf": {
 	      "profiles": [
-	        {"name": "nobackend", "backend": "", "env": [], "args": []}
+	        {"name": "nobackend", "backend": "", "env": [], "args": ["--ctx-size", "4096"]}
 	      ],
 	      "activeIndex": 0
 	    }
@@ -1835,8 +1838,8 @@ func TestOpenExportView_SameBackendSortByName(t *testing.T) {
 	  "models": {
 	    "/models/Test.gguf": {
 	      "profiles": [
-	        {"name": "z-profile", "backend": "llama", "env": [], "args": []},
-	        {"name": "a-profile", "backend": "llama", "env": [], "args": []}
+	        {"name": "z-profile", "backend": "llama", "env": [], "args": ["--ctx-size", "4096"]},
+	        {"name": "a-profile", "backend": "llama", "env": [], "args": ["--n-gpu-layers", "80"]}
 	      ],
 	      "activeIndex": 0
 	    }
