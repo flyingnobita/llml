@@ -73,6 +73,8 @@ func TestFormatVLLMServerInvocation(t *testing.T) {
 func TestSplitServerInvocationEcho_matchesLlamaSplitLogLine(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("HOME", dir)
+	t.Setenv("AppData", dir)
 	t.Setenv(models.EnvLlamaServerPort, "9090")
 	modelPath := filepath.Join(dir, "a.gguf")
 	m := New()
@@ -114,6 +116,8 @@ func TestSplitServerInvocationEcho_matchesLlamaSplitLogLine(t *testing.T) {
 func TestLaunchPreviewCommandLine_vllmOmitsActivateWrapper(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("HOME", dir)
+	t.Setenv("AppData", dir)
 	t.Setenv(models.EnvVLLMServerPort, "8000")
 	modelPath := filepath.Join(dir, "hf-model")
 	m := New()
@@ -262,6 +266,8 @@ func TestBuildServerSpec_koboldCppNonStrict(t *testing.T) {
 func TestSplitServerInvocationEcho_koboldCppProfile(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("HOME", dir)
+	t.Setenv("AppData", dir)
 	t.Setenv(models.EnvKoboldCppPort, "5001")
 	modelPath := filepath.Join(dir, "a.gguf")
 	m := New()
@@ -300,6 +306,8 @@ func TestSplitServerInvocationEcho_koboldCppProfile(t *testing.T) {
 func TestLaunchPreviewCommandLine_koboldCppProfile(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("HOME", dir)
+	t.Setenv("AppData", dir)
 	t.Setenv(models.EnvKoboldCppPort, "5001")
 	modelPath := filepath.Join(dir, "a.gguf")
 	m := New()

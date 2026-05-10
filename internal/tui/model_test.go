@@ -310,6 +310,8 @@ func trimToColumns(s string, width int) string {
 func TestResolveEffectiveBackend_GGUFWithKoboldProfile(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("HOME", dir)
+	t.Setenv("AppData", dir)
 	modelPath := filepath.Join(dir, "a.gguf")
 	m := New()
 	m.loading = false
@@ -337,6 +339,8 @@ func TestResolveEffectiveBackend_GGUFWithKoboldProfile(t *testing.T) {
 func TestResolveEffectiveBackend_GGUFWithLlamaProfile(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("HOME", dir)
+	t.Setenv("AppData", dir)
 	modelPath := filepath.Join(dir, "a.gguf")
 	m := New()
 	m.loading = false
@@ -364,6 +368,8 @@ func TestResolveEffectiveBackend_GGUFWithLlamaProfile(t *testing.T) {
 func TestResolveEffectiveBackend_VLLMIgnoresProfileOverride(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("HOME", dir)
+	t.Setenv("AppData", dir)
 	modelPath := filepath.Join(dir, "hf-model")
 	m := New()
 	m.loading = false
@@ -391,6 +397,8 @@ func TestResolveEffectiveBackend_VLLMIgnoresProfileOverride(t *testing.T) {
 func TestResolveEffectiveBackend_OllamaIgnoresProfileOverride(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("HOME", dir)
+	t.Setenv("AppData", dir)
 	m := New()
 	m.loading = false
 	m.table.files = []models.ModelFile{

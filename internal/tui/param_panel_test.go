@@ -32,6 +32,10 @@ func TestCloneProfileName(t *testing.T) {
 }
 
 func TestParamPanelCloneProfile(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("HOME", dir)
+	t.Setenv("AppData", dir)
 	m := New()
 	m.table.files = []models.ModelFile{
 		{Path: "/m/a.gguf", Backend: models.BackendLlama},
