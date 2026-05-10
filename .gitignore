@@ -93,3 +93,4 @@ logs/*
 .gstack/
 .opencode/
 TODOS.md
+.firecrawl/
