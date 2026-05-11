@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -100,47 +101,71 @@ func runImport(args []string) {
 	target := fs.String("target", "", "local model path to attach imported profiles to")
 	dryRun := fs.Bool("dry-run", false, "parse and show profiles without writing")
 	force := fs.Bool("force", false, "overwrite existing profiles with same name")
+	activate := fs.Bool("activate", false, "set imported profile as active for the target model")
+	rescan := fs.Bool("rescan", false, "force fresh model discovery before picker")
+	yes := fs.Bool("yes", false, "skip confirmation prompt")
 	fs.Parse(args)
 
 	if fs.NArg() < 1 {
-		fmt.Fprintf(os.Stderr, "usage: llml import [flags] <file.toml>\n")
+		fmt.Fprintf(os.Stderr, "usage: llml import [flags] <file.toml|https://...>\n")
 		os.Exit(1)
 	}
-	path := fs.Arg(0)
+	arg := fs.Arg(0)
 
-	f, err := profiles.ReadPortable(path)
+	isURL := strings.HasPrefix(arg, "https://")
+
+	var f *profiles.PortableFile
+	var err error
+
+	if isURL {
+		f, err = profiles.FetchPortable(fsParseCtx(), arg)
+	} else {
+		f, err = profiles.ReadPortable(arg)
+	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "llml import: %v\n", err)
 		os.Exit(1)
 	}
 
+	if *activate && len(f.Profiles) > 1 {
+		fmt.Fprintf(os.Stderr, "llml import: --activate requires a single-profile file (got %d profiles)\n", len(f.Profiles))
+		os.Exit(1)
+	}
+
 	if *dryRun {
-		fmt.Printf("File: %s\n", path)
-		fmt.Printf("Schema version: %d\n", f.SchemaVersion)
-		fmt.Printf("Profiles: %d\n\n", len(f.Profiles))
-		for i, pp := range f.Profiles {
-			fmt.Printf("[%d] %s\n", i+1, pp.Name)
-			fmt.Printf("    backend: %s\n", pp.Backend)
-			if pp.ModelHint != "" {
-				fmt.Printf("    model_hint: %s\n", pp.ModelHint)
-			}
-			if len(pp.Args) > 0 {
-				fmt.Printf("    args: %v\n", pp.Args)
-			}
-			if len(pp.Env) > 0 {
-				for _, e := range pp.Env {
-					fmt.Printf("    env: %s=%s\n", e.Key, e.Value)
-				}
-			}
-			fmt.Println()
-		}
+		fmt.Print(profiles.FormatPortablePreview(f, profiles.PreviewOpts{}))
 		return
 	}
 
-	if *target == "" {
+	if *target == "" && !isURL {
 		fmt.Fprintf(os.Stderr, "llml import: --target is required (local model path to attach profiles to)\n")
 		os.Exit(1)
 	}
+
+	if isURL {
+		// TODO: picker in step D — for now require --target for URL path.
+		if *target == "" {
+			fmt.Fprintf(os.Stderr, "llml import: --target is required when importing from a URL\n")
+			os.Exit(1)
+		}
+
+		// Show preview with target model line
+		preview := profiles.FormatPortablePreview(f, profiles.PreviewOpts{TargetModel: *target})
+		fmt.Print(preview)
+
+		if !*yes {
+			fmt.Print("\nSave this profile? [y/N]: ")
+			var response string
+			fmt.Scanln(&response)
+			response = strings.TrimSpace(strings.ToLower(response))
+			if response != "y" && response != "yes" {
+				fmt.Println("Cancelled.")
+				os.Exit(0)
+			}
+		}
+	}
+
+	_ = rescan // wired in step D
 
 	var imported []profiles.Profile
 	for _, pp := range f.Profiles {
@@ -163,6 +188,11 @@ func runImport(args []string) {
 		os.Exit(1)
 	}
 
+	if *activate && len(imported) == 1 {
+		// TODO: set active in step D — placeholder
+		_ = activate
+	}
+
 	fmt.Printf("Imported to %s: %d added", *target, result.Added)
 	if result.Replaced > 0 {
 		fmt.Printf(", %d replaced", result.Replaced)
@@ -171,4 +201,9 @@ func runImport(args []string) {
 		fmt.Printf(", %d skipped (name conflict, use --force to overwrite)", result.Skipped)
 	}
 	fmt.Println()
+}
+
+// fsParseCtx returns a context for use during flag-set parsing / fetch operations.
+func fsParseCtx() context.Context {
+	return context.Background()
 }
