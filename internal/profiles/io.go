@@ -275,6 +275,25 @@ func ModelParamsKey(modelPath string) string {
 	return filepath.Clean(key)
 }
 
+// SetActiveProfile marks the profile with the given name as active for
+// targetKey. Returns an error if no profile with that name is found.
+func SetActiveProfile(targetKey, profileName string) error {
+	if targetKey == "" {
+		return fmt.Errorf("target model key is required")
+	}
+	ent, err := LoadEntry(targetKey)
+	if err != nil {
+		return fmt.Errorf("loading entry for %s: %w", targetKey, err)
+	}
+	for i, p := range ent.Profiles {
+		if p.Name == profileName {
+			ent.ActiveIndex = i
+			return SaveEntry(targetKey, ent)
+		}
+	}
+	return fmt.Errorf("profile %q not found for model %s", profileName, targetKey)
+}
+
 func applyMigrationDefaults(ent Entry) Entry {
 	for i := range ent.Profiles {
 		ent.Profiles[i].Backend = normalizeBackend(ent.Profiles[i].Backend)

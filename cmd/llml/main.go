@@ -189,8 +189,10 @@ func runImport(args []string) {
 	}
 
 	if *activate && len(imported) == 1 {
-		// TODO: set active in step D — placeholder
-		_ = activate
+		if err := profiles.SetActiveProfile(*target, imported[0].Name); err != nil {
+			fmt.Fprintf(os.Stderr, "llml import: setting active profile: %v\n", err)
+			os.Exit(1)
+		}
 	}
 
 	fmt.Printf("Imported to %s: %d added", *target, result.Added)
