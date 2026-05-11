@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"charm.land/bubbles/v2/filepicker"
 	btable "charm.land/bubbles/v2/table"
 	"charm.land/bubbles/v2/textinput"
 	"charm.land/bubbles/v2/viewport"
@@ -132,6 +133,36 @@ type collisionState struct {
 	suffixPath string
 }
 
+// importViewState holds the profile import modal state.
+type importViewState struct {
+	open         bool
+	focus        importFocus
+	filePath     string
+	pathInput    textinput.Model
+	picker       filepicker.Model
+	groups       []importGroup
+	cursor       int
+	scrollOffset int
+	parseError   string
+}
+
+// importGroup is one model_hint group in the import modal.
+type importGroup struct {
+	modelHint      string
+	matchedKey     string
+	matchedDisplay string
+	profiles       []profiles.PortableProfile
+	checked        bool
+}
+
+type importFocus int
+
+const (
+	importFocusPath importFocus = iota
+	importFocusList
+	importFocusPicker
+)
+
 type exportFocus int
 
 const (
@@ -178,6 +209,7 @@ type Model struct {
 	alerts    alertsState
 	discovery discoveryPathsState
 	export    exportViewState
+	import_   importViewState
 	collision collisionState
 	paneFocus mainPaneFocusSnap
 
@@ -268,6 +300,7 @@ func New() Model {
 		params:    paramsState{editInput: newParamLineTextInput()},
 		discovery: discoveryPathsState{editInput: newPathTextInput()},
 		export:    exportViewState{pathInput: newPathTextInput(), filterInput: newFilterTextInput()},
+		import_:   importViewState{pathInput: newPathTextInput(), picker: filepicker.New()},
 		keys:      DefaultKeyMap(),
 		loading:   true,
 	}

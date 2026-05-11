@@ -282,8 +282,8 @@ func footerHelpLine(m Model) string {
 	}
 	if m.preview.focused {
 		return fmt.Sprintf(
-			"%s · %s · %s · %s · %s · %s · %s",
-			FooterHintTabSections, FooterNavHint, FooterHintRunSplit, FooterHintParameters, FooterHintCopyPath, m.alertsFooterHint(), FooterHintHelp,
+			"%s · %s · %s · %s · %s · %s · %s · %s",
+			FooterHintTabSections, FooterNavHint, FooterHintRunSplit, FooterHintParameters, FooterHintImport, FooterHintCopyPath, m.alertsFooterHint(), FooterHintHelp,
 		)
 	}
 	parts := []string{
@@ -291,6 +291,7 @@ func footerHelpLine(m Model) string {
 		FooterNavHint,
 		FooterHintRunSplit,
 		FooterHintParameters,
+		FooterHintImport,
 		m.alertsFooterHint(),
 		FooterHintHelp,
 	}
@@ -548,6 +549,8 @@ func (m Model) modalBlock() (string, bool) {
 	switch {
 	case m.collision.open:
 		return m.collisionModalBlock(), true
+	case m.import_.open:
+		return m.importModalBlock(), true
 	case m.export.open:
 		return m.exportModalBlock(), true
 	case m.params.open:

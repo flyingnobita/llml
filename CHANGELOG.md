@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
+- May-11, 2026 - 04:00 PM +0800 - [Import: built-in `llml import` — press `I` in the TUI to open the import modal (filepicker + text input), or run `llml import <file.toml>` from the CLI; parses portable TOML profiles, fuzzy-matches model hints against scanned models, strips model-location parameters, and merges into model-params.json with collision detection]
 - May-07, 2026 - 08:00 PM +0800 - [v0.4.0 release: profile export]
 - May-07, 2026 - 08:00 PM +0800 - [Export: you can now export parameter profiles to a portable TOML file shared across machines — press E in the TUI or run `llml export`; includes filter, scrollbar, collision handling, and group toggles]
 - May-07, 2026 - 08:00 PM +0800 - [Export: TUI modal shows profiles grouped by model with checkboxes — select individual profiles or toggle entire groups; `/` filters by name, model, or backend; `a`/`A` selects/deselects all visible profiles]

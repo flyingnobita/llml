@@ -23,6 +23,7 @@ type KeyMap struct {
 	SortReverse  key.Binding
 	RescanModels key.Binding
 	Export       key.Binding
+	Import       key.Binding
 	Help         key.Binding
 }
 
@@ -117,6 +118,10 @@ func DefaultKeyMap() KeyMap {
 		Export: key.NewBinding(
 			key.WithKeys("E"),
 			key.WithHelp("E", "export profiles"),
+		),
+		Import: key.NewBinding(
+			key.WithKeys("I"),
+			key.WithHelp("I", "import profiles"),
 		),
 		SortColumn: key.NewBinding(
 			key.WithKeys(FooterKeySortColumn),

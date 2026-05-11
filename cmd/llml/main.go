@@ -27,6 +27,10 @@ func main() {
 		runExport(os.Args[2:])
 		return
 	}
+	if len(os.Args) >= 2 && os.Args[1] == "import" {
+		runImport(os.Args[2:])
+		return
+	}
 	if err := userdata.MaybeBackupOnVersionChange(version); err != nil {
 		fmt.Fprintf(os.Stderr, "llml: warning: config backup: %v\n", err)
 	}
@@ -89,4 +93,82 @@ func runExport(args []string) {
 	}
 
 	fmt.Printf("Exported %d profiles to %s\n", len(filtered), dest)
+}
+
+func runImport(args []string) {
+	fs := flag.NewFlagSet("llml import", flag.ExitOnError)
+	target := fs.String("target", "", "local model path to attach imported profiles to")
+	dryRun := fs.Bool("dry-run", false, "parse and show profiles without writing")
+	force := fs.Bool("force", false, "overwrite existing profiles with same name")
+	fs.Parse(args)
+
+	if fs.NArg() < 1 {
+		fmt.Fprintf(os.Stderr, "usage: llml import [flags] <file.toml>\n")
+		os.Exit(1)
+	}
+	path := fs.Arg(0)
+
+	f, err := profiles.ReadPortable(path)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "llml import: %v\n", err)
+		os.Exit(1)
+	}
+
+	if *dryRun {
+		fmt.Printf("File: %s\n", path)
+		fmt.Printf("Schema version: %d\n", f.SchemaVersion)
+		fmt.Printf("Profiles: %d\n\n", len(f.Profiles))
+		for i, pp := range f.Profiles {
+			fmt.Printf("[%d] %s\n", i+1, pp.Name)
+			fmt.Printf("    backend: %s\n", pp.Backend)
+			if pp.ModelHint != "" {
+				fmt.Printf("    model_hint: %s\n", pp.ModelHint)
+			}
+			if len(pp.Args) > 0 {
+				fmt.Printf("    args: %v\n", pp.Args)
+			}
+			if len(pp.Env) > 0 {
+				for _, e := range pp.Env {
+					fmt.Printf("    env: %s=%s\n", e.Key, e.Value)
+				}
+			}
+			fmt.Println()
+		}
+		return
+	}
+
+	if *target == "" {
+		fmt.Fprintf(os.Stderr, "llml import: --target is required (local model path to attach profiles to)\n")
+		os.Exit(1)
+	}
+
+	var imported []profiles.Profile
+	for _, pp := range f.Profiles {
+		p := profiles.PortableToProfile(pp)
+		if _, _, droppedEnv, droppedArgs := profiles.StripModelLocationParams(p.Backend,
+			pp.Env, pp.Args); len(droppedEnv) > 0 || len(droppedArgs) > 0 {
+			for _, d := range droppedEnv {
+				fmt.Fprintf(os.Stderr, "warning: stripped model-location env %s from profile %q\n", d, p.Name)
+			}
+			for _, d := range droppedArgs {
+				fmt.Fprintf(os.Stderr, "warning: stripped model-location arg %s from profile %q\n", d, p.Name)
+			}
+		}
+		imported = append(imported, p)
+	}
+
+	result, err := profiles.ImportProfiles(*target, imported, *force)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "llml import: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Imported to %s: %d added", *target, result.Added)
+	if result.Replaced > 0 {
+		fmt.Printf(", %d replaced", result.Replaced)
+	}
+	if result.Skipped > 0 {
+		fmt.Printf(", %d skipped (name conflict, use --force to overwrite)", result.Skipped)
+	}
+	fmt.Println()
 }

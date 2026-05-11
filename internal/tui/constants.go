@@ -180,6 +180,10 @@ const (
 	FooterDescExport = "export"
 	FooterHintExport = FooterKeyExport + ": " + FooterDescExport
 
+	FooterKeyImport  = "I"
+	FooterDescImport = "import"
+	FooterHintImport = FooterKeyImport + ": " + FooterDescImport
+
 	FooterKeyCopyPath  = "enter"
 	FooterDescCopyPath = "copy cmd"
 	FooterHintCopyPath = FooterKeyCopyPath + ": " + FooterDescCopyPath
@@ -261,4 +265,8 @@ const (
 	FooterExportHints    = FooterHintExport + FooterHintSep + "tab: focus · /: filter · space: toggle · ctrl+u/d: page · a: select all · A: select none · enter: export · esc: back"
 	FooterExportNoMatch  = "(no matches)"
 	FooterCollisionHints = "o: overwrite · n: new name · esc: cancel"
+
+	// Import modal.
+	FooterImportHintsPath = FooterHintImport + FooterHintSep + "enter: parse · esc: back"
+	FooterImportHintsList = FooterHintImport + FooterHintSep + "space: toggle · enter: import · esc: back"
 )

@@ -43,7 +43,7 @@ cmd/llml/            # Binary entrypoint (main.go)
 internal/
   config/            # TOML persistence ({UserConfigDir}/llml/config.toml): runtime, discovery cache, [[models]]
   models/            # GGUF + safetensors discovery, metadata, runtime detection, formatting; also Ollama API discovery and HF-hub support. Filesystem discovery uses the `modelSource` interface (`ggufSource`, `safetensorsSource`) and Ollama rows are merged from the daemon API.
-  profiles/          # Profile export: reads model-params.json, filters profiles, writes portable TOML files (schema v2); also hosts tests for the export pipeline
+  profiles/          # Profile import/export: parse/write portable TOML files (schema v2), merge profiles into model-params.json, strip model-location params
   tui/               # Bubble Tea model, update, view, styles, keymaps
 .agents/skills/     # Canonical repo-managed agent skills; llml-import lives here
 .claude/skills/     # Tracked Claude compatibility copies for repo-managed skills
@@ -116,11 +116,14 @@ scripts/             # gofmt-check.sh, precommit-docs-fix.sh
 
 **Parameter profiles** (per-model extra env + argv for `llama-server`, `koboldcpp`, `vllm`, and backend-specific launch helpers, edited with **`p`**) are **not** in `config.toml`: they are stored in **`{UserConfigDir}/llml/model-params.json`** (see `internal/tui/model_params.go`). Keys are stable model identities: cleaned filesystem paths for local rows, model IDs for Ollama rows. Each entry has named profiles and `activeIndex` for which profile **`R`** uses. In the `p` modal, **`c`** duplicates the highlighted profile (clone env + args).
 
-**Portable profile format** lives in **`docs/profile-format.md`**. The canonical
-repo-managed `llml-import` skill lives at **`.agents/skills/llml-import/SKILL.md`**.
-Keep that `.agents` file as the source of truth. The tracked Claude workspace copy at
-**`.claude/skills/llml-import/SKILL.md`** must stay byte-for-byte in sync; refresh it
-with **`./scripts/sync-skill --workspace --tool claude`** after editing the canonical
+**Portable profile format** lives in **`docs/profile-format.md`**. Import is built-in:
+use **`I`** in the TUI (filepicker + text input) or **`llml import <file.toml>`** from
+the CLI. The canonical `llml-import` agent skill at
+**`.agents/skills/llml-import/SKILL.md`** remains available for web-scraping new
+profiles into portable TOML. Keep that `.agents` file as the source of truth. The
+tracked Claude workspace copy at **`.claude/skills/llml-import/SKILL.md`** must stay
+byte-for-byte in sync; refresh it with
+**`./scripts/sync-skill --workspace --tool claude`** after editing the canonical
 skill. User-level installs for local agent tools are handled by **`scripts/sync-skill`**.
 
 Set machine-specific env (for example `LLAMA_CPP_PATH`) in `mise.local.toml` (gitignored); keep shared tool/tasks config in `mise.toml`. For a **linked git worktree**, run **`mise run worktree-setup`** in that checkout so dependencies install and **`scripts/sync_gitignore_agents.sh`** runs with **`LLML_AGENTS_SYNC=import`**, pulling gitignored paths listed at the top of that script (agent dirs, `TODOS.md`, `mise.local.toml`) from the **primary** checkout by default; set **`LLML_AGENTS_PEER`** or **`LLML_AGENTS_SYNC`** (`import` / `export` / `none`) to override.

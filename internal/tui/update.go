@@ -29,6 +29,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.params.open {
 			m.params.editInput.SetWidth(m.paramEditInnerWidth())
 		}
+		if m.import_.open {
+			m.import_.picker, _ = m.import_.picker.Update(msg)
+		}
 		return m, nil
 
 	case runtimeReadyMsg:
@@ -195,6 +198,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.export.outputPath = m.export.pathInput.Value()
 		return m, cmd
 	}
+	if m.import_.open && m.import_.focus == importFocusPicker {
+		m.import_.picker, cmd = m.import_.picker.Update(msg)
+		if m.import_.picker.Path != "" && !isDir(m.import_.picker.Path) {
+			m.import_.filePath = m.import_.picker.Path
+			m.import_.pathInput.SetValue(m.import_.picker.Path)
+			m.import_.focus = importFocusPath
+			m.import_.pathInput.Focus()
+			m2 := m.parseImportFile()
+			return m2, cmd
+		}
+		return m, cmd
+	}
+	if m.import_.open && m.import_.focus == importFocusPath {
+		m.import_.pathInput, cmd = m.import_.pathInput.Update(msg)
+		m.import_.filePath = m.import_.pathInput.Value()
+		return m, cmd
+	}
 	if m.params.open && m.params.editKind != paramEditNone {
 		m.params.editInput, cmd = m.params.editInput.Update(msg)
 		return m, cmd
@@ -242,6 +262,9 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		return m, nil
+	}
+	if m.import_.open {
+		return m.updateImportKey(msg)
 	}
 	if m.collision.open {
 		return m.updateCollisionKey(msg)
@@ -362,6 +385,9 @@ func (m Model) tableNavKeys(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 		return m2, cmd, true
 	case key.Matches(msg, m.keys.Export):
 		return m.openExportView(), nil, true
+	case key.Matches(msg, m.keys.Import):
+		m2, cmd := m.openImportView()
+		return m2, cmd, true
 	case key.Matches(msg, m.keys.ModelPaths):
 		if m.loading {
 			m2, cmd := m.flashError("Wait for the model scan to finish.")
