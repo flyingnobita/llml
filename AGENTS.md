@@ -21,6 +21,18 @@ and launching `llama-server`, `koboldcpp`, `vllm serve`, or Ollama preload flows
 
 ---
 
+## Agent coordination
+
+Before starting work, read `dev-docs/BOARD.md` to see what tasks are already claimed
+by other agents. Claim a task by moving it from "Up next" → "In progress" with your
+agent ID. Move it to "Recently completed" when done.
+
+The board is shared across `llml` and `llml-catalog` via the dev-docs submodule.
+
+---
+
+---
+
 ## Source Layout
 
 ```text
