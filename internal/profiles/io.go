@@ -1,16 +1,124 @@
 package profiles
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
+	"github.com/BurntSushi/toml"
 	"github.com/flyingnobita/llml/internal/fsutil"
 	"github.com/flyingnobita/llml/internal/userdata"
 )
+
+// maxProfileBody is the maximum size of a profile TOML fetched over HTTP.
+const maxProfileBody = 256 * 1024
+
+// maxRedirects is the maximum number of HTTP redirects to follow.
+const maxRedirects = 5
+
+// httpClient is the HTTP client used by FetchPortable. Exposed as a package
+// variable so tests can replace it with a client that trusts test server certs.
+var httpClient = &http.Client{
+	Timeout: 30 * time.Second,
+	CheckRedirect: func(req *http.Request, via []*http.Request) error {
+		if len(via) >= maxRedirects {
+			return fmt.Errorf("too many redirects (max %d)", maxRedirects)
+		}
+		if req.URL.Scheme != "https" {
+			return fmt.Errorf("refusing redirect from https to non-https")
+		}
+		return nil
+	},
+	Transport: &http.Transport{
+		DialContext: (&net.Dialer{
+			Timeout: 10 * time.Second,
+		}).DialContext,
+	},
+}
+
+// FetchPortable fetches and parses a portable profile TOML from an HTTPS URL.
+// Plain http:// URLs are rejected without making a network call.
+func FetchPortable(ctx context.Context, rawURL string) (*PortableFile, error) {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return nil, fmt.Errorf("cannot parse URL %q: %w", rawURL, err)
+	}
+	if u.Scheme != "https" {
+		return nil, fmt.Errorf("only https:// URLs are supported")
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create request: %w", err)
+	}
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		var netErr net.Error
+		if errors.As(err, &netErr) && netErr.Timeout() {
+			return nil, fmt.Errorf("timed out fetching %s", rawURL)
+		}
+		var urlErr *url.Error
+		if errors.As(err, &urlErr) {
+			if urlErr.Err != nil && strings.Contains(urlErr.Err.Error(), "connection refused") {
+				return nil, fmt.Errorf("cannot reach %s: connection refused", u.Host)
+			}
+			if _, ok := urlErr.Err.(*net.DNSError); ok || strings.Contains(urlErr.Err.Error(), "no such host") {
+				return nil, fmt.Errorf("cannot reach %s: %v", u.Host, urlErr.Err)
+			}
+		}
+		if ctx.Err() == context.DeadlineExceeded {
+			return nil, fmt.Errorf("timed out fetching %s", rawURL)
+		}
+		return nil, fmt.Errorf("cannot reach %s: %v", u.Host, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 404 {
+		return nil, fmt.Errorf("no profile at %s (404)", rawURL)
+	}
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("%s returned %d", rawURL, resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxProfileBody+1))
+	if err != nil {
+		return nil, fmt.Errorf("error reading response from %s: %w", rawURL, err)
+	}
+	if len(body) > maxProfileBody {
+		return nil, fmt.Errorf("profile body exceeds 256KB cap")
+	}
+
+	var f PortableFile
+	if err := toml.Unmarshal(body, &f); err != nil {
+		preview := string(body)
+		if len(preview) > 80 {
+			preview = preview[:80]
+		}
+		return nil, fmt.Errorf("response is not valid TOML at %s (got %q)", rawURL, preview)
+	}
+
+	if f.SchemaVersion != SchemaVersion {
+		return nil, fmt.Errorf("invalid profile schema at %s: schema_version %d (expected %d)", rawURL, f.SchemaVersion, SchemaVersion)
+	}
+
+	for i, p := range f.Profiles {
+		if p.Name == "" {
+			return nil, fmt.Errorf("invalid profile schema at %s: profile %d missing name", rawURL, i+1)
+		}
+	}
+
+	return &f, nil
+}
 
 // ConfigPath returns the path to model-params.json.
 func ConfigPath() (string, error) {
@@ -165,6 +273,25 @@ func ModelParamsKey(modelPath string) string {
 		return key
 	}
 	return filepath.Clean(key)
+}
+
+// SetActiveProfile marks the profile with the given name as active for
+// targetKey. Returns an error if no profile with that name is found.
+func SetActiveProfile(targetKey, profileName string) error {
+	if targetKey == "" {
+		return fmt.Errorf("target model key is required")
+	}
+	ent, err := LoadEntry(targetKey)
+	if err != nil {
+		return fmt.Errorf("loading entry for %s: %w", targetKey, err)
+	}
+	for i, p := range ent.Profiles {
+		if p.Name == profileName {
+			ent.ActiveIndex = i
+			return SaveEntry(targetKey, ent)
+		}
+	}
+	return fmt.Errorf("profile %q not found for model %s", profileName, targetKey)
 }
 
 func applyMigrationDefaults(ent Entry) Entry {

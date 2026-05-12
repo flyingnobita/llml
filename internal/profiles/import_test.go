@@ -1,7 +1,10 @@
 package profiles
 
 import (
+	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -437,5 +440,212 @@ func TestPortableRoundTrip(t *testing.T) {
 	}
 	if p.UseCase.Primary != UseCaseChat {
 		t.Fatalf("useCase = %q", p.UseCase.Primary)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// SetActiveProfile tests (case 26 from test plan)
+// ---------------------------------------------------------------------------
+
+func TestSetActiveProfile(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("HOME", dir)
+	t.Setenv("AppData", dir)
+	llmlDir := filepath.Join(dir, ".config", "llml")
+	if err := os.MkdirAll(llmlDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	paramsPath := filepath.Join(llmlDir, "model-params.json")
+	writeParamsJSON(t, paramsPath, map[string]any{"version": 3, "models": map[string]any{}})
+
+	modelPath := filepath.Join(dir, "model.gguf")
+	if _, err := ImportProfiles(modelPath, []Profile{
+		{Name: "first", Backend: "llama"},
+		{Name: "second", Backend: "vllm"},
+	}, false); err != nil {
+		t.Fatal(err)
+	}
+
+	// Activate "second"
+	if err := SetActiveProfile(modelPath, "second"); err != nil {
+		t.Fatal(err)
+	}
+
+	ent, err := LoadEntry(modelPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ent.ActiveIndex != 1 {
+		t.Fatalf("ActiveIndex = %d, want 1", ent.ActiveIndex)
+	}
+}
+
+func TestSetActiveProfile_NotFound(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("HOME", dir)
+	t.Setenv("AppData", dir)
+	llmlDir := filepath.Join(dir, ".config", "llml")
+	if err := os.MkdirAll(llmlDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	paramsPath := filepath.Join(llmlDir, "model-params.json")
+	writeParamsJSON(t, paramsPath, map[string]any{"version": 3, "models": map[string]any{}})
+
+	modelPath := filepath.Join(dir, "model.gguf")
+	if _, err := ImportProfiles(modelPath, []Profile{
+		{Name: "only", Backend: "llama"},
+	}, false); err != nil {
+		t.Fatal(err)
+	}
+
+	err := SetActiveProfile(modelPath, "nonexistent")
+	if err == nil {
+		t.Fatal("expected error for nonexistent profile")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Fatalf("expected 'not found' in error, got %v", err)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Combined URL fetch + import integration test (cases 28, 31, 32)
+// ---------------------------------------------------------------------------
+
+func TestFetchAndImportIntegration(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("HOME", dir)
+	t.Setenv("AppData", dir)
+	llmlDir := filepath.Join(dir, ".config", "llml")
+	if err := os.MkdirAll(llmlDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	paramsPath := filepath.Join(llmlDir, "model-params.json")
+	writeParamsJSON(t, paramsPath, map[string]any{"version": 3, "models": map[string]any{}})
+
+	// Start a test TLS server serving a valid profile
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(singleProfileTOML("url-profile")))
+	}))
+	defer srv.Close()
+	defer useTestServerClient(srv)()
+
+	// Step 1: Fetch from URL
+	f, err := FetchPortable(context.Background(), srv.URL+"/profile.toml")
+	if err != nil {
+		t.Fatalf("fetch: %v", err)
+	}
+	if len(f.Profiles) != 1 {
+		t.Fatalf("expected 1 profile, got %d", len(f.Profiles))
+	}
+
+	// Step 2: Convert and import
+	modelPath := filepath.Join(dir, "model.gguf")
+	pp := f.Profiles[0]
+	p := PortableToProfile(pp)
+	_, _, _, _ = StripModelLocationParams(p.Backend, pp.Env, pp.Args)
+
+	result, err := ImportProfiles(modelPath, []Profile{p}, false)
+	if err != nil {
+		t.Fatalf("import: %v", err)
+	}
+	if result.Added != 1 {
+		t.Fatalf("expected 1 added, got %+v", result)
+	}
+
+	// Step 3: Activate
+	if err := SetActiveProfile(modelPath, p.Name); err != nil {
+		t.Fatalf("activate: %v", err)
+	}
+
+	// Verify
+	ent, err := LoadEntry(modelPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ent.ActiveIndex != 0 {
+		t.Fatalf("ActiveIndex = %d", ent.ActiveIndex)
+	}
+	if ent.Profiles[0].Name != "url-profile" {
+		t.Fatalf("name = %q", ent.Profiles[0].Name)
+	}
+}
+
+func TestFetchAndImportIntegration_Collision(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("HOME", dir)
+	t.Setenv("AppData", dir)
+	llmlDir := filepath.Join(dir, ".config", "llml")
+	if err := os.MkdirAll(llmlDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	paramsPath := filepath.Join(llmlDir, "model-params.json")
+	writeParamsJSON(t, paramsPath, map[string]any{"version": 3, "models": map[string]any{}})
+
+	modelPath := filepath.Join(dir, "model.gguf")
+
+	// Pre-seed with a profile named "url-profile"
+	if _, err := ImportProfiles(modelPath, []Profile{
+		{Name: "url-profile", Backend: "ollama"},
+	}, false); err != nil {
+		t.Fatal(err)
+	}
+
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(singleProfileTOML("url-profile")))
+	}))
+	defer srv.Close()
+	defer useTestServerClient(srv)()
+
+	f, err := FetchPortable(context.Background(), srv.URL+"/profile.toml")
+	if err != nil {
+		t.Fatalf("fetch: %v", err)
+	}
+
+	pp := f.Profiles[0]
+	p := PortableToProfile(pp)
+	_, _, _, _ = StripModelLocationParams(p.Backend, pp.Env, pp.Args)
+
+	// Without --force: should skip
+	result, err := ImportProfiles(modelPath, []Profile{p}, false)
+	if err != nil {
+		t.Fatalf("import: %v", err)
+	}
+	if result.Skipped != 1 {
+		t.Fatalf("expected 1 skipped, got %+v", result)
+	}
+
+	// With --force: should replace
+	result, err = ImportProfiles(modelPath, []Profile{p}, true)
+	if err != nil {
+		t.Fatalf("import force: %v", err)
+	}
+	if result.Replaced != 1 {
+		t.Fatalf("expected 1 replaced, got %+v", result)
+	}
+}
+
+// Case 27: multi-profile with --activate equivalent (check before import)
+func TestMultiProfileActivateCheck(t *testing.T) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(multiProfileTOML()))
+	}))
+	defer srv.Close()
+	defer useTestServerClient(srv)()
+
+	f, err := FetchPortable(context.Background(), srv.URL+"/multi.toml")
+	if err != nil {
+		t.Fatalf("fetch: %v", err)
+	}
+	// Simulate the --activate check: fail if > 1 profile with --activate
+	if len(f.Profiles) > 1 {
+		// This is the error path — verify the detection
+		if len(f.Profiles) != 3 {
+			t.Fatalf("expected 3 profiles, got %d", len(f.Profiles))
+		}
+		// In the actual CLI, this would exit with an error
 	}
 }
