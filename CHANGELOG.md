@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
+- May-12, 2026 - 11:00 AM +0800 - [v0.5.0 release: URL-aware import, interactive model picker, and shared discovery runner]
+- May-12, 2026 - 11:00 AM +0800 - [Import: `llml import <url>` fetches portable profile TOML over HTTPS — `FetchPortable` enforces HTTPS-only, 256KB body cap, 10s connect / 30s total timeout, and ≤5 redirect hops; plain `http://` rejected without a network call]
+- May-12, 2026 - 11:00 AM +0800 - [Import: interactive model picker runs when importing from a URL without `--target` — shows only backend-compatible local models (Tension 3 hard-block), auto-discovers on empty cache (2A-revised), and auto-rescans when the cache is stale (>24h)]
+- May-12, 2026 - 11:00 AM +0800 - [Import: `--target` validates backend compatibility against discovered models and exits with a clear error if incompatible]
+- May-12, 2026 - 11:00 AM +0800 - [Import: `--activate` flag sets the imported profile as active for the target model after import; `--rescan` forces fresh discovery before the picker; `--yes` skips the y/N confirmation prompt]
+- May-12, 2026 - 11:00 AM +0800 - [Import: `--dry-run` and URL confirmation both use shared `FormatPortablePreview` — args/env truncated at 6 each, env values capped at 40 chars]
+- May-12, 2026 - 11:00 AM +0800 - [Discovery: shared `RunDiscovery` / `CachedModels` in `internal/config` callable from both CLI import path and TUI — writes `config.toml` with `[[models]]` and `last_scan` timestamp after every scan]
+- May-12, 2026 - 11:00 AM +0800 - [Import: multi-profile TOML with `--activate` fails with a clear error before fetch; model-location env/args stripped on import with per-backend tables]
+- May-12, 2026 - 11:00 AM +0800 - [Migration: pre-0.5.0 binaries cannot import from URLs — upgrade to `v0.5.0` for the catalog download/use flow]
 - May-11, 2026 - 04:00 PM +0800 - [Import: built-in `llml import` — press `I` in the TUI to open the import modal (filepicker + text input), or run `llml import <file.toml>` from the CLI; parses portable TOML profiles, fuzzy-matches model hints against scanned models, strips model-location parameters, and merges into model-params.json with collision detection]
 - May-07, 2026 - 08:00 PM +0800 - [v0.4.0 release: profile export]
 - May-07, 2026 - 08:00 PM +0800 - [Export: you can now export parameter profiles to a portable TOML file shared across machines — press E in the TUI or run `llml export`; includes filter, scrollbar, collision handling, and group toggles]
