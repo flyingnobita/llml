@@ -24,6 +24,7 @@ venv/
 node_modules/
 .npm
 .pnpm-store/
+bun.lock
 dist/
 .next/
 .nuxt/
@@ -41,6 +42,7 @@ Cargo.lock
 *.dylib
 vendor/
 /bin/
+/llml
 
 # Java / JVM
 *.class
@@ -89,6 +91,7 @@ logs/*
 !.claude/skills/llml-import/**
 .codex/
 .cursor/
+.gbrain-source
 .gemini/
 .gstack/
 .opencode/
