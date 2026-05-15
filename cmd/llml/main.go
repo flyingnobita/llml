@@ -192,6 +192,11 @@ func runImport(args []string) {
 				fmt.Fprintf(os.Stderr, "warning: stripped model-location arg %s from profile %q\n", d, p.Name)
 			}
 		}
+		if targetModel != "" && pp.ModelHint != "" && modelHintsDiffer(pp.ModelHint, targetModel) {
+			targetHint := profiles.ModelHint(targetModel)
+			fmt.Fprintf(os.Stderr, "warning: profile %q was created for %q but is being imported to %q\n", p.Name, pp.ModelHint, targetHint)
+		}
+
 		imported = append(imported, p)
 	}
 
@@ -362,4 +367,24 @@ func presentModelPicker(models []models.ModelFile, r io.Reader) (string, error) 
 		return "", fmt.Errorf("reading input: %w", err)
 	}
 	return "", fmt.Errorf("cancelled")
+}
+
+// modelHintsDiffer returns true when the profile's model_hint and the target
+// model path look like they refer to different models. It normalizes both
+// strings and checks whether either is a substring of the other.
+func modelHintsDiffer(profileHint, targetPath string) bool {
+	targetHint := strings.ToLower(profiles.ModelHint(targetPath))
+	ph := strings.ToLower(profileHint)
+
+	// Normalize: replace dashes and underscores with spaces, collapse whitespace.
+	normalize := func(s string) string {
+		r := strings.NewReplacer("-", " ", "_", " ")
+		fields := strings.Fields(r.Replace(s))
+		return strings.Join(fields, " ")
+	}
+
+	phNorm := normalize(ph)
+	tgtNorm := normalize(targetHint)
+
+	return !strings.Contains(phNorm, tgtNorm) && !strings.Contains(tgtNorm, phNorm)
 }
