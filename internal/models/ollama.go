@@ -94,7 +94,7 @@ func doOllamaJSON(method, path string, reqBody any, out any, timeout time.Durati
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("ollama API %s %s: %s", method, path, resp.Status)
 	}

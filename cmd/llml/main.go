@@ -54,7 +54,7 @@ func runExport(args []string) {
 	outputPath := fs.String("output", profiles.DefaultExportFilename(), "output file path")
 	force := fs.Bool("force", false, "overwrite without prompting")
 	all := fs.Bool("all", false, "export all profiles (default when no filters given)")
-	fs.Parse(args)
+	_ = fs.Parse(args)
 
 	allProfiles, err := profiles.AllToPortable()
 	if err != nil {
@@ -110,7 +110,7 @@ func runImport(args []string) {
 	activate := fs.Bool("activate", false, "set imported profile as active for the target model")
 	rescan := fs.Bool("rescan", false, "force fresh model discovery before picker")
 	yes := fs.Bool("yes", false, "skip confirmation prompt")
-	fs.Parse(args)
+	_ = fs.Parse(args)
 
 	if fs.NArg() < 1 {
 		fmt.Fprintf(os.Stderr, "usage: llml import [flags] <file.toml|https://...>\n")
@@ -171,7 +171,7 @@ func runImport(args []string) {
 		if !*yes {
 			fmt.Print("\nSave this profile? [y/N]: ")
 			var response string
-			fmt.Scanln(&response)
+			_, _ = fmt.Scanln(&response)
 			response = strings.TrimSpace(strings.ToLower(response))
 			if response != "y" && response != "yes" {
 				fmt.Println("Cancelled.")
@@ -240,7 +240,7 @@ func pickTargetModel(portableProfiles []profiles.PortableProfile, rescan bool) (
 	}
 
 	if len(modelFiles) == 0 {
-		return "", fmt.Errorf("no local model files found. Download a model first, then retry.")
+		return "", fmt.Errorf("no local model files found: download a model first, then retry")
 	}
 
 	compatible := config.FilterByBackend(modelFiles, backends)

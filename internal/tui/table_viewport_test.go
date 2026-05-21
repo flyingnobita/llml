@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"charm.land/lipgloss/v2"
+
 	"github.com/flyingnobita/llml/internal/models"
 )
 

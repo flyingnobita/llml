@@ -47,6 +47,6 @@ func overlayCentered(backdrop, modal string, termW, termH int) string {
 		y = 0
 	}
 
-	modalBuf.Buffer.Draw(canvas, uv.Rect(x, y, mw, mh))
+	modalBuf.Draw(canvas, uv.Rect(x, y, mw, mh))
 	return canvas.Render()
 }

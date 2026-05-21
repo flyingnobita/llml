@@ -6,8 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/flyingnobita/llml/internal/models"
 	"github.com/mattn/go-runewidth"
+
+	"github.com/flyingnobita/llml/internal/models"
 )
 
 // FormatPathDisplay shortens the user home directory prefix to ~/ for TUI display only.

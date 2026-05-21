@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
+
 	"github.com/flyingnobita/llml/internal/fsutil"
 )
 
@@ -90,7 +91,8 @@ func RecombineArgs(args []string) []string {
 	i := 0
 	for i < len(args) {
 		tok := args[i]
-		if strings.HasPrefix(tok, "-") && !strings.Contains(tok, " ") {
+		switch {
+		case strings.HasPrefix(tok, "-") && !strings.Contains(tok, " "):
 			if i+1 < len(args) {
 				next := args[i+1]
 				if isValue(next) {
@@ -101,10 +103,10 @@ func RecombineArgs(args []string) []string {
 			}
 			out = append(out, tok)
 			i++
-		} else if strings.HasPrefix(tok, "-") && strings.Contains(tok, " ") {
+		case strings.HasPrefix(tok, "-") && strings.Contains(tok, " "):
 			out = append(out, tok)
 			i++
-		} else {
+		default:
 			i++
 		}
 	}
@@ -162,7 +164,7 @@ func ProfileToPortable(p Profile, modelKey string) PortableProfile {
 	}
 	for _, e := range p.Env {
 		if !ShouldExcludeEnv(e.Key) {
-			pp.Env = append(pp.Env, PortableEnvVar{Key: e.Key, Value: e.Value})
+			pp.Env = append(pp.Env, PortableEnvVar(e))
 		}
 	}
 	if p.UseCase.Primary != "" || len(p.UseCase.Tags) > 0 {

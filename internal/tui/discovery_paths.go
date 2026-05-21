@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+
 	"github.com/flyingnobita/llml/internal/config"
 )
 
@@ -14,11 +15,7 @@ func (m Model) openDiscoveryPathsModal() (Model, tea.Cmd) {
 	m.discovery.open = true
 	m = m.withLastRunCleared()
 	m.discovery.editOpen = false
-	if len(m.discovery.paths) > 0 {
-		m.discovery.cursor = 0
-	} else {
-		m.discovery.cursor = 0
-	}
+	m.discovery.cursor = 0
 	m.discovery.editInput.Blur()
 	m.discovery.editInput.SetValue("")
 	return m, nil

@@ -13,6 +13,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"charm.land/lipgloss/v2/compat"
 	"github.com/charmbracelet/x/ansi"
+
 	"github.com/flyingnobita/llml/internal/models"
 	"github.com/flyingnobita/llml/internal/profiles"
 )
@@ -772,13 +773,14 @@ func (m Model) applySplitPaneFocusStyles() Model {
 		m.alerts.viewport.Style = m.ui.styles.alertPaneViewport
 		return m
 	}
-	if m.server.splitFocused {
+	switch {
+	case m.server.splitFocused:
 		m.table.hscroll.Style = m.ui.styles.splitPaneChromeDim
 		m.server.viewport.Style = m.ui.styles.splitPaneChromeFocused
-	} else if m.preview.focused {
+	case m.preview.focused:
 		m.table.hscroll.Style = m.ui.styles.splitPaneChromeDim
 		m.server.viewport.Style = m.ui.styles.splitPaneChromeDim
-	} else {
+	default:
 		m.table.hscroll.Style = m.ui.styles.splitPaneChromeFocused
 		m.server.viewport.Style = m.ui.styles.splitPaneChromeDim
 	}

@@ -23,6 +23,8 @@ const BackupDirName = "backups"
 // BackupFileIfExists copies srcPath into {dir(srcPath)/backups/<basename>.<unixnano>.bak}
 // when srcPath exists. It is a no-op when the file is missing. Creates the backups
 // directory as needed.
+//
+//nolint:gosec // G304: file paths derived from os.UserConfigDir — trusted source.
 func BackupFileIfExists(srcPath string) error {
 	st, err := os.Stat(srcPath)
 	if err != nil {
@@ -36,7 +38,7 @@ func BackupFileIfExists(srcPath string) error {
 	}
 
 	backupDir := filepath.Join(filepath.Dir(srcPath), BackupDirName)
-	if err := os.MkdirAll(backupDir, 0o755); err != nil {
+	if err := os.MkdirAll(backupDir, 0o700); err != nil {
 		return err
 	}
 
@@ -47,19 +49,19 @@ func BackupFileIfExists(srcPath string) error {
 	if err != nil {
 		return err
 	}
-	defer in.Close()
+	defer func() { _ = in.Close() }()
 
 	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_EXCL, st.Mode()&0o777)
 	if err != nil {
 		return err
 	}
 	if _, err := io.Copy(out, in); err != nil {
-		out.Close()
-		os.Remove(dst)
+		_ = out.Close()
+		_ = os.Remove(dst)
 		return err
 	}
 	if err := out.Close(); err != nil {
-		os.Remove(dst)
+		_ = os.Remove(dst)
 		return err
 	}
 
@@ -114,12 +116,14 @@ func PruneOldBackups(backupDir, base string, keep int) error {
 // model-params.json if they exist, then writes the marker. Skips version-based
 // backup when currentVersion is empty or "dev" to avoid noisy backups during
 // development.
+//
+//nolint:gosec // G304: marker path derived from os.UserConfigDir — trusted source.
 func MaybeBackupOnVersionChange(currentVersion string) error {
 	llml, err := LlmlDir()
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(llml, 0o755); err != nil {
+	if err := os.MkdirAll(llml, 0o700); err != nil {
 		return err
 	}
 
@@ -153,5 +157,5 @@ func MaybeBackupOnVersionChange(currentVersion string) error {
 }
 
 func writeVersionMarker(marker, version string) error {
-	return os.WriteFile(marker, []byte(strings.TrimSpace(version)+"\n"), 0o644)
+	return os.WriteFile(marker, []byte(strings.TrimSpace(version)+"\n"), 0o600)
 }

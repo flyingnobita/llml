@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+
 	"github.com/flyingnobita/llml/internal/profiles"
 )
 
@@ -672,12 +673,10 @@ func TestExportHeaderAtZeroCursorNavigationClamped(t *testing.T) {
 
 	// Down at end should stay at end.
 	m2.export.cursor = 1
-	tm, _ = m2.updateExportKey(msg) // j
-	m3 := asModel(tm)
-	// Actually let me fix this — msg is 'k' not 'j'.
+	_, _ = m2.updateExportKey(msg) // j — msg is 'k', overwritten below
 	msg2 := tea.KeyPressMsg{Code: 'j', Text: "down"}
 	tm, _ = m2.updateExportKey(msg2)
-	m3 = asModel(tm)
+	m3 := asModel(tm)
 	if m3.export.cursor != 1 {
 		t.Errorf("cursor = %d, want 1 (clamped at end)", m3.export.cursor)
 	}
@@ -1159,6 +1158,7 @@ func TestOpenExportView_PopulatesItems(t *testing.T) {
 func TestOpenExportView_NoFileOpensEmpty(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", dir)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(dir, ".config"))
 
 	m := New()
 	m = m.openExportView()
@@ -1405,7 +1405,7 @@ func TestExportKeyPageUpDown(t *testing.T) {
 	m.export.focus = exportFocusList
 	// Create enough items to make page navigation meaningful.
 	var items []exportProfileItem
-	for i := 0; i < 30; i++ {
+	for i := range 30 {
 		items = append(items, exportProfileItem{
 			kind: exportItemProfile, modelDisplay: "M", backend: "llama",
 			profileName: fmt.Sprintf("p%d", i), checked: false,
@@ -1506,7 +1506,7 @@ func TestExportModalBlock_ScrollingWithScrollbar(t *testing.T) {
 
 	// Create more items than visible.
 	var items []exportProfileItem
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		items = append(items, exportProfileItem{
 			kind: exportItemProfile, modelKey: fmt.Sprintf("/models/M%d.gguf", i),
 			modelDisplay: fmt.Sprintf("M%d", i),

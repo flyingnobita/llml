@@ -8,6 +8,7 @@ import (
 	"charm.land/bubbles/v2/filepicker"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+
 	"github.com/flyingnobita/llml/internal/models"
 	"github.com/flyingnobita/llml/internal/profiles"
 )
@@ -282,11 +283,7 @@ func (m Model) importModalBlock() string {
 // importPickerBodyH returns the available height for the filepicker file list,
 // accounting for the modal frame (title, footer, border).
 func (m Model) importPickerBodyH() int {
-	tw := m.layout.width
 	th := m.layout.height
-	if tw < 40 {
-		tw = 40
-	}
 	if th < 10 {
 		th = 10
 	}

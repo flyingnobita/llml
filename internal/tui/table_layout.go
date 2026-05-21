@@ -4,6 +4,7 @@ import (
 	"github.com/mattn/go-runewidth"
 
 	btable "charm.land/bubbles/v2/table"
+
 	"github.com/flyingnobita/llml/internal/models"
 )
 

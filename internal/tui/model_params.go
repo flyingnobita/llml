@@ -40,8 +40,6 @@ func saveModelEntry(modelPath string, ent modelEntry) error {
 
 func modelParamsKey(modelPath string) string { return profiles.ModelParamsKey(modelPath) }
 
-func normalizeModelEntry(ent modelEntry) modelEntry { return profiles.NormalizeEntry(ent) }
-
 // activeProfileNameForPreview returns the active profile name for the selected model: the
 // in-memory name when the params panel is open for that model, otherwise from disk.
 func activeProfileNameForPreview(m Model) string {

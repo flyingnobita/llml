@@ -7,6 +7,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+
 	"github.com/flyingnobita/llml/internal/config"
 	"github.com/flyingnobita/llml/internal/models"
 )
@@ -101,6 +102,7 @@ func discoveryStartNote(rt models.RuntimeInfo) string {
 	return fmt.Sprintf("Starting Ollama on %s to discover models...", spec.host)
 }
 
+//nolint:staticcheck // ST1008: note strings follow error returns — caller unpacks by position.
 func runDiscoveryScan(plan discoveryScanPlan) (models.RuntimeInfo, []models.ModelFile, time.Time, error, error, string, string) {
 	rt := plan.runtime
 	var ollamaNote, ollamaWarn string

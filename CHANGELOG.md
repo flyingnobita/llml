@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
+- May-21, 2026 - 04:00 PM +0800 - [v0.5.1 release: golangci-lint, lint fixes, and homebrew_casks migration]
+- May-21, 2026 - 04:00 PM +0800 - [CI: added golangci-lint with staticcheck, unused, gosec, gocritic, misspell, gofmt, goimports linters; lint task updated to run golangci-lint after gofmt-check; .golangci.yml config with 3m timeout]
+- May-21, 2026 - 04:00 PM +0800 - [Lint: fixed violations across the codebase — replaced interface{} with any, added missing error checks, fixed unused params]
+- May-21, 2026 - 04:00 PM +0800 - [Release: migrated from deprecated brews to homebrew_casks in GoReleaser config; updated Homebrew install to brew install --cask llml; removed old Formula from homebrew-tap]
 - May-12, 2026 - 11:00 AM +0800 - [v0.5.0 release: URL-aware import, interactive model picker, and shared discovery runner]
 - May-12, 2026 - 11:00 AM +0800 - [Import: `llml import <url>` fetches portable profile TOML over HTTPS — `FetchPortable` enforces HTTPS-only, 256KB body cap, 10s connect / 30s total timeout, and ≤5 redirect hops; plain `http://` rejected without a network call]
 - May-12, 2026 - 11:00 AM +0800 - [Import: interactive model picker runs when importing from a URL without `--target` — shows only backend-compatible local models (Tension 3 hard-block), auto-discovers on empty cache (2A-revised), and auto-rescans when the cache is stale (>24h)]

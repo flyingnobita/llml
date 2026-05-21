@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
+
 	"github.com/flyingnobita/llml/internal/fsutil"
 	"github.com/flyingnobita/llml/internal/userdata"
 )
@@ -81,7 +82,7 @@ func FetchPortable(ctx context.Context, rawURL string) (*PortableFile, error) {
 		}
 		return nil, fmt.Errorf("cannot reach %s: %v", u.Host, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == 404 {
 		return nil, fmt.Errorf("no profile at %s (404)", rawURL)
@@ -134,6 +135,7 @@ func ReadFile() (file, error) {
 	return readFile(path)
 }
 
+//nolint:gosec // G304: path from ConfigPath() using os.UserConfigDir — trusted source.
 func readFile(path string) (file, error) {
 	var f file
 	b, err := os.ReadFile(path)
@@ -178,7 +180,7 @@ func SaveEntry(modelPath string, ent Entry) error {
 		return err
 	}
 	key := ModelParamsKey(modelPath)
-	if err := os.MkdirAll(filepath.Dir(cfgPath), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(cfgPath), 0o700); err != nil {
 		return err
 	}
 	f, err := readFile(cfgPath)

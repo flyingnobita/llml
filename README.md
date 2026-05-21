@@ -73,10 +73,10 @@ go install github.com/flyingnobita/llml/cmd/llml@latest
 
 ```bash
 brew tap flyingnobita/tap
-brew install llml
+brew install --cask llml
 ```
 
-Upgrade later with `brew upgrade llml`.
+Upgrade later with `brew upgrade --cask llml`.
 
 #### Scoop
 

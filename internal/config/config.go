@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
+
 	"github.com/flyingnobita/llml/internal/fsutil"
 	"github.com/flyingnobita/llml/internal/models"
 	"github.com/flyingnobita/llml/internal/userdata"
@@ -71,6 +72,8 @@ func ConfigPath() (string, error) {
 }
 
 // ReadFile reads and parses config.toml, or returns an empty error if the file is missing.
+//
+//nolint:gosec // G304: path from ConfigPath() using os.UserConfigDir — trusted source.
 func ReadFile() (Config, error) {
 	path, err := ConfigPath()
 	if err != nil {
@@ -113,16 +116,16 @@ func ApplyRuntimeFromConfig(r *RuntimeConfig) {
 	applyPathIfUnset(models.EnvOllamaPath, r.DefaultOllamaPath)
 	applyPathIfUnset(models.EnvKoboldCppPath, r.DefaultKoboldCppPath)
 	if v := strings.TrimSpace(r.DefaultOllamaHost); v != "" && os.Getenv(models.EnvOllamaHost) == "" {
-		os.Setenv(models.EnvOllamaHost, v)
+		_ = os.Setenv(models.EnvOllamaHost, v)
 	}
 	if r.DefaultLlamaServerPort != nil && os.Getenv(models.EnvLlamaServerPort) == "" {
-		os.Setenv(models.EnvLlamaServerPort, strconv.Itoa(*r.DefaultLlamaServerPort))
+		_ = os.Setenv(models.EnvLlamaServerPort, strconv.Itoa(*r.DefaultLlamaServerPort))
 	}
 	if r.DefaultVLLMServerPort != nil && os.Getenv(models.EnvVLLMServerPort) == "" {
-		os.Setenv(models.EnvVLLMServerPort, strconv.Itoa(*r.DefaultVLLMServerPort))
+		_ = os.Setenv(models.EnvVLLMServerPort, strconv.Itoa(*r.DefaultVLLMServerPort))
 	}
 	if r.DefaultKoboldCppPort != nil && os.Getenv(models.EnvKoboldCppPort) == "" {
-		os.Setenv(models.EnvKoboldCppPort, strconv.Itoa(*r.DefaultKoboldCppPort))
+		_ = os.Setenv(models.EnvKoboldCppPort, strconv.Itoa(*r.DefaultKoboldCppPort))
 	}
 }
 
@@ -140,7 +143,7 @@ func applyPathIfUnset(key, value string) {
 	if v == "" || v == "." || os.Getenv(key) != "" {
 		return
 	}
-	os.Setenv(key, v)
+	_ = os.Setenv(key, v)
 }
 
 // RuntimeFromEnv builds a RuntimeConfig from the current process environment (for writing).
@@ -264,7 +267,7 @@ func WriteFile(c Config) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
 	_ = userdata.BackupFileIfExists(path)

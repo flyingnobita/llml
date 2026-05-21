@@ -17,6 +17,8 @@ type hfConfig struct {
 }
 
 // hfParamsSummary returns a short summary for safetensors model dirs (architecture / model_type).
+//
+//nolint:gosec // G304: path from model discovery — trusted source.
 func hfParamsSummary(dir string) string {
 	p := filepath.Join(dir, hfConfigFileName)
 	data, err := os.ReadFile(p)
