@@ -564,7 +564,7 @@ func (m Model) exportModalBlock() string {
 	// Footer.
 	sel := m.exportSelectedCount()
 	footer := fmt.Sprintf("(%d selected)  %s", sel, FooterExportHints)
-	rows = append(rows, m.ui.styles.footer.Render(footer))
+	rows = append(rows, m.renderFooterHints(footer))
 
 	block := lipgloss.JoinVertical(lipgloss.Left, rows...)
 	if m.lastRunNote != "" {
@@ -656,7 +656,7 @@ func (m Model) collisionModalBlock() string {
 		m.ui.styles.bodyBold.Render("[O] Overwrite"),
 		bodyStyle.Render(fmt.Sprintf("[N] Save as %s", suffixName)),
 		"",
-		m.ui.styles.footer.Render(FooterCollisionHints),
+		m.renderFooterHints(FooterCollisionHints),
 	}
 
 	block := lipgloss.JoinVertical(lipgloss.Left, rows...)

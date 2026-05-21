@@ -135,6 +135,11 @@ type collisionState struct {
 	suffixPath string
 }
 
+// quitConfirmState holds the "quit while server is still running" modal state.
+type quitConfirmState struct {
+	open bool
+}
+
 // importViewState holds the profile import modal state.
 type importViewState struct {
 	open         bool
@@ -213,6 +218,7 @@ type Model struct {
 	export    exportViewState
 	import_   importViewState
 	collision collisionState
+	quit      quitConfirmState
 	paneFocus mainPaneFocusSnap
 
 	keys               KeyMap

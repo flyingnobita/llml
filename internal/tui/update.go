@@ -267,6 +267,9 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.import_.open {
 		return m.updateImportKey(msg)
 	}
+	if m.quit.open {
+		return m.updateQuitConfirmKey(msg)
+	}
 	if m.collision.open {
 		return m.updateCollisionKey(msg)
 	}

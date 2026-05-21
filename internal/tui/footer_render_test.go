@@ -35,6 +35,17 @@ func TestDarkThemeFooterColorsAreDistinct(t *testing.T) {
 	}
 }
 
+func TestImportFooter_UsesSemanticHintRendering(t *testing.T) {
+	m := newTestModel()
+	m.import_.focus = importFocusPicker
+
+	got := m.importFooter()
+	plain := m.ui.styles.footer.Render("tab: path input · enter: select · " + FooterNavHint + " · esc: back")
+	if got == plain {
+		t.Fatal("expected import footer to use semantic hint rendering, not flat footer color")
+	}
+}
+
 func TestMainAppPlacedView_HasBlankRowAboveFooter(t *testing.T) {
 	m := newTestModel()
 	m.layout.width = 100

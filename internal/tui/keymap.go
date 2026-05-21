@@ -8,6 +8,7 @@ import (
 // KeyMap holds key bindings. Add fields here as your TUI grows, and wire them in Update.
 type KeyMap struct {
 	Quit         key.Binding
+	StopServer   key.Binding
 	Refresh      key.Binding
 	RunServer    key.Binding
 	ScrollLeft   key.Binding
@@ -63,6 +64,10 @@ func DefaultKeyMap() KeyMap {
 		Quit: key.NewBinding(
 			key.WithKeys(FooterKeyQuit),
 			key.WithHelp(FooterKeyQuit, FooterDescQuit),
+		),
+		StopServer: key.NewBinding(
+			key.WithKeys(FooterKeyStopServer),
+			key.WithHelp(FooterKeyStopServer, FooterDescStopServer),
 		),
 		Refresh: key.NewBinding(
 			key.WithKeys(FooterKeyRefresh),

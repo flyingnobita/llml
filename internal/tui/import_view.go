@@ -344,14 +344,13 @@ func (m Model) importPickerModalBlock() string {
 }
 
 func (m Model) importFooter() string {
-	st := m.ui.styles
 	switch m.import_.focus {
 	case importFocusPath:
-		return st.footer.Render("tab: browse · enter: parse · esc: back")
+		return m.renderFooterHints("tab: browse · enter: parse · esc: back")
 	case importFocusPicker:
-		return st.footer.Render("tab: path input · enter: select · " + FooterNavHint + " · esc: back")
+		return m.renderFooterHints("tab: path input · enter: select · " + FooterNavHint + " · esc: back")
 	default:
-		return st.footer.Render("space: toggle · a: all · A: none · enter: import · esc: back")
+		return m.renderFooterHints("space: toggle · a: all · A: none · enter: import · esc: back")
 	}
 }
 

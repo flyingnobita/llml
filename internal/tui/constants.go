@@ -181,6 +181,10 @@ const (
 	FooterDescQuit = "quit"
 	FooterHintQuit = FooterKeyQuit + ": " + FooterDescQuit
 
+	FooterKeyStopServer  = "s"
+	FooterDescStopServer = "stop server"
+	FooterHintStopServer = FooterKeyStopServer + ": " + FooterDescStopServer
+
 	FooterHintHelp = "?: more"
 
 	FooterKeyExport  = "E"
@@ -218,8 +222,9 @@ const (
 	FooterNavHint = FooterKeyNav + ": " + FooterDescNav
 
 	// Split server view (while running).
-	FooterSplitStopServer = "esc/q: stop server"
+	FooterSplitStopServer = FooterHintStopServer
 	FooterSplitDismiss    = "enter/esc/q: close"
+	FooterQuitConfirmYN   = "y: quit anyway · n/esc: stay"
 
 	// splitPanePressEnterToClose is appended to the split log after the server process exits.
 	splitPanePressEnterToClose = "Press Enter to close..."

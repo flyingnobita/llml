@@ -70,7 +70,8 @@ func helpSections() []struct {
 			entries: []helpEntry{
 				{"tab", "Switch table / log"},
 				{"w", "Toggle word wrap"},
-				{"esc/q", "Stop server"},
+				{"s", "Stop server"},
+				{"q", "Quit (warn if still running)"},
 			},
 		},
 	}
@@ -121,7 +122,7 @@ func (m Model) helpPanelModalBlock() string {
 		}
 	}
 	rows = append(rows, "")
-	rows = append(rows, m.ui.styles.footer.Render("esc: back"))
+	rows = append(rows, m.renderFooterHints("esc: back"))
 
 	block := lipgloss.JoinVertical(lipgloss.Left, rows...)
 	return m.ui.styles.portConfigBox.Render(block)
