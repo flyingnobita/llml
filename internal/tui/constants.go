@@ -41,6 +41,9 @@ const (
 	// serverLogAlignPadMax caps padding width to avoid runaway indentation if prefix detection misbehaves.
 	serverLogAlignPadMax = 256
 
+	// serverLogWrapPrefix marks continuation lines when server output wrap is enabled.
+	serverLogWrapPrefix = ".. "
+
 	// serverLogSeparatorLines is extra body rows between the table and log in split
 	// mode (0 = panes are adjacent).
 	serverLogSeparatorLines = 0
@@ -169,6 +172,10 @@ const (
 	FooterKeyToggleTheme  = "t"
 	FooterDescToggleTheme = "theme"
 	FooterHintToggleTheme = FooterKeyToggleTheme + ": " + FooterDescToggleTheme
+
+	FooterKeyToggleWrap  = "w"
+	FooterDescToggleWrap = "wrap"
+	FooterHintToggleWrap = FooterKeyToggleWrap + ": " + FooterDescToggleWrap
 
 	FooterKeyQuit  = "q"
 	FooterDescQuit = "quit"

@@ -251,6 +251,41 @@ func (m Model) lastRunNoteView() string {
 	return lipgloss.JoinVertical(lipgloss.Left, lines...)
 }
 
+func (m Model) renderFooterHints(line string) string {
+	if strings.TrimSpace(line) == "" {
+		return ""
+	}
+	parts := strings.Split(line, FooterHintSep)
+	rendered := make([]string, 0, len(parts)*2-1)
+	for i, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if i > 0 {
+			rendered = append(rendered, m.ui.styles.footerSep.Render(FooterHintSep))
+		}
+		keyPart, descPart, ok := strings.Cut(part, ": ")
+		if !ok {
+			rendered = append(rendered, m.ui.styles.footer.Render(part))
+			continue
+		}
+		rendered = append(rendered,
+			m.ui.styles.footerKey.Render(keyPart),
+			m.ui.styles.footerSep.Render(": "),
+			m.ui.styles.footer.Render(descPart),
+		)
+	}
+	return lipgloss.JoinHorizontal(lipgloss.Top, rendered...)
+}
+
+func (m Model) renderFooterGap(width int) string {
+	if width < 1 {
+		width = 1
+	}
+	return strings.Repeat(" ", width)
+}
+
 // footerHelpLine is the keyboard hint line (shared with layout height math).
 // Each binding uses "key: description"; bindings are separated by " · ".
 // The same convention is used for modal hint bars (runtime config, parameters).
@@ -262,20 +297,21 @@ func footerHelpLine(m Model) string {
 		}
 		if m.server.splitFocused {
 			return fmt.Sprintf(
-				"%s · %s · %s · %s · %s",
-				FooterHintTabSections, FooterNavHint, stopOrDismiss, m.alertsFooterHint(), FooterHintHelp,
+				"%s · %s · %s · %s · %s · %s",
+				FooterHintTabSections, FooterNavHint, FooterHintToggleWrap, stopOrDismiss, m.alertsFooterHint(), FooterHintHelp,
 			)
 		}
 		if m.preview.focused {
 			return fmt.Sprintf(
-				"%s · %s · %s · %s · %s · %s",
-				FooterHintTabSections, FooterNavHint, FooterHintCopyPath, stopOrDismiss, m.alertsFooterHint(), FooterHintHelp,
+				"%s · %s · %s · %s · %s · %s · %s",
+				FooterHintTabSections, FooterNavHint, FooterHintCopyPath, FooterHintToggleWrap, stopOrDismiss, m.alertsFooterHint(), FooterHintHelp,
 			)
 		}
 		// Table focused: same global shortcuts as the idle view except run (R / ctrl+R) while a server is up.
 		parts := []string{
 			FooterHintTabSections,
 			FooterNavHint,
+			FooterHintToggleWrap,
 			stopOrDismiss,
 			m.alertsFooterHint(),
 			FooterHintHelp,
@@ -322,7 +358,8 @@ func mainChromeLines(m Model, needsTableHBar bool, needsLogHBar bool) int {
 		}
 	}
 
-	n += lipgloss.Height(m.ui.styles.footer.Render(footerHelpLine(m)))
+	n += lipgloss.Height(m.renderFooterGap(iw))
+	n += lipgloss.Height(m.renderFooterHints(footerHelpLine(m)))
 
 	if m.alerts.current != "" {
 		n += lipgloss.Height(m.currentStatusView())
@@ -497,7 +534,8 @@ func (m Model) mainAppPlacedView() string {
 		tableScrollBase = ash
 	}
 
-	footer := m.ui.styles.footer.Render(footerHelpLine(m))
+	footer := m.renderFooterHints(footerHelpLine(m))
+	footerGap := m.renderFooterGap(iw)
 
 	headerParts := []string{title}
 	if strings.TrimSpace(appSubtitle) != "" {
@@ -505,7 +543,7 @@ func (m Model) mainAppPlacedView() string {
 	}
 	header := lipgloss.JoinVertical(lipgloss.Left, headerParts...)
 
-	tailParts := []string{body, footer}
+	tailParts := []string{body, footerGap, footer}
 	if m.alerts.current != "" {
 		tailParts = append(tailParts, m.currentStatusView())
 	}
@@ -525,7 +563,7 @@ func (m Model) mainAppPlacedView() string {
 		pad := target - lipgloss.Height(framed)
 		if pad > 0 {
 			body, _ = m.mainAppModelListBody(iw, tableScrollBase+pad)
-			tailParts = []string{body, footer}
+			tailParts = []string{body, footerGap, footer}
 			if m.alerts.current != "" {
 				tailParts = append(tailParts, m.currentStatusView())
 			}

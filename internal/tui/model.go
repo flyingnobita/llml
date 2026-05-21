@@ -81,6 +81,7 @@ type serverPaneState struct {
 	msgCh         chan tea.Msg
 	log           []string
 	logAlignWidth int // measured prefix width for split-pane log alignment (vLLM vs tqdm)
+	wrap          bool
 	viewport      viewport.Model
 	viewportH     int
 	splitFocused  bool // true: keys scroll log; false: keys use model table (Tab toggles).
@@ -476,6 +477,9 @@ func (m Model) serverLogNeedsHorizontalScroll() bool {
 	if !m.server.running || len(m.server.log) == 0 {
 		return false
 	}
+	if m.server.wrap || m.server.viewport.SoftWrap {
+		return false
+	}
 	inner := m.server.viewport.Width() - m.server.viewport.Style.GetHorizontalFrameSize()
 	if inner < 1 {
 		return false
@@ -520,7 +524,7 @@ func (m Model) layoutTableAtInnerW(innerW int) Model {
 	m.layout.tableNeedsHScroll = len(m.table.files) > 0 && minW > innerW
 
 	logFrameH := m.server.viewport.Style.GetHorizontalFrameSize()
-	needsLogHBar := m.server.running && maxAnsiLineWidth(m.server.log) > max(1, innerW-logFrameH)
+	needsLogHBar := m.server.running && !m.server.wrap && maxAnsiLineWidth(m.server.log) > max(1, innerW-logFrameH)
 
 	previewH := m.launchPreviewPaneLayoutHeight()
 	h := m.computeBodyHeight(needsLogHBar)
@@ -619,8 +623,10 @@ func (m Model) applyTableAndLogHeights(bodyH, innerW, previewH int) Model {
 		m.table.tbl.SetHeight(tableRowAreaHeight(tableContentH))
 		m.server.viewport.SetHeight(logContentH)
 		m.server.viewport.SetWidth(innerW)
+		m = m.syncServerLogViewportContent()
 		if m.server.viewport.TotalLineCount() > m.server.viewport.VisibleLineCount() {
 			m.server.viewport.SetWidth(innerW - 1)
+			m = m.syncServerLogViewportContent()
 		}
 		m.server.viewportH = logContentH
 	} else {
@@ -713,6 +719,20 @@ func (m Model) withLaunchPreviewSynced() Model {
 	return m.syncLaunchPreviewViewport(iw)
 }
 
+func (m Model) syncServerLogViewportContent() Model {
+	m.server.viewport.SoftWrap = false
+	content := strings.Join(m.server.log, "\n")
+	if m.server.wrap {
+		width := m.server.viewport.Width() - m.server.viewport.Style.GetHorizontalFrameSize()
+		if width < MinTextDisplayWidth {
+			width = MinTextDisplayWidth
+		}
+		content = renderWrappedServerLog(m.server.log, width)
+	}
+	m.server.viewport.SetContent(content)
+	return m
+}
+
 // saveMainPaneFocusForModal snapshots which main pane had keyboard focus, then clears
 // launch-preview focus so modal routing matches existing behavior.
 func (m Model) saveMainPaneFocusForModal() Model {
@@ -797,9 +817,20 @@ func (m Model) appendServerLogLine(line string) Model {
 	if len(m.server.log) > maxServerLogLines {
 		m.server.log = m.server.log[len(m.server.log)-maxServerLogLines:]
 	}
-	m.server.viewport.SetContent(strings.Join(m.server.log, "\n"))
+	m = m.syncServerLogViewportContent()
 	m.server.viewport.GotoBottom()
 	return m
+}
+
+func (m Model) toggleServerLogWrap() Model {
+	m.server.viewport.SetXOffset(0)
+	m.server.wrap = !m.server.wrap
+	m = m.syncServerLogViewportContent()
+	m = m.layoutTable()
+	if m.server.wrap {
+		return m.withLastRunSuccess("Server output wrap enabled")
+	}
+	return m.withLastRunSuccess("Server output wrap disabled")
 }
 
 // cycleTheme advances dark → light → auto → dark, rebuilds lipgloss styles, and
@@ -963,6 +994,7 @@ func (m Model) dismissSplitServer() Model {
 	m.server.msgCh = nil
 	m.server.log = nil
 	m.server.logAlignWidth = 0
+	m.server.wrap = false
 	m.server.viewport.SetContent("")
 	m.table.tbl.Focus()
 	m = m.layoutTable()

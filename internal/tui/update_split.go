@@ -68,6 +68,8 @@ func (m Model) updateServerSplitKeys(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		switch {
 		case isTabKey(msg):
 			return m.cycleSplitPaneFocus(), nil
+		case key.Matches(msg, m.keys.ToggleWrap):
+			return m.toggleServerLogWrap(), nil
 		case isEnterKey(msg), key.Matches(msg, m.keys.Quit), isEscapeKey(msg), isCtrlC(msg):
 			m = m.dismissSplitServer()
 			return m, nil
@@ -94,6 +96,8 @@ func (m Model) updateServerSplitKeys(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m.stopSplitServer()
 	case isCtrlC(msg):
 		return m.stopSplitServer()
+	case key.Matches(msg, m.keys.ToggleWrap):
+		return m.toggleServerLogWrap(), nil
 	case isTabKey(msg):
 		return m.cycleSplitPaneFocus(), nil
 	}

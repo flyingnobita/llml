@@ -69,6 +69,7 @@ func helpSections() []struct {
 			title: "Split Server Pane",
 			entries: []helpEntry{
 				{"tab", "Switch table / log"},
+				{"w", "Toggle word wrap"},
 				{"esc/q", "Stop server"},
 			},
 		},

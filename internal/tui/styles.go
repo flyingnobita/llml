@@ -17,6 +17,8 @@ type styles struct {
 	bodyBold          lipgloss.Style
 	bodyDim           lipgloss.Style
 	footer            lipgloss.Style
+	footerKey         lipgloss.Style
+	footerSep         lipgloss.Style
 	// scrollBarColumn colors the █/░ track beside viewports (no margin).
 	scrollBarColumn        lipgloss.Style
 	infoLine               lipgloss.Style
@@ -80,6 +82,11 @@ func newStyles(theme Theme) styles {
 			Foreground(theme.Subtitle),
 		footer: lipgloss.NewStyle().
 			Foreground(theme.Footer),
+		footerKey: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(theme.FooterKey),
+		footerSep: lipgloss.NewStyle().
+			Foreground(theme.FooterSep),
 		scrollBarColumn: lipgloss.NewStyle().
 			Foreground(theme.Footer),
 		infoLine: lipgloss.NewStyle().Foreground(theme.Info),

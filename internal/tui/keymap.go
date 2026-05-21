@@ -19,6 +19,7 @@ type KeyMap struct {
 	Parameters   key.Binding
 	ModelPaths   key.Binding
 	ToggleTheme  key.Binding
+	ToggleWrap   key.Binding
 	SortColumn   key.Binding
 	SortReverse  key.Binding
 	RescanModels key.Binding
@@ -114,6 +115,10 @@ func DefaultKeyMap() KeyMap {
 		ToggleTheme: key.NewBinding(
 			key.WithKeys(FooterKeyToggleTheme),
 			key.WithHelp(FooterKeyToggleTheme, FooterDescToggleTheme),
+		),
+		ToggleWrap: key.NewBinding(
+			key.WithKeys(FooterKeyToggleWrap),
+			key.WithHelp(FooterKeyToggleWrap, FooterDescToggleWrap),
 		),
 		Export: key.NewBinding(
 			key.WithKeys("E"),
