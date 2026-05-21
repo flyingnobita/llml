@@ -1158,6 +1158,7 @@ func TestOpenExportView_PopulatesItems(t *testing.T) {
 func TestOpenExportView_NoFileOpensEmpty(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", dir)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(dir, ".config"))
 
 	m := New()
 	m = m.openExportView()
@@ -1404,7 +1405,7 @@ func TestExportKeyPageUpDown(t *testing.T) {
 	m.export.focus = exportFocusList
 	// Create enough items to make page navigation meaningful.
 	var items []exportProfileItem
-	for i := 0; i < 30; i++ {
+	for i := range 30 {
 		items = append(items, exportProfileItem{
 			kind: exportItemProfile, modelDisplay: "M", backend: "llama",
 			profileName: fmt.Sprintf("p%d", i), checked: false,
@@ -1505,7 +1506,7 @@ func TestExportModalBlock_ScrollingWithScrollbar(t *testing.T) {
 
 	// Create more items than visible.
 	var items []exportProfileItem
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		items = append(items, exportProfileItem{
 			kind: exportItemProfile, modelKey: fmt.Sprintf("/models/M%d.gguf", i),
 			modelDisplay: fmt.Sprintf("M%d", i),
