@@ -4,9 +4,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/flyingnobita/llml/internal/models"
-	"github.com/mattn/go-runewidth"
 	"time"
+
+	"github.com/mattn/go-runewidth"
+
+	"github.com/flyingnobita/llml/internal/models"
 )
 
 func TestFormatSortColumnTitle_inactiveColumn(t *testing.T) {

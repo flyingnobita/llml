@@ -161,6 +161,8 @@ func StripModelLocationParams(backend string, env []PortableEnvVar, args []strin
 }
 
 // ReadPortable reads and validates a portable profile TOML file.
+//
+//nolint:gosec // G304: path from user input (CLI arg or filepicker) — user-intended file.
 func ReadPortable(path string) (*PortableFile, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
@@ -196,7 +198,7 @@ func PortableToProfile(pp PortableProfile) Profile {
 	})
 	env := make([]EnvVar, len(pp.Env))
 	for i, e := range pp.Env {
-		env[i] = EnvVar{Key: e.Key, Value: e.Value}
+		env[i] = EnvVar(e)
 	}
 	return NormalizeProfile(Profile{
 		Name:     pp.Name,

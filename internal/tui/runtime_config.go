@@ -9,6 +9,7 @@ import (
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
+
 	"github.com/flyingnobita/llml/internal/models"
 )
 
@@ -31,14 +32,14 @@ const (
 func applyPortEnv(envKey string, raw string, defaultPort int) error {
 	v := strings.TrimSpace(raw)
 	if v == "" {
-		os.Unsetenv(envKey)
+		_ = os.Unsetenv(envKey)
 		return nil
 	}
 	p, err := strconv.Atoi(v)
 	if err != nil || p < 1 || p > 65535 {
 		return fmt.Errorf("port must be 1-65535 or empty for default %d", defaultPort)
 	}
-	os.Setenv(envKey, v)
+	_ = os.Setenv(envKey, v)
 	return nil
 }
 
@@ -55,15 +56,15 @@ func prefillPort(envKey string, effective int) string {
 func applyPathEnv(key, raw string) {
 	v := strings.TrimSpace(raw)
 	if v == "" {
-		os.Unsetenv(key)
+		_ = os.Unsetenv(key)
 		return
 	}
 	v = filepath.Clean(models.ExpandTildePath(v))
 	if v == "" || v == "." {
-		os.Unsetenv(key)
+		_ = os.Unsetenv(key)
 		return
 	}
-	os.Setenv(key, v)
+	_ = os.Setenv(key, v)
 }
 
 func validatePortInput(s string) error {
@@ -240,9 +241,9 @@ func (m Model) commitRuntimeConfig() (Model, tea.Cmd) {
 	applyPathEnv(models.EnvOllamaPath, m.rc.inputs[runtimeFieldOllamaPath].Value())
 	applyPathEnv(models.EnvKoboldCppPath, m.rc.inputs[runtimeFieldKoboldCppPath].Value())
 	if host := strings.TrimSpace(m.rc.inputs[runtimeFieldOllamaHost].Value()); host == "" {
-		os.Unsetenv(models.EnvOllamaHost)
+		_ = os.Unsetenv(models.EnvOllamaHost)
 	} else {
-		os.Setenv(models.EnvOllamaHost, host)
+		_ = os.Setenv(models.EnvOllamaHost, host)
 	}
 	m.runtime = models.DiscoverRuntime()
 	var cmd tea.Cmd

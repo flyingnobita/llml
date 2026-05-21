@@ -11,7 +11,7 @@ import (
 // It uses "› " prefix for the focused row, shows the inline edit input when that row is being edited,
 // and renders "(none)" when the list is empty and not in an active-append edit.
 func (m Model) renderEditableListItems(items []string, sectionFocus paramFocus, cursor int, sectionEditKind paramEditKind, maxSec int) []string {
-	if len(items) == 0 && !(m.params.focus == sectionFocus && m.params.editKind == sectionEditKind) {
+	if len(items) == 0 && (m.params.focus != sectionFocus || m.params.editKind != sectionEditKind) {
 		prefix := "  "
 		if m.params.focus == sectionFocus {
 			prefix = "› "

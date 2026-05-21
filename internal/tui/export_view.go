@@ -9,6 +9,7 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+
 	"github.com/flyingnobita/llml/internal/profiles"
 )
 
@@ -370,9 +371,10 @@ func (m Model) updateExportKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		idx := m.exportRealCursorIndex()
 		if idx >= 0 && idx < len(m.export.items) {
 			it := &m.export.items[idx]
-			if it.kind == exportItemHeader {
+			switch it.kind {
+			case exportItemHeader:
 				m.toggleGroup(!it.checked)
-			} else if it.kind == exportItemProfile {
+			case exportItemProfile:
 				it.checked = !it.checked
 				m.syncHeaderStates()
 			}

@@ -8,6 +8,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+
 	"github.com/flyingnobita/llml/internal/models"
 )
 
@@ -165,16 +166,17 @@ func (m Model) modelTablePaneView() string {
 	}
 	var pct float64
 	haveOuter := m.table.hscroll.TotalLineCount() > m.table.hscroll.VisibleLineCount()
-	if haveOuter {
+	switch {
+	case haveOuter:
 		pct = viewportVerticalScrollPercent(m.table.hscroll)
-	} else if len(m.table.files) > m.table.tbl.Height() {
+	case len(m.table.files) > m.table.tbl.Height():
 		n := len(m.table.files)
 		if n <= 1 {
 			pct = 0
 		} else {
 			pct = float64(m.table.tbl.Cursor()) / float64(n-1)
 		}
-	} else {
+	default:
 		return vp
 	}
 	return m.withVScrollBar(vp, pct)

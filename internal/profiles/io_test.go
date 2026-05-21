@@ -185,7 +185,7 @@ func TestFetchPortable(t *testing.T) {
 	// Case 10: Redirect chain >= 5
 	t.Run("too many redirects", func(t *testing.T) {
 		srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, r.URL.String(), 302)
+			http.Redirect(w, r, r.URL.String(), http.StatusFound)
 		}))
 		defer srv.Close()
 		defer useTestServerClient(srv)()
@@ -202,7 +202,7 @@ func TestFetchPortable(t *testing.T) {
 	// Case 11: Redirect to non-HTTPS
 	t.Run("redirect to non-https", func(t *testing.T) {
 		srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, "http://example.com/evil.toml", 302)
+			http.Redirect(w, r, "http://example.com/evil.toml", http.StatusFound)
 		}))
 		defer srv.Close()
 		defer useTestServerClient(srv)()

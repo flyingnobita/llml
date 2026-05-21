@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+
 	"github.com/flyingnobita/llml/internal/profiles"
 )
 
@@ -672,12 +673,10 @@ func TestExportHeaderAtZeroCursorNavigationClamped(t *testing.T) {
 
 	// Down at end should stay at end.
 	m2.export.cursor = 1
-	tm, _ = m2.updateExportKey(msg) // j
-	m3 := asModel(tm)
-	// Actually let me fix this — msg is 'k' not 'j'.
+	_, _ = m2.updateExportKey(msg) // j — msg is 'k', overwritten below
 	msg2 := tea.KeyPressMsg{Code: 'j', Text: "down"}
 	tm, _ = m2.updateExportKey(msg2)
-	m3 = asModel(tm)
+	m3 := asModel(tm)
 	if m3.export.cursor != 1 {
 		t.Errorf("cursor = %d, want 1 (clamped at end)", m3.export.cursor)
 	}

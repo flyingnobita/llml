@@ -27,8 +27,8 @@ func DumpGGUF(w io.Writer, path string, opts DumpGGUFOptions) error {
 }
 
 func writeGGUFReport(w io.Writer, r *gguf.Reader, opts DumpGGUFOptions) error {
-	fmt.Fprintf(w, "gguf_version: %d\n", r.Version)
-	fmt.Fprintf(w, "byte_order: %s\n", byteOrderLabel(r.ByteOrder))
+	_, _ = fmt.Fprintf(w, "gguf_version: %d\n", r.Version)
+	_, _ = fmt.Fprintf(w, "byte_order: %s\n", byteOrderLabel(r.ByteOrder))
 
 	keys := make([]string, 0, len(r.Metadata))
 	for k := range r.Metadata {
@@ -36,15 +36,15 @@ func writeGGUFReport(w io.Writer, r *gguf.Reader, opts DumpGGUFOptions) error {
 	}
 	sort.Strings(keys)
 
-	fmt.Fprintln(w, "metadata:")
+	_, _ = fmt.Fprintln(w, "metadata:")
 	for _, k := range keys {
-		fmt.Fprintf(w, "  %s: %s\n", k, formatGGUFMetadataValue(r.Metadata[k]))
+		_, _ = fmt.Fprintf(w, "  %s: %s\n", k, formatGGUFMetadataValue(r.Metadata[k]))
 	}
 
 	if opts.Tensors {
-		fmt.Fprintln(w, "tensors:")
+		_, _ = fmt.Fprintln(w, "tensors:")
 		for _, t := range r.Tensors {
-			fmt.Fprintf(w, "  %s: %s %v\n", t.Name, t.Type.String(), t.Dimensions)
+			_, _ = fmt.Fprintf(w, "  %s: %s %v\n", t.Name, t.Type.String(), t.Dimensions)
 		}
 	}
 	return nil

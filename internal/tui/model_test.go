@@ -8,8 +8,9 @@ import (
 
 	btable "charm.land/bubbles/v2/table"
 	tea "charm.land/bubbletea/v2"
-	"github.com/flyingnobita/llml/internal/models"
 	"github.com/mattn/go-runewidth"
+
+	"github.com/flyingnobita/llml/internal/models"
 )
 
 func TestLayoutTable_wideTerminalFitsViewport(t *testing.T) {

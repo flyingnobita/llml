@@ -2,6 +2,7 @@ package tui
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -13,6 +14,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/atotto/clipboard"
+
 	"github.com/flyingnobita/llml/internal/models"
 )
 
@@ -39,7 +41,7 @@ func buildServerSpec(backend models.ModelBackend, modelPath string, params Model
 			host = models.OllamaHost()
 		}
 		if strict && bin == "" && !rt.OllamaRunning {
-			return serverSpec{}, fmt.Errorf(MissingOllamaFooterNote)
+			return serverSpec{}, errors.New(MissingOllamaFooterNote)
 		}
 		if bin == "" {
 			bin = "ollama"
@@ -56,7 +58,7 @@ func buildServerSpec(backend models.ModelBackend, modelPath string, params Model
 		activate := models.ResolveVLLMActivateScript(bin)
 		if strict {
 			if bin == "" {
-				return serverSpec{}, fmt.Errorf(MissingVLLMFooterNote)
+				return serverSpec{}, errors.New(MissingVLLMFooterNote)
 			}
 			if runtime.GOOS == "windows" && activate != "" {
 				return serverSpec{}, fmt.Errorf("vLLM venv activation is not supported on Windows from this app; run vllm from an activated shell or add vllm to PATH (detected %s)", activate)
@@ -75,7 +77,7 @@ func buildServerSpec(backend models.ModelBackend, modelPath string, params Model
 	case models.BackendKobold:
 		bin := models.ResolveKoboldCppPath(rt)
 		if strict && bin == "" {
-			return serverSpec{}, fmt.Errorf(MissingKoboldCppFooterNote)
+			return serverSpec{}, errors.New(MissingKoboldCppFooterNote)
 		}
 		if bin == "" {
 			bin = "koboldcpp"
@@ -90,7 +92,7 @@ func buildServerSpec(backend models.ModelBackend, modelPath string, params Model
 	default: // BackendLlama
 		bin := models.ResolveLlamaServerPath(rt)
 		if strict && bin == "" {
-			return serverSpec{}, fmt.Errorf(MissingLlamaServerFooterNote)
+			return serverSpec{}, errors.New(MissingLlamaServerFooterNote)
 		}
 		if bin == "" {
 			bin = "llama-server"
@@ -198,26 +200,29 @@ func (s serverSpec) unixSplitScript() string {
 // foregroundCmd returns an *exec.Cmd for tea.ExecProcess (TUI suspends while server runs).
 // On Unix, wraps in sh -c with printf echo and read-pause so logs stay readable before the TUI redraws.
 // On Windows, runs the binary directly with merged env (no pause support).
-func (s serverSpec) foregroundCmd() *exec.Cmd {
+// G204: intentional subprocess launch — llml's purpose is launching model servers.
+func (s serverSpec) foregroundCmd() *exec.Cmd { //nolint:gosec
 	if runtime.GOOS == "windows" {
-		c := exec.Command(s.bin, s.directArgs()...)
+		c := exec.Command(s.bin, s.directArgs()...) //nolint:gosec //nolint:gosec
 		c.Env = mergeEnv(os.Environ(), s.params.Env)
 		return c
 	}
-	return exec.Command("sh", "-c", s.unixForegroundScript())
+	return exec.Command("sh", "-c", s.unixForegroundScript()) //nolint:gosec
 }
 
 // splitCmd returns an *exec.Cmd for split-pane log streaming.
 // Unix vLLM uses sh -c with 2>&1 (stderr merge) and also sets Env via mergeEnv — double propagation
 // is intentional and matches the original per-backend split paths.
 // All other cases run the binary directly with merged env.
+//
+//nolint:gosec // G204: intentional subprocess launch.
 func (s serverSpec) splitCmd() *exec.Cmd {
 	if s.backend == models.BackendVLLM && runtime.GOOS != "windows" {
-		c := exec.Command("sh", "-c", s.unixSplitScript())
+		c := exec.Command("sh", "-c", s.unixSplitScript()) //nolint:gosec
 		c.Env = mergeEnv(os.Environ(), s.params.Env)
 		return c
 	}
-	c := exec.Command(s.bin, s.directArgs()...)
+	c := exec.Command(s.bin, s.directArgs()...) //nolint:gosec
 	c.Env = mergeEnv(os.Environ(), s.params.Env)
 	return c
 }
@@ -341,13 +346,13 @@ func runSplitServerCmd(spec serverSpec) tea.Cmd {
 }
 
 func startOllamaDaemon(spec serverSpec) error {
-	cmd := exec.Command(spec.bin, "serve")
+	cmd := exec.Command(spec.bin, "serve") //nolint:gosec
 	cmd.Env = mergeEnv(os.Environ(), spec.params.Env)
 	devNull, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
 	if err != nil {
 		return err
 	}
-	defer devNull.Close()
+	defer func() { _ = devNull.Close() }()
 	cmd.Stdout = devNull
 	cmd.Stderr = devNull
 	applyBackgroundCmdSysProcAttr(cmd)

@@ -11,12 +11,14 @@ import (
 
 // withGGUFMetadata opens path as a GGUF file and calls fn with its metadata.
 // The file is closed before returning.
+//
+//nolint:gosec // G304: path from model discovery — trusted source.
 func withGGUFMetadata(path string, fn func(gguf.Metadata) error) error {
 	f, err := os.Open(path)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	r, err := gguf.Open(f)
 	if err != nil {
 		return err

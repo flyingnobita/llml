@@ -50,14 +50,13 @@ archives:
 checksum:
   name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
 
-brews:
+homebrew_casks:
   - name: llml
     ids:
       - llml
     homepage: https://github.com/flyingnobita/llml
     description: Terminal UI to discover local models and launch llama-server, vLLM, or Ollama
     skip_upload: '{{ not (isEnvSet "HOMEBREW_TAP_GITHUB_TOKEN") }}'
-    directory: Formula
     repository:
       owner: flyingnobita
       name: homebrew-tap
