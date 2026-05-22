@@ -144,6 +144,46 @@ func TestParamPanelDeleteEnvRowConfirm(t *testing.T) {
 	}
 }
 
+func TestParamPanelEscapeClosesPanelByKeyCode(t *testing.T) {
+	m := New()
+	m.layout.width = 80
+	m.layout.height = 24
+	m.params.open = true
+	m.params.focus = paramFocusProfiles
+	m.params.profiles = []ParameterProfile{{Name: "a"}}
+	m.params.profileIndex = 0
+
+	m, _ = m.updateParamPanelKey(tea.KeyPressMsg{Code: tea.KeyEscape})
+	if m.params.open {
+		t.Fatal("expected escape key code to close parameter panel")
+	}
+}
+
+func TestParamPanelEscapeClosesEvenWithMissingRuntimeNote(t *testing.T) {
+	m := New()
+	m.layout.width = 80
+	m.layout.height = 24
+	m.table.files = []models.ModelFile{
+		{Path: "/m/a.gguf", Backend: models.BackendLlama, Name: "a"},
+	}
+	m.table.effectiveBackends = map[string]models.ModelBackend{
+		"/m/a.gguf": models.BackendKobold,
+	}
+	m.params.open = true
+	m.params.focus = paramFocusProfiles
+	m.params.modelPath = "/m/a.gguf"
+	m.params.profiles = []ParameterProfile{{Name: "a", Backend: "koboldcpp"}}
+	m.params.profileIndex = 0
+
+	m, _ = m.updateParamPanelKey(tea.KeyPressMsg{Code: tea.KeyEscape})
+	if m.params.open {
+		t.Fatal("expected escape to close parameter panel even when a missing-runtime note is set")
+	}
+	if !strings.Contains(m.lastRunNote, MissingKoboldCppFooterNote) {
+		t.Fatalf("expected missing koboldcpp note after close, got %q", m.lastRunNote)
+	}
+}
+
 func TestCommitParamLineEdit_blankEnvLikeCancel(t *testing.T) {
 	m := New()
 	m.params.focus = paramFocusEnv

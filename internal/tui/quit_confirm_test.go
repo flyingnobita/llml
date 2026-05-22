@@ -150,3 +150,59 @@ func TestUpdateServerSplitKeys_StopServerKeyDoesNotOpenQuitConfirm(t *testing.T)
 		t.Fatal("expected stop-server key not to open quit confirmation")
 	}
 }
+
+func TestUpdateServerSplitKeys_ExitedPreviewEnterDoesNotDismissLog(t *testing.T) {
+	m := newTestModel()
+	m.server.running = true
+	m.server.exited = true
+	m.preview.focused = true
+	m.server.splitFocused = false
+	m.preview.lastCmd = "llama-server --model /tmp/a.gguf"
+
+	got, _ := m.updateServerSplitKeys(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	if !got.server.running {
+		t.Fatal("expected exited split pane to stay open when enter is pressed in preview focus")
+	}
+	if !got.server.exited {
+		t.Fatal("expected exited state to remain when enter is pressed in preview focus")
+	}
+}
+
+func TestUpdateServerSplitKeys_ExitedLogEnterDismisses(t *testing.T) {
+	m := newTestModel()
+	m.server.running = true
+	m.server.exited = true
+	m.server.splitFocused = true
+
+	got, _ := m.updateServerSplitKeys(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	if got.server.running {
+		t.Fatal("expected enter to dismiss exited split pane when log focus is active")
+	}
+}
+
+func TestFooterHelpLine_ExitedPreviewKeepsCopyHintWithoutCloseHint(t *testing.T) {
+	m := newTestModel()
+	m.server.running = true
+	m.server.exited = true
+	m.preview.focused = true
+
+	got := footerHelpLine(m)
+	if !strings.Contains(got, FooterHintCopyPath) {
+		t.Fatalf("expected exited preview footer to keep copy hint, got %q", got)
+	}
+	if strings.Contains(got, FooterSplitDismiss) {
+		t.Fatalf("expected exited preview footer to omit dismiss hint, got %q", got)
+	}
+}
+
+func TestFooterHelpLine_ExitedLogShowsCloseHint(t *testing.T) {
+	m := newTestModel()
+	m.server.running = true
+	m.server.exited = true
+	m.server.splitFocused = true
+
+	got := footerHelpLine(m)
+	if !strings.Contains(got, FooterSplitDismiss) {
+		t.Fatalf("expected exited log footer to show dismiss hint, got %q", got)
+	}
+}

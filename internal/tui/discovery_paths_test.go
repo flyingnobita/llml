@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -91,6 +92,84 @@ func TestDiscoveryPathsModal_CancelDiscardsEdits(t *testing.T) {
 	}
 	if m.discovery.paths[0] != "/start" {
 		t.Fatalf("expected /start, got %s", m.discovery.paths[0])
+	}
+}
+
+func TestDiscoveryPathsModal_EscapeClosesAndRestoresOriginalPaths(t *testing.T) {
+	m := New()
+	m.discovery.paths = []string{"/start", "/keep"}
+	m, _ = m.openDiscoveryPathsModal()
+	m.discovery.cursor = 0
+
+	m, _ = m.startDiscoveryPathEdit(false)
+	m.discovery.editInput.SetValue("/edited")
+	m = m.commitDiscoveryPathEdit()
+	m.discovery.cursor = 1
+	m = m.deleteDiscoveryPathRow()
+
+	got, _ := m.updateDiscoveryPathsKey(tea.KeyPressMsg{Code: tea.KeyEscape})
+	if !got.discovery.open {
+		t.Fatal("expected discovery paths modal to remain open for discard confirmation")
+	}
+	if !got.discovery.discardConfirm {
+		t.Fatal("expected discard confirmation to open")
+	}
+	got, _ = got.updateDiscoveryPathsKey(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	if got.discovery.open {
+		t.Fatal("expected discovery paths modal to close after confirming discard")
+	}
+	if !slices.Equal(got.discovery.paths, []string{"/start", "/keep"}) {
+		t.Fatalf("expected original paths restored after discard, got %v", got.discovery.paths)
+	}
+}
+
+func TestDiscoveryPathsModal_EscapeWithDirtyStateOpensDiscardConfirm(t *testing.T) {
+	m := New()
+	m.discovery.paths = []string{"/start"}
+	m, _ = m.openDiscoveryPathsModal()
+	m.discovery.paths = []string{"/edited"}
+
+	got, _ := m.updateDiscoveryPathsKey(tea.KeyPressMsg{Code: tea.KeyEscape})
+	if !got.discovery.open {
+		t.Fatal("expected discovery paths modal to remain open while confirming discard")
+	}
+	if !got.discovery.discardConfirm {
+		t.Fatal("expected discard confirmation to open for dirty discovery paths")
+	}
+}
+
+func TestDiscoveryPathsDiscardConfirm_YRestoresOriginalAndCloses(t *testing.T) {
+	m := New()
+	m.discovery.paths = []string{"/start"}
+	m, _ = m.openDiscoveryPathsModal()
+	m.discovery.paths = []string{"/edited"}
+	m.discovery.discardConfirm = true
+
+	got, _ := m.updateDiscoveryPathsKey(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	if got.discovery.open {
+		t.Fatal("expected discovery paths modal to close after confirming discard")
+	}
+	if !slices.Equal(got.discovery.paths, []string{"/start"}) {
+		t.Fatalf("expected original paths restored, got %v", got.discovery.paths)
+	}
+}
+
+func TestDiscoveryPathsDiscardConfirm_NStaysOpen(t *testing.T) {
+	m := New()
+	m.discovery.paths = []string{"/start"}
+	m, _ = m.openDiscoveryPathsModal()
+	m.discovery.paths = []string{"/edited"}
+	m.discovery.discardConfirm = true
+
+	got, _ := m.updateDiscoveryPathsKey(tea.KeyPressMsg{Code: 'n', Text: "n"})
+	if !got.discovery.open {
+		t.Fatal("expected discovery paths modal to stay open after canceling discard")
+	}
+	if got.discovery.discardConfirm {
+		t.Fatal("expected discard confirmation to close after choosing stay")
+	}
+	if !slices.Equal(got.discovery.paths, []string{"/edited"}) {
+		t.Fatalf("expected edited paths to remain in draft, got %v", got.discovery.paths)
 	}
 }
 

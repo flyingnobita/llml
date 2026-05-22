@@ -306,7 +306,7 @@ func footerHelpLine(m Model) string {
 			return strings.Join(parts, FooterHintSep)
 		}
 		if m.preview.focused {
-			parts := []string{FooterHintTabSections, FooterNavHint, FooterHintCopyPath, FooterHintToggleWrap, stopOrDismiss}
+			parts := []string{FooterHintTabSections, FooterNavHint, FooterHintCopyPath, FooterHintToggleWrap}
 			if quitHint != "" {
 				parts = append(parts, quitHint)
 			}
@@ -318,7 +318,9 @@ func footerHelpLine(m Model) string {
 			FooterHintTabSections,
 			FooterNavHint,
 			FooterHintToggleWrap,
-			stopOrDismiss,
+		}
+		if !m.server.exited {
+			parts = append(parts, stopOrDismiss)
 		}
 		if quitHint != "" {
 			parts = append(parts, quitHint)
@@ -665,6 +667,10 @@ func (m Model) discoveryRow(i int, p string) string {
 
 // discoveryPathsModalBlock returns the framed discovery paths configuration panel.
 func (m Model) discoveryPathsModalBlock() string {
+	if m.discovery.discardConfirm {
+		return m.discoveryDiscardConfirmModalBlock()
+	}
+
 	cw := m.paramPanelContentWidth()
 	rows := []string{
 		m.modalTitleRow(cw, m.ui.styles.portConfigTitle, "Model Paths"),
@@ -687,6 +693,24 @@ func (m Model) discoveryPathsModalBlock() string {
 	rows = append(rows, "", m.renderFooterHints(FooterDiscoveryPathsHints))
 	block := lipgloss.JoinVertical(lipgloss.Left, rows...)
 	return m.ui.styles.portConfigBox.Render(block)
+}
+
+func (m Model) discoveryDiscardConfirmModalBlock() string {
+	cw := min(m.paramPanelContentWidth(), 64)
+	panelBox := m.ui.styles.paramPanelBox
+	bodyStyle := m.ui.styles.body
+
+	rows := []string{
+		m.modalTitleRow(cw, m.ui.styles.portConfigTitle, "Discard Model Paths changes?"),
+		"",
+		bodyStyle.Render("You have unsaved Model Paths changes."),
+		bodyStyle.Render("Leave this window and discard those changes?"),
+		"",
+		m.renderFooterHints(FooterDiscoveryDiscardYN),
+	}
+
+	block := lipgloss.JoinVertical(lipgloss.Left, rows...)
+	return panelBox.Width(cw + panelBox.GetHorizontalFrameSize()).Render(block)
 }
 
 // runtimeFieldRow renders a label + input pair for one runtime config field.
