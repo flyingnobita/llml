@@ -108,11 +108,13 @@ type alertsState struct {
 
 // discoveryPathsState holds the model-discovery paths modal's state.
 type discoveryPathsState struct {
-	open      bool
-	cursor    int
-	paths     []string
-	editOpen  bool
-	editInput textinput.Model
+	open           bool
+	cursor         int
+	paths          []string
+	original       []string
+	discardConfirm bool
+	editOpen       bool
+	editInput      textinput.Model
 }
 
 // exportViewState holds the profile export modal state.

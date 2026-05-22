@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/flyingnobita/llml/internal/profiles"
 )
@@ -357,6 +358,86 @@ func TestExportModalBlockRendering(t *testing.T) {
 	}
 	if !contains(block, "Model-B") {
 		t.Error("missing second model display")
+	}
+}
+
+func TestExportModalBlock_FooterTracksFocus(t *testing.T) {
+	m := New()
+	m.layout.width = 100
+	m.layout.height = 40
+	m.layout.bodyInnerW = 80
+	m.export.open = true
+	m.export.items = []exportProfileItem{
+		{kind: exportItemProfile, modelDisplay: "Model-A", backend: "llama", profileName: "gpu-full", checked: true},
+	}
+	m.export.outputPath = "/tmp/llml-profiles.toml"
+
+	m.export.focus = exportFocusList
+	listBlock := ansi.Strip(m.exportModalBlock())
+	if !contains(listBlock, "/: filter") {
+		t.Fatal("expected list footer to advertise filter entry")
+	}
+	if contains(listBlock, "type: filter") {
+		t.Fatal("did not expect filter-focus footer while list is focused")
+	}
+
+	m.export.focus = exportFocusFilter
+	filterBlock := ansi.Strip(m.exportModalBlock())
+	if !contains(filterBlock, "type: filter") {
+		t.Fatal("expected filter footer after entering filter focus")
+	}
+	if contains(filterBlock, "/: filter") {
+		t.Fatal("did not expect list footer after entering filter focus")
+	}
+
+	m.export.focus = exportFocusPath
+	pathBlock := ansi.Strip(m.exportModalBlock())
+	if !contains(pathBlock, "tab: list") {
+		t.Fatal("expected path footer to advertise returning to list")
+	}
+}
+
+func TestExportFilterTextPersistsWhenRefocusedFromList(t *testing.T) {
+	m := New()
+	m.export.open = true
+	m.export.focus = exportFocusList
+	m.export.items = []exportProfileItem{
+		{kind: exportItemProfile, modelDisplay: "Model-A", backend: "llama", profileName: "gpu-full", checked: true},
+		{kind: exportItemProfile, modelDisplay: "Model-B", backend: "vllm", profileName: "cpu", checked: false},
+	}
+	m.export.filterInput.SetValue("gpu")
+	m.rebuildExportFilter()
+
+	tm, _ := m.updateExportKey(tea.KeyPressMsg{Code: '/', Text: "/"})
+	m2 := asModel(tm)
+	if m2.export.focus != exportFocusFilter {
+		t.Fatal("expected / to focus filter from list")
+	}
+	if got := m2.export.filterInput.Value(); got != "gpu" {
+		t.Fatalf("expected existing filter text to persist, got %q", got)
+	}
+}
+
+func TestExportFilterTextPersistsWhenRefocusedFromPath(t *testing.T) {
+	m := New()
+	m.export.open = true
+	m.export.focus = exportFocusPath
+	m.export.outputPath = "/tmp/export.toml"
+	m.export.pathInput.SetValue(m.export.outputPath)
+	m.export.items = []exportProfileItem{
+		{kind: exportItemProfile, modelDisplay: "Model-A", backend: "llama", profileName: "gpu-full", checked: true},
+		{kind: exportItemProfile, modelDisplay: "Model-B", backend: "vllm", profileName: "cpu", checked: false},
+	}
+	m.export.filterInput.SetValue("gpu")
+	m.rebuildExportFilter()
+
+	tm, _ := m.updateExportKey(tea.KeyPressMsg{Code: '/', Text: "/"})
+	m2 := asModel(tm)
+	if m2.export.focus != exportFocusFilter {
+		t.Fatal("expected / to focus filter from path")
+	}
+	if got := m2.export.filterInput.Value(); got != "gpu" {
+		t.Fatalf("expected existing filter text to persist, got %q", got)
 	}
 }
 

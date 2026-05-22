@@ -260,6 +260,7 @@ const (
 
 	// Discovery paths modal.
 	FooterDiscoveryPathsHints   = FooterNavHint + FooterHintSep + FooterParamHintAdd + FooterHintSep + "enter: edit · d: delete · s: save · esc: back"
+	FooterDiscoveryDiscardYN    = "y: discard changes · n/esc: stay"
 	discoveryPathsModalSubtitle = "These paths are saved to config.toml and scanned in addition to the defaults below."
 	FooterParamHintBack         = "esc: back"
 	FooterParamHintDelete       = "d: delete"
@@ -274,9 +275,11 @@ const (
 	FooterParamFooterDetailRows  = FooterHintTabSections + FooterHintSep + FooterNavHint + FooterHintSep + FooterParamHintAdd + FooterHintSep + FooterParamHintDelete + FooterHintSep + FooterParamHintEnterEdit + FooterHintSep + FooterParamHintBack
 
 	// Export modal.
-	FooterExportHints    = FooterHintExport + FooterHintSep + "tab: focus · /: filter · space: toggle · ctrl+u/d: page · a: select all · A: select none · enter: export · esc: back"
-	FooterExportNoMatch  = "(no matches)"
-	FooterCollisionHints = "o: overwrite · n: new name · esc: cancel"
+	FooterExportHintsList   = FooterHintExport + FooterHintSep + "/: filter · space: toggle · ctrl+u/d: page · a: select all · A: select none · enter: export · tab: output · esc: back"
+	FooterExportHintsFilter = FooterHintExport + FooterHintSep + "type: filter · tab: output · esc: list"
+	FooterExportHintsPath   = FooterHintExport + FooterHintSep + "enter: export · tab: list · esc: list"
+	FooterExportNoMatch     = "(no matches)"
+	FooterCollisionHints    = "o: overwrite · n: new name · esc: cancel"
 
 	// Import modal.
 	FooterImportHintsPath = FooterHintImport + FooterHintSep + "enter: parse · esc: back"

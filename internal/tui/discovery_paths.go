@@ -13,6 +13,8 @@ import (
 func (m Model) openDiscoveryPathsModal() (Model, tea.Cmd) {
 	m = m.saveMainPaneFocusForModal()
 	m.discovery.open = true
+	m.discovery.original = slices.Clone(m.discovery.paths)
+	m.discovery.discardConfirm = false
 	m = m.withLastRunCleared()
 	m.discovery.editOpen = false
 	m.discovery.cursor = 0
@@ -24,10 +26,46 @@ func (m Model) openDiscoveryPathsModal() (Model, tea.Cmd) {
 // closeDiscoveryPathsModal closes the modal.
 func (m Model) closeDiscoveryPathsModal() Model {
 	m.discovery.open = false
+	m.discovery.original = nil
+	m.discovery.discardConfirm = false
 	m.discovery.editOpen = false
 	m.discovery.editInput.Blur()
 	m.discovery.editInput.SetValue("")
 	return m.restoreMainPaneFocusAfterModal()
+}
+
+// cancelDiscoveryPathsModal closes the modal and restores the pre-open paths snapshot.
+func (m Model) cancelDiscoveryPathsModal() Model {
+	m.discovery.paths = slices.Clone(m.discovery.original)
+	return m.closeDiscoveryPathsModal()
+}
+
+func (m Model) discoveryPathsDirty() bool {
+	originalNorm := config.MergeExtraRoots(m.discovery.original, nil)
+	currentNorm := config.MergeExtraRoots(m.discovery.paths, nil)
+	if len(originalNorm) == 0 {
+		originalNorm = nil
+	}
+	if len(currentNorm) == 0 {
+		currentNorm = nil
+	}
+	return !slices.Equal(originalNorm, currentNorm)
+}
+
+func (m Model) updateDiscoveryDiscardConfirmKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	if isEscapeKey(msg) {
+		m.discovery.discardConfirm = false
+		return m, nil
+	}
+
+	switch strings.ToLower(strings.TrimSpace(msg.String())) {
+	case "y":
+		return m.cancelDiscoveryPathsModal(), nil
+	case "n":
+		m.discovery.discardConfirm = false
+		return m, nil
+	}
+	return m, nil
 }
 
 // startDiscoveryPathEdit opens the inline text input for editing the current row or a new row.
@@ -121,12 +159,16 @@ func (m Model) saveDiscoveryPaths() (Model, tea.Cmd) {
 
 // updateDiscoveryPathsKey handles keys while the discovery paths modal is open.
 func (m Model) updateDiscoveryPathsKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	if m.discovery.discardConfirm {
+		return m.updateDiscoveryDiscardConfirmKey(msg)
+	}
+
 	if m.discovery.editOpen {
-		switch msg.String() {
-		case "esc":
+		switch {
+		case isEscapeKey(msg):
 			m = m.cancelDiscoveryPathEdit()
 			return m, nil
-		case "enter":
+		case isEnterKey(msg):
 			m = m.commitDiscoveryPathEdit()
 			return m, nil
 		default:
@@ -136,11 +178,22 @@ func (m Model) updateDiscoveryPathsKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		}
 	}
 
-	switch msg.String() {
-	case "esc":
-		m = m.closeDiscoveryPathsModal()
-		m = m.withLastRunCleared()
+	if isEscapeKey(msg) {
+		if m.discoveryPathsDirty() {
+			m.discovery.discardConfirm = true
+			return m, nil
+		}
+		m = m.cancelDiscoveryPathsModal().withLastRunCleared()
 		return m, nil
+	}
+	if isEnterKey(msg) {
+		if len(m.discovery.paths) > 0 {
+			return m.startDiscoveryPathEdit(false)
+		}
+		return m, nil
+	}
+
+	switch msg.String() {
 	case "s":
 		return m.saveDiscoveryPaths()
 	case "up", "k":
@@ -155,11 +208,6 @@ func (m Model) updateDiscoveryPathsKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, nil
 	case "a":
 		return m.startDiscoveryPathEdit(true)
-	case "enter":
-		if len(m.discovery.paths) > 0 {
-			return m.startDiscoveryPathEdit(false)
-		}
-		return m, nil
 	case "d":
 		m = m.deleteDiscoveryPathRow()
 		return m, nil

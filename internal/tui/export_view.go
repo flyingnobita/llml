@@ -305,8 +305,7 @@ func (m *Model) toggleGroup(checked bool) {
 
 func (m Model) updateExportKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.export.focus == exportFocusFilter {
-		switch msg.String() {
-		case "esc":
+		if isEscapeKey(msg) {
 			m.export.filterInput.SetValue("")
 			m.export.filteredIndices = nil
 			m.export.cursor = 0
@@ -314,7 +313,8 @@ func (m Model) updateExportKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.export.filterInput.Blur()
 			m.export.focus = exportFocusList
 			return m, nil
-		case "tab":
+		}
+		if isTabKey(msg) {
 			m.export.filterInput.Blur()
 			m.export.focus = exportFocusPath
 			m.setExportPathWidth()
@@ -322,50 +322,61 @@ func (m Model) updateExportKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.export.pathInput.SetValue(m.export.outputPath)
 			m.export.pathInput.CursorEnd()
 			return m, nil
-		default:
-			var cmd tea.Cmd
-			m.export.filterInput, cmd = m.export.filterInput.Update(msg)
-			m.rebuildExportFilter()
-			return m, cmd
 		}
+		var cmd tea.Cmd
+		m.export.filterInput, cmd = m.export.filterInput.Update(msg)
+		m.rebuildExportFilter()
+		return m, cmd
 	}
 
 	if m.export.focus == exportFocusPath {
-		switch msg.String() {
-		case "esc":
-			m.export.focus = exportFocusList
+		if msg.String() == "/" {
+			m.export.focus = exportFocusFilter
+			m.export.pathInput.Blur()
+			m.export.filterInput.Focus()
+			m.export.filterInput.CursorEnd()
+			m.rebuildExportFilter()
 			return m, nil
-		case "tab":
-			m.export.focus = exportFocusList
-			return m, nil
-		case "enter":
-			return m.doExportAttempt()
-		default:
-			var cmd tea.Cmd
-			m.export.pathInput, cmd = m.export.pathInput.Update(msg)
-			m.export.outputPath = m.export.pathInput.Value()
-			return m, cmd
 		}
+		if isEscapeKey(msg) {
+			m.export.focus = exportFocusList
+			return m, nil
+		}
+		if isTabKey(msg) {
+			m.export.focus = exportFocusList
+			return m, nil
+		}
+		if isEnterKey(msg) {
+			return m.doExportAttempt()
+		}
+		var cmd tea.Cmd
+		m.export.pathInput, cmd = m.export.pathInput.Update(msg)
+		m.export.outputPath = m.export.pathInput.Value()
+		return m, cmd
 	}
 
 	// Focus on profile list.
-	switch msg.String() {
-	case "esc":
+	if isEscapeKey(msg) {
 		m = m.closeExportView()
 		return m, nil
-	case "tab":
+	}
+	if isTabKey(msg) {
 		m.export.focus = exportFocusPath
 		m.setExportPathWidth()
 		m.export.pathInput.Focus()
 		m.export.pathInput.SetValue(m.export.outputPath)
 		m.export.pathInput.CursorEnd()
 		return m, nil
+	}
+	if isEnterKey(msg) {
+		return m.doExportAttempt()
+	}
+	switch msg.String() {
 	case "/":
 		m.export.focus = exportFocusFilter
-		m.export.filterInput.SetValue("")
-		m.export.filteredIndices = nil
 		m.export.filterInput.Focus()
 		m.export.filterInput.CursorEnd()
+		m.rebuildExportFilter()
 		return m, nil
 	case "space":
 		idx := m.exportRealCursorIndex()
@@ -412,8 +423,6 @@ func (m Model) updateExportKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		m.syncHeaderStates()
 		return m, nil
-	case "enter":
-		return m.doExportAttempt()
 	case "up", "k":
 		if m.export.cursor > 0 {
 			m.export.cursor--
@@ -475,13 +484,13 @@ func (m Model) finishExport(dest string, force bool) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateCollisionKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "esc":
+	switch {
+	case isEscapeKey(msg):
 		m = m.closeCollision()
 		return m, nil
-	case "o", "O":
+	case strings.EqualFold(msg.String(), "o"):
 		return m.finishExport(m.collision.dest, true)
-	case "n", "N":
+	case strings.EqualFold(msg.String(), "n"):
 		return m.finishExport(m.collision.suffixPath, false)
 	}
 	return m, nil
@@ -563,7 +572,14 @@ func (m Model) exportModalBlock() string {
 
 	// Footer.
 	sel := m.exportSelectedCount()
-	footer := fmt.Sprintf("(%d selected)  %s", sel, FooterExportHints)
+	footerHints := FooterExportHintsList
+	switch m.export.focus {
+	case exportFocusFilter:
+		footerHints = FooterExportHintsFilter
+	case exportFocusPath:
+		footerHints = FooterExportHintsPath
+	}
+	footer := fmt.Sprintf("(%d selected)  %s", sel, footerHints)
 	rows = append(rows, m.renderFooterHints(footer))
 
 	block := lipgloss.JoinVertical(lipgloss.Left, rows...)

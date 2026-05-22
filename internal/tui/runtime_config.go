@@ -261,22 +261,23 @@ func (m Model) commitRuntimeConfig() (Model, tea.Cmd) {
 
 // updateRuntimeConfigKey handles keys while the runtime env editor is open.
 func (m Model) updateRuntimeConfigKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	switch msg.String() {
-	case "esc":
+	if isEscapeKey(msg) {
 		m = m.withLastRunCleared()
 		m = m.closeRuntimeConfig()
 		return m, nil
-	case "enter":
+	}
+	if isEnterKey(msg) {
 		return m.commitRuntimeConfig()
-	case "tab":
+	}
+	if isTabKey(msg) {
 		next := (m.rc.focus + 1) % runtimeFieldCount
 		return m.focusRuntimeField(next)
-	case "shift+tab":
+	}
+	if isShiftTabKey(msg) {
 		prev := (m.rc.focus + runtimeFieldCount - 1) % runtimeFieldCount
 		return m.focusRuntimeField(prev)
-	default:
-		var cmd tea.Cmd
-		m.rc.inputs[m.rc.focus], cmd = m.rc.inputs[m.rc.focus].Update(msg)
-		return m, cmd
 	}
+	var cmd tea.Cmd
+	m.rc.inputs[m.rc.focus], cmd = m.rc.inputs[m.rc.focus].Update(msg)
+	return m, cmd
 }

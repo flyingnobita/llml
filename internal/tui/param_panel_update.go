@@ -282,7 +282,7 @@ func (m Model) paramsModelIsGGUF() bool {
 	return false
 }
 
-func (m Model) persistParamPanel() (Model, tea.Cmd) {
+func (m Model) persistParamPanelState() (Model, tea.Cmd, bool) {
 	m.params.syncCurrentProfileOut()
 	profiles := copyProfiles(m.params.profiles)
 	if !m.paramsModelIsGGUF() {
@@ -306,20 +306,25 @@ func (m Model) persistParamPanel() (Model, tea.Cmd) {
 	}
 	if err := saveModelEntry(m.params.modelPath, ent); err != nil {
 		m = m.withLastRunError(err.Error())
-		return m, clearLastRunNoteAfterCmd()
+		return m, clearLastRunNoteAfterCmd(), true
 	}
 	m = m.withLastRunCleared()
 	m = m.updateEffectiveBackendForPath(m.params.modelPath)
 	m = m.refreshTableRows()
 	m = m.withLaunchPreviewSynced()
 	m, noteCmd := m.maybeSetMissingRuntimeFooterNote()
-	return m, noteCmd
+	return m, noteCmd, false
+}
+
+func (m Model) persistParamPanel() (Model, tea.Cmd) {
+	m, cmd, _ := m.persistParamPanelState()
+	return m, cmd
 }
 
 // closeParamPanelWithPersist saves first; on error the panel stays open and lastRunNote is set.
 func (m Model) closeParamPanelWithPersist() (Model, tea.Cmd) {
-	m, cmd := m.persistParamPanel()
-	if m.lastRunNote != "" {
+	m, cmd, failed := m.persistParamPanelState()
+	if failed {
 		return m, cmd
 	}
 	m = m.closeParamPanel()
@@ -392,10 +397,12 @@ func (m Model) handleConfirmKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 
 // handleEditKey handles keys while a param line edit is active.
 func (m Model) handleEditKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	switch msg.String() {
-	case "esc":
+	if isEscapeKey(msg) {
 		m = m.cancelParamLineEdit()
 		return m, nil
+	}
+
+	switch msg.String() {
 	case "enter":
 		m = m.commitParamLineEdit()
 		return m.persistParamPanel()
@@ -410,20 +417,34 @@ func (m Model) handleEditKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 
 // handleNavKey handles navigation and action keys in the param panel idle state.
 func (m Model) handleNavKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	switch msg.String() {
-	case "esc":
+	if isEscapeKey(msg) {
 		return m.closeParamPanelWithPersist()
+	}
+
+	if isTabKey(msg) {
+		m = m.cycleParamFocus(1)
+		return m, nil
+	}
+	if isShiftTabKey(msg) {
+		m = m.cycleParamFocus(-1)
+		return m, nil
+	}
+	if isEnterKey(msg) {
+		if m.params.focus == paramFocusMetadata {
+			return m.startMetadataValueEdit()
+		}
+		if m.params.focus == paramFocusEnv || m.params.focus == paramFocusArgs {
+			return m.startParamLineEdit()
+		}
+		return m, nil
+	}
+
+	switch msg.String() {
 	case "E":
 		m = m.openExportView()
 		return m, nil
 	case "t":
 		return m.cycleTheme()
-	case "tab":
-		m = m.cycleParamFocus(1)
-		return m, nil
-	case "shift+tab":
-		m = m.cycleParamFocus(-1)
-		return m, nil
 	case "up", "k":
 		return m.moveParamCursor(-1)
 	case "down", "j":
@@ -487,14 +508,6 @@ func (m Model) handleNavKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	case "r", "R":
 		if m.params.focus == paramFocusProfiles {
 			return m.startProfileNameEdit()
-		}
-		return m, nil
-	case "enter":
-		if m.params.focus == paramFocusMetadata {
-			return m.startMetadataValueEdit()
-		}
-		if m.params.focus == paramFocusEnv || m.params.focus == paramFocusArgs {
-			return m.startParamLineEdit()
 		}
 		return m, nil
 	default:

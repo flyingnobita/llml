@@ -31,6 +31,10 @@ func isEnterKey(msg tea.KeyPressMsg) bool {
 	return msg.Key().Code == tea.KeyEnter
 }
 
+func isShiftTabKey(msg tea.KeyPressMsg) bool {
+	return msg.String() == "shift+tab"
+}
+
 // cycleSplitPaneFocus shifts focus between the table, launch preview (if visible), and the server log.
 func (m Model) cycleSplitPaneFocus() Model {
 	switch {
@@ -70,7 +74,7 @@ func (m Model) updateServerSplitKeys(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 			return m.cycleSplitPaneFocus(), nil
 		case key.Matches(msg, m.keys.ToggleWrap):
 			return m.toggleServerLogWrap(), nil
-		case isEnterKey(msg), key.Matches(msg, m.keys.Quit), isEscapeKey(msg), isCtrlC(msg):
+		case m.server.splitFocused && (isEnterKey(msg) || key.Matches(msg, m.keys.Quit) || isEscapeKey(msg) || isCtrlC(msg)):
 			m = m.dismissSplitServer()
 			return m, nil
 		}

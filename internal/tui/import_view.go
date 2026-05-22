@@ -134,12 +134,12 @@ func (m Model) updateImportKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		switch {
 		case isEscapeKey(msg):
 			return m.closeImportView(), nil
-		case msg.String() == "tab":
+		case isTabKey(msg):
 			m.import_.focus = importFocusPicker
 			m.import_.picker.Path = ""
 			m.import_.picker.SetHeight(m.importPickerBodyH())
 			return m, m.import_.picker.Init()
-		case msg.String() == "enter":
+		case isEnterKey(msg):
 			m = m.parseImportFile()
 			return m, nil
 		default:
@@ -152,7 +152,7 @@ func (m Model) updateImportKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		switch {
 		case isEscapeKey(msg):
 			return m.closeImportView(), nil
-		case msg.String() == "tab":
+		case isTabKey(msg):
 			m.import_.focus = importFocusPath
 			m.import_.pathInput.Focus()
 			return m, nil
@@ -180,7 +180,7 @@ func (m Model) updateImportKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				m.import_.groups[m.import_.cursor].checked = !m.import_.groups[m.import_.cursor].checked
 			}
 			return m, nil
-		case msg.String() == "enter":
+		case isEnterKey(msg):
 			return m.doImportAttempt()
 		case msg.String() == "j", msg.String() == "down":
 			if m.import_.cursor < len(m.import_.groups)-1 {
