@@ -191,9 +191,25 @@ func findKoboldCppBinary() string {
 	return ""
 }
 
-// probeHealthEndpoint GETs /health on 127.0.0.1 (avoids localhost IPv6/IPv4 ambiguity). Used by both llama-server and KoboldCpp.
-func probeHealthEndpoint(port int) bool {
-	url := fmt.Sprintf("http://127.0.0.1:%d/health", port)
+// LlamaServerHost returns the listen host from LLAMA_SERVER_HOST, or "127.0.0.1" if unset.
+func LlamaServerHost() string {
+	if v := strings.TrimSpace(os.Getenv(EnvLlamaServerHost)); v != "" {
+		return v
+	}
+	return defaultLlamaServerHost
+}
+
+// VllmServerHost returns the listen host from VLLM_SERVER_HOST, or "127.0.0.1" if unset.
+func VllmServerHost() string {
+	if v := strings.TrimSpace(os.Getenv(EnvVLLMServerHost)); v != "" {
+		return v
+	}
+	return defaultVLLMServerHost
+}
+
+// probeHealthEndpoint GETs /health on host:port. Used by both llama-server and KoboldCpp.
+func probeHealthEndpoint(host string, port int) bool {
+	url := fmt.Sprintf("http://%s:%d/health", host, port)
 	client := &http.Client{Timeout: 2 * time.Second}
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
@@ -208,7 +224,9 @@ func probeHealthEndpoint(port int) bool {
 }
 
 const defaultLlamaServerPort = 8080
+const defaultLlamaServerHost = "127.0.0.1"
 const defaultVLLMServerPort = 8000
+const defaultVLLMServerHost = "127.0.0.1"
 const defaultKoboldCppPort = 5001
 
 // portFromEnv reads a port number from the named env var, returning def if unset or invalid.

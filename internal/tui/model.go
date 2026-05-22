@@ -50,9 +50,10 @@ type tableState struct {
 
 // runtimeConfigState holds the runtime-config modal's open/focus/input state.
 type runtimeConfigState struct {
-	open   bool
-	focus  runtimeField
-	inputs [runtimeFieldCount]textinput.Model
+	open           bool
+	focus          runtimeField
+	discardConfirm bool
+	inputs         [runtimeFieldCount]textinput.Model
 }
 
 // paramsState holds the parameter-profiles panel's state.
@@ -284,8 +285,10 @@ func newRuntimeConfigInputs() [runtimeFieldCount]textinput.Model {
 		newPortTextInput(),
 		newPathTextInput(),
 		newPathTextInput(),
-		newPortTextInput(),
 		newPathTextInput(),
+		newPathTextInput(),
+		newPathTextInput(),
+		newPortTextInput(),
 		newPathTextInput(),
 		newPathTextInput(),
 		newPortTextInput(),

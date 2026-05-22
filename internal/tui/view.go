@@ -713,6 +713,25 @@ func (m Model) discoveryDiscardConfirmModalBlock() string {
 	return panelBox.Width(cw + panelBox.GetHorizontalFrameSize()).Render(block)
 }
 
+// runtimeConfigDiscardConfirmBlock returns the discard-confirmation overlay for the runtime config modal.
+func (m Model) runtimeConfigDiscardConfirmBlock() string {
+	cw := min(m.paramPanelContentWidth(), 64)
+	panelBox := m.ui.styles.paramPanelBox
+	bodyStyle := m.ui.styles.body
+
+	rows := []string{
+		m.modalTitleRow(cw, m.ui.styles.portConfigTitle, "Discard runtime changes?"),
+		"",
+		bodyStyle.Render("You have unsaved Runtime Environment changes."),
+		bodyStyle.Render("Leave this window and discard those changes?"),
+		"",
+		m.renderFooterHints(FooterRuntimeConfigDiscardYN),
+	}
+
+	block := lipgloss.JoinVertical(lipgloss.Left, rows...)
+	return panelBox.Width(cw + panelBox.GetHorizontalFrameSize()).Render(block)
+}
+
 // runtimeFieldRow renders a label + input pair for one runtime config field.
 func (m Model) runtimeFieldRow(fieldID runtimeField, label string) []string {
 	prefix := "  "
@@ -729,19 +748,26 @@ func (m Model) runtimeFieldRow(fieldID runtimeField, label string) []string {
 // (no full-screen placement). Composed over the main view via [overlayCentered].
 // [runtimePanelView] is shown under the title.
 func (m Model) runtimeConfigModalBlock() string {
+	if m.rc.discardConfirm {
+		return m.runtimeConfigDiscardConfirmBlock()
+	}
 	cw := m.paramPanelContentWidth()
 	header := func(text string) string { return m.ui.styles.bodyBold.Render(text) }
 
 	llamaRows := append([]string{header(runtimeConfigHeaderLlama), ""},
 		append(m.runtimeFieldRow(runtimeFieldLlamaCppPath, runtimeConfigLabelLlamaCppPath),
-			append([]string{""}, m.runtimeFieldRow(runtimeFieldLlamaPort, runtimeConfigLabelLlamaPort)...)...)...)
+			append([]string{""},
+				append(m.runtimeFieldRow(runtimeFieldLlamaPort, runtimeConfigLabelLlamaPort),
+					append([]string{""}, m.runtimeFieldRow(runtimeFieldLlamaHost, runtimeConfigLabelLlamaHost)...)...)...)...)...)
 	llamaBlock := lipgloss.JoinVertical(lipgloss.Left, llamaRows...)
 
 	vllmRows := append([]string{header(runtimeConfigHeaderVLLM), ""},
 		append(m.runtimeFieldRow(runtimeFieldVLLMPath, runtimeConfigLabelVLLMPath),
 			append([]string{""},
 				append(m.runtimeFieldRow(runtimeFieldVLLMVenv, runtimeConfigLabelVLLMVenv),
-					append([]string{""}, m.runtimeFieldRow(runtimeFieldVLLMPort, runtimeConfigLabelVLLMPort)...)...)...)...)...)
+					append([]string{""},
+						append(m.runtimeFieldRow(runtimeFieldVLLMPort, runtimeConfigLabelVLLMPort),
+							append([]string{""}, m.runtimeFieldRow(runtimeFieldVLLMHost, runtimeConfigLabelVLLMHost)...)...)...)...)...)...)...)
 	vllmBlock := lipgloss.JoinVertical(lipgloss.Left, vllmRows...)
 
 	ollamaRows := append([]string{header(runtimeConfigHeaderOllama), ""},

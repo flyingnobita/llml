@@ -8,10 +8,9 @@ import (
 
 func TestRuntimeConfigEscapeClosesByKeyCode(t *testing.T) {
 	m := newTestModel()
-	m.rc.open = true
-	m.rc.focus = runtimeFieldLlamaCppPath
+	m2, _ := m.openRuntimeConfig()
 
-	got, _ := m.updateRuntimeConfigKey(tea.KeyPressMsg{Code: tea.KeyEscape})
+	got, _ := m2.updateRuntimeConfigKey(tea.KeyPressMsg{Code: tea.KeyEscape})
 	if got.rc.open {
 		t.Fatal("expected escape key code to close runtime config")
 	}

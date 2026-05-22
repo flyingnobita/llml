@@ -9,8 +9,12 @@ import (
 const (
 	EnvLlamaCppPath    = "LLAMA_CPP_PATH"
 	EnvLlamaServerPort = "LLAMA_SERVER_PORT"
+	// EnvLlamaServerHost is the listen host for llama-server (default 127.0.0.1).
+	EnvLlamaServerHost = "LLAMA_SERVER_HOST"
 	// EnvVLLMServerPort is the TCP port for vllm serve (default 8000 when unset or invalid; matches vLLM's typical default).
 	EnvVLLMServerPort = "VLLM_SERVER_PORT"
+	// EnvVLLMServerHost is the listen host for vllm serve (default 127.0.0.1).
+	EnvVLLMServerHost = "VLLM_SERVER_HOST"
 	// EnvVLLMPath is an optional directory containing a `vllm` executable (checked before PATH).
 	EnvVLLMPath = "VLLM_PATH"
 	// EnvVLLMVenv is an optional Python venv root (directory containing bin/activate on Unix).
@@ -37,7 +41,9 @@ const (
 type RuntimeInfo struct {
 	LlamaCLIPath       string
 	LlamaServerPath    string
+	LlamaServerHost    string
 	VLLMPath           string
+	VLLMServerHost     string
 	OllamaPath         string
 	OllamaHost         string
 	KoboldCppPath      string
@@ -122,17 +128,20 @@ func DiscoverRuntime() RuntimeInfo {
 	cli := findLlamaBinary("llama-cli")
 	srv := findLlamaBinary("llama-server")
 	port := ListenPort()
+	host := LlamaServerHost()
 	info := RuntimeInfo{
 		LlamaCLIPath:    cli,
 		LlamaServerPath: srv,
+		LlamaServerHost: host,
 		VLLMPath:        findVLLMBinary(),
+		VLLMServerHost:  VllmServerHost(),
 		OllamaPath:      findOllamaBinary(),
 		OllamaHost:      OllamaHost(),
 		KoboldCppPath:   findKoboldCppBinary(),
 		ProbePort:       port,
 	}
 	if cli == "" && srv == "" {
-		if probeHealthEndpoint(port) {
+		if probeHealthEndpoint(host, port) {
 			info.ServerRunning = true
 		}
 	}
@@ -140,7 +149,7 @@ func DiscoverRuntime() RuntimeInfo {
 		info.OllamaRunning = true
 	}
 	kPort := KoboldCppPort()
-	if probeHealthEndpoint(kPort) {
+	if probeHealthEndpoint("127.0.0.1", kPort) {
 		info.KoboldCppRunning = true
 		info.KoboldCppProbePort = kPort
 	}

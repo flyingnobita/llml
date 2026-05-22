@@ -15,11 +15,13 @@ const (
 	runtimePanelLabelKoboldCppPath   = "koboldcpp path"
 	runtimePanelLabelKoboldCppPort   = "koboldcpp port"
 	runtimePanelLabelLlamaServerPath = "llama-server path"
-	runtimePanelLabelLlamaServerPort = "llama-server port"
+	runtimePanelLabelLlamaServerPort = "llama.cpp port"
+	runtimePanelLabelLlamaServerHost = "llama.cpp host"
 	runtimePanelLabelOllamaHost      = "ollama host"
 	runtimePanelLabelOllamaPath      = "ollama path"
 	runtimePanelLabelVLLMPath        = "vllm path"
 	runtimePanelLabelVLLMPort        = "vllm port"
+	runtimePanelLabelVLLMHost        = "vllm host"
 	runtimePanelLabelVLLMVenv        = "vllm venv path"
 )
 
@@ -132,11 +134,13 @@ func RuntimePanelLines(maxWidth int, r models.RuntimeInfo) []string {
 		{runtimePanelLabelKoboldCppPath, koboldCppPathPanelDisplay(r)},
 		{runtimePanelLabelKoboldCppPort, portEnvDisplay(models.EnvKoboldCppPort, models.KoboldCppPort())},
 		{runtimePanelLabelLlamaServerPath, llamaServerPathPanelDisplay(r)},
+		{runtimePanelLabelLlamaServerHost, r.LlamaServerHost},
 		{runtimePanelLabelLlamaServerPort, portEnvDisplay(models.EnvLlamaServerPort, models.ListenPort())},
 		{runtimePanelLabelOllamaHost, models.OllamaHost()},
 		{runtimePanelLabelOllamaPath, ollamaPathPanelDisplay(r)},
 		{runtimePanelLabelVLLMPath, vllmPathPanelDisplay(r)},
 		{runtimePanelLabelVLLMPort, portEnvDisplay(models.EnvVLLMServerPort, models.VLLMPort())},
+		{runtimePanelLabelVLLMHost, r.VLLMServerHost},
 		{runtimePanelLabelVLLMVenv, vllmVenvPanelDisplay(r)},
 	}
 	sort.Slice(rows, func(i, j int) bool { return rows[i].key < rows[j].key })

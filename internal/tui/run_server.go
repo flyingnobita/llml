@@ -56,6 +56,10 @@ func buildServerSpec(backend models.ModelBackend, modelPath string, params Model
 	case models.BackendVLLM:
 		bin := models.ResolveVLLMPath(rt)
 		activate := models.ResolveVLLMActivateScript(bin)
+		host := rt.VLLMServerHost
+		if strings.TrimSpace(host) == "" {
+			host = models.VllmServerHost()
+		}
 		if strict {
 			if bin == "" {
 				return serverSpec{}, errors.New(MissingVLLMFooterNote)
@@ -69,6 +73,7 @@ func buildServerSpec(backend models.ModelBackend, modelPath string, params Model
 		return serverSpec{
 			backend:        models.BackendVLLM,
 			bin:            bin,
+			host:           host,
 			port:           models.VLLMPort(),
 			modelPath:      modelPath,
 			params:         params,
@@ -91,6 +96,10 @@ func buildServerSpec(backend models.ModelBackend, modelPath string, params Model
 		}, nil
 	default: // BackendLlama
 		bin := models.ResolveLlamaServerPath(rt)
+		host := rt.LlamaServerHost
+		if strings.TrimSpace(host) == "" {
+			host = models.LlamaServerHost()
+		}
 		if strict && bin == "" {
 			return serverSpec{}, errors.New(MissingLlamaServerFooterNote)
 		}
@@ -100,6 +109,7 @@ func buildServerSpec(backend models.ModelBackend, modelPath string, params Model
 		return serverSpec{
 			backend:   models.BackendLlama,
 			bin:       bin,
+			host:      host,
 			port:      models.ListenPort(),
 			modelPath: modelPath,
 			params:    params,
@@ -120,6 +130,7 @@ func (s serverSpec) commandWords() []string {
 			shellSingleQuoted(s.bin), "serve",
 			shellSingleQuoted(s.modelPath),
 			"--served-model-name", shellSingleQuoted(models.InferModelID(s.modelPath)),
+			"--host", s.host,
 			"--port", fmt.Sprintf("%d", s.port),
 		}
 	case models.BackendKobold:
@@ -133,6 +144,7 @@ func (s serverSpec) commandWords() []string {
 			shellSingleQuoted(s.bin),
 			"--model", shellSingleQuoted(s.modelPath),
 			"--alias", shellSingleQuoted(llamaServerAlias(s.modelPath)),
+			"--host", s.host,
 			"--port", fmt.Sprintf("%d", s.port),
 		}
 	}
@@ -157,6 +169,7 @@ func (s serverSpec) directArgs() []string {
 		args = []string{
 			"serve", s.modelPath,
 			"--served-model-name", models.InferModelID(s.modelPath),
+			"--host", s.host,
 			"--port", fmt.Sprintf("%d", s.port),
 		}
 	case models.BackendKobold:
@@ -168,6 +181,7 @@ func (s serverSpec) directArgs() []string {
 		args = []string{
 			"-m", s.modelPath,
 			"--alias", llamaServerAlias(s.modelPath),
+			"--host", s.host,
 			"--port", fmt.Sprintf("%d", s.port),
 		}
 	}

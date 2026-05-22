@@ -34,7 +34,9 @@ type Config struct {
 // Empty strings mean unset; ports use pointers so zero can mean "omit default in file".
 type RuntimeConfig struct {
 	DefaultLlamaCppPath    string `toml:"default_llama_cpp_path"`
+	DefaultLlamaServerHost string `toml:"default_llama_server_host"`
 	DefaultVLLMPath        string `toml:"default_vllm_path"`
+	DefaultVLLMServerHost  string `toml:"default_vllm_server_host"`
 	DefaultVLLMVenv        string `toml:"default_vllm_venv"`
 	DefaultOllamaPath      string `toml:"default_ollama_path"`
 	DefaultOllamaHost      string `toml:"default_ollama_host"`
@@ -115,6 +117,12 @@ func ApplyRuntimeFromConfig(r *RuntimeConfig) {
 	applyPathIfUnset(models.EnvVLLMVenv, r.DefaultVLLMVenv)
 	applyPathIfUnset(models.EnvOllamaPath, r.DefaultOllamaPath)
 	applyPathIfUnset(models.EnvKoboldCppPath, r.DefaultKoboldCppPath)
+	if v := strings.TrimSpace(r.DefaultLlamaServerHost); v != "" && os.Getenv(models.EnvLlamaServerHost) == "" {
+		_ = os.Setenv(models.EnvLlamaServerHost, v)
+	}
+	if v := strings.TrimSpace(r.DefaultVLLMServerHost); v != "" && os.Getenv(models.EnvVLLMServerHost) == "" {
+		_ = os.Setenv(models.EnvVLLMServerHost, v)
+	}
 	if v := strings.TrimSpace(r.DefaultOllamaHost); v != "" && os.Getenv(models.EnvOllamaHost) == "" {
 		_ = os.Setenv(models.EnvOllamaHost, v)
 	}
@@ -163,6 +171,16 @@ func RuntimeFromEnv() RuntimeConfig {
 	}
 	if v := normalizePath(os.Getenv(models.EnvKoboldCppPath)); v != "" {
 		r.DefaultKoboldCppPath = v
+	}
+	if v := strings.TrimSpace(os.Getenv(models.EnvLlamaServerHost)); v != "" {
+		r.DefaultLlamaServerHost = v
+	} else {
+		r.DefaultLlamaServerHost = models.LlamaServerHost()
+	}
+	if v := strings.TrimSpace(os.Getenv(models.EnvVLLMServerHost)); v != "" {
+		r.DefaultVLLMServerHost = v
+	} else {
+		r.DefaultVLLMServerHost = models.VllmServerHost()
 	}
 	if v := strings.TrimSpace(os.Getenv(models.EnvOllamaHost)); v != "" {
 		r.DefaultOllamaHost = v

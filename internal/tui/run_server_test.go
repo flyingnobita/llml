@@ -20,11 +20,11 @@ func TestShellSingleQuoted(t *testing.T) {
 }
 
 func llamaSpec(bin, modelPath string, port int, params ModelParams) serverSpec {
-	return serverSpec{backend: models.BackendLlama, bin: bin, port: port, modelPath: modelPath, params: params}
+	return serverSpec{backend: models.BackendLlama, bin: bin, host: "127.0.0.1", port: port, modelPath: modelPath, params: params}
 }
 
 func vllmSpec(bin, modelPath string, port int, activateScript string, params ModelParams) serverSpec {
-	return serverSpec{backend: models.BackendVLLM, bin: bin, port: port, modelPath: modelPath, params: params, activateScript: activateScript}
+	return serverSpec{backend: models.BackendVLLM, bin: bin, host: "127.0.0.1", port: port, modelPath: modelPath, params: params, activateScript: activateScript}
 }
 
 func TestFormatLlamaServerInvocation(t *testing.T) {
@@ -33,6 +33,7 @@ func TestFormatLlamaServerInvocation(t *testing.T) {
 		"+ '/bin/llama-server' \\\n" +
 		"  --model '/m/a.gguf' \\\n" +
 		"  --alias 'a.gguf' \\\n" +
+		"  --host 127.0.0.1 \\\n" +
 		"  --port 9090"
 	if got != want {
 		t.Fatalf("got %q want %q", got, want)
@@ -54,6 +55,7 @@ func TestFormatVLLMServerInvocation(t *testing.T) {
 		"  serve \\\n" +
 		"  '/m/hf-model' \\\n" +
 		"  --served-model-name 'hf-model' \\\n" +
+		"  --host 127.0.0.1 \\\n" +
 		"  --port 9090"
 	if got != want {
 		t.Fatalf("got %q want %q", got, want)
@@ -65,6 +67,7 @@ func TestFormatVLLMServerInvocation(t *testing.T) {
 		"  serve \\\n" +
 		"  '/m/hf-model' \\\n" +
 		"  --served-model-name 'hf-model' \\\n" +
+		"  --host 127.0.0.1 \\\n" +
 		"  --port 9090"
 	if got2 != want2 {
 		t.Fatalf("got %q want %q", got2, want2)

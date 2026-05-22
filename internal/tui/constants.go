@@ -232,7 +232,8 @@ const (
 	splitServerStoppedWithHint = "Server stopped. Press Enter to close..."
 
 	// Runtime config modal.
-	FooterRuntimeConfigHints = "tab: fields · enter: save · esc: back"
+	FooterRuntimeConfigHints     = "tab: fields · enter: save · esc: back"
+	FooterRuntimeConfigDiscardYN = "y: discard changes · n/esc: stay"
 	// runtimeConfigModalSubtitle appears below the modal title (values here override startup discovery).
 	runtimeConfigModalSubtitle      = "Overrides saved to config.toml. Shell environment variables take precedence."
 	runtimeConfigHeaderLlama        = "Llama.cpp"
@@ -240,14 +241,16 @@ const (
 	runtimeConfigHeaderOllama       = "Ollama"
 	runtimeConfigHeaderKoboldCpp    = "KoboldCpp"
 	runtimeConfigLabelLlamaCppPath  = "Path (llama-cli / llama-server)"
+	runtimeConfigLabelLlamaPort     = "Port"
+	runtimeConfigLabelLlamaHost     = "Host"
 	runtimeConfigLabelVLLMPath      = "Path (vllm binary)"
 	runtimeConfigLabelVLLMVenv      = "Venv Root (Optional)"
-	runtimeConfigLabelLlamaPort     = "Server Port"
-	runtimeConfigLabelVLLMPort      = "Server Port"
+	runtimeConfigLabelVLLMPort      = "Port"
+	runtimeConfigLabelVLLMHost      = "Host"
 	runtimeConfigLabelOllamaPath    = "Path (ollama binary)"
 	runtimeConfigLabelOllamaHost    = "Host"
 	runtimeConfigLabelKoboldCppPath = "Path (koboldcpp binary)"
-	runtimeConfigLabelKoboldCppPort = "Server Port"
+	runtimeConfigLabelKoboldCppPort = "Port"
 
 	// FooterHintTabSections is the shared "tab: sections" fragment used by split-pane
 	// and parameter modal footers.

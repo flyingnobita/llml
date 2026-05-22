@@ -18,11 +18,13 @@ type runtimeField int
 const (
 	runtimeFieldLlamaCppPath runtimeField = iota
 	runtimeFieldLlamaPort
+	runtimeFieldLlamaHost
+	runtimeFieldOllamaPath
+	runtimeFieldOllamaHost
 	runtimeFieldVLLMPath
 	runtimeFieldVLLMVenv
 	runtimeFieldVLLMPort
-	runtimeFieldOllamaPath
-	runtimeFieldOllamaHost
+	runtimeFieldVLLMHost
 	runtimeFieldKoboldCppPath
 	runtimeFieldKoboldCppPort
 	runtimeFieldCount
@@ -111,6 +113,62 @@ func newPathTextInput() textinput.Model {
 	return ti
 }
 
+// runtimeConfigDirty reports whether any runtime config input differs from the current env.
+func (m Model) runtimeConfigDirty() bool {
+	if m.rc.inputs[runtimeFieldLlamaCppPath].Value() != os.Getenv(models.EnvLlamaCppPath) {
+		return true
+	}
+	if m.rc.inputs[runtimeFieldLlamaPort].Value() != prefillPort(models.EnvLlamaServerPort, models.ListenPort()) {
+		return true
+	}
+	if m.rc.inputs[runtimeFieldLlamaHost].Value() != models.LlamaServerHost() {
+		return true
+	}
+	if m.rc.inputs[runtimeFieldOllamaPath].Value() != os.Getenv(models.EnvOllamaPath) {
+		return true
+	}
+	if m.rc.inputs[runtimeFieldOllamaHost].Value() != models.OllamaHost() {
+		return true
+	}
+	if m.rc.inputs[runtimeFieldVLLMPath].Value() != os.Getenv(models.EnvVLLMPath) {
+		return true
+	}
+	if m.rc.inputs[runtimeFieldVLLMVenv].Value() != os.Getenv(models.EnvVLLMVenv) {
+		return true
+	}
+	if m.rc.inputs[runtimeFieldVLLMPort].Value() != prefillPort(models.EnvVLLMServerPort, models.VLLMPort()) {
+		return true
+	}
+	if m.rc.inputs[runtimeFieldVLLMHost].Value() != models.VllmServerHost() {
+		return true
+	}
+	if m.rc.inputs[runtimeFieldKoboldCppPath].Value() != os.Getenv(models.EnvKoboldCppPath) {
+		return true
+	}
+	if m.rc.inputs[runtimeFieldKoboldCppPort].Value() != prefillPort(models.EnvKoboldCppPort, models.KoboldCppPort()) {
+		return true
+	}
+	return false
+}
+
+// updateRuntimeConfigDiscardConfirmKey handles y/n/esc in the discard-confirm overlay.
+func (m Model) updateRuntimeConfigDiscardConfirmKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	if isEscapeKey(msg) {
+		m.rc.discardConfirm = false
+		return m, nil
+	}
+	switch strings.ToLower(strings.TrimSpace(msg.String())) {
+	case "y":
+		m = m.withLastRunCleared()
+		m = m.closeRuntimeConfig()
+		return m, nil
+	case "n":
+		m.rc.discardConfirm = false
+		return m, nil
+	}
+	return m, nil
+}
+
 // openRuntimeConfig shows editors for the same env vars summarized in the runtimes footer.
 func (m Model) openRuntimeConfig() (Model, tea.Cmd) {
 	return m.openRuntimeConfigFocused(runtimeFieldLlamaCppPath)
@@ -121,12 +179,15 @@ func (m Model) openRuntimeConfig() (Model, tea.Cmd) {
 func (m Model) openRuntimeConfigFocused(focus runtimeField) (Model, tea.Cmd) {
 	m = m.saveMainPaneFocusForModal()
 	m.rc.open = true
+	m.rc.discardConfirm = false
 	m = m.withLastRunCleared()
 	m.rc.inputs[runtimeFieldLlamaCppPath].SetValue(os.Getenv(models.EnvLlamaCppPath))
+	m.rc.inputs[runtimeFieldLlamaPort].SetValue(prefillPort(models.EnvLlamaServerPort, models.ListenPort()))
+	m.rc.inputs[runtimeFieldLlamaHost].SetValue(models.LlamaServerHost())
 	m.rc.inputs[runtimeFieldVLLMPath].SetValue(os.Getenv(models.EnvVLLMPath))
 	m.rc.inputs[runtimeFieldVLLMVenv].SetValue(os.Getenv(models.EnvVLLMVenv))
-	m.rc.inputs[runtimeFieldLlamaPort].SetValue(prefillPort(models.EnvLlamaServerPort, models.ListenPort()))
 	m.rc.inputs[runtimeFieldVLLMPort].SetValue(prefillPort(models.EnvVLLMServerPort, models.VLLMPort()))
+	m.rc.inputs[runtimeFieldVLLMHost].SetValue(models.VllmServerHost())
 	m.rc.inputs[runtimeFieldOllamaPath].SetValue(os.Getenv(models.EnvOllamaPath))
 	m.rc.inputs[runtimeFieldOllamaHost].SetValue(models.OllamaHost())
 	m.rc.inputs[runtimeFieldKoboldCppPath].SetValue(os.Getenv(models.EnvKoboldCppPath))
@@ -240,6 +301,16 @@ func (m Model) commitRuntimeConfig() (Model, tea.Cmd) {
 	applyPathEnv(models.EnvVLLMVenv, m.rc.inputs[runtimeFieldVLLMVenv].Value())
 	applyPathEnv(models.EnvOllamaPath, m.rc.inputs[runtimeFieldOllamaPath].Value())
 	applyPathEnv(models.EnvKoboldCppPath, m.rc.inputs[runtimeFieldKoboldCppPath].Value())
+	if host := strings.TrimSpace(m.rc.inputs[runtimeFieldLlamaHost].Value()); host == "" {
+		_ = os.Unsetenv(models.EnvLlamaServerHost)
+	} else {
+		_ = os.Setenv(models.EnvLlamaServerHost, host)
+	}
+	if host := strings.TrimSpace(m.rc.inputs[runtimeFieldVLLMHost].Value()); host == "" {
+		_ = os.Unsetenv(models.EnvVLLMServerHost)
+	} else {
+		_ = os.Setenv(models.EnvVLLMServerHost, host)
+	}
 	if host := strings.TrimSpace(m.rc.inputs[runtimeFieldOllamaHost].Value()); host == "" {
 		_ = os.Unsetenv(models.EnvOllamaHost)
 	} else {
@@ -261,7 +332,14 @@ func (m Model) commitRuntimeConfig() (Model, tea.Cmd) {
 
 // updateRuntimeConfigKey handles keys while the runtime env editor is open.
 func (m Model) updateRuntimeConfigKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	if m.rc.discardConfirm {
+		return m.updateRuntimeConfigDiscardConfirmKey(msg)
+	}
 	if isEscapeKey(msg) {
+		if m.runtimeConfigDirty() {
+			m.rc.discardConfirm = true
+			return m, nil
+		}
 		m = m.withLastRunCleared()
 		m = m.closeRuntimeConfig()
 		return m, nil
