@@ -79,7 +79,7 @@ func (m Model) renderConfirmBlock(cw int) string {
 	if len(confirmRows) == 0 {
 		return ""
 	}
-	confirmRows = append(confirmRows, "", m.ui.styles.footer.Render(FooterParamConfirmYN))
+	confirmRows = append(confirmRows, "", m.renderFooterHints(FooterParamConfirmYN))
 	return confirmBox.Width(cw).Render(lipgloss.JoinVertical(lipgloss.Left, confirmRows...))
 }
 
@@ -263,7 +263,7 @@ func (m Model) paramPanelModalBlock() string {
 		}
 	}
 	if m.params.confirmDelete == paramConfirmNone {
-		rows = append(rows, m.ui.styles.footer.Render(footerHelp))
+		rows = append(rows, m.renderFooterHints(footerHelp))
 	}
 	block := lipgloss.JoinVertical(lipgloss.Left, rows...)
 	if m.lastRunNote != "" {

@@ -42,13 +42,15 @@ func themeToastText(pick int, resolved Theme) string {
 // Theme holds semantic colors for the TUI. All values are image/color.Color
 // values, typically created via lipgloss.Color("ANSI-or-hex-string").
 type Theme struct {
-	Title    color.Color
-	Subtitle color.Color
-	Body     color.Color
-	Footer   color.Color
-	Info     color.Color
-	Warn     color.Color
-	Error    color.Color
+	Title     color.Color
+	Subtitle  color.Color
+	Body      color.Color
+	Footer    color.Color
+	FooterKey color.Color
+	FooterSep color.Color
+	Info      color.Color
+	Warn      color.Color
+	Error     color.Color
 	// Border is the default pane and modal border color. In split-server mode it
 	// is also the inactive split-pane chrome (dim model table, launch preview,
 	// server log borders) when keyboard focus is on another pane.
@@ -81,7 +83,9 @@ func DarkTheme() Theme {
 		Title:        lipgloss.Color("99"),
 		Subtitle:     lipgloss.Color("241"),
 		Body:         lipgloss.Color("252"),
-		Footer:       lipgloss.Color("240"),
+		Footer:       lipgloss.Color("250"),
+		FooterKey:    lipgloss.Color("111"),
+		FooterSep:    lipgloss.Color("239"),
 		Info:         lipgloss.Color("75"),
 		Warn:         lipgloss.Color("221"),
 		Error:        lipgloss.Color("203"),
@@ -111,7 +115,9 @@ func LightTheme() Theme {
 		Title:        lipgloss.Color("55"),
 		Subtitle:     lipgloss.Color("243"),
 		Body:         lipgloss.Color("235"),
-		Footer:       lipgloss.Color("249"),
+		Footer:       lipgloss.Color("243"),
+		FooterKey:    lipgloss.Color("25"),
+		FooterSep:    lipgloss.Color("247"),
 		Info:         lipgloss.Color("27"),
 		Warn:         lipgloss.Color("136"),
 		Error:        lipgloss.Color("160"),

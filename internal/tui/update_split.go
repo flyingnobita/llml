@@ -68,6 +68,8 @@ func (m Model) updateServerSplitKeys(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		switch {
 		case isTabKey(msg):
 			return m.cycleSplitPaneFocus(), nil
+		case key.Matches(msg, m.keys.ToggleWrap):
+			return m.toggleServerLogWrap(), nil
 		case isEnterKey(msg), key.Matches(msg, m.keys.Quit), isEscapeKey(msg), isCtrlC(msg):
 			m = m.dismissSplitServer()
 			return m, nil
@@ -89,11 +91,15 @@ func (m Model) updateServerSplitKeys(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	}
 	switch {
 	case key.Matches(msg, m.keys.Quit):
-		return m.stopSplitServer()
-	case isEscapeKey(msg):
-		return m.stopSplitServer()
+		m.quit.open = true
+		return m, nil
 	case isCtrlC(msg):
+		m.quit.open = true
+		return m, nil
+	case key.Matches(msg, m.keys.StopServer):
 		return m.stopSplitServer()
+	case key.Matches(msg, m.keys.ToggleWrap):
+		return m.toggleServerLogWrap(), nil
 	case isTabKey(msg):
 		return m.cycleSplitPaneFocus(), nil
 	}
@@ -126,5 +132,22 @@ func (m Model) stopSplitServer() (Model, tea.Cmd) {
 		return m, nil
 	}
 	_ = interruptServerProcess(m.server.cmd)
+	return m, nil
+}
+
+func (m Model) updateQuitConfirmKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	if isEscapeKey(msg) {
+		m.quit.open = false
+		return m, nil
+	}
+
+	switch strings.ToLower(strings.TrimSpace(msg.String())) {
+	case "y":
+		m.quit.open = false
+		return m, tea.Quit
+	case "n", "q":
+		m.quit.open = false
+		return m, nil
+	}
 	return m, nil
 }

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/flyingnobita/llml/internal/models"
 	"github.com/flyingnobita/llml/internal/profiles"
@@ -295,7 +296,7 @@ func TestParamPanelViewIncludesMainAppBackdrop(t *testing.T) {
 	}
 
 	v := m.View()
-	content := v.Content
+	content := ansi.Strip(v.Content)
 	if !strings.Contains(content, "LLM") || !strings.Contains(content, "Launcher") {
 		t.Fatalf("overlaid view missing title (backdrop should remain above modal)")
 	}

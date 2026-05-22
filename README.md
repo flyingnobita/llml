@@ -174,7 +174,7 @@ llml
 
 ### Server output
 
-**`R`** runs the server in a **split layout**: the model table stays in the upper half and server logs stream into a scrollable pane below. **tab** switches focus between the two panes; **esc**, **q**, or **ctrl+c** stops the server.
+**`R`** runs the server in a **split layout**: the model table stays in the upper half and server logs stream into a scrollable pane below. **tab** switches focus between the two panes; **s** stops the server. You can still quit with **q** or **ctrl+c** while a model is running, but `llml` will warn first and require explicit **y** confirmation before closing.
 
 **ctrl+`R`** runs full-screen: the TUI is suspended and the server process is attached directly to your terminal. On Linux/macOS, after the server exits you are prompted to press Enter before the TUI redraws. On Windows there is no Enter prompt; you return when the server process exits.
 

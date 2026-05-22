@@ -8,6 +8,7 @@ import (
 
 	btable "charm.land/bubbles/v2/table"
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/mattn/go-runewidth"
 
 	"github.com/flyingnobita/llml/internal/models"
@@ -275,6 +276,7 @@ func TestSplitViewShowsTitleAndFooterHints(t *testing.T) {
 }
 
 func visibleViewport(content string, width, height int) string {
+	content = ansi.Strip(content)
 	lines := strings.Split(content, "\n")
 	if height > 0 && len(lines) > height {
 		lines = lines[len(lines)-height:]

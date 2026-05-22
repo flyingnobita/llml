@@ -41,6 +41,9 @@ const (
 	// serverLogAlignPadMax caps padding width to avoid runaway indentation if prefix detection misbehaves.
 	serverLogAlignPadMax = 256
 
+	// serverLogWrapPrefix marks continuation lines when server output wrap is enabled.
+	serverLogWrapPrefix = ".. "
+
 	// serverLogSeparatorLines is extra body rows between the table and log in split
 	// mode (0 = panes are adjacent).
 	serverLogSeparatorLines = 0
@@ -170,9 +173,17 @@ const (
 	FooterDescToggleTheme = "theme"
 	FooterHintToggleTheme = FooterKeyToggleTheme + ": " + FooterDescToggleTheme
 
+	FooterKeyToggleWrap  = "w"
+	FooterDescToggleWrap = "wrap"
+	FooterHintToggleWrap = FooterKeyToggleWrap + ": " + FooterDescToggleWrap
+
 	FooterKeyQuit  = "q"
 	FooterDescQuit = "quit"
 	FooterHintQuit = FooterKeyQuit + ": " + FooterDescQuit
+
+	FooterKeyStopServer  = "s"
+	FooterDescStopServer = "stop server"
+	FooterHintStopServer = FooterKeyStopServer + ": " + FooterDescStopServer
 
 	FooterHintHelp = "?: more"
 
@@ -211,8 +222,9 @@ const (
 	FooterNavHint = FooterKeyNav + ": " + FooterDescNav
 
 	// Split server view (while running).
-	FooterSplitStopServer = "esc/q: stop server"
+	FooterSplitStopServer = FooterHintStopServer
 	FooterSplitDismiss    = "enter/esc/q: close"
+	FooterQuitConfirmYN   = "y: quit anyway · n/esc: stay"
 
 	// splitPanePressEnterToClose is appended to the split log after the server process exits.
 	splitPanePressEnterToClose = "Press Enter to close..."

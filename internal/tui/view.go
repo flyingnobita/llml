@@ -251,35 +251,79 @@ func (m Model) lastRunNoteView() string {
 	return lipgloss.JoinVertical(lipgloss.Left, lines...)
 }
 
+func (m Model) renderFooterHints(line string) string {
+	if strings.TrimSpace(line) == "" {
+		return ""
+	}
+	parts := strings.Split(line, FooterHintSep)
+	rendered := make([]string, 0, len(parts)*2-1)
+	for i, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if i > 0 {
+			rendered = append(rendered, m.ui.styles.footerSep.Render(FooterHintSep))
+		}
+		keyPart, descPart, ok := strings.Cut(part, ": ")
+		if !ok {
+			rendered = append(rendered, m.ui.styles.footer.Render(part))
+			continue
+		}
+		rendered = append(rendered,
+			m.ui.styles.footerKey.Render(keyPart),
+			m.ui.styles.footerSep.Render(": "),
+			m.ui.styles.footer.Render(descPart),
+		)
+	}
+	return lipgloss.JoinHorizontal(lipgloss.Top, rendered...)
+}
+
+func (m Model) renderFooterGap(width int) string {
+	if width < 1 {
+		width = 1
+	}
+	return strings.Repeat(" ", width)
+}
+
 // footerHelpLine is the keyboard hint line (shared with layout height math).
 // Each binding uses "key: description"; bindings are separated by " · ".
 // The same convention is used for modal hint bars (runtime config, parameters).
 func footerHelpLine(m Model) string {
 	if m.server.running {
 		stopOrDismiss := FooterSplitStopServer
+		quitHint := FooterHintQuit
 		if m.server.exited {
 			stopOrDismiss = FooterSplitDismiss
+			quitHint = ""
 		}
 		if m.server.splitFocused {
-			return fmt.Sprintf(
-				"%s · %s · %s · %s · %s",
-				FooterHintTabSections, FooterNavHint, stopOrDismiss, m.alertsFooterHint(), FooterHintHelp,
-			)
+			parts := []string{FooterHintTabSections, FooterNavHint, FooterHintToggleWrap, stopOrDismiss}
+			if quitHint != "" {
+				parts = append(parts, quitHint)
+			}
+			parts = append(parts, m.alertsFooterHint(), FooterHintHelp)
+			return strings.Join(parts, FooterHintSep)
 		}
 		if m.preview.focused {
-			return fmt.Sprintf(
-				"%s · %s · %s · %s · %s · %s",
-				FooterHintTabSections, FooterNavHint, FooterHintCopyPath, stopOrDismiss, m.alertsFooterHint(), FooterHintHelp,
-			)
+			parts := []string{FooterHintTabSections, FooterNavHint, FooterHintCopyPath, FooterHintToggleWrap, stopOrDismiss}
+			if quitHint != "" {
+				parts = append(parts, quitHint)
+			}
+			parts = append(parts, m.alertsFooterHint(), FooterHintHelp)
+			return strings.Join(parts, FooterHintSep)
 		}
 		// Table focused: same global shortcuts as the idle view except run (R / ctrl+R) while a server is up.
 		parts := []string{
 			FooterHintTabSections,
 			FooterNavHint,
+			FooterHintToggleWrap,
 			stopOrDismiss,
-			m.alertsFooterHint(),
-			FooterHintHelp,
 		}
+		if quitHint != "" {
+			parts = append(parts, quitHint)
+		}
+		parts = append(parts, m.alertsFooterHint(), FooterHintHelp)
 		return strings.Join(parts, FooterHintSep)
 	}
 	if m.preview.focused {
@@ -322,7 +366,8 @@ func mainChromeLines(m Model, needsTableHBar bool, needsLogHBar bool) int {
 		}
 	}
 
-	n += lipgloss.Height(m.ui.styles.footer.Render(footerHelpLine(m)))
+	n += lipgloss.Height(m.renderFooterGap(iw))
+	n += lipgloss.Height(m.renderFooterHints(footerHelpLine(m)))
 
 	if m.alerts.current != "" {
 		n += lipgloss.Height(m.currentStatusView())
@@ -497,7 +542,8 @@ func (m Model) mainAppPlacedView() string {
 		tableScrollBase = ash
 	}
 
-	footer := m.ui.styles.footer.Render(footerHelpLine(m))
+	footer := m.renderFooterHints(footerHelpLine(m))
+	footerGap := m.renderFooterGap(iw)
 
 	headerParts := []string{title}
 	if strings.TrimSpace(appSubtitle) != "" {
@@ -505,7 +551,7 @@ func (m Model) mainAppPlacedView() string {
 	}
 	header := lipgloss.JoinVertical(lipgloss.Left, headerParts...)
 
-	tailParts := []string{body, footer}
+	tailParts := []string{body, footerGap, footer}
 	if m.alerts.current != "" {
 		tailParts = append(tailParts, m.currentStatusView())
 	}
@@ -525,7 +571,7 @@ func (m Model) mainAppPlacedView() string {
 		pad := target - lipgloss.Height(framed)
 		if pad > 0 {
 			body, _ = m.mainAppModelListBody(iw, tableScrollBase+pad)
-			tailParts = []string{body, footer}
+			tailParts = []string{body, footerGap, footer}
 			if m.alerts.current != "" {
 				tailParts = append(tailParts, m.currentStatusView())
 			}
@@ -549,6 +595,8 @@ func (m Model) mainAppPlacedView() string {
 // and true when any modal is open.
 func (m Model) modalBlock() (string, bool) {
 	switch {
+	case m.quit.open:
+		return m.quitConfirmModalBlock(), true
 	case m.collision.open:
 		return m.collisionModalBlock(), true
 	case m.import_.open:
@@ -579,6 +627,24 @@ func (m Model) View() tea.View {
 	v := tea.NewView(base)
 	v.AltScreen = true
 	return v
+}
+
+func (m Model) quitConfirmModalBlock() string {
+	cw := min(m.paramPanelContentWidth(), 64)
+	panelBox := m.ui.styles.paramPanelBox
+	bodyStyle := m.ui.styles.body
+
+	rows := []string{
+		m.modalTitleRow(cw, m.ui.styles.portConfigTitle, "Quit while model is running?"),
+		"",
+		bodyStyle.Render("A model server is still running in the split pane."),
+		bodyStyle.Render("Quit llml anyway? The server process will keep running."),
+		"",
+		m.renderFooterHints(FooterQuitConfirmYN),
+	}
+
+	block := lipgloss.JoinVertical(lipgloss.Left, rows...)
+	return panelBox.Width(cw + panelBox.GetHorizontalFrameSize()).Render(block)
 }
 
 // discoveryRow renders one editable path row (with inline edit input when active).
@@ -618,7 +684,7 @@ func (m Model) discoveryPathsModalBlock() string {
 	for _, p := range models.DefaultSearchRoots() {
 		rows = append(rows, m.ui.styles.bodyDim.Render("  "+p))
 	}
-	rows = append(rows, "", m.ui.styles.footer.Render(FooterDiscoveryPathsHints))
+	rows = append(rows, "", m.renderFooterHints(FooterDiscoveryPathsHints))
 	block := lipgloss.JoinVertical(lipgloss.Left, rows...)
 	return m.ui.styles.portConfigBox.Render(block)
 }
@@ -682,7 +748,7 @@ func (m Model) runtimeConfigModalBlock() string {
 		"",
 		inputBlock,
 		"",
-		m.ui.styles.footer.Render(FooterRuntimeConfigHints),
+		m.renderFooterHints(FooterRuntimeConfigHints),
 	}
 	block := lipgloss.JoinVertical(lipgloss.Left, rows...)
 	return m.ui.styles.portConfigBox.Render(block)

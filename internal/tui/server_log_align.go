@@ -63,3 +63,40 @@ func looksLikeUnprefixedProgressLine(line string) bool {
 	}
 	return false
 }
+
+func renderWrappedServerLogLine(line string, width int) string {
+	if width < 1 || line == "" {
+		return line
+	}
+
+	first := ansi.Wrap(line, width, "")
+	parts := strings.Split(first, "\n")
+	if len(parts) <= 1 {
+		return first
+	}
+
+	contWidth := width - ansi.StringWidth(serverLogWrapPrefix)
+	if contWidth < 1 {
+		contWidth = 1
+	}
+
+	out := make([]string, 0, len(parts))
+	out = append(out, parts[0])
+	for _, part := range parts[1:] {
+		for _, soft := range strings.Split(ansi.Wrap(part, contWidth, ""), "\n") {
+			out = append(out, serverLogWrapPrefix+soft)
+		}
+	}
+	return strings.Join(out, "\n")
+}
+
+func renderWrappedServerLog(lines []string, width int) string {
+	if len(lines) == 0 {
+		return ""
+	}
+	rendered := make([]string, len(lines))
+	for i, line := range lines {
+		rendered[i] = renderWrappedServerLogLine(line, width)
+	}
+	return strings.Join(rendered, "\n")
+}
