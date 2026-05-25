@@ -24,13 +24,13 @@ and launching `llama-server`, `koboldcpp`, `vllm serve`, or Ollama preload flows
 ## Agent coordination
 
 Before starting work, read the live working board at
-`/Users/flyingnobita/Data/Projects/Personal/llml-catalog/dev-docs/BOARD_working.md`
+`/home/omarchy/Data/Projects/Personal/llml-internal/BOARD_working.md`
 to see what tasks are already claimed by other agents. Claim a task by moving it from
 "Up next" → "In progress" with your agent ID. Move it to "Recently completed" when done.
 
-`BOARD_working.md` is gitignored in dev-docs — changes are real-time and shared across
-both repos via the same filesystem path. Do NOT commit it. At end of session, the user
-archives it to `dev-docs/BOARD.md`.
+`BOARD_working.md` is gitignored in llml-internal — changes are real-time and shared across
+both repos via the same absolute path. Do NOT commit it. At end of session, the user
+archives it to `BOARD.md`.
 
 ---
 
