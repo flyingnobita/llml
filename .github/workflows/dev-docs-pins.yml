@@ -14,8 +14,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-        with:
-          submodules: true
 
       - name: Fetch llml-catalog for pin comparison
         run: git clone --depth 1 https://github.com/flyingnobita/llml-catalog.git "${RUNNER_TEMP}/llml-catalog"
