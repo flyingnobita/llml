@@ -22,6 +22,13 @@ jobs:
         env:
           RUNNER_TEMP: ${{ runner.temp }}
         run: |
-          bash dev-docs/scripts/check_parent_dev_docs_pins.sh \
-            --catalog "${RUNNER_TEMP}/llml-catalog" \
-            --launcher "${GITHUB_WORKSPACE}"
+          PIN_CATALOG=$(git -C "${RUNNER_TEMP}/llml-catalog" rev-parse HEAD:dev-docs)
+          PIN_LAUNCHER=$(git rev-parse HEAD:dev-docs)
+          if [ "$PIN_CATALOG" != "$PIN_LAUNCHER" ]; then
+            echo "dev-docs pin mismatch:" >&2
+            echo "  catalog:  $PIN_CATALOG" >&2
+            echo "  launcher: $PIN_LAUNCHER" >&2
+            echo "Fix: from llml-internal run: scripts/bump_parent_dev_docs_submodules.sh" >&2
+            exit 1
+          fi
+          echo "dev-docs pins match: $PIN_CATALOG"
