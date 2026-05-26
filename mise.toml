@@ -28,5 +28,7 @@ lint = "mise run fmt-check && mise run golangci-lint && mise run vet && mise run
 check = "mise run lint && mise run test"
 sync = "git submodule sync --recursive && git submodule update --init --recursive"  # Align submodule remotes and checkout their pinned commits.
 dev-docs-pull = "scripts/dev_docs_pull.sh"  # Sync and update the dev-docs submodule from its remote (see scripts/dev_docs_pull.sh).
+dev-docs-check-pins = "scripts/dev_docs_check_pins.sh"  # Fail if catalog and launcher dev-docs gitlinks differ.
+dev-docs-bump-parents = "scripts/dev_docs_bump_parents.sh"  # Commit matching dev-docs pins in catalog + launcher (run after llml-internal merges).
 pull-latest = "git pull --rebase origin main --no-recurse-submodules && mise run dev-docs-pull"  # Rebase without submodule fetch during pull (submodule.recurse breaks rebase); dev-docs-pull updates dev-docs.
 worktree-setup = "npm ci && go mod download && git submodule update --init --recursive && LLML_AGENTS_SYNC=import ./scripts/sync_gitignore_agents.sh"  # Install JS/Go deps, init submodules, import gitignored agent paths for a linked worktree.

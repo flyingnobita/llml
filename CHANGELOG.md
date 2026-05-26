@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
+- May-26, 2026 - [Add cross-repo dev-docs pin check (CI + mise) and bump-parents script via llml-internal]
 - May-22, 2026 - 06:07 AM +0800 - [TUI: split-pane server stop moved to `s`; `q` and `ctrl+c` can quit while a model is still running, with an explicit `y` confirmation warning first]
 - May-21, 2026 - 04:00 PM +0800 - [v0.5.1 release: golangci-lint, lint fixes, and homebrew_casks migration]
 - May-21, 2026 - 04:00 PM +0800 - [CI: added golangci-lint with staticcheck, unused, gosec, gocritic, misspell, gofmt, goimports linters; lint task updated to run golangci-lint after gofmt-check; .golangci.yml config with 3m timeout]

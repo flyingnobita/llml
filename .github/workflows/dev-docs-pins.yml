@@ -1,0 +1,29 @@
+name: dev-docs submodule pins
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  aligned:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+
+      - name: Fetch llml-catalog for pin comparison
+        run: git clone --depth 1 https://github.com/flyingnobita/llml-catalog.git "${RUNNER_TEMP}/llml-catalog"
+
+      - name: Check dev-docs pins match catalog and launcher
+        env:
+          RUNNER_TEMP: ${{ runner.temp }}
+        run: |
+          bash dev-docs/scripts/check_parent_dev_docs_pins.sh \
+            --catalog "${RUNNER_TEMP}/llml-catalog" \
+            --launcher "${GITHUB_WORKSPACE}"
