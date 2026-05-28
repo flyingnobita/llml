@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run from llm-launcher root. Bumps dev-docs in catalog + launcher via llml-internal script.
+# Run from llml root. Bumps dev-docs in catalog + launcher via llml-internal script.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

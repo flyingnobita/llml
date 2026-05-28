@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run from llm-launcher root. Delegates to dev-docs/scripts in the submodule.
+# Run from llml root. Delegates to dev-docs/scripts in the submodule.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
