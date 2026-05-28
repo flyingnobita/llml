@@ -93,7 +93,8 @@ logs/*
 .cursor/
 .gbrain-source
 .gemini/
+.antigravitycli/
 .gstack/
 .opencode/
-TODOS.md
 .firecrawl/
+TODOS.md
