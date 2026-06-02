@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
+- Jun-02, 2026 - 11:59 PM +0800 - [v0.6.0 release: one-line installer, configurable hosts, quit confirmation, split-pane readability improvements, and missing-model/runtime guidance]
+- Jun-02, 2026 - 11:59 PM +0800 - [Installer: curl -fsSL https://llml.dev/install.sh | sh installs the latest release on macOS and Linux; resolves GitHub latest release dynamically; no dependencies beyond curl and tar]
+- Jun-02, 2026 - 11:59 PM +0800 - [Hosts: llama.cpp and vLLM server host/port are now configurable via runtime environment settings and environment variables; runtime-environment panel UX cleaned up]
+- Jun-02, 2026 - 11:59 PM +0800 - [Quit: pressing q or ctrl-c while a split-server is running now shows an explicit confirmation warning before exiting; split log and footer readability improved]
+- Jun-02, 2026 - 11:59 PM +0800 - [Guidance: missing-model and missing-runtime warnings now present; users see actionable messages when no models are found or no supported runtime is detected]
 - Jun-02, 2026 - 09:41 PM +0800 - [Installer: add POSIX shell installation script scripts/install.sh for macOS and Linux; document installation method in README.md]
 - May-26, 2026 - [Add cross-repo dev-docs pin check (CI + mise) and bump-parents script via llml-internal]
 - May-22, 2026 - 06:07 AM +0800 - [TUI: split-pane server stop moved to `s`; `q` and `ctrl+c` can quit while a model is still running, with an explicit `y` confirmation warning first]
