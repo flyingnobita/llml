@@ -18,6 +18,9 @@ last time is always one keystroke away.
 
 Browse local models. Detect the right runtime. Launch with one key.
 
+Works alongside llama.cpp, vLLM, Ollama, and KoboldCpp — not a replacement for them.
+llml is the profile manager for whatever backend you already run.
+
 ## ✨ Features
 
 - **Model discovery** — auto-scans common paths for GGUF files and safetensors model
