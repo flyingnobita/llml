@@ -64,6 +64,14 @@ llml is the profile manager for whatever backend you already run.
 
 Pick one path; you only need a single install method.
 
+#### One-line installer (macOS/Linux)
+
+Install the latest version of `llml` directly to `$HOME/.local/bin/` (or `/usr/local/bin/` if run with `sudo`):
+
+```bash
+curl -fsSL https://llml.dev/install.sh | sh
+```
+
 #### Go (`go install`)
 
 Requires [Go 1.26+](go.mod). Ensure `$(go env GOPATH)/bin` is on your `PATH`.

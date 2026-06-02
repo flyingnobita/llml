@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
+- Jun-02, 2026 - 09:41 PM +0800 - [Installer: add POSIX shell installation script scripts/install.sh for macOS and Linux; document installation method in README.md]
 - May-26, 2026 - [Add cross-repo dev-docs pin check (CI + mise) and bump-parents script via llml-internal]
 - May-22, 2026 - 06:07 AM +0800 - [TUI: split-pane server stop moved to `s`; `q` and `ctrl+c` can quit while a model is still running, with an explicit `y` confirmation warning first]
 - May-21, 2026 - 04:00 PM +0800 - [v0.5.1 release: golangci-lint, lint fixes, and homebrew_casks migration]
