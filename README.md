@@ -21,6 +21,11 @@ Browse local models. Detect the right runtime. Launch with one key.
 Works alongside llama.cpp, vLLM, Ollama, and KoboldCpp — not a replacement for them.
 llml is the profile manager for whatever backend you already run.
 
+> [!NOTE]
+> **Importable profiles are available at [llml.dev](https://llml.dev/).** The catalog is
+> actively curated — new profiles are added regularly. [Watch the catalog repo](https://github.com/flyingnobita/llml-catalog)
+> (Watch → Custom → Releases) to get notified when new ones land.
+
 ## ✨ Features
 
 - **Model discovery** — auto-scans common paths for GGUF files and safetensors model
