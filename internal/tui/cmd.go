@@ -218,11 +218,15 @@ func reloadRuntimeCmd() tea.Cmd {
 func startupCmd() tea.Cmd {
 	return func() tea.Msg {
 		cfg, err := readConfigFileFn()
+		if err == nil {
+			// Apply runtime env vars eagerly so they are set before any write path
+			// (including the full-scan fallback) calls runtimeFromEnvFn().
+			applyRuntimeFromConfigFn(&cfg.Runtime)
+		}
 		if err != nil || !cfg.ValidForCache() {
 			debugf("startupCmd: no valid cache, falling back to full scan err=%v valid=%t", err, err == nil && cfg.ValidForCache())
 			return startupNeedFullScanMsg{}
 		}
-		applyRuntimeFromConfigFn(&cfg.Runtime)
 		rt := discoverRuntimeFn()
 		debugf("startupCmd: cache valid, runtime ollamaPath=%q ollamaRunning=%t cachedModels=%d", rt.OllamaPath, rt.OllamaRunning, len(cfg.Models))
 		if rt.OllamaPath != "" && !rt.OllamaRunning {

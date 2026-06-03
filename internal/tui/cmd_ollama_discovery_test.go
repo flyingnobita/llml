@@ -156,6 +156,40 @@ func TestApplyAndFullScanCmd_StartsOllamaForDiscovery(t *testing.T) {
 	}
 }
 
+// TestStartupCmd_InvalidCacheStillAppliesRuntime ensures that when the config
+// reads successfully but the cache is unusable (wrong schema version), the
+// runtime env vars are still applied before the early return. Without this,
+// runtimeFromEnvFn() could be called in the subsequent full-scan write with
+// no env vars set, blanking the on-disk runtime config.
+func TestStartupCmd_InvalidCacheStillAppliesRuntime(t *testing.T) {
+	t.Cleanup(restoreDiscoveryTestSeams())
+
+	wantPath := "/test/llama.cpp"
+	var appliedRuntime *config.RuntimeConfig
+
+	readConfigFileFn = func() (config.Config, error) {
+		return config.Config{
+			SchemaVersion: config.SchemaVersion - 1, // invalid cache
+			Runtime:       config.RuntimeConfig{DefaultLlamaCppPath: wantPath},
+		}, nil
+	}
+	applyRuntimeFromConfigFn = func(r *config.RuntimeConfig) { appliedRuntime = r }
+
+	msgs := collectCmdMsgs(t, startupCmd())
+	if len(msgs) != 1 {
+		t.Fatalf("got %d msgs, want 1", len(msgs))
+	}
+	if _, ok := msgs[0].(startupNeedFullScanMsg); !ok {
+		t.Fatalf("msg[0] %T, want startupNeedFullScanMsg", msgs[0])
+	}
+	if appliedRuntime == nil {
+		t.Fatal("applyRuntimeFromConfigFn was not called before early return")
+	}
+	if appliedRuntime.DefaultLlamaCppPath != wantPath {
+		t.Fatalf("applied runtime path %q, want %q", appliedRuntime.DefaultLlamaCppPath, wantPath)
+	}
+}
+
 func TestStartupCmd_CacheHitWithStoppedOllamaFallsBackToFullScan(t *testing.T) {
 	t.Cleanup(restoreDiscoveryTestSeams())
 
