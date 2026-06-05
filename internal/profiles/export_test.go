@@ -170,7 +170,7 @@ func TestProfileToPortable(t *testing.T) {
 		Name:    "gpu-full",
 		Backend: "llama",
 		UseCase: UseCaseMetadata{
-			Primary: UseCaseChat,
+			Primary: UseCasePrimaries{UseCaseChat},
 			Tags:    []string{"interactive", "balanced"},
 		},
 		Hardware: HardwareMetadata{
@@ -220,8 +220,8 @@ func TestProfileToPortable(t *testing.T) {
 		t.Errorf("Env[0] = {%q, %q}", pp.Env[0].Key, pp.Env[0].Value)
 	}
 
-	if pp.UseCase.Primary != "chat" {
-		t.Errorf("UseCase.Primary = %q", pp.UseCase.Primary)
+	if len(pp.UseCase.Primary) != 1 || pp.UseCase.Primary[0] != "chat" {
+		t.Errorf("UseCase.Primary = %v", pp.UseCase.Primary)
 	}
 	if len(pp.UseCase.Tags) != 2 {
 		t.Errorf("len(UseCase.Tags) = %d", len(pp.UseCase.Tags))
@@ -377,8 +377,8 @@ func TestWritePortable(t *testing.T) {
 	content := string(data)
 
 	// Verify schema_version and key fields.
-	if !strings.Contains(content, "schema_version = 2") {
-		t.Error("missing schema_version = 2")
+	if !strings.Contains(content, "schema_version = 3") {
+		t.Error("missing schema_version = 3")
 	}
 	if !strings.Contains(content, `name = "test-profile"`) {
 		t.Error("missing profile name")
@@ -437,7 +437,7 @@ func TestWritePortableEmptyProfiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(data), "schema_version = 2") {
+	if !strings.Contains(string(data), "schema_version = 3") {
 		t.Error("missing schema_version even with empty profiles")
 	}
 }
@@ -461,7 +461,7 @@ func TestPortableFileRoundTrip(t *testing.T) {
 			ModelHint: "Llama-3-8B-GGUF",
 			Args:      []string{"--n-gpu-layers 80", "--ctx-size 4096", "--threads 8"},
 			UseCase: PortableUseCase{
-				Primary: "chat",
+				Primary: []string{"chat"},
 				Tags:    []string{"interactive", "balanced"},
 			},
 			Hardware: PortableHardware{
@@ -505,8 +505,8 @@ func TestPortableFileRoundTrip(t *testing.T) {
 	if len(p.Args) != 3 {
 		t.Errorf("len(Args) = %d, want 3", len(p.Args))
 	}
-	if p.UseCase.Primary != "chat" {
-		t.Errorf("UseCase.Primary = %q", p.UseCase.Primary)
+	if len(p.UseCase.Primary) != 1 || p.UseCase.Primary[0] != "chat" {
+		t.Errorf("UseCase.Primary = %v", p.UseCase.Primary)
 	}
 	if len(p.UseCase.Tags) != 2 {
 		t.Errorf("len(UseCase.Tags) = %d", len(p.UseCase.Tags))

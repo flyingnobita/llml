@@ -68,6 +68,9 @@ type Theme struct {
 	ParamProfileName color.Color
 	// ParamProfileInactive is used for non-active profile names in the params modal list.
 	ParamProfileInactive color.Color
+	// ParamMetadataLabel is the muted color for key labels in the Profile Metadata section
+	// (e.g. "Backend:", "Hardware Class:"), distinct from the brighter value text.
+	ParamMetadataLabel color.Color
 	// SplitPaneBorderFocused accents the keyboard-focused pane in split-server mode.
 	SplitPaneBorderFocused color.Color
 	// SplitPaneBorderDim matches Border (same lipgloss.Color in theme constructors)
@@ -103,6 +106,7 @@ func DarkTheme() Theme {
 		// Distinct from ModalTitle / ParamSectionHeading; warm vs purple chrome.
 		ParamProfileName:       lipgloss.Color("178"),
 		ParamProfileInactive:   lipgloss.Color("246"),
+		ParamMetadataLabel:     lipgloss.Color("244"),
 		SplitPaneBorderFocused: lipgloss.Color("51"),
 		SplitPaneBorderDim:     border,
 	}
@@ -135,6 +139,7 @@ func LightTheme() Theme {
 		// Distinct from ModalTitle / ParamSectionHeading; green accent on light bg.
 		ParamProfileName:       lipgloss.Color("30"),
 		ParamProfileInactive:   lipgloss.Color("238"),
+		ParamMetadataLabel:     lipgloss.Color("240"),
 		SplitPaneBorderFocused: lipgloss.Color("27"),
 		SplitPaneBorderDim:     border,
 	}

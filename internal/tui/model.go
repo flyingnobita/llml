@@ -7,6 +7,7 @@ import (
 
 	"charm.land/bubbles/v2/filepicker"
 	btable "charm.land/bubbles/v2/table"
+	"charm.land/bubbles/v2/textarea"
 	"charm.land/bubbles/v2/textinput"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
@@ -58,20 +59,25 @@ type runtimeConfigState struct {
 
 // paramsState holds the parameter-profiles panel's state.
 type paramsState struct {
-	open             bool
-	confirmDelete    paramConfirm
-	modelPath        string
-	modelDisplayName string
-	focus            paramFocus
-	profileIndex     int
-	profiles         []ParameterProfile
-	metadataCursor   int
-	envCursor        int
-	argsCursor       int
-	env              []EnvVar
-	args             []string
-	editKind         paramEditKind
-	editInput        textinput.Model
+	open                bool
+	confirmDelete       paramConfirm
+	modelPath           string
+	modelDisplayName    string
+	focus               paramFocus
+	profileIndex        int
+	profiles            []ParameterProfile
+	metadataCursor      int
+	primaryCursor       int // horizontal cursor within the Use Case Primary checkbox row
+	tagCursor           int // horizontal cursor within the Tags checkbox row
+	backendCursor       int // horizontal cursor within the Backend radio row
+	hardwareClassCursor int // horizontal cursor within the Hardware Class radio row
+	envCursor           int
+	argsCursor          int
+	env                 []EnvVar
+	args                []string
+	editKind            paramEditKind
+	editInput           textinput.Model
+	notesInput          textarea.Model // multi-line editor for the Notes metadata field
 }
 
 // serverPaneState holds the split-pane server subprocess and log viewport.
@@ -310,7 +316,7 @@ func New() Model {
 		preview:   launchPreviewState{viewport: newLaunchPreviewViewport(st)},
 		alerts:    alertsState{viewport: newAlertViewport(st)},
 		rc:        runtimeConfigState{inputs: newRuntimeConfigInputs()},
-		params:    paramsState{editInput: newParamLineTextInput()},
+		params:    paramsState{editInput: newParamLineTextInput(), notesInput: newNotesTextarea()},
 		discovery: discoveryPathsState{editInput: newPathTextInput()},
 		export:    exportViewState{pathInput: newPathTextInput(), filterInput: newFilterTextInput()},
 		import_:   importViewState{pathInput: newPathTextInput(), picker: filepicker.New()},
@@ -690,7 +696,7 @@ func (m Model) syncLaunchPreviewViewport(innerW int) Model {
 		m.preview.lastCmd = ""
 		return m
 	}
-	cmd := launchPreviewCommandLine(m)
+	cmd, note := launchPreviewCmdAndNote(m)
 	if cmd != m.preview.lastCmd {
 		m.preview.viewport.GotoTop()
 		m.preview.lastCmd = cmd
@@ -703,9 +709,15 @@ func (m Model) syncLaunchPreviewViewport(innerW int) Model {
 	}
 	pvFrV := m.preview.viewport.Style.GetVerticalFrameSize()
 	outerH := launchPreviewVisibleLines + pvFrV
-
+	buildRendered := func(textWidth int) string {
+		r := m.ui.styles.launchPreviewContent.Width(textWidth).Render(cmd)
+		if note != "" {
+			r = r + "\n" + m.ui.styles.warnLine.Render(note)
+		}
+		return r
+	}
 	m.preview.viewport.SetWidth(innerW)
-	rendered := m.ui.styles.launchPreviewContent.Width(textW).Render(cmd)
+	rendered := buildRendered(textW)
 	m.preview.viewport.SetContent(rendered)
 	m.preview.viewport.SetHeight(outerH)
 	if m.preview.viewport.TotalLineCount() > m.preview.viewport.VisibleLineCount() {
@@ -714,7 +726,7 @@ func (m Model) syncLaunchPreviewViewport(innerW int) Model {
 		if textW < MinTextDisplayWidth {
 			textW = MinTextDisplayWidth
 		}
-		rendered = m.ui.styles.launchPreviewContent.Width(textW).Render(cmd)
+		rendered = buildRendered(textW)
 		m.preview.viewport.SetContent(rendered)
 		m.preview.viewport.SetHeight(outerH)
 	}

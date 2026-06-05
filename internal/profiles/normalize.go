@@ -64,7 +64,7 @@ func NormalizeModelParams(p ModelParams) ModelParams {
 		}
 		args = append(args, ExpandArgLine(a)...)
 	}
-	return ModelParams{Env: env, Args: args}
+	return ModelParams{Env: env, Args: args, UseCase: p.UseCase}
 }
 
 // ExpandArgLine maps one panel row to argv tokens.
@@ -91,7 +91,7 @@ func FlattenArgLines(lines []string) []string {
 
 // NormalizeUseCase trims and validates use-case metadata.
 func NormalizeUseCase(uc UseCaseMetadata) UseCaseMetadata {
-	primary := normalizeUseCasePrimary(uc.Primary)
+	primary := normalizeUseCasePrimaries(uc.Primary)
 	seen := map[string]struct{}{}
 	var tags []string
 	for _, tag := range uc.Tags {
@@ -113,9 +113,13 @@ func NormalizeBackendInput(v string) string {
 	return normalizeBackend(v)
 }
 
-// NormalizeUseCasePrimaryInput trims and canonicalizes a use-case primary from user input.
-func NormalizeUseCasePrimaryInput(v string) UseCasePrimary {
-	return normalizeUseCasePrimary(UseCasePrimary(v))
+// NormalizeUseCasePrimariesInput trims and canonicalizes a slice of primary values from user input.
+func NormalizeUseCasePrimariesInput(vs []string) UseCasePrimaries {
+	raw := make(UseCasePrimaries, len(vs))
+	for i, s := range vs {
+		raw[i] = UseCasePrimary(s)
+	}
+	return normalizeUseCasePrimaries(raw)
 }
 
 // NormalizeHardwareClassInput trims and canonicalizes a hardware class from user input.
@@ -232,26 +236,42 @@ func normalizeBackend(v string) string {
 	}
 }
 
-func normalizeUseCasePrimary(v UseCasePrimary) UseCasePrimary {
+// normalizeOneUseCasePrimary canonicalizes one raw primary value.
+// Removed enum values (completion, embedding, batch) map to UseCaseUnspecified
+// so that old data silently drops them on normalize.
+func normalizeOneUseCasePrimary(v UseCasePrimary) UseCasePrimary {
 	s := strings.ToLower(strings.TrimSpace(string(v)))
 	switch s {
 	case "", "unknown", "unspecified":
 		return UseCaseUnspecified
 	case "chat", "assistant":
 		return UseCaseChat
-	case "completion", "generate", "generation":
-		return UseCaseCompletion
 	case "tool-calling", "tool_calling", "tools":
 		return UseCaseToolCalling
-	case "embedding", "embeddings":
-		return UseCaseEmbedding
 	case "eval", "evaluation":
 		return UseCaseEval
-	case "batch", "offline":
-		return UseCaseBatch
 	default:
 		return UseCaseUnspecified
 	}
+}
+
+// normalizeUseCasePrimaries canonicalizes, deduplicates, and drops unknown values
+// from a slice of primary values.
+func normalizeUseCasePrimaries(vs UseCasePrimaries) UseCasePrimaries {
+	seen := map[UseCasePrimary]struct{}{}
+	var out UseCasePrimaries
+	for _, v := range vs {
+		n := normalizeOneUseCasePrimary(v)
+		if n == UseCaseUnspecified {
+			continue
+		}
+		if _, ok := seen[n]; ok {
+			continue
+		}
+		seen[n] = struct{}{}
+		out = append(out, n)
+	}
+	return out
 }
 
 func normalizeHardwareClass(v HardwareClass) HardwareClass {
@@ -275,6 +295,14 @@ func normalizeTag(v string) string {
 	v = strings.ReplaceAll(v, "_", "-")
 	fields := strings.Fields(v)
 	v = strings.Join(fields, "-")
+	// Migrate legacy/removed tags.
+	switch v {
+	case "vision":
+		return "image"
+	case "non-thinking", "server", "mamba", "fp8", "multi-gpu",
+		"cpu-offload", "chat-template-jinja", "terminal-bench", "instruct":
+		return ""
+	}
 	return v
 }
 

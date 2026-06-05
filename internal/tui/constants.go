@@ -96,6 +96,15 @@ const (
 
 	// MinParamEditInnerWidth is the minimum inner width for a parameter edit text input.
 	MinParamEditInnerWidth = 32
+
+	// paramMetadataLabelWidth is the padded visual width for the label text in every
+	// Profile Metadata row so all value columns start at the same horizontal offset.
+	// Equals len("Hardware Min VRAM GB") = 20.
+	paramMetadataLabelWidth = 20
+
+	// notesMaxLines is the maximum number of lines the Notes field displays before
+	// the content is clipped and a scrollbar indicator appears.
+	notesMaxLines = 3
 )
 
 // Server and process constants.

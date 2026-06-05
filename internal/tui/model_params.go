@@ -71,9 +71,14 @@ func modelParamsForLaunchPreview(m Model) (ModelParams, bool) {
 	}
 	if m.params.open {
 		if modelParamsKey(m.params.modelPath) == modelParamsKey(sel) {
+			var uc profiles.UseCaseMetadata
+			if m.params.profileIndex >= 0 && m.params.profileIndex < len(m.params.profiles) {
+				uc = m.params.profiles[m.params.profileIndex].UseCase
+			}
 			return normalizeModelParams(ModelParams{
-				Env:  append([]EnvVar(nil), m.params.env...),
-				Args: flattenArgLines(m.params.args),
+				Env:     append([]EnvVar(nil), m.params.env...),
+				Args:    flattenArgLines(m.params.args),
+				UseCase: uc,
 			}), true
 		}
 	}

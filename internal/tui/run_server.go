@@ -20,13 +20,61 @@ import (
 
 // serverSpec holds the resolved parameters needed to build server commands for one launch.
 type serverSpec struct {
-	backend        models.ModelBackend
-	bin            string
-	port           int
-	modelPath      string
-	host           string
-	params         ModelParams
-	activateScript string // vLLM only: path to venv activate script
+	backend          models.ModelBackend
+	bin              string
+	port             int
+	modelPath        string
+	host             string
+	params           ModelParams
+	activateScript   string   // vLLM only: path to venv activate script
+	mmprojPath       string   // auto-detected mmproj sidecar (llama/kobold only); empty when none found or profile already specifies one
+	mmprojCandidates []string // non-empty when multiple mmproj siblings exist and disambiguation failed (mmprojPath is empty)
+	mmprojMissing    bool     // image/audio tagged but no mmproj file found; launch proceeds without multimodal support
+}
+
+// profileHasMMProj reports whether params already contains a --mmproj / -mm flag token,
+// meaning the user has manually specified the projector and auto-injection should be skipped.
+// Matches both space-separated form ("--mmproj /path") and equals form ("--mmproj=/path").
+func profileHasMMProj(params ModelParams) bool {
+	for _, a := range params.Args {
+		if a == "--mmproj" || a == "-mm" ||
+			strings.HasPrefix(a, "--mmproj=") || strings.HasPrefix(a, "-mm=") {
+			return true
+		}
+	}
+	return false
+}
+
+// profileWantsMMProj reports whether the active profile opts into mmproj injection
+// via an "image" or "audio" use_case tag.
+func profileWantsMMProj(params ModelParams) bool {
+	for _, t := range params.UseCase.Tags {
+		tl := strings.ToLower(strings.TrimSpace(t))
+		if tl == "image" || tl == "audio" {
+			return true
+		}
+	}
+	return false
+}
+
+// resolveMMProjForSpec returns (mmprojPath, mmprojCandidates, mmprojMissing).
+// Injection is opt-in: only resolves when the profile has an image/audio use_case tag.
+// Returns ("", nil, false) when the profile already carries --mmproj or has no image/audio tag.
+func resolveMMProjForSpec(modelPath string, params ModelParams) (string, []string, bool) {
+	if profileHasMMProj(params) {
+		return "", nil, false
+	}
+	if !profileWantsMMProj(params) {
+		return "", nil, false
+	}
+	chosen, candidates := models.ResolveMMProj(modelPath)
+	if chosen != "" {
+		return chosen, nil, false
+	}
+	if len(candidates) > 0 {
+		return "", candidates, false
+	}
+	return "", nil, true
 }
 
 // buildServerSpec resolves the binary, port, and venv for launching a server.
@@ -87,12 +135,16 @@ func buildServerSpec(backend models.ModelBackend, modelPath string, params Model
 		if bin == "" {
 			bin = "koboldcpp"
 		}
+		mmprojPath, mmprojCandidates, mmprojMissing := resolveMMProjForSpec(modelPath, params)
 		return serverSpec{
-			backend:   models.BackendKobold,
-			bin:       bin,
-			port:      models.KoboldCppPort(),
-			modelPath: modelPath,
-			params:    params,
+			backend:          models.BackendKobold,
+			bin:              bin,
+			port:             models.KoboldCppPort(),
+			modelPath:        modelPath,
+			params:           params,
+			mmprojPath:       mmprojPath,
+			mmprojCandidates: mmprojCandidates,
+			mmprojMissing:    mmprojMissing,
 		}, nil
 	default: // BackendLlama
 		bin := models.ResolveLlamaServerPath(rt)
@@ -106,15 +158,31 @@ func buildServerSpec(backend models.ModelBackend, modelPath string, params Model
 		if bin == "" {
 			bin = "llama-server"
 		}
+		mmprojPath, mmprojCandidates, mmprojMissing := resolveMMProjForSpec(modelPath, params)
 		return serverSpec{
-			backend:   models.BackendLlama,
-			bin:       bin,
-			host:      host,
-			port:      models.ListenPort(),
-			modelPath: modelPath,
-			params:    params,
+			backend:          models.BackendLlama,
+			bin:              bin,
+			host:             host,
+			port:             models.ListenPort(),
+			modelPath:        modelPath,
+			params:           params,
+			mmprojPath:       mmprojPath,
+			mmprojCandidates: mmprojCandidates,
+			mmprojMissing:    mmprojMissing,
 		}, nil
 	}
+}
+
+// mmprojNote returns a one-line warning string when mmproj state is abnormal for this spec.
+// Empty string means no warning needed.
+func (s serverSpec) mmprojNote() string {
+	if s.mmprojMissing {
+		return "⚠ image/audio profile — no mmproj file found; launching without multimodal support"
+	}
+	if len(s.mmprojCandidates) > 0 {
+		return "⚠ multiple mmproj files found; add --mmproj to profile args to select one"
+	}
+	return ""
 }
 
 // commandWords returns the escaped shell tokens for the server invocation (same order as directArgs).
@@ -139,6 +207,9 @@ func (s serverSpec) commandWords() []string {
 			shellSingleQuoted(s.modelPath),
 			"--port", fmt.Sprintf("%d", s.port),
 		}
+		if s.mmprojPath != "" {
+			words = append(words, "--mmproj", shellSingleQuoted(s.mmprojPath))
+		}
 	default:
 		words = []string{
 			shellSingleQuoted(s.bin),
@@ -146,6 +217,9 @@ func (s serverSpec) commandWords() []string {
 			"--alias", shellSingleQuoted(llamaServerAlias(s.modelPath)),
 			"--host", s.host,
 			"--port", fmt.Sprintf("%d", s.port),
+		}
+		if s.mmprojPath != "" {
+			words = append(words, "--mmproj", shellSingleQuoted(s.mmprojPath))
 		}
 	}
 	for _, a := range s.params.Args {
@@ -177,12 +251,18 @@ func (s serverSpec) directArgs() []string {
 			s.modelPath,
 			"--port", fmt.Sprintf("%d", s.port),
 		}
+		if s.mmprojPath != "" {
+			args = append(args, "--mmproj", s.mmprojPath)
+		}
 	default:
 		args = []string{
 			"-m", s.modelPath,
 			"--alias", llamaServerAlias(s.modelPath),
 			"--host", s.host,
 			"--port", fmt.Sprintf("%d", s.port),
+		}
+		if s.mmprojPath != "" {
+			args = append(args, "--mmproj", s.mmprojPath)
 		}
 	}
 	return append(args, s.params.Args...)
@@ -296,6 +376,23 @@ func launchPreviewCommandLine(m Model) string {
 	be := m.resolveEffectiveBackend()
 	spec, _ := buildServerSpec(be, modelPath, params, m.runtime, false)
 	return spec.previewLine()
+}
+
+// launchPreviewCmdAndNote returns both the preview command line and the mmproj note from a single
+// buildServerSpec call, avoiding the double os.ReadDir that occurs when the two are fetched
+// independently via launchPreviewCommandLine + launchPreviewMMProjNote.
+func launchPreviewCmdAndNote(m Model) (string, string) {
+	modelPath, _ := m.SelectedModel()
+	if modelPath == "" {
+		return "", ""
+	}
+	params, ok := modelParamsForLaunchPreview(m)
+	if !ok {
+		return "", ""
+	}
+	be := m.resolveEffectiveBackend()
+	spec, _ := buildServerSpec(be, modelPath, params, m.runtime, false)
+	return spec.previewLine(), spec.mmprojNote()
 }
 
 func scanReaderLines(r io.Reader, ch chan<- tea.Msg, wg *sync.WaitGroup) {

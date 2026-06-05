@@ -99,8 +99,12 @@ func FetchPortable(ctx context.Context, rawURL string) (*PortableFile, error) {
 		return nil, fmt.Errorf("profile body exceeds 256KB cap")
 	}
 
-	var f PortableFile
-	if err := toml.Unmarshal(body, &f); err != nil {
+	// Peek at schema_version before full parse.
+	type versionOnly struct {
+		SchemaVersion int `toml:"schema_version"`
+	}
+	var vo versionOnly
+	if err := toml.Unmarshal(body, &vo); err != nil {
 		preview := string(body)
 		if len(preview) > 80 {
 			preview = preview[:80]
@@ -108,8 +112,42 @@ func FetchPortable(ctx context.Context, rawURL string) (*PortableFile, error) {
 		return nil, fmt.Errorf("response is not valid TOML at %s (got %q)", rawURL, preview)
 	}
 
-	if f.SchemaVersion != SchemaVersion {
-		return nil, fmt.Errorf("invalid profile schema at %s: schema_version %d (expected %d)", rawURL, f.SchemaVersion, SchemaVersion)
+	var f *PortableFile
+	switch vo.SchemaVersion {
+	case SchemaVersion:
+		var pf PortableFile
+		if err := toml.Unmarshal(body, &pf); err != nil {
+			return nil, fmt.Errorf("response is not valid TOML at %s: %w", rawURL, err)
+		}
+		f = &pf
+	case 2:
+		// Legacy v2: primary was a single string; migrate to single-element array.
+		var lf portableFileLegacyV2
+		if err := toml.Unmarshal(body, &lf); err != nil {
+			return nil, fmt.Errorf("response is not valid TOML at %s: %w", rawURL, err)
+		}
+		out := &PortableFile{
+			SchemaVersion: SchemaVersion,
+			Profiles:      make([]PortableProfile, len(lf.Profiles)),
+		}
+		for i, lp := range lf.Profiles {
+			pp := PortableProfile{
+				Name:      lp.Name,
+				Backend:   lp.Backend,
+				ModelHint: lp.ModelHint,
+				Args:      lp.Args,
+				Env:       lp.Env,
+				Hardware:  lp.Hardware,
+				UseCase:   PortableUseCase{Tags: lp.UseCase.Tags},
+			}
+			if lp.UseCase.Primary != "" {
+				pp.UseCase.Primary = []string{lp.UseCase.Primary}
+			}
+			out.Profiles[i] = pp
+		}
+		f = out
+	default:
+		return nil, fmt.Errorf("invalid profile schema at %s: schema_version %d (expected %d)", rawURL, vo.SchemaVersion, SchemaVersion)
 	}
 
 	for i, p := range f.Profiles {
@@ -118,7 +156,7 @@ func FetchPortable(ctx context.Context, rawURL string) (*PortableFile, error) {
 		}
 	}
 
-	return &f, nil
+	return f, nil
 }
 
 // ConfigPath returns the path to model-params.json.
@@ -220,7 +258,7 @@ func LoadParamsForRun(modelPath string) (ModelParams, error) {
 	}
 	idx := clampInt(ent.ActiveIndex, 0, len(ent.Profiles)-1)
 	p := ent.Profiles[idx]
-	return NormalizeModelParams(ModelParams{Env: p.Env, Args: p.Args}), nil
+	return NormalizeModelParams(ModelParams{Env: p.Env, Args: p.Args, UseCase: p.UseCase}), nil
 }
 
 // ParseEntry decodes one model entry according to the file version.
