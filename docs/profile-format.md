@@ -66,16 +66,17 @@ The `use_case` table maps to llml's local `useCase` object.
 
 | Field     | Type            | Required | Description                                                                                                                                                                |
 | --------- | --------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `primary` | array of string | no       | One or more of: `chat`, `tool-calling`, `eval`.                                                                                                                            |
+| `primary` | array of string | no       | One or more of: `general`, `eval`.                                                                                                                                         |
 | `tags`    | array of string | no       | Normalized tags. Two canonical behavioral tags control mmproj injection: `"image"` and `"audio"` (see below). Other common tags: `interactive`, `low-latency`, `balanced`. |
 
 Normalization rules:
 
-- `primary` is an array; use `["chat"]` for a single value and `["chat",
-"tool-calling"]` for multiple. An empty array or omitted field means unspecified.
-- Canonical primary values are `chat`, `tool-calling`, and `eval`.
-- Importers normalize synonyms: `assistant → chat`, `tool_calling → tool-calling`,
-  `evaluation → eval`. Unknown values are silently dropped on import.
+- `primary` is an array; use `["general"]` for a single value and `["general",
+"eval"]` for multiple. An empty array or omitted field means unspecified.
+- Canonical primary values are `general` and `eval`.
+- Importers normalize synonyms: `assistant → general`, `chat → general`, and
+  `evaluation → eval`. Retired values such as `completion`, `embedding`, `batch`,
+  `tool-calling`, and `tool_calling` are silently dropped on import.
 - Tags should be lowercase and kebab-case where practical.
 
 **Canonical behavioral tags — `"image"` and `"audio"`:** When a profile for a
@@ -146,7 +147,7 @@ name = "balanced-q4"
 backend = "llama"
 model_hint = "Llama-3-8B-GGUF"
 args = ["--n-gpu-layers 80", "--ctx-size 4096", "--threads 8"]
-use_case.primary = ["chat"]
+use_case.primary = ["general"]
 use_case.tags = ["interactive", "balanced"]
 hardware.class = "gpu"
 hardware.gpu_count = 1
@@ -167,7 +168,7 @@ name = "max-context"
 backend = "llama"
 model_hint = "Llama-3-8B-GGUF"
 args = ["--n-gpu-layers 80", "--ctx-size 32768"]
-use_case.primary = ["chat"]
+use_case.primary = ["general"]
 use_case.tags = ["long-context"]
 hardware.class = "gpu"
 hardware.min_vram_gb = 48
@@ -181,7 +182,7 @@ name = "image"
 backend = "llama"
 model_hint = "gemma-4-26B-GGUF"
 args = ["--n-gpu-layers 80", "--ctx-size 4096"]
-use_case.primary = ["chat"]
+use_case.primary = ["general"]
 use_case.tags = ["image", "interactive"]
 hardware.class = "gpu"
 hardware.min_vram_gb = 24
@@ -191,7 +192,7 @@ name = "text-only"
 backend = "llama"
 model_hint = "gemma-4-26B-GGUF"
 args = ["--n-gpu-layers 80", "--ctx-size 8192"]
-use_case.primary = ["chat"]
+use_case.primary = ["general"]
 use_case.tags = ["interactive"]
 hardware.class = "gpu"
 hardware.min_vram_gb = 16
@@ -207,7 +208,7 @@ name = "single-gpu"
 backend = "vllm"
 model_hint = "Qwen2.5-72B-Instruct-AWQ"
 args = ["--tensor-parallel-size 1", "--gpu-memory-utilization 0.95", "--max-model-len 8192"]
-use_case.primary = ["chat"]
+use_case.primary = ["general"]
 use_case.tags = ["interactive", "balanced"]
 hardware.class = "gpu"
 hardware.gpu_count = 1
@@ -238,7 +239,7 @@ name = "gpu-full"
 backend = "ollama"
 model_hint = "llama3.2"
 args = []
-use_case.primary = ["chat"]
+use_case.primary = ["general"]
 use_case.tags = ["interactive"]
 hardware.class = "gpu"
 hardware.notes = "All layers on GPU, 8k context."
@@ -262,7 +263,7 @@ name = "gpu-full"
 backend = "koboldcpp"
 model_hint = "Llama-3-8B-GGUF"
 args = ["--gpulayers 80", "--contextsize 4096", "--threads 8", "--flashattention"]
-use_case.primary = ["chat"]
+use_case.primary = ["general"]
 use_case.tags = ["interactive", "balanced"]
 hardware.class = "gpu"
 hardware.gpu_count = 1
@@ -282,7 +283,7 @@ name = "vulkan"
 backend = "koboldcpp"
 model_hint = "Llama-3-8B-GGUF"
 args = ["--gpulayers 80", "--contextsize 4096", "--usevulkan"]
-use_case.primary = ["chat"]
+use_case.primary = ["general"]
 use_case.tags = ["interactive"]
 hardware.class = "gpu"
 hardware.notes = "Vulkan backend for AMD GPUs."
@@ -291,8 +292,8 @@ hardware.notes = "Vulkan backend for AMD GPUs."
 ## Compatibility
 
 `schema_version = 3` is the current portable format. `schema_version = 2` is the
-legacy format where `use_case.primary` was a single string (`primary = "chat"`)
-instead of an array (`primary = ["chat"]`). Both `ReadPortable` and `FetchPortable`
+legacy format where `use_case.primary` was a single string (`primary = "general"`)
+instead of an array (`primary = ["general"]`). Both `ReadPortable` and `FetchPortable`
 accept v2 files and automatically migrate them to v3 in memory (single string becomes
 a one-element array). New files should always emit `schema_version = 3`.
 
@@ -327,8 +328,8 @@ follow these rules:
    Keep it short.
 
 6. **use_case:** When the source provides enough evidence, set `use_case.primary`
-   as a TOML array using the canonical values (`chat`, `tool-calling`, `eval`). Add
-   short lowercase tags only when the source materially supports them, such as
+   as a TOML array using the canonical values (`general`, `eval`). Add short
+   lowercase tags only when the source materially supports them, such as
    `interactive`, `throughput`, `long-context`, or `low-latency`. If the source does
    not justify a field, omit it.
 
@@ -359,7 +360,7 @@ follow these rules:
    will use your value instead (regardless of the tag).
 
 9. **Output:** Emit valid TOML matching this schema. Set `schema_version = 3`. Use
-   an array for `use_case.primary` (e.g. `primary = ["chat"]`). Do not include
+   an array for `use_case.primary` (e.g. `primary = ["general"]`). Do not include
    fields not listed in this spec. Do not include the model path or binary name in
    `args`.
 

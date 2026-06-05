@@ -50,7 +50,7 @@ func TestParamPanelCloneProfile(t *testing.T) {
 		{
 			Name:     "cuda",
 			Backend:  "koboldcpp",
-			UseCase:  profiles.UseCaseMetadata{Primary: profiles.UseCasePrimaries{profiles.UseCaseChat}, Tags: []string{"interactive"}},
+			UseCase:  profiles.UseCaseMetadata{Primary: profiles.UseCasePrimaries{profiles.UseCaseGeneral}, Tags: []string{"interactive"}},
 			Hardware: profiles.HardwareMetadata{Class: profiles.HardwareClassGPU},
 			Env:      []EnvVar{{Key: "FOO", Value: "bar"}},
 			Args:     []string{"--x"},
@@ -77,7 +77,7 @@ func TestParamPanelCloneProfile(t *testing.T) {
 	if len(clone.Args) != 1 || clone.Args[0] != "--x" {
 		t.Fatalf("clone args: %+v", clone.Args)
 	}
-	if clone.Backend != "koboldcpp" || !slices.Contains(clone.UseCase.Primary, profiles.UseCaseChat) || clone.Hardware.Class != profiles.HardwareClassGPU {
+	if clone.Backend != "koboldcpp" || !slices.Contains(clone.UseCase.Primary, profiles.UseCaseGeneral) || clone.Hardware.Class != profiles.HardwareClassGPU {
 		t.Fatalf("clone metadata: %+v", clone)
 	}
 	if m.params.profiles[0].Name != "cuda" {
@@ -325,7 +325,7 @@ func TestParamPanelViewIncludesMainAppBackdrop(t *testing.T) {
 	m.params.profiles = []ParameterProfile{{
 		Name:    "default",
 		Backend: "vllm",
-		UseCase: profiles.UseCaseMetadata{Primary: profiles.UseCasePrimaries{profiles.UseCaseChat}, Tags: []string{"interactive"}},
+		UseCase: profiles.UseCaseMetadata{Primary: profiles.UseCasePrimaries{profiles.UseCaseGeneral}, Tags: []string{"interactive"}},
 		Hardware: profiles.HardwareMetadata{
 			Class: profiles.HardwareClassGPU,
 		},
@@ -369,9 +369,9 @@ func TestParamPanelMetadataTracksActiveProfile(t *testing.T) {
 	m.params.modelDisplayName = "test/model"
 	m.params.profiles = []ParameterProfile{
 		{
-			Name:    "chat",
+			Name:    "general",
 			Backend: "vllm",
-			UseCase: profiles.UseCaseMetadata{Primary: profiles.UseCasePrimaries{profiles.UseCaseChat}, Tags: []string{"coding"}},
+			UseCase: profiles.UseCaseMetadata{Primary: profiles.UseCasePrimaries{profiles.UseCaseGeneral}, Tags: []string{"coding"}},
 			Hardware: profiles.HardwareMetadata{
 				Class: profiles.HardwareClassGPU,
 			},
@@ -390,7 +390,7 @@ func TestParamPanelMetadataTracksActiveProfile(t *testing.T) {
 	view1 := m.paramPanelModalBlock()
 	flat1 := strings.ReplaceAll(view1, "\n", " ")
 	// Backend radio shows "(•) vllm"; Primary and Tags checkboxes show checked chips.
-	if !strings.Contains(flat1, "(•) vllm") || !strings.Contains(flat1, "[✓] chat") || !strings.Contains(flat1, "[✓] coding") {
+	if !strings.Contains(flat1, "(•) vllm") || !strings.Contains(flat1, "[✓] general") || !strings.Contains(flat1, "[✓] coding") {
 		t.Fatalf("expected active metadata for first profile:\n%s", view1)
 	}
 	m = m.moveProfile(1)
@@ -403,8 +403,8 @@ func TestParamPanelMetadataTracksActiveProfile(t *testing.T) {
 	if !strings.Contains(view2, "Notes") || !strings.Contains(view2, "quiet box") {
 		t.Fatalf("expected notes field for second profile:\n%s", view2)
 	}
-	// Backend radio shows "(•) (none)" for empty backend; Primary shows "[ ] chat".
-	if !strings.Contains(flat2, "(•) (none)") || !strings.Contains(flat2, "Use Case Primary") || !strings.Contains(flat2, "[ ] chat") {
+	// Backend radio shows "(•) (none)" for empty backend; Primary shows "[ ] general".
+	if !strings.Contains(flat2, "(•) (none)") || !strings.Contains(flat2, "Use Case Primary") || !strings.Contains(flat2, "[ ] general") {
 		t.Fatalf("expected unspecified placeholders:\n%s", view2)
 	}
 }
@@ -484,7 +484,7 @@ func TestParamPanelMetadataEditsPersistAndSwitchProfiles(t *testing.T) {
 	modelPath := filepath.Join(cfg, "meta-edit.gguf")
 	if err := saveModelEntry(modelPath, modelEntry{
 		Profiles: []ParameterProfile{
-			{Name: "chat"},
+			{Name: "general"},
 			{Name: "cpu", Backend: "ollama", Hardware: profiles.HardwareMetadata{Class: profiles.HardwareClassCPU}},
 		},
 		ActiveIndex: 0,
@@ -516,11 +516,11 @@ func TestParamPanelMetadataEditsPersistAndSwitchProfiles(t *testing.T) {
 		t.Fatalf("backend = %q", got)
 	}
 
-	// Toggle "chat" (primaryCursor=0 → CanonicalPrimaries[0]) via space.
+	// Toggle "general" (primaryCursor=0 → CanonicalPrimaries[0]) via space.
 	m.params.metadataCursor = int(paramMetadataUseCasePrimary)
-	m.params.primaryCursor = 0 // "chat" is CanonicalPrimaries[0]
+	m.params.primaryCursor = 0 // "general" is CanonicalPrimaries[0]
 	m, _ = m.updateParamPanelKey(tea.KeyPressMsg{Code: ' ', Text: "space"})
-	if got := m.params.profiles[0].UseCase.Primary; !slices.Contains(got, profiles.UseCaseChat) {
+	if got := m.params.profiles[0].UseCase.Primary; !slices.Contains(got, profiles.UseCaseGeneral) {
 		t.Fatalf("use case primary = %v", got)
 	}
 
@@ -547,7 +547,7 @@ func TestParamPanelMetadataEditsPersistAndSwitchProfiles(t *testing.T) {
 	if got.Profiles[0].Backend != "llama" {
 		t.Fatalf("saved backend = %q", got.Profiles[0].Backend)
 	}
-	if !slices.Contains(got.Profiles[0].UseCase.Primary, profiles.UseCaseChat) {
+	if !slices.Contains(got.Profiles[0].UseCase.Primary, profiles.UseCaseGeneral) {
 		t.Fatalf("saved use case = %v", got.Profiles[0].UseCase.Primary)
 	}
 	if !hasTag(got.Profiles[0].UseCase.Tags, "image") {

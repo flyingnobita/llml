@@ -20,9 +20,9 @@ func TestSaveLoadEntryRoundTrip_v3Metadata(t *testing.T) {
 	ent := Entry{
 		Profiles: []Profile{
 			{
-				Name:    "single-gpu-chat",
+				Name:    "single-gpu-general",
 				Backend: "vllm",
-				UseCase: UseCaseMetadata{Primary: UseCasePrimaries{UseCaseChat}, Tags: []string{"interactive", "balanced"}},
+				UseCase: UseCaseMetadata{Primary: UseCasePrimaries{UseCaseGeneral}, Tags: []string{"interactive", "balanced"}},
 				Hardware: HardwareMetadata{
 					Class:     HardwareClassGPU,
 					GPUCount:  &gpuCount,
@@ -48,7 +48,7 @@ func TestSaveLoadEntryRoundTrip_v3Metadata(t *testing.T) {
 	if got.Profiles[0].Backend != "vllm" {
 		t.Fatalf("backend = %q", got.Profiles[0].Backend)
 	}
-	if !slices.Contains(got.Profiles[0].UseCase.Primary, UseCaseChat) {
+	if !slices.Contains(got.Profiles[0].UseCase.Primary, UseCaseGeneral) {
 		t.Fatalf("use case = %v", got.Profiles[0].UseCase.Primary)
 	}
 	if got.Profiles[0].Hardware.Class != HardwareClassGPU {
@@ -114,7 +114,7 @@ func TestNormalizeUseCaseAndHardware(t *testing.T) {
 	p := NormalizeProfile(Profile{
 		Name:    "x",
 		Backend: "VLLM",
-		UseCase: UseCaseMetadata{Primary: UseCasePrimaries{"tool_calling"}, Tags: []string{" Interactive ", "interactive", "LOW_LATENCY"}},
+		UseCase: UseCaseMetadata{Primary: UseCasePrimaries{"assistant"}, Tags: []string{" Interactive ", "interactive", "LOW_LATENCY"}},
 		Hardware: HardwareMetadata{
 			Class:     "GPU",
 			GPUCount:  &gpuCount,
@@ -126,7 +126,7 @@ func TestNormalizeUseCaseAndHardware(t *testing.T) {
 	if p.Backend != "vllm" {
 		t.Fatalf("backend = %q", p.Backend)
 	}
-	if !slices.Contains(p.UseCase.Primary, UseCaseToolCalling) {
+	if !slices.Contains(p.UseCase.Primary, UseCaseGeneral) {
 		t.Fatalf("use case = %v", p.UseCase.Primary)
 	}
 	if len(p.UseCase.Tags) != 2 || p.UseCase.Tags[0] != "interactive" || p.UseCase.Tags[1] != "low-latency" {
@@ -168,7 +168,7 @@ func TestNormalizeMetadataInputsFromTUIStrings(t *testing.T) {
 	if p.Backend != "llama" {
 		t.Fatalf("backend = %q", p.Backend)
 	}
-	if !slices.Contains(p.UseCase.Primary, UseCaseToolCalling) {
+	if len(p.UseCase.Primary) != 0 {
 		t.Fatalf("use case = %v", p.UseCase.Primary)
 	}
 	if len(p.UseCase.Tags) != 2 || p.UseCase.Tags[0] != "interactive" || p.UseCase.Tags[1] != "low-latency" {
@@ -240,7 +240,7 @@ func TestCopyProfileDeepCopiesNestedMetadata(t *testing.T) {
 	in := Profile{
 		Name:    "x",
 		Backend: "vllm",
-		UseCase: UseCaseMetadata{Primary: UseCasePrimaries{UseCaseChat}, Tags: []string{"interactive"}},
+		UseCase: UseCaseMetadata{Primary: UseCasePrimaries{UseCaseGeneral}, Tags: []string{"interactive"}},
 		Hardware: HardwareMetadata{
 			Class:     HardwareClassGPU,
 			GPUCount:  &gpuCount,
@@ -275,7 +275,7 @@ func TestLoadParamsForRunIgnoresMetadata(t *testing.T) {
 			{
 				Name:     "x",
 				Backend:  "vllm",
-				UseCase:  UseCaseMetadata{Primary: UseCasePrimaries{UseCaseChat}},
+				UseCase:  UseCaseMetadata{Primary: UseCasePrimaries{UseCaseGeneral}},
 				Hardware: HardwareMetadata{Class: HardwareClassGPU},
 				Env:      []EnvVar{{Key: "CUDA_VISIBLE_DEVICES", Value: "0"}},
 				Args:     []string{"--max-model-len", "8192"},

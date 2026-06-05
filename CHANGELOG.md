@@ -6,7 +6,8 @@ Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
 - Jun-05, 2026 - [v0.7.0 release: multimodal mmproj injection, multi-value use_case.primary, and p panel UX overhaul]
 - Jun-05, 2026 - [mmproj auto-detection: for llama.cpp and KoboldCpp backends, llml now auto-detects a sibling mmproj GGUF in the model directory and injects --mmproj at launch; opt-in via image/audio use_case tag in p panel; ambiguous multi-mmproj setups surface a warn alert; missing mmproj warned in launch preview and alert history]
-- Jun-05, 2026 - [Portable schema v3: use_case.primary is now a TOML array (primary = ["chat", "tool-calling"]); v2 single-string files are migrated on import; enum trimmed to chat, tool-calling, eval]
+- Jun-05, 2026 - [Portable schema v3: use_case.primary is now a TOML array (primary = ["general"]); v2 single-string files are migrated on import; enum trimmed to general and eval]
+- Jun-05, 2026 - 03:01 PM +0800 - [Profiles: simplify primary use-case metadata to `general` and `eval`; legacy `chat`/`assistant` normalize to `general`, while retired `completion`, `embedding`, `batch`, and tool-calling values normalize to unspecified]
 - Jun-05, 2026 - [p panel UX overhaul: Use Case Primary and Tags are horizontal checkbox rows (left/right + space to toggle); Backend and Hardware Class are radio rows (( )/(•) chips); labels and values use distinct colors aligned at the same offset; "Hardware Notes" renamed to "Notes"]
 - Jun-05, 2026 - [Notes field: word-wraps up to 3 lines with scrollbar (█/░) in view mode; edit mode opens a multi-line textarea]
 - Jun-02, 2026 - 11:59 PM +0800 - [v0.6.0 release: one-line installer, configurable hosts, quit confirmation, split-pane readability improvements, and missing-model/runtime guidance]

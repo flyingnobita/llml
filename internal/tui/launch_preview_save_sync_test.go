@@ -118,7 +118,7 @@ func TestMetadataOnlyDifferencesDoNotChangeLaunchPreview(t *testing.T) {
 		Profiles: []ParameterProfile{{
 			Name:     "default",
 			Backend:  "vllm",
-			UseCase:  profiles.UseCaseMetadata{Primary: profiles.UseCasePrimaries{profiles.UseCaseChat}, Tags: []string{"interactive"}},
+			UseCase:  profiles.UseCaseMetadata{Primary: profiles.UseCasePrimaries{profiles.UseCaseGeneral}, Tags: []string{"interactive"}},
 			Hardware: profiles.HardwareMetadata{Class: profiles.HardwareClassGPU},
 			Env:      []EnvVar{{Key: "CUDA_VISIBLE_DEVICES", Value: "0"}},
 			Args:     []string{"--ctx-size", "4096"},

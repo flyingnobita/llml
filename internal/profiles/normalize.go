@@ -237,17 +237,15 @@ func normalizeBackend(v string) string {
 }
 
 // normalizeOneUseCasePrimary canonicalizes one raw primary value.
-// Removed enum values (completion, embedding, batch) map to UseCaseUnspecified
-// so that old data silently drops them on normalize.
+// Removed enum values map to UseCaseUnspecified so that old data silently drops
+// them on normalize.
 func normalizeOneUseCasePrimary(v UseCasePrimary) UseCasePrimary {
 	s := strings.ToLower(strings.TrimSpace(string(v)))
 	switch s {
 	case "", "unknown", "unspecified":
 		return UseCaseUnspecified
-	case "chat", "assistant":
-		return UseCaseChat
-	case "tool-calling", "tool_calling", "tools":
-		return UseCaseToolCalling
+	case "general", "chat", "assistant":
+		return UseCaseGeneral
 	case "eval", "evaluation":
 		return UseCaseEval
 	default:

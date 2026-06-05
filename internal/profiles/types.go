@@ -26,14 +26,13 @@ type UseCasePrimary string
 
 const (
 	UseCaseUnspecified UseCasePrimary = ""
-	UseCaseChat        UseCasePrimary = "chat"
-	UseCaseToolCalling UseCasePrimary = "tool-calling"
+	UseCaseGeneral     UseCasePrimary = "general"
 	UseCaseEval        UseCasePrimary = "eval"
 )
 
 // UseCasePrimaries is a set of primary use-case values for a profile.
 // It handles both the legacy single-string JSON form ("chat") and the current
-// array form (["chat","tool-calling"]) when reading from model-params.json.
+// array form (["general","eval"]) when reading from model-params.json.
 type UseCasePrimaries []UseCasePrimary
 
 // UnmarshalJSON accepts either a JSON string (legacy) or a JSON array.

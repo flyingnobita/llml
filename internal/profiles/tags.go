@@ -13,7 +13,6 @@ var CanonicalTags = []string{
 // CanonicalPrimaries is the ordered list of predefined use-case primary values shown
 // in the p-panel checkbox row. Multiple primaries may be selected for a profile.
 var CanonicalPrimaries = []UseCasePrimary{
-	UseCaseChat,
-	UseCaseToolCalling,
+	UseCaseGeneral,
 	UseCaseEval,
 }

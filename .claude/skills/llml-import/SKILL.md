@@ -63,8 +63,8 @@ Rules (from the spec's LLM extraction section):
 - Derive `name` from the section heading or context (e.g. `"default"`, `"4-bit-gpu"`,
   `"cpu-only"`).
 - When the source supports it, set structured `use_case` metadata:
-  `primary` as one of `chat`, `completion`, `tool-calling`, `embedding`, `eval`,
-  `batch`, plus short lowercase tag strings when they are explicit or well-supported.
+  `primary` as one of `general` or `eval`, plus short lowercase tag strings when
+  they are explicit or well-supported.
 - When the source supports it, set structured `hardware` metadata:
   `class`, `gpu_count`, `min_vram_gb`, `max_vram_gb`, and `notes`.
 - **Do not extract model-location parameters into the portable profile.** Exclude
@@ -147,11 +147,11 @@ Found N profile(s) across M model variant(s):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 [Qwen3-35B-A3B-GGUF]  →  Qwen3-35B-A3B-Q4_K_M.gguf
   1. "thinking-fast" — backend: llama
-     use_case: chat [interactive]
+     use_case: general [interactive]
      hardware: gpu, min_vram_gb=24
      args: [--n-gpu-layers 80, --ctx-size 8192]
   2. "thinking-slow" — backend: llama
-     use_case: batch [throughput]
+     use_case: general [throughput]
      hardware: gpu, gpu_count=2
      args: [--n-gpu-layers 80, --ctx-size 32768]
 
@@ -159,7 +159,7 @@ Found N profile(s) across M model variant(s):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 [Qwen3-8B-GGUF]
   3. "default" — backend: llama
-     use_case: completion
+     use_case: general
      args: [--n-gpu-layers 80]
 [Qwen3-0.5B-GGUF]
   4. "default" — backend: llama
@@ -430,18 +430,10 @@ def normalize_use_case_primary(v):
     s = (v or '').strip().lower()
     if s in ('', 'unknown', 'unspecified'):
         return ''
-    if s in ('chat', 'assistant'):
-        return 'chat'
-    if s in ('completion', 'generate', 'generation'):
-        return 'completion'
-    if s in ('tool-calling', 'tool_calling', 'tools'):
-        return 'tool-calling'
-    if s in ('embedding', 'embeddings'):
-        return 'embedding'
+    if s in ('general', 'chat', 'assistant'):
+        return 'general'
     if s in ('eval', 'evaluation'):
         return 'eval'
-    if s in ('batch', 'offline'):
-        return 'batch'
     return ''
 
 def normalize_tag(v):
@@ -683,12 +675,15 @@ Optional fields:
 - `model_hint`
 - `args` as panel-row strings, for example `"--ctx-size 4096"`
 - `[[profiles.env]]` as `{key, value}` pairs
-- `[profiles.use_case]` with `primary` and `tags`
+- `[profiles.use_case]` with `primary` (`general` or `eval`) and `tags`
 - `[profiles.hardware]` with `class`, `gpu_count`, `min_vram_gb`, `max_vram_gb`, `notes`
 
 Do not include model-location parameters in `args` or `env`. llml supplies the model
 path itself. Portable `use_case` and `hardware` fields map into llml's local
-canonical `useCase` and `hardware` metadata on import.
+canonical `useCase` and `hardware` metadata on import. Legacy `chat` and
+`assistant` primary values normalize to `general`; retired primary values such as
+`completion`, `embedding`, `batch`, `tool-calling`, and `tool_calling` normalize to
+unspecified.
 
 Example:
 
@@ -700,7 +695,7 @@ name = "balanced"
 backend = "llama"
 model_hint = "Llama-3-8B"
 args = ["--n-gpu-layers 80", "--ctx-size 4096"]
-use_case.primary = "chat"
+use_case.primary = "general"
 use_case.tags = ["interactive"]
 hardware.class = "gpu"
 hardware.min_vram_gb = 24

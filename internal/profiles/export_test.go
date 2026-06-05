@@ -170,7 +170,7 @@ func TestProfileToPortable(t *testing.T) {
 		Name:    "gpu-full",
 		Backend: "llama",
 		UseCase: UseCaseMetadata{
-			Primary: UseCasePrimaries{UseCaseChat},
+			Primary: UseCasePrimaries{UseCaseGeneral},
 			Tags:    []string{"interactive", "balanced"},
 		},
 		Hardware: HardwareMetadata{
@@ -220,7 +220,7 @@ func TestProfileToPortable(t *testing.T) {
 		t.Errorf("Env[0] = {%q, %q}", pp.Env[0].Key, pp.Env[0].Value)
 	}
 
-	if len(pp.UseCase.Primary) != 1 || pp.UseCase.Primary[0] != "chat" {
+	if len(pp.UseCase.Primary) != 1 || pp.UseCase.Primary[0] != "general" {
 		t.Errorf("UseCase.Primary = %v", pp.UseCase.Primary)
 	}
 	if len(pp.UseCase.Tags) != 2 {
@@ -461,7 +461,7 @@ func TestPortableFileRoundTrip(t *testing.T) {
 			ModelHint: "Llama-3-8B-GGUF",
 			Args:      []string{"--n-gpu-layers 80", "--ctx-size 4096", "--threads 8"},
 			UseCase: PortableUseCase{
-				Primary: []string{"chat"},
+				Primary: []string{"general"},
 				Tags:    []string{"interactive", "balanced"},
 			},
 			Hardware: PortableHardware{
@@ -505,7 +505,7 @@ func TestPortableFileRoundTrip(t *testing.T) {
 	if len(p.Args) != 3 {
 		t.Errorf("len(Args) = %d, want 3", len(p.Args))
 	}
-	if len(p.UseCase.Primary) != 1 || p.UseCase.Primary[0] != "chat" {
+	if len(p.UseCase.Primary) != 1 || p.UseCase.Primary[0] != "general" {
 		t.Errorf("UseCase.Primary = %v", p.UseCase.Primary)
 	}
 	if len(p.UseCase.Tags) != 2 {

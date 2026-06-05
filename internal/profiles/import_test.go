@@ -145,7 +145,7 @@ func TestStripModelLocationParams(t *testing.T) {
 
 func TestPortableToProfile(t *testing.T) {
 	pp := PortableProfile{
-		Name:    "  gpu-chat  ",
+		Name:    "  gpu-general  ",
 		Backend: "llama.cpp",
 		Args:    []string{"--n-gpu-layers 80", "--flash-attn"},
 		Env: []PortableEnvVar{
@@ -165,7 +165,7 @@ func TestPortableToProfile(t *testing.T) {
 	}
 	p := PortableToProfile(pp)
 
-	if p.Name != "gpu-chat" {
+	if p.Name != "gpu-general" {
 		t.Fatalf("name = %q", p.Name)
 	}
 	if p.Backend != "llama" {
@@ -180,8 +180,8 @@ func TestPortableToProfile(t *testing.T) {
 	if len(p.Env) != 1 || p.Env[0].Key != "CUDA_VISIBLE_DEVICES" {
 		t.Fatalf("env = %+v", p.Env)
 	}
-	if !slices.Contains(p.UseCase.Primary, UseCaseChat) {
-		t.Fatalf("useCase.primary = %v, want chat", p.UseCase.Primary)
+	if !slices.Contains(p.UseCase.Primary, UseCaseGeneral) {
+		t.Fatalf("useCase.primary = %v, want general", p.UseCase.Primary)
 	}
 	if len(p.UseCase.Tags) != 2 {
 		t.Fatalf("tags = %v", p.UseCase.Tags)
@@ -404,12 +404,12 @@ func TestPortableRoundTrip(t *testing.T) {
 		SchemaVersion: SchemaVersion,
 		Profiles: []PortableProfile{
 			{
-				Name:      "gpu-chat",
+				Name:      "gpu-general",
 				Backend:   "llama",
 				ModelHint: "model-x",
 				Args:      []string{"--n-gpu-layers 80", "--flash-attn"},
 				Env:       []PortableEnvVar{{Key: "CUDA_VISIBLE_DEVICES", Value: "0"}},
-				UseCase:   PortableUseCase{Primary: []string{"chat"}, Tags: []string{"interactive"}},
+				UseCase:   PortableUseCase{Primary: []string{"general"}, Tags: []string{"interactive"}},
 				Hardware:  PortableHardware{Class: "gpu", GPUCount: intPtr(1)},
 			},
 		},
@@ -430,7 +430,7 @@ func TestPortableRoundTrip(t *testing.T) {
 	}
 	p := PortableToProfile(f.Profiles[0])
 
-	if p.Name != "gpu-chat" {
+	if p.Name != "gpu-general" {
 		t.Fatalf("name = %q", p.Name)
 	}
 	if p.Backend != "llama" {
@@ -439,7 +439,7 @@ func TestPortableRoundTrip(t *testing.T) {
 	if len(p.Args) != 3 {
 		t.Fatalf("args = %v", p.Args)
 	}
-	if !slices.Contains(p.UseCase.Primary, UseCaseChat) {
+	if !slices.Contains(p.UseCase.Primary, UseCaseGeneral) {
 		t.Fatalf("useCase = %v", p.UseCase.Primary)
 	}
 }
