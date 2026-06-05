@@ -45,6 +45,9 @@ type styles struct {
 	paramProfileName       lipgloss.Style
 	paramProfileInactive   lipgloss.Style
 	paramDetailContent     lipgloss.Style
+	// paramMetadataLabel styles the key labels in the Profile Metadata section
+	// (e.g. "Backend:", "Notes:") in a muted color to distinguish them from values.
+	paramMetadataLabel     lipgloss.Style
 	paramTagSelected       lipgloss.Style
 	serverLogViewport      lipgloss.Style
 	splitPaneChromeFocused lipgloss.Style
@@ -163,6 +166,8 @@ func newStyles(theme Theme) styles {
 		// Env / argv lines for the active profile: same hue as active name, not bold (readable blocks).
 		paramDetailContent: lipgloss.NewStyle().
 			Foreground(theme.ParamProfileName),
+		paramMetadataLabel: lipgloss.NewStyle().
+			Foreground(theme.ParamMetadataLabel),
 		paramTagSelected: lipgloss.NewStyle().
 			Reverse(true).
 			Foreground(theme.ParamProfileName),

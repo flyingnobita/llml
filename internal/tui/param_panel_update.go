@@ -30,8 +30,19 @@ func (ps *paramsState) loadCurrentProfileIn() {
 	ps.argsCursor = 0
 }
 
+// isEditingNotes reports whether the Notes textarea is the active edit widget.
+func (m Model) isEditingNotes() bool {
+	return m.params.editKind == paramEditMetadataValue &&
+		paramMetadataField(m.params.metadataCursor) == paramMetadataHardwareNotes
+}
+
 func (m Model) commitParamLineEdit() Model {
-	line := m.params.editInput.Value()
+	var line string
+	if m.isEditingNotes() {
+		line = m.params.notesInput.Value()
+	} else {
+		line = m.params.editInput.Value()
+	}
 	kind := m.params.editKind
 
 	switch kind {
@@ -96,6 +107,8 @@ func (m Model) commitParamLineEdit() Model {
 		}
 	}
 	m.params.editInput.SetValue("")
+	m.params.notesInput.Reset()
+	m.params.notesInput.Blur()
 	return m
 }
 
@@ -103,6 +116,8 @@ func (m Model) cancelParamLineEdit() Model {
 	m.params.editKind = paramEditNone
 	m = m.blurParamEdit()
 	m.params.editInput.SetValue("")
+	m.params.notesInput.Reset()
+	m.params.notesInput.Blur()
 	return m
 }
 
@@ -123,6 +138,7 @@ func (m Model) startParamLineEdit() (Model, tea.Cmd) {
 	default:
 		return m, nil
 	}
+	m.params.editInput.SetWidth(m.paramEditInnerWidth())
 	return m.focusParamEdit()
 }
 
@@ -132,6 +148,7 @@ func (m Model) startProfileNameEdit() (Model, tea.Cmd) {
 	}
 	m.params.editKind = paramEditProfileName
 	m.params.editInput.SetValue(m.params.profiles[m.params.profileIndex].Name)
+	m.params.editInput.SetWidth(m.paramEditInnerWidth())
 	return m.focusParamEdit()
 }
 
@@ -151,6 +168,7 @@ func (m Model) addParamRow() (Model, tea.Cmd) {
 	default:
 		return m, nil
 	}
+	m.params.editInput.SetWidth(m.paramEditInnerWidth())
 	return m.focusParamEdit()
 }
 
@@ -265,6 +283,9 @@ func (m Model) moveProfile(delta int) Model {
 	m.params.loadCurrentProfileIn()
 	m.params.envCursor = 0
 	m.params.argsCursor = 0
+	// Reset radio cursors to match the new profile's current values.
+	m.params.backendCursor = m.backendCurrentIndex()
+	m.params.hardwareClassCursor = m.hardwareClassCurrentIndex()
 	return m
 }
 
@@ -340,12 +361,16 @@ func (m Model) moveParamCursor(delta int) (Model, tea.Cmd) {
 		next := clampInt(m.params.metadataCursor+delta, 0, int(paramMetadataFieldCount)-1)
 		if next != m.params.metadataCursor {
 			m.params.metadataCursor = next
-			// Reset horizontal cursors when entering their checkbox rows.
+			// Reset horizontal cursors when entering their interactive rows.
 			switch paramMetadataField(next) {
 			case paramMetadataUseCasePrimary:
 				m.params.primaryCursor = 0
 			case paramMetadataUseCaseTags:
 				m.params.tagCursor = 0
+			case paramMetadataBackend:
+				m.params.backendCursor = m.backendCurrentIndex()
+			case paramMetadataHardwareClass:
+				m.params.hardwareClassCursor = m.hardwareClassCurrentIndex()
 			}
 		}
 	case paramFocusEnv:
@@ -418,7 +443,11 @@ func (m Model) handleEditKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, nil
 	default:
 		var cmd tea.Cmd
-		m.params.editInput, cmd = m.params.editInput.Update(msg)
+		if m.isEditingNotes() {
+			m.params.notesInput, cmd = m.params.notesInput.Update(msg)
+		} else {
+			m.params.editInput, cmd = m.params.editInput.Update(msg)
+		}
 		return m, cmd
 	}
 }
@@ -470,8 +499,16 @@ func (m Model) handleNavKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 					m.params.tagCursor--
 				}
 				return m, nil
-			case paramMetadataBackend, paramMetadataHardwareClass:
-				return m.cycleMetadataEnum(-1)
+			case paramMetadataBackend:
+				if m.params.backendCursor > 0 {
+					m.params.backendCursor--
+				}
+				return m, nil
+			case paramMetadataHardwareClass:
+				if m.params.hardwareClassCursor > 0 {
+					m.params.hardwareClassCursor--
+				}
+				return m, nil
 			}
 		}
 		return m, nil
@@ -488,8 +525,17 @@ func (m Model) handleNavKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 					m.params.tagCursor++
 				}
 				return m, nil
-			case paramMetadataBackend, paramMetadataHardwareClass:
-				return m.cycleMetadataEnum(1)
+			case paramMetadataBackend:
+				opts := m.paramBackendOptionsForModel()
+				if m.params.backendCursor < len(opts)-1 {
+					m.params.backendCursor++
+				}
+				return m, nil
+			case paramMetadataHardwareClass:
+				if m.params.hardwareClassCursor < len(paramHardwareClassOptions)-1 {
+					m.params.hardwareClassCursor++
+				}
+				return m, nil
 			}
 		}
 		return m, nil
@@ -500,6 +546,10 @@ func (m Model) handleNavKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 				return m.toggleCurrentPrimary()
 			case paramMetadataUseCaseTags:
 				return m.toggleCurrentTag()
+			case paramMetadataBackend:
+				return m.selectBackend()
+			case paramMetadataHardwareClass:
+				return m.selectHardwareClass()
 			}
 		}
 		return m, nil

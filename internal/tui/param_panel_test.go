@@ -344,8 +344,13 @@ func TestParamPanelViewIncludesMainAppBackdrop(t *testing.T) {
 	if !strings.Contains(content, "Parameter Profiles") {
 		t.Fatal("expected parameter profiles modal in view")
 	}
-	if !strings.Contains(content, "Profile Metadata") || !strings.Contains(content, "Backend: vllm") {
+	if !strings.Contains(content, "Profile Metadata") {
 		t.Fatal("expected metadata section in parameters modal")
+	}
+	// Hardware Class is GPU — radio row must show the selected chip.
+	flatContent := strings.ReplaceAll(content, "\n", " ")
+	if !strings.Contains(flatContent, "(•) gpu") {
+		t.Fatal("expected hardware class gpu radio chip in parameters modal")
 	}
 	if !strings.Contains(content, "(active)") {
 		t.Fatal("expected (active) prefix on active profile in parameters modal")
@@ -384,16 +389,22 @@ func TestParamPanelMetadataTracksActiveProfile(t *testing.T) {
 	m.params.profileIndex = 0
 	view1 := m.paramPanelModalBlock()
 	flat1 := strings.ReplaceAll(view1, "\n", " ")
-	if !strings.Contains(view1, "Backend: vllm") || !strings.Contains(flat1, "[✓] chat") || !strings.Contains(flat1, "[✓] coding") {
+	// Backend radio shows "(•) vllm"; Primary and Tags checkboxes show checked chips.
+	if !strings.Contains(flat1, "(•) vllm") || !strings.Contains(flat1, "[✓] chat") || !strings.Contains(flat1, "[✓] coding") {
 		t.Fatalf("expected active metadata for first profile:\n%s", view1)
 	}
 	m = m.moveProfile(1)
 	view2 := m.paramPanelModalBlock()
-	if !strings.Contains(view2, "Hardware Class: cpu") || !strings.Contains(view2, "Hardware Notes: quiet box") {
-		t.Fatalf("expected hardware for second profile:\n%s", view2)
-	}
 	flat2 := strings.ReplaceAll(view2, "\n", " ")
-	if !strings.Contains(view2, "Backend: unspecified") || !strings.Contains(flat2, "Use Case Primary:") || !strings.Contains(flat2, "[ ] chat") {
+	// Hardware Class radio shows "(•) cpu"; Notes field (renamed) shows value.
+	if !strings.Contains(flat2, "(•) cpu") {
+		t.Fatalf("expected hardware class cpu radio in second profile:\n%s", view2)
+	}
+	if !strings.Contains(view2, "Notes") || !strings.Contains(view2, "quiet box") {
+		t.Fatalf("expected notes field for second profile:\n%s", view2)
+	}
+	// Backend radio shows "(•) (none)" for empty backend; Primary shows "[ ] chat".
+	if !strings.Contains(flat2, "(•) (none)") || !strings.Contains(flat2, "Use Case Primary") || !strings.Contains(flat2, "[ ] chat") {
 		t.Fatalf("expected unspecified placeholders:\n%s", view2)
 	}
 }
@@ -450,8 +461,8 @@ func TestParamPanelMetadataTagsRowRendersCheckboxes(t *testing.T) {
 	view := m.paramPanelModalBlock()
 	// Collapse newlines so word-wrapped chips are still detectable as substrings.
 	flat := strings.ReplaceAll(view, "\n", " ")
-	if !strings.Contains(flat, "Tags:") {
-		t.Fatalf("expected Tags: label in view:\n%s", view)
+	if !strings.Contains(flat, "Tags") {
+		t.Fatalf("expected Tags label in view:\n%s", view)
 	}
 	if !strings.Contains(flat, "[✓] thinking") {
 		t.Fatalf("expected checked thinking tag:\n%s", view)
@@ -498,7 +509,9 @@ func TestParamPanelMetadataEditsPersistAndSwitchProfiles(t *testing.T) {
 	m.params.loadCurrentProfileIn()
 
 	m.params.metadataCursor = int(paramMetadataBackend)
+	// backendCursor starts at 0 ("(none)"); move right to "llama" then select with space.
 	m, _ = m.updateParamPanelKey(tea.KeyPressMsg{Code: tea.KeyRight, Text: ""})
+	m, _ = m.updateParamPanelKey(tea.KeyPressMsg{Code: ' ', Text: "space"})
 	if got := m.params.profiles[0].Backend; got != "llama" {
 		t.Fatalf("backend = %q", got)
 	}
@@ -569,8 +582,10 @@ func TestParamPanelHardwareMetadataPersistsAndClears(t *testing.T) {
 	m.params.loadCurrentProfileIn()
 
 	m.params.metadataCursor = int(paramMetadataHardwareClass)
-	m, _ = m.updateParamPanelKey(tea.KeyPressMsg{Code: tea.KeyRight, Text: ""})
-	m, _ = m.updateParamPanelKey(tea.KeyPressMsg{Code: tea.KeyRight, Text: ""})
+	// hardwareClassCursor starts at 0 (unspecified); right×2 to gpu, then select with space.
+	m, _ = m.updateParamPanelKey(tea.KeyPressMsg{Code: tea.KeyRight, Text: ""}) // 0→1 (cpu)
+	m, _ = m.updateParamPanelKey(tea.KeyPressMsg{Code: tea.KeyRight, Text: ""}) // 1→2 (gpu)
+	m, _ = m.updateParamPanelKey(tea.KeyPressMsg{Code: ' ', Text: "space"})     // select gpu
 	if got := m.params.profiles[0].Hardware.Class; got != profiles.HardwareClassGPU {
 		t.Fatalf("hardware class = %q", got)
 	}
@@ -579,7 +594,11 @@ func TestParamPanelHardwareMetadataPersistsAndClears(t *testing.T) {
 		t.Helper()
 		m.params.metadataCursor = int(field)
 		m.params.editKind = paramEditMetadataValue
-		m.params.editInput.SetValue(value)
+		if field == paramMetadataHardwareNotes {
+			m.params.notesInput.SetValue(value)
+		} else {
+			m.params.editInput.SetValue(value)
+		}
 		m = m.commitParamLineEdit()
 	}
 	setField(paramMetadataHardwareGPUCount, "2")

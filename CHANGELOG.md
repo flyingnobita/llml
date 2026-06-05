@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
+- Jun-05, 2026 - [Notes field in Profile Metadata now word-wraps up to 3 lines in both view and edit mode; scrollbar indicator (█/░) appears when content exceeds 3 lines; edit mode uses a multi-line textarea matching the view layout]
+- Jun-05, 2026 - [Profile Metadata UX: Backend and Hardware Class are now single-select radio rows (( )/(•) chips, left/right moves cursor, space/enter selects); labels and values have distinct colors; all value columns align at the same horizontal offset; "Hardware Notes" renamed to "Notes"]
 - Jun-05, 2026 - [use_case.primary is now multi-value: portable schema bumped to v3 (primary = ["chat", "tool-calling"]), p panel shows checkbox row (left/right + space), v2 files migrated on import; enum trimmed to chat/tool-calling/eval]
 - Jun-05, 2026 - [Tags and Use Case Primary in p panel are now horizontal checkbox rows: chips are packed into lines that fit the terminal width so no word-wrap splits a chip across lines]
 - Jun-04, 2026 - [mmproj injection now opt-in: profiles must declare use_case.tags = ["image"] or ["audio"] to trigger --mmproj injection; image/audio toggle added to p panel (llama/koboldcpp only); missing mmproj warned in launch preview and alert history]

@@ -132,32 +132,12 @@ func (m Model) renderProfileSection(cw, maxSec int, secBox lipgloss.Style) strin
 	return secBox.Width(cw).Render(lipgloss.JoinVertical(lipgloss.Left, rows...))
 }
 
-func formatMetadataValue(v string) string {
-	v = truncateParamLine(v, 120)
-	if v == "" {
-		return "unspecified"
-	}
-	return v
-}
-
-func formatMetadataFieldLine(p ParameterProfile, field paramMetadataField) string {
-	label := paramMetadataFieldLabels[field]
-	switch field {
-	case paramMetadataBackend:
-		return fmt.Sprintf("%s: %s", label, formatMetadataValue(p.Backend))
-	case paramMetadataHardwareClass:
-		return fmt.Sprintf("%s: %s", label, formatMetadataValue(string(p.Hardware.Class)))
-	case paramMetadataHardwareGPUCount:
-		return fmt.Sprintf("%s: %s", label, formatMetadataValue(formatOptionalInt(p.Hardware.GPUCount)))
-	case paramMetadataHardwareMinVRAM:
-		return fmt.Sprintf("%s: %s", label, formatMetadataValue(formatOptionalInt(p.Hardware.MinVRAMGB)))
-	case paramMetadataHardwareMaxVRAM:
-		return fmt.Sprintf("%s: %s", label, formatMetadataValue(formatOptionalInt(p.Hardware.MaxVRAMGB)))
-	case paramMetadataHardwareNotes:
-		return fmt.Sprintf("%s: %s", label, formatMetadataValue(p.Hardware.Notes))
-	default:
-		return label + ": unspecified"
-	}
+// renderLabelPart builds the styled label column for a metadata row.
+// The label text is padded to paramMetadataLabelWidth with muted color;
+// prefix carries the focus indicator.
+func (m Model) renderLabelPart(prefix, label string) string {
+	labelFmt := fmt.Sprintf("%-*s: ", paramMetadataLabelWidth, label)
+	return m.ui.styles.paramMetadataLabel.Render(prefix + labelFmt)
 }
 
 // renderCheckboxRow renders a label and [ ]/[✓] chips packed into lines that each fit
@@ -178,12 +158,11 @@ func (m Model) renderCheckboxRow(
 	const sep = "  " // 2-space gap between chips
 	sepW := lipgloss.Width(sep)
 
-	labelPart := m.ui.styles.paramDetailContent.Render(prefix + label + ":")
+	labelPart := m.renderLabelPart(prefix, label)
 	labelPartW := lipgloss.Width(labelPart)
-
-	// Available chip-area widths.
-	firstAvail := width - labelPartW - sepW
-	contAvail := width - lipgloss.Width(prefix)
+	contIndent := labelPartW + sepW // where chips start on line 1; continuation aligns there
+	firstAvail := width - contIndent
+	contAvail := width - contIndent
 
 	var rows []string
 	var lineChips []string
@@ -215,17 +194,16 @@ func (m Model) renderCheckboxRow(
 		}
 
 		if len(lineChips) > 0 && lineUsed+needed > avail {
-			// Flush current line.
 			chipsStr := strings.Join(lineChips, sep)
 			if isFirst {
 				rows = append(rows, labelPart+sep+chipsStr)
 			} else {
-				rows = append(rows, strings.Repeat(" ", lipgloss.Width(prefix))+chipsStr)
+				rows = append(rows, strings.Repeat(" ", contIndent)+chipsStr)
 			}
 			lineChips = nil
 			lineUsed = 0
 			isFirst = false
-			needed = chipW // no separator at start of new line
+			needed = chipW
 		}
 
 		lineChips = append(lineChips, chipRendered)
@@ -237,11 +215,137 @@ func (m Model) renderCheckboxRow(
 		if isFirst {
 			rows = append(rows, labelPart+sep+chipsStr)
 		} else {
-			rows = append(rows, strings.Repeat(" ", lipgloss.Width(prefix))+chipsStr)
+			rows = append(rows, strings.Repeat(" ", contIndent)+chipsStr)
 		}
 	}
 
 	return rows
+}
+
+// renderRadioRow renders a label and ( )/(•) chips for a single-select field.
+// selectedIndex is the index of the currently chosen value (-1 = none selected).
+// cursor is the navigation cursor position. optLabels are the display strings for each option.
+// Returns one rendered string per terminal line.
+func (m Model) renderRadioRow(
+	label string,
+	optLabels []string,
+	selectedIndex int,
+	cursor int,
+	focused bool,
+	width int,
+) []string {
+	prefix := "  "
+	if focused {
+		prefix = "› "
+	}
+	const sep = "  "
+	sepW := lipgloss.Width(sep)
+
+	labelPart := m.renderLabelPart(prefix, label)
+	labelPartW := lipgloss.Width(labelPart)
+	contIndent := labelPartW + sepW
+	firstAvail := width - contIndent
+	contAvail := width - contIndent
+
+	var rows []string
+	var lineChips []string
+	lineUsed := 0
+	isFirst := true
+
+	for i, optLabel := range optLabels {
+		radio := "( )"
+		if i == selectedIndex {
+			radio = "(•)"
+		}
+		chipText := radio + " " + optLabel
+		chipW := lipgloss.Width(chipText)
+
+		var chipRendered string
+		if focused && i == cursor {
+			chipRendered = m.ui.styles.paramTagSelected.Render(chipText)
+		} else {
+			chipRendered = m.ui.styles.paramDetailContent.Render(chipText)
+		}
+
+		avail := firstAvail
+		if !isFirst {
+			avail = contAvail
+		}
+		needed := chipW
+		if len(lineChips) > 0 {
+			needed += sepW
+		}
+
+		if len(lineChips) > 0 && lineUsed+needed > avail {
+			chipsStr := strings.Join(lineChips, sep)
+			if isFirst {
+				rows = append(rows, labelPart+sep+chipsStr)
+			} else {
+				rows = append(rows, strings.Repeat(" ", contIndent)+chipsStr)
+			}
+			lineChips = nil
+			lineUsed = 0
+			isFirst = false
+			needed = chipW
+		}
+
+		lineChips = append(lineChips, chipRendered)
+		lineUsed += needed
+	}
+
+	if len(lineChips) > 0 {
+		chipsStr := strings.Join(lineChips, sep)
+		if isFirst {
+			rows = append(rows, labelPart+sep+chipsStr)
+		} else {
+			rows = append(rows, strings.Repeat(" ", contIndent)+chipsStr)
+		}
+	}
+
+	return rows
+}
+
+// wrapTextToLines word-wraps text to fit within maxW visible columns, returning one
+// element per output line. Words longer than maxW are kept on their own line untruncated
+// (the caller can truncate at render time if needed).
+func wrapTextToLines(text string, maxW int) []string {
+	if maxW < 1 {
+		maxW = 1
+	}
+	words := strings.Fields(text)
+	if len(words) == 0 {
+		return nil
+	}
+	var lines []string
+	var cur []string
+	curW := 0
+	for _, word := range words {
+		ww := lipgloss.Width(word)
+		switch {
+		case len(cur) == 0:
+			cur = append(cur, word)
+			curW = ww
+		case curW+1+ww <= maxW:
+			cur = append(cur, word)
+			curW += 1 + ww
+		default:
+			lines = append(lines, strings.Join(cur, " "))
+			cur = []string{word}
+			curW = ww
+		}
+	}
+	if len(cur) > 0 {
+		lines = append(lines, strings.Join(cur, " "))
+	}
+	return lines
+}
+
+// radioOptionLabel returns a display label for a raw option value (empty string → "(none)").
+func radioOptionLabel(v string) string {
+	if v == "" {
+		return "(none)"
+	}
+	return v
 }
 
 func (m Model) renderMetadataSection(cw, maxSec int, secBox lipgloss.Style) string {
@@ -265,7 +369,44 @@ func (m Model) renderMetadataSection(cw, maxSec int, secBox lipgloss.Style) stri
 		}
 		for field := paramMetadataField(0); field < paramMetadataFieldCount; field++ {
 			focused := m.params.focus == paramFocusMetadata && m.params.metadataCursor == int(field)
+			prefix := "  "
+			if focused {
+				prefix = "› "
+			}
 			switch field {
+			case paramMetadataBackend:
+				opts := m.paramBackendOptionsForModel()
+				optLabels := make([]string, len(opts))
+				for i, o := range opts {
+					optLabels[i] = radioOptionLabel(o)
+				}
+				selIdx := -1
+				for i, o := range opts {
+					if o == p.Backend {
+						selIdx = i
+						break
+					}
+				}
+				rows = append(rows, m.renderRadioRow(
+					"Backend", optLabels, selIdx,
+					m.params.backendCursor, focused, maxSec,
+				)...)
+			case paramMetadataHardwareClass:
+				hwLabels := make([]string, len(paramHardwareClassOptions))
+				for i, o := range paramHardwareClassOptions {
+					hwLabels[i] = radioOptionLabel(string(o))
+				}
+				selIdx := -1
+				for i, o := range paramHardwareClassOptions {
+					if o == p.Hardware.Class {
+						selIdx = i
+						break
+					}
+				}
+				rows = append(rows, m.renderRadioRow(
+					"Hardware Class", hwLabels, selIdx,
+					m.params.hardwareClassCursor, focused, maxSec,
+				)...)
 			case paramMetadataUseCasePrimary:
 				rows = append(rows, m.renderCheckboxRow(
 					"Use Case Primary", canonicalPrimaryStrs, primaryStrs,
@@ -276,20 +417,92 @@ func (m Model) renderMetadataSection(cw, maxSec int, secBox lipgloss.Style) stri
 					"Tags", profilepkg.CanonicalTags, p.UseCase.Tags,
 					m.params.tagCursor, focused, maxSec,
 				)...)
-			default:
-				prefix := "  "
-				if focused {
-					prefix = "› "
-				}
+			case paramMetadataHardwareNotes:
 				if focused && m.params.editKind == paramEditMetadataValue {
-					label := paramMetadataFieldLabels[field] + ": "
+					labelPart := m.renderLabelPart(prefix, paramMetadataFieldLabels[field])
+					labelPartW := lipgloss.Width(labelPart)
+					indent := strings.Repeat(" ", labelPartW)
+					// Split textarea view into lines; prepend label to first, indent the rest.
+					taLines := strings.Split(m.params.notesInput.View(), "\n")
+					for i, taLine := range taLines {
+						if taLine == "" && i == len(taLines)-1 {
+							break // skip trailing empty line from textarea View
+						}
+						if i == 0 {
+							rows = append(rows, labelPart+taLine)
+						} else {
+							rows = append(rows, indent+taLine)
+						}
+					}
+					continue
+				}
+				labelPart := m.renderLabelPart(prefix, paramMetadataFieldLabels[field])
+				labelPartW := lipgloss.Width(labelPart)
+				valueW := max(maxSec-labelPartW, 8)
+				value := m.metadataFieldValue(field)
+
+				var wrapped []string
+				if value == "" {
+					wrapped = []string{"unspecified"}
+				} else {
+					wrapped = wrapTextToLines(value, valueW)
+					if len(wrapped) == 0 {
+						wrapped = []string{"unspecified"}
+					}
+				}
+
+				displayLines := min(notesMaxLines, len(wrapped))
+				hasScroll := len(wrapped) > notesMaxLines
+				displayW := valueW
+				thumbLines := 0
+				if hasScroll {
+					displayW = max(valueW-2, 4)
+					thumbLines = max(1, notesMaxLines*notesMaxLines/len(wrapped))
+				}
+
+				for i := range displayLines {
+					line := truncateParamLine(wrapped[i], displayW)
+					var lineStr string
+					if hasScroll {
+						pad := displayW - lipgloss.Width(line)
+						padded := line
+						if pad > 0 {
+							padded = line + strings.Repeat(" ", pad)
+						}
+						scrollChar := "░"
+						if i < thumbLines {
+							scrollChar = "█"
+						}
+						lineStr = m.ui.styles.paramDetailContent.Render(padded) +
+							" " + m.ui.styles.scrollBarColumn.Render(scrollChar)
+					} else {
+						lineStr = m.ui.styles.paramDetailContent.Render(line)
+					}
+					if i == 0 {
+						rows = append(rows, labelPart+lineStr)
+					} else {
+						rows = append(rows, strings.Repeat(" ", labelPartW)+lineStr)
+					}
+				}
+			default:
+				if focused && m.params.editKind == paramEditMetadataValue {
+					labelPart := m.renderLabelPart(prefix, paramMetadataFieldLabels[field])
 					rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Top,
-						m.ui.styles.paramDetailContent.Render(prefix+label),
+						labelPart,
 						m.params.editInput.View(),
 					))
 					continue
 				}
-				rows = append(rows, m.ui.styles.paramDetailContent.Render(prefix+truncateParamLine(formatMetadataFieldLine(p, field), maxSec)))
+				// Split label (muted) and value (bright) with aligned column.
+				labelPart := m.renderLabelPart(prefix, paramMetadataFieldLabels[field])
+				labelPartW := lipgloss.Width(labelPart)
+				valueW := max(maxSec-labelPartW, 8)
+				value := m.metadataFieldValue(field)
+				if value == "" {
+					value = "unspecified"
+				}
+				valuePart := m.ui.styles.paramDetailContent.Render(truncateParamLine(value, valueW))
+				rows = append(rows, labelPart+valuePart)
 			}
 		}
 	} else {
