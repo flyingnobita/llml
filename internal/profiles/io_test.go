@@ -76,8 +76,8 @@ func TestFetchPortable(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if f.SchemaVersion != 2 {
-			t.Fatalf("version = %d", f.SchemaVersion)
+		if f.SchemaVersion != SchemaVersion {
+			t.Fatalf("version = %d (want %d)", f.SchemaVersion, SchemaVersion)
 		}
 		if len(f.Profiles) != 1 {
 			t.Fatalf("got %d profiles", len(f.Profiles))

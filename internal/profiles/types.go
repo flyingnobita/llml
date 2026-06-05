@@ -16,36 +16,59 @@ type EnvVar struct {
 
 // ModelParams holds extra environment variables and argv tokens for one parameter profile.
 type ModelParams struct {
-	Env  []EnvVar `json:"env"`
-	Args []string `json:"args"`
+	Env     []EnvVar        `json:"env"`
+	Args    []string        `json:"args"`
+	UseCase UseCaseMetadata `json:"useCase,omitempty"`
 }
 
-// UseCasePrimary is the constrained primary purpose for a profile.
+// UseCasePrimary is one constrained primary purpose value for a profile.
 type UseCasePrimary string
 
 const (
 	UseCaseUnspecified UseCasePrimary = ""
 	UseCaseChat        UseCasePrimary = "chat"
-	UseCaseCompletion  UseCasePrimary = "completion"
 	UseCaseToolCalling UseCasePrimary = "tool-calling"
-	UseCaseEmbedding   UseCasePrimary = "embedding"
 	UseCaseEval        UseCasePrimary = "eval"
-	UseCaseBatch       UseCasePrimary = "batch"
 )
 
 var validUseCasePrimary = []UseCasePrimary{
 	UseCaseChat,
-	UseCaseCompletion,
 	UseCaseToolCalling,
-	UseCaseEmbedding,
 	UseCaseEval,
-	UseCaseBatch,
+}
+
+// UseCasePrimaries is a set of primary use-case values for a profile.
+// It handles both the legacy single-string JSON form ("chat") and the current
+// array form (["chat","tool-calling"]) when reading from model-params.json.
+type UseCasePrimaries []UseCasePrimary
+
+// UnmarshalJSON accepts either a JSON string (legacy) or a JSON array.
+func (p *UseCasePrimaries) UnmarshalJSON(b []byte) error {
+	if len(b) > 0 && b[0] == '[' {
+		var arr []string
+		if err := json.Unmarshal(b, &arr); err != nil {
+			return err
+		}
+		for _, s := range arr {
+			*p = append(*p, UseCasePrimary(s))
+		}
+		return nil
+	}
+	// Legacy: single string value.
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	if s != "" {
+		*p = append(*p, UseCasePrimary(s))
+	}
+	return nil
 }
 
 // UseCaseMetadata describes what a profile is for.
 type UseCaseMetadata struct {
-	Primary UseCasePrimary `json:"primary,omitempty"`
-	Tags    []string       `json:"tags,omitempty"`
+	Primary UseCasePrimaries `json:"primary,omitempty"`
+	Tags    []string         `json:"tags,omitempty"`
 }
 
 // HardwareClass is the coarse machine class a profile expects.
@@ -120,6 +143,7 @@ func CopyProfile(in Profile) Profile {
 	out := in
 	out.Env = append([]EnvVar(nil), in.Env...)
 	out.Args = append([]string(nil), in.Args...)
+	out.UseCase.Primary = append(UseCasePrimaries(nil), in.UseCase.Primary...)
 	out.UseCase.Tags = append([]string(nil), in.UseCase.Tags...)
 	if in.Hardware.GPUCount != nil {
 		v := *in.Hardware.GPUCount

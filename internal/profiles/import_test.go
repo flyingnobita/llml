@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -33,8 +34,8 @@ args = ["--n-gpu-layers 80", "--ctx-size 4096"]
 		if err != nil {
 			t.Fatal(err)
 		}
-		if f.SchemaVersion != 2 {
-			t.Fatalf("version = %d", f.SchemaVersion)
+		if f.SchemaVersion != SchemaVersion {
+			t.Fatalf("version = %d (want %d)", f.SchemaVersion, SchemaVersion)
 		}
 		if len(f.Profiles) != 1 {
 			t.Fatalf("got %d profiles", len(f.Profiles))
@@ -151,7 +152,7 @@ func TestPortableToProfile(t *testing.T) {
 			{Key: "CUDA_VISIBLE_DEVICES", Value: "0"},
 		},
 		UseCase: PortableUseCase{
-			Primary: "assistant",
+			Primary: []string{"assistant"},
 			Tags:    []string{"Interactive", "BALANCED"},
 		},
 		Hardware: PortableHardware{
@@ -179,8 +180,8 @@ func TestPortableToProfile(t *testing.T) {
 	if len(p.Env) != 1 || p.Env[0].Key != "CUDA_VISIBLE_DEVICES" {
 		t.Fatalf("env = %+v", p.Env)
 	}
-	if p.UseCase.Primary != UseCaseChat {
-		t.Fatalf("useCase.primary = %q, want chat", p.UseCase.Primary)
+	if !slices.Contains(p.UseCase.Primary, UseCaseChat) {
+		t.Fatalf("useCase.primary = %v, want chat", p.UseCase.Primary)
 	}
 	if len(p.UseCase.Tags) != 2 {
 		t.Fatalf("tags = %v", p.UseCase.Tags)
@@ -400,7 +401,7 @@ func TestPortableRoundTrip(t *testing.T) {
 	dir := t.TempDir()
 
 	original := PortableFile{
-		SchemaVersion: 2,
+		SchemaVersion: SchemaVersion,
 		Profiles: []PortableProfile{
 			{
 				Name:      "gpu-chat",
@@ -408,7 +409,7 @@ func TestPortableRoundTrip(t *testing.T) {
 				ModelHint: "model-x",
 				Args:      []string{"--n-gpu-layers 80", "--flash-attn"},
 				Env:       []PortableEnvVar{{Key: "CUDA_VISIBLE_DEVICES", Value: "0"}},
-				UseCase:   PortableUseCase{Primary: "chat", Tags: []string{"interactive"}},
+				UseCase:   PortableUseCase{Primary: []string{"chat"}, Tags: []string{"interactive"}},
 				Hardware:  PortableHardware{Class: "gpu", GPUCount: intPtr(1)},
 			},
 		},
@@ -438,8 +439,8 @@ func TestPortableRoundTrip(t *testing.T) {
 	if len(p.Args) != 3 {
 		t.Fatalf("args = %v", p.Args)
 	}
-	if p.UseCase.Primary != UseCaseChat {
-		t.Fatalf("useCase = %q", p.UseCase.Primary)
+	if !slices.Contains(p.UseCase.Primary, UseCaseChat) {
+		t.Fatalf("useCase = %v", p.UseCase.Primary)
 	}
 }
 

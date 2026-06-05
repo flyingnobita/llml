@@ -176,5 +176,5 @@ func isAuxiliaryModel(f ModelFile) bool {
 	case "clip", "flip":
 		return true
 	}
-	return strings.Contains(strings.ToLower(f.Name), "mmproj")
+	return isMMProjName(f.Name)
 }

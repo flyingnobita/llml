@@ -16,7 +16,7 @@ import (
 )
 
 // SchemaVersion is the current portable profile format version.
-const SchemaVersion = 2
+const SchemaVersion = 3
 
 // envExcludePatterns are env var keys excluded from portable export
 // (model-location parameters per docs/profile-format.md §8).
@@ -56,7 +56,7 @@ type PortableEnvVar struct {
 
 // PortableUseCase maps to [profiles.use_case] in portable TOML.
 type PortableUseCase struct {
-	Primary string   `toml:"primary,omitempty"`
+	Primary []string `toml:"primary,omitempty"`
 	Tags    []string `toml:"tags,omitempty"`
 }
 
@@ -167,9 +167,13 @@ func ProfileToPortable(p Profile, modelKey string) PortableProfile {
 			pp.Env = append(pp.Env, PortableEnvVar(e))
 		}
 	}
-	if p.UseCase.Primary != "" || len(p.UseCase.Tags) > 0 {
+	if len(p.UseCase.Primary) > 0 || len(p.UseCase.Tags) > 0 {
+		primaryStrs := make([]string, len(p.UseCase.Primary))
+		for i, v := range p.UseCase.Primary {
+			primaryStrs[i] = string(v)
+		}
 		pp.UseCase = PortableUseCase{
-			Primary: string(p.UseCase.Primary),
+			Primary: primaryStrs,
 			Tags:    append([]string(nil), p.UseCase.Tags...),
 		}
 	}

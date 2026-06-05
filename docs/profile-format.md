@@ -44,7 +44,7 @@ canonical local profile schema, and writes the resulting profiles into
 
 | Field            | Type    | Required | Description                   |
 | ---------------- | ------- | -------- | ----------------------------- |
-| `schema_version` | integer | yes      | Must be `2` for this version. |
+| `schema_version` | integer | yes      | Must be `3` for this version. |
 
 ### `[[profiles]]` array
 
@@ -64,17 +64,28 @@ Each entry in `[[profiles]]` is one parameter profile.
 
 The `use_case` table maps to llml's local `useCase` object.
 
-| Field     | Type            | Required | Description                                                                 |
-| --------- | --------------- | -------- | --------------------------------------------------------------------------- |
-| `primary` | string          | no       | One of: `chat`, `completion`, `tool-calling`, `embedding`, `eval`, `batch`. |
-| `tags`    | array of string | no       | Freeform normalized tags such as `interactive`, `low-latency`, `balanced`.  |
+| Field     | Type            | Required | Description                                                                                                                                                                |
+| --------- | --------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `primary` | array of string | no       | One or more of: `chat`, `tool-calling`, `eval`.                                                                                                                            |
+| `tags`    | array of string | no       | Normalized tags. Two canonical behavioral tags control mmproj injection: `"image"` and `"audio"` (see below). Other common tags: `interactive`, `low-latency`, `balanced`. |
 
 Normalization rules:
 
-- `primary` should use the canonical values above.
-- Importers may normalize synonyms to the canonical set, matching local llml rules
-  (for example `assistant -> chat`, `tool_calling -> tool-calling`).
+- `primary` is an array; use `["chat"]` for a single value and `["chat",
+"tool-calling"]` for multiple. An empty array or omitted field means unspecified.
+- Canonical primary values are `chat`, `tool-calling`, and `eval`.
+- Importers normalize synonyms: `assistant → chat`, `tool_calling → tool-calling`,
+  `evaluation → eval`. Unknown values are silently dropped on import.
 - Tags should be lowercase and kebab-case where practical.
+
+**Canonical behavioral tags — `"image"` and `"audio"`:** When a profile for a
+`llama` or `koboldcpp` backend includes `"image"` or `"audio"` in `use_case.tags`,
+llml will attempt to inject `--mmproj <path>` at launch using a sibling
+`*mmproj*.gguf` file auto-detected in the model's directory. Without one of these
+tags, no injection occurs even if a sibling mmproj file is present. A model can
+have both image-enabled and text-only profiles — the tag is the per-profile opt-in.
+If the tag is set but no mmproj file is found, llml warns in the launch preview and
+alert history and launches without multimodal support.
 
 ### `[profiles.hardware]` format
 
@@ -128,14 +139,14 @@ Each entry is a table with two string fields:
 ## Example: llama.cpp profiles
 
 ```toml
-schema_version = 2
+schema_version = 3
 
 [[profiles]]
 name = "balanced-q4"
 backend = "llama"
 model_hint = "Llama-3-8B-GGUF"
 args = ["--n-gpu-layers 80", "--ctx-size 4096", "--threads 8"]
-use_case.primary = "chat"
+use_case.primary = ["chat"]
 use_case.tags = ["interactive", "balanced"]
 hardware.class = "gpu"
 hardware.gpu_count = 1
@@ -148,7 +159,6 @@ name = "cpu-only"
 backend = "llama"
 model_hint = "Llama-3-8B-GGUF"
 args = ["--n-gpu-layers 0", "--ctx-size 2048", "--threads 4"]
-use_case.primary = "completion"
 use_case.tags = ["low-memory"]
 hardware.class = "cpu"
 
@@ -157,7 +167,7 @@ name = "max-context"
 backend = "llama"
 model_hint = "Llama-3-8B-GGUF"
 args = ["--n-gpu-layers 80", "--ctx-size 32768"]
-use_case.primary = "chat"
+use_case.primary = ["chat"]
 use_case.tags = ["long-context"]
 hardware.class = "gpu"
 hardware.min_vram_gb = 48
@@ -165,19 +175,39 @@ hardware.min_vram_gb = 48
 [[profiles.env]]
 key = "LLAMA_CACHE_SIZE"
 value = "8192"
+
+[[profiles]]
+name = "image"
+backend = "llama"
+model_hint = "gemma-4-26B-GGUF"
+args = ["--n-gpu-layers 80", "--ctx-size 4096"]
+use_case.primary = ["chat"]
+use_case.tags = ["image", "interactive"]
+hardware.class = "gpu"
+hardware.min_vram_gb = 24
+
+[[profiles]]
+name = "text-only"
+backend = "llama"
+model_hint = "gemma-4-26B-GGUF"
+args = ["--n-gpu-layers 80", "--ctx-size 8192"]
+use_case.primary = ["chat"]
+use_case.tags = ["interactive"]
+hardware.class = "gpu"
+hardware.min_vram_gb = 16
 ```
 
 ## Example: vLLM profiles
 
 ```toml
-schema_version = 2
+schema_version = 3
 
 [[profiles]]
 name = "single-gpu"
 backend = "vllm"
 model_hint = "Qwen2.5-72B-Instruct-AWQ"
 args = ["--tensor-parallel-size 1", "--gpu-memory-utilization 0.95", "--max-model-len 8192"]
-use_case.primary = "chat"
+use_case.primary = ["chat"]
 use_case.tags = ["interactive", "balanced"]
 hardware.class = "gpu"
 hardware.gpu_count = 1
@@ -190,7 +220,7 @@ name = "dual-gpu"
 backend = "vllm"
 model_hint = "Qwen2.5-72B-Instruct-AWQ"
 args = ["--tensor-parallel-size 2", "--gpu-memory-utilization 0.90", "--max-model-len 32768"]
-use_case.primary = "batch"
+use_case.primary = ["eval"]
 use_case.tags = ["throughput", "long-context"]
 hardware.class = "gpu"
 hardware.gpu_count = 2
@@ -201,14 +231,14 @@ hardware.notes = "Two A100 80GB cards."
 ## Example: Ollama profiles
 
 ```toml
-schema_version = 2
+schema_version = 3
 
 [[profiles]]
 name = "gpu-full"
 backend = "ollama"
 model_hint = "llama3.2"
 args = []
-use_case.primary = "chat"
+use_case.primary = ["chat"]
 use_case.tags = ["interactive"]
 hardware.class = "gpu"
 hardware.notes = "All layers on GPU, 8k context."
@@ -225,14 +255,14 @@ value = "8192"
 ## Example: KoboldCpp profiles
 
 ```toml
-schema_version = 2
+schema_version = 3
 
 [[profiles]]
 name = "gpu-full"
 backend = "koboldcpp"
 model_hint = "Llama-3-8B-GGUF"
 args = ["--gpulayers 80", "--contextsize 4096", "--threads 8", "--flashattention"]
-use_case.primary = "chat"
+use_case.primary = ["chat"]
 use_case.tags = ["interactive", "balanced"]
 hardware.class = "gpu"
 hardware.gpu_count = 1
@@ -244,7 +274,6 @@ name = "cpu-only"
 backend = "koboldcpp"
 model_hint = "Llama-3-8B-GGUF"
 args = ["--gpulayers 0", "--contextsize 2048", "--threads 4"]
-use_case.primary = "completion"
 use_case.tags = ["low-memory"]
 hardware.class = "cpu"
 
@@ -253,7 +282,7 @@ name = "vulkan"
 backend = "koboldcpp"
 model_hint = "Llama-3-8B-GGUF"
 args = ["--gpulayers 80", "--contextsize 4096", "--usevulkan"]
-use_case.primary = "chat"
+use_case.primary = ["chat"]
 use_case.tags = ["interactive"]
 hardware.class = "gpu"
 hardware.notes = "Vulkan backend for AMD GPUs."
@@ -261,12 +290,14 @@ hardware.notes = "Vulkan backend for AMD GPUs."
 
 ## Compatibility
 
-`schema_version = 1` was the earlier portable draft. It used `description` as a
-free-text field and did not define structured `use_case` or `hardware` metadata.
+`schema_version = 3` is the current portable format. `schema_version = 2` is the
+legacy format where `use_case.primary` was a single string (`primary = "chat"`)
+instead of an array (`primary = ["chat"]`). Both `ReadPortable` and `FetchPortable`
+accept v2 files and automatically migrate them to v3 in memory (single string becomes
+a one-element array). New files should always emit `schema_version = 3`.
 
-For new shared files, emit `schema_version = 2` and prefer structured metadata.
-When importing older material, tools may map a useful legacy `description` into
-`hardware.notes`, but new output should not rely on `description`.
+`schema_version = 1` was the earlier portable draft without structured `use_case` or
+`hardware` metadata. It is not supported and will be rejected with an error.
 
 ## LLM extraction instructions
 
@@ -296,10 +327,10 @@ follow these rules:
    Keep it short.
 
 6. **use_case:** When the source provides enough evidence, set `use_case.primary`
-   using the canonical values (`chat`, `completion`, `tool-calling`, `embedding`,
-   `eval`, `batch`). Add short lowercase tags only when the source materially
-   supports them, such as `interactive`, `throughput`, `long-context`, or
-   `low-latency`. If the source does not justify a field, omit it.
+   as a TOML array using the canonical values (`chat`, `tool-calling`, `eval`). Add
+   short lowercase tags only when the source materially supports them, such as
+   `interactive`, `throughput`, `long-context`, or `low-latency`. If the source does
+   not justify a field, omit it.
 
 7. **hardware:** When the source provides enough evidence, set `hardware.class`,
    `hardware.gpu_count`, `hardware.min_vram_gb`, `hardware.max_vram_gb`, and
@@ -316,15 +347,27 @@ follow these rules:
    that specify model file paths — the same model-location parameters that
    apply to `llama` also apply to `koboldcpp`.
 
-9. **Output:** Emit valid TOML matching this schema. Set `schema_version = 2`. Do
-   not include fields not listed in this spec. Do not include the model path or
-   binary name in `args`.
+   **`--mmproj` note (image/audio models):** `--mmproj` injection for `llama`
+   and `koboldcpp` backends is **opt-in**: llml only injects a `--mmproj <path>`
+   at launch when the active profile has `"image"` or `"audio"` in
+   `use_case.tags`. When opted in, llml auto-detects a sibling `*mmproj*.gguf`
+   file in the same directory as the model and injects the path. Portable profiles
+   for image/audio-capable models (e.g. Gemma multimodal) therefore need not —
+   and should not — include `--mmproj`; the path is machine-specific and llml
+   supplies it automatically when the tag is set. If you need to override the
+   detected path, add `--mmproj /explicit/path.gguf` to the profile args and llml
+   will use your value instead (regardless of the tag).
+
+9. **Output:** Emit valid TOML matching this schema. Set `schema_version = 3`. Use
+   an array for `use_case.primary` (e.g. `primary = ["chat"]`). Do not include
+   fields not listed in this spec. Do not include the model path or binary name in
+   `args`.
 
 ## Versioning
 
-`schema_version = 2` is the current portable format. `schema_version = 1` is the
-legacy draft format without structured metadata. Future versions will be documented
-here. Import tooling should reject unrecognized schema versions with a clear error.
+`schema_version = 3` is the current portable format. Import tooling accepts v2 files
+and migrates them automatically. Future versions will be documented here. Import
+tooling should reject unrecognized schema versions with a clear error.
 
 ## Relation to internal model-params.json
 

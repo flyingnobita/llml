@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
+- Jun-05, 2026 - [use_case.primary is now multi-value: portable schema bumped to v3 (primary = ["chat", "tool-calling"]), p panel shows checkbox row (left/right + space), v2 files migrated on import; enum trimmed to chat/tool-calling/eval]
+- Jun-05, 2026 - [Tags and Use Case Primary in p panel are now horizontal checkbox rows: chips are packed into lines that fit the terminal width so no word-wrap splits a chip across lines]
+- Jun-04, 2026 - [mmproj injection now opt-in: profiles must declare use_case.tags = ["image"] or ["audio"] to trigger --mmproj injection; image/audio toggle added to p panel (llama/koboldcpp only); missing mmproj warned in launch preview and alert history]
+- Jun-04, 2026 - [mmproj auto-detection: for llama.cpp and KoboldCpp backends, llml now auto-detects a sibling mmproj GGUF in the model directory and injects --mmproj at launch; ambiguous multi-mmproj setups surface a warn alert]
 - Jun-02, 2026 - 11:59 PM +0800 - [v0.6.0 release: one-line installer, configurable hosts, quit confirmation, split-pane readability improvements, and missing-model/runtime guidance]
 - Jun-02, 2026 - 11:59 PM +0800 - [Installer: curl -fsSL https://llml.dev/install.sh | sh installs the latest release on macOS and Linux; resolves GitHub latest release dynamically; no dependencies beyond curl and tar]
 - Jun-02, 2026 - 11:59 PM +0800 - [Hosts: llama.cpp and vLLM server host/port are now configurable via runtime environment settings and environment variables; runtime-environment panel UX cleaned up]

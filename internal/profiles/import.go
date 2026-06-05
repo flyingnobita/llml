@@ -160,7 +160,31 @@ func StripModelLocationParams(backend string, env []PortableEnvVar, args []strin
 	return keptEnv, keptArgs, droppedEnv, droppedArgs
 }
 
+// portableUseCaseLegacyV2 is the v2 use_case block where primary was a single string.
+type portableUseCaseLegacyV2 struct {
+	Primary string   `toml:"primary,omitempty"`
+	Tags    []string `toml:"tags,omitempty"`
+}
+
+// portableProfileLegacyV2 mirrors PortableProfile with a v2 use_case.
+type portableProfileLegacyV2 struct {
+	Name      string                  `toml:"name"`
+	Backend   string                  `toml:"backend"`
+	ModelHint string                  `toml:"model_hint,omitempty"`
+	Args      []string                `toml:"args,omitempty"`
+	Env       []PortableEnvVar        `toml:"env,omitempty"`
+	UseCase   portableUseCaseLegacyV2 `toml:"use_case,omitempty"`
+	Hardware  PortableHardware        `toml:"hardware,omitempty"`
+}
+
+// portableFileLegacyV2 is the top-level v2 portable TOML document.
+type portableFileLegacyV2 struct {
+	SchemaVersion int                       `toml:"schema_version"`
+	Profiles      []portableProfileLegacyV2 `toml:"profiles"`
+}
+
 // ReadPortable reads and validates a portable profile TOML file.
+// It accepts schema_version 3 (current) and 2 (legacy: primary was a single string).
 //
 //nolint:gosec // G304: path from user input (CLI arg or filepicker) — user-intended file.
 func ReadPortable(path string) (*PortableFile, error) {
@@ -168,14 +192,51 @@ func ReadPortable(path string) (*PortableFile, error) {
 	if err != nil {
 		return nil, err
 	}
-	var f PortableFile
-	if err := toml.Unmarshal(b, &f); err != nil {
+	// Peek at the schema version without a full parse.
+	type versionOnly struct {
+		SchemaVersion int `toml:"schema_version"`
+	}
+	var vo versionOnly
+	if err := toml.Unmarshal(b, &vo); err != nil {
 		return nil, fmt.Errorf("invalid TOML: %w", err)
 	}
-	if f.SchemaVersion != SchemaVersion {
-		return nil, fmt.Errorf("unsupported schema_version %d (expected %d)", f.SchemaVersion, SchemaVersion)
+	switch vo.SchemaVersion {
+	case SchemaVersion: // v3 — current
+		var f PortableFile
+		if err := toml.Unmarshal(b, &f); err != nil {
+			return nil, fmt.Errorf("invalid TOML: %w", err)
+		}
+		return &f, nil
+	case 2: // legacy — migrate primary from string → single-element array
+		var lf portableFileLegacyV2
+		if err := toml.Unmarshal(b, &lf); err != nil {
+			return nil, fmt.Errorf("invalid TOML: %w", err)
+		}
+		out := &PortableFile{
+			SchemaVersion: SchemaVersion,
+			Profiles:      make([]PortableProfile, len(lf.Profiles)),
+		}
+		for i, lp := range lf.Profiles {
+			pp := PortableProfile{
+				Name:      lp.Name,
+				Backend:   lp.Backend,
+				ModelHint: lp.ModelHint,
+				Args:      lp.Args,
+				Env:       lp.Env,
+				Hardware:  lp.Hardware,
+				UseCase: PortableUseCase{
+					Tags: lp.UseCase.Tags,
+				},
+			}
+			if lp.UseCase.Primary != "" {
+				pp.UseCase.Primary = []string{lp.UseCase.Primary}
+			}
+			out.Profiles[i] = pp
+		}
+		return out, nil
+	default:
+		return nil, fmt.Errorf("unsupported schema_version %d (expected %d)", vo.SchemaVersion, SchemaVersion)
 	}
-	return &f, nil
 }
 
 // PortableToProfile converts one portable profile to an internal Profile,
@@ -186,7 +247,7 @@ func PortableToProfile(pp PortableProfile) Profile {
 		backend = "llama"
 	}
 	useCase := NormalizeUseCase(UseCaseMetadata{
-		Primary: NormalizeUseCasePrimaryInput(pp.UseCase.Primary),
+		Primary: NormalizeUseCasePrimariesInput(pp.UseCase.Primary),
 		Tags:    NormalizeTagsCSV(strings.Join(pp.UseCase.Tags, ",")),
 	})
 	hardware := NormalizeHardware(HardwareMetadata{
@@ -274,7 +335,7 @@ func isSentinelDefault(p Profile) bool {
 		len(p.Args) == 0 &&
 		len(p.Env) == 0 &&
 		p.Backend == "" &&
-		p.UseCase.Primary == "" &&
+		len(p.UseCase.Primary) == 0 &&
 		len(p.UseCase.Tags) == 0 &&
 		p.Hardware.Class == ""
 }

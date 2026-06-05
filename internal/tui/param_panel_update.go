@@ -83,8 +83,6 @@ func (m Model) commitParamLineEdit() Model {
 		if m.params.profileIndex >= 0 && m.params.profileIndex < len(m.params.profiles) {
 			p := m.params.profiles[m.params.profileIndex]
 			switch paramMetadataField(m.params.metadataCursor) {
-			case paramMetadataUseCaseTags:
-				p.UseCase.Tags = profiles.NormalizeTagsCSV(line)
 			case paramMetadataHardwareGPUCount:
 				p.Hardware.GPUCount = profiles.ParseOptionalPositiveInt(line)
 			case paramMetadataHardwareMinVRAM:
@@ -339,7 +337,17 @@ func (m Model) moveParamCursor(delta int) (Model, tea.Cmd) {
 		m = m.moveProfile(delta)
 		return m.persistParamPanel()
 	case paramFocusMetadata:
-		m.params.metadataCursor = clampInt(m.params.metadataCursor+delta, 0, int(paramMetadataFieldCount)-1)
+		next := clampInt(m.params.metadataCursor+delta, 0, int(paramMetadataFieldCount)-1)
+		if next != m.params.metadataCursor {
+			m.params.metadataCursor = next
+			// Reset horizontal cursors when entering their checkbox rows.
+			switch paramMetadataField(next) {
+			case paramMetadataUseCasePrimary:
+				m.params.primaryCursor = 0
+			case paramMetadataUseCaseTags:
+				m.params.tagCursor = 0
+			}
+		}
 	case paramFocusEnv:
 		n := m.paramEnvLen()
 		if n == 0 {
@@ -452,7 +460,17 @@ func (m Model) handleNavKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	case "left", "h":
 		if m.params.focus == paramFocusMetadata {
 			switch paramMetadataField(m.params.metadataCursor) {
-			case paramMetadataBackend, paramMetadataUseCasePrimary, paramMetadataHardwareClass:
+			case paramMetadataUseCasePrimary:
+				if m.params.primaryCursor > 0 {
+					m.params.primaryCursor--
+				}
+				return m, nil
+			case paramMetadataUseCaseTags:
+				if m.params.tagCursor > 0 {
+					m.params.tagCursor--
+				}
+				return m, nil
+			case paramMetadataBackend, paramMetadataHardwareClass:
 				return m.cycleMetadataEnum(-1)
 			}
 		}
@@ -460,8 +478,28 @@ func (m Model) handleNavKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	case "right", "l":
 		if m.params.focus == paramFocusMetadata {
 			switch paramMetadataField(m.params.metadataCursor) {
-			case paramMetadataBackend, paramMetadataUseCasePrimary, paramMetadataHardwareClass:
+			case paramMetadataUseCasePrimary:
+				if m.params.primaryCursor < len(profiles.CanonicalPrimaries)-1 {
+					m.params.primaryCursor++
+				}
+				return m, nil
+			case paramMetadataUseCaseTags:
+				if m.params.tagCursor < len(profiles.CanonicalTags)-1 {
+					m.params.tagCursor++
+				}
+				return m, nil
+			case paramMetadataBackend, paramMetadataHardwareClass:
 				return m.cycleMetadataEnum(1)
+			}
+		}
+		return m, nil
+	case "space":
+		if m.params.focus == paramFocusMetadata {
+			switch paramMetadataField(m.params.metadataCursor) {
+			case paramMetadataUseCasePrimary:
+				return m.toggleCurrentPrimary()
+			case paramMetadataUseCaseTags:
+				return m.toggleCurrentTag()
 			}
 		}
 		return m, nil

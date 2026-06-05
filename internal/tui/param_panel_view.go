@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
+
+	profilepkg "github.com/flyingnobita/llml/internal/profiles"
 )
 
 // renderEditableListItems renders the rows for one editable param section (env vars or extra args).
@@ -143,10 +145,6 @@ func formatMetadataFieldLine(p ParameterProfile, field paramMetadataField) strin
 	switch field {
 	case paramMetadataBackend:
 		return fmt.Sprintf("%s: %s", label, formatMetadataValue(p.Backend))
-	case paramMetadataUseCasePrimary:
-		return fmt.Sprintf("%s: %s", label, formatMetadataValue(string(p.UseCase.Primary)))
-	case paramMetadataUseCaseTags:
-		return fmt.Sprintf("%s: %s", label, formatMetadataValue(strings.Join(p.UseCase.Tags, ", ")))
 	case paramMetadataHardwareClass:
 		return fmt.Sprintf("%s: %s", label, formatMetadataValue(string(p.Hardware.Class)))
 	case paramMetadataHardwareGPUCount:
@@ -162,6 +160,90 @@ func formatMetadataFieldLine(p ParameterProfile, field paramMetadataField) strin
 	}
 }
 
+// renderCheckboxRow renders a label and [ ]/[✓] chips packed into lines that each fit
+// within width, so lipgloss never splits a chip across lines.
+// Returns one rendered string per terminal line (no newlines within each string).
+func (m Model) renderCheckboxRow(
+	label string,
+	options []string,
+	selected []string,
+	cursor int,
+	focused bool,
+	width int,
+) []string {
+	prefix := "  "
+	if focused {
+		prefix = "› "
+	}
+	const sep = "  " // 2-space gap between chips
+	sepW := lipgloss.Width(sep)
+
+	labelPart := m.ui.styles.paramDetailContent.Render(prefix + label + ":")
+	labelPartW := lipgloss.Width(labelPart)
+
+	// Available chip-area widths.
+	firstAvail := width - labelPartW - sepW
+	contAvail := width - lipgloss.Width(prefix)
+
+	var rows []string
+	var lineChips []string
+	lineUsed := 0
+	isFirst := true
+
+	for i, opt := range options {
+		check := "[ ]"
+		if hasTag(selected, opt) {
+			check = "[✓]"
+		}
+		chipText := check + " " + opt
+		chipW := lipgloss.Width(chipText)
+
+		var chipRendered string
+		if focused && i == cursor {
+			chipRendered = m.ui.styles.paramTagSelected.Render(chipText)
+		} else {
+			chipRendered = m.ui.styles.paramDetailContent.Render(chipText)
+		}
+
+		avail := firstAvail
+		if !isFirst {
+			avail = contAvail
+		}
+		needed := chipW
+		if len(lineChips) > 0 {
+			needed += sepW
+		}
+
+		if len(lineChips) > 0 && lineUsed+needed > avail {
+			// Flush current line.
+			chipsStr := strings.Join(lineChips, sep)
+			if isFirst {
+				rows = append(rows, labelPart+sep+chipsStr)
+			} else {
+				rows = append(rows, strings.Repeat(" ", lipgloss.Width(prefix))+chipsStr)
+			}
+			lineChips = nil
+			lineUsed = 0
+			isFirst = false
+			needed = chipW // no separator at start of new line
+		}
+
+		lineChips = append(lineChips, chipRendered)
+		lineUsed += needed
+	}
+
+	if len(lineChips) > 0 {
+		chipsStr := strings.Join(lineChips, sep)
+		if isFirst {
+			rows = append(rows, labelPart+sep+chipsStr)
+		} else {
+			rows = append(rows, strings.Repeat(" ", lipgloss.Width(prefix))+chipsStr)
+		}
+	}
+
+	return rows
+}
+
 func (m Model) renderMetadataSection(cw, maxSec int, secBox lipgloss.Style) string {
 	rows := []string{
 		lipgloss.JoinHorizontal(lipgloss.Top,
@@ -172,21 +254,43 @@ func (m Model) renderMetadataSection(cw, maxSec int, secBox lipgloss.Style) stri
 	}
 	if m.params.profileIndex >= 0 && m.params.profileIndex < len(m.params.profiles) {
 		p := m.params.profiles[m.params.profileIndex]
+		// Build []string slices for checkbox rows.
+		primaryStrs := make([]string, len(p.UseCase.Primary))
+		for i, v := range p.UseCase.Primary {
+			primaryStrs[i] = string(v)
+		}
+		canonicalPrimaryStrs := make([]string, len(profilepkg.CanonicalPrimaries))
+		for i, v := range profilepkg.CanonicalPrimaries {
+			canonicalPrimaryStrs[i] = string(v)
+		}
 		for field := paramMetadataField(0); field < paramMetadataFieldCount; field++ {
 			focused := m.params.focus == paramFocusMetadata && m.params.metadataCursor == int(field)
-			prefix := "  "
-			if focused {
-				prefix = "› "
+			switch field {
+			case paramMetadataUseCasePrimary:
+				rows = append(rows, m.renderCheckboxRow(
+					"Use Case Primary", canonicalPrimaryStrs, primaryStrs,
+					m.params.primaryCursor, focused, maxSec,
+				)...)
+			case paramMetadataUseCaseTags:
+				rows = append(rows, m.renderCheckboxRow(
+					"Tags", profilepkg.CanonicalTags, p.UseCase.Tags,
+					m.params.tagCursor, focused, maxSec,
+				)...)
+			default:
+				prefix := "  "
+				if focused {
+					prefix = "› "
+				}
+				if focused && m.params.editKind == paramEditMetadataValue {
+					label := paramMetadataFieldLabels[field] + ": "
+					rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Top,
+						m.ui.styles.paramDetailContent.Render(prefix+label),
+						m.params.editInput.View(),
+					))
+					continue
+				}
+				rows = append(rows, m.ui.styles.paramDetailContent.Render(prefix+truncateParamLine(formatMetadataFieldLine(p, field), maxSec)))
 			}
-			if focused && m.params.editKind == paramEditMetadataValue {
-				label := paramMetadataFieldLabels[field] + ": "
-				rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Top,
-					m.ui.styles.paramDetailContent.Render(prefix+label),
-					m.params.editInput.View(),
-				))
-				continue
-			}
-			rows = append(rows, m.ui.styles.paramDetailContent.Render(prefix+truncateParamLine(formatMetadataFieldLine(p, field), maxSec)))
 		}
 	} else {
 		rows = append(rows, m.ui.styles.paramDetailContent.Render("  unspecified"))

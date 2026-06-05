@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"charm.land/bubbles/v2/textinput"
@@ -59,7 +60,7 @@ const (
 var paramMetadataFieldLabels = [...]string{
 	"Backend",
 	"Use Case Primary",
-	"Use Case Tags",
+	"Tags",
 	"Hardware Class",
 	"Hardware GPU Count",
 	"Hardware Min VRAM GB",
@@ -86,16 +87,6 @@ func (m Model) paramBackendOptionsForModel() []string {
 		}
 	}
 	return paramBackendOptionsAll // fallback (shouldn't happen)
-}
-
-var paramUseCasePrimaryOptions = []profilepkg.UseCasePrimary{
-	profilepkg.UseCaseUnspecified,
-	profilepkg.UseCaseChat,
-	profilepkg.UseCaseCompletion,
-	profilepkg.UseCaseToolCalling,
-	profilepkg.UseCaseEmbedding,
-	profilepkg.UseCaseEval,
-	profilepkg.UseCaseBatch,
 }
 
 var paramHardwareClassOptions = []profilepkg.HardwareClass{
@@ -251,6 +242,15 @@ func (m Model) paramArgsLen() int {
 	return len(m.params.args)
 }
 
+func hasTag(tags []string, tag string) bool {
+	for _, t := range tags {
+		if strings.EqualFold(t, tag) {
+			return true
+		}
+	}
+	return false
+}
+
 func (m Model) metadataFieldValue(field paramMetadataField) string {
 	if m.params.profileIndex < 0 || m.params.profileIndex >= len(m.params.profiles) {
 		return ""
@@ -260,7 +260,11 @@ func (m Model) metadataFieldValue(field paramMetadataField) string {
 	case paramMetadataBackend:
 		return p.Backend
 	case paramMetadataUseCasePrimary:
-		return string(p.UseCase.Primary)
+		strs := make([]string, len(p.UseCase.Primary))
+		for i, v := range p.UseCase.Primary {
+			strs[i] = string(v)
+		}
+		return strings.Join(strs, ", ")
 	case paramMetadataUseCaseTags:
 		return strings.Join(p.UseCase.Tags, ", ")
 	case paramMetadataHardwareClass:
@@ -283,8 +287,12 @@ func (m Model) startMetadataValueEdit() (Model, tea.Cmd) {
 		return m, nil
 	}
 	switch paramMetadataField(m.params.metadataCursor) {
-	case paramMetadataBackend, paramMetadataUseCasePrimary, paramMetadataHardwareClass:
+	case paramMetadataBackend, paramMetadataHardwareClass:
 		return m.cycleMetadataEnum(1)
+	case paramMetadataUseCasePrimary:
+		return m.toggleCurrentPrimary()
+	case paramMetadataUseCaseTags:
+		return m.toggleCurrentTag()
 	default:
 		m.params.editKind = paramEditMetadataValue
 		m.params.editInput.SetValue(m.metadataFieldValue(paramMetadataField(m.params.metadataCursor)))
@@ -309,6 +317,16 @@ func cycleOption[T comparable](options []T, current T, delta int) T {
 	return options[(cur+delta+len(options))%len(options)]
 }
 
+// toggleTag adds tag to tags if absent, or removes it (case-insensitive) if present.
+func toggleTag(tags []string, tag string) []string {
+	for i, t := range tags {
+		if strings.EqualFold(t, tag) {
+			return slices.Delete(tags, i, i+1)
+		}
+	}
+	return append(tags, tag)
+}
+
 func (m Model) cycleMetadataEnum(delta int) (Model, tea.Cmd) {
 	if m.params.focus != paramFocusMetadata || m.params.profileIndex < 0 || m.params.profileIndex >= len(m.params.profiles) {
 		return m, nil
@@ -321,13 +339,51 @@ func (m Model) cycleMetadataEnum(delta int) (Model, tea.Cmd) {
 			return m, nil
 		}
 		p.Backend = cycleOption(opts, p.Backend, delta)
-	case paramMetadataUseCasePrimary:
-		p.UseCase.Primary = cycleOption(paramUseCasePrimaryOptions, p.UseCase.Primary, delta)
 	case paramMetadataHardwareClass:
 		p.Hardware.Class = cycleOption(paramHardwareClassOptions, p.Hardware.Class, delta)
 	default:
 		return m, nil
 	}
+	m.params.profiles[m.params.profileIndex] = profilepkg.NormalizeProfile(p)
+	return m.persistParamPanel()
+}
+
+// toggleCurrentPrimary toggles the canonical primary value at the current primaryCursor position.
+func (m Model) toggleCurrentPrimary() (Model, tea.Cmd) {
+	if m.params.profileIndex < 0 || m.params.profileIndex >= len(m.params.profiles) {
+		return m, nil
+	}
+	if m.params.primaryCursor < 0 || m.params.primaryCursor >= len(profilepkg.CanonicalPrimaries) {
+		return m, nil
+	}
+	primStr := string(profilepkg.CanonicalPrimaries[m.params.primaryCursor])
+	p := m.params.profiles[m.params.profileIndex]
+	// Convert to []string for toggleTag, then back to UseCasePrimaries.
+	strs := make([]string, len(p.UseCase.Primary))
+	for i, v := range p.UseCase.Primary {
+		strs[i] = string(v)
+	}
+	strs = toggleTag(strs, primStr)
+	newPrimary := make(profilepkg.UseCasePrimaries, len(strs))
+	for i, s := range strs {
+		newPrimary[i] = profilepkg.UseCasePrimary(s)
+	}
+	p.UseCase.Primary = newPrimary
+	m.params.profiles[m.params.profileIndex] = profilepkg.NormalizeProfile(p)
+	return m.persistParamPanel()
+}
+
+// toggleCurrentTag toggles the canonical tag at the current tagCursor position.
+func (m Model) toggleCurrentTag() (Model, tea.Cmd) {
+	if m.params.profileIndex < 0 || m.params.profileIndex >= len(m.params.profiles) {
+		return m, nil
+	}
+	if m.params.tagCursor < 0 || m.params.tagCursor >= len(profilepkg.CanonicalTags) {
+		return m, nil
+	}
+	tag := profilepkg.CanonicalTags[m.params.tagCursor]
+	p := m.params.profiles[m.params.profileIndex]
+	p.UseCase.Tags = toggleTag(p.UseCase.Tags, tag)
 	m.params.profiles[m.params.profileIndex] = profilepkg.NormalizeProfile(p)
 	return m.persistParamPanel()
 }

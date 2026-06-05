@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"charm.land/bubbles/v2/key"
@@ -337,6 +338,16 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		spec, err := buildServerSpec(be, p, params, m.runtime, true)
 		if err != nil {
 			return m.flashError(err.Error())
+		}
+		if len(spec.mmprojCandidates) > 0 {
+			cands := strings.Join(spec.mmprojCandidates, ", ")
+			m = m.addAlert(alertSeverityWarn, "mmproj",
+				fmt.Sprintf("Multiple mmproj files found; none auto-selected. Add --mmproj <file> to the profile. Candidates: %s", cands))
+		}
+		if spec.mmprojMissing {
+			m = m.addAlert(alertSeverityWarn, "mmproj",
+				fmt.Sprintf("Profile has image/audio tag but no mmproj file found in %s — launching without multimodal support",
+					filepath.Dir(p)))
 		}
 		if be == models.BackendOllama {
 			return m, runOllamaLaunchCmd(spec)

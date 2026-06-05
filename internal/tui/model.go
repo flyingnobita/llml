@@ -66,6 +66,8 @@ type paramsState struct {
 	profileIndex     int
 	profiles         []ParameterProfile
 	metadataCursor   int
+	primaryCursor    int // horizontal cursor within the Use Case Primary checkbox row
+	tagCursor        int // horizontal cursor within the Tags checkbox row
 	envCursor        int
 	argsCursor       int
 	env              []EnvVar
@@ -704,8 +706,16 @@ func (m Model) syncLaunchPreviewViewport(innerW int) Model {
 	pvFrV := m.preview.viewport.Style.GetVerticalFrameSize()
 	outerH := launchPreviewVisibleLines + pvFrV
 
+	note := launchPreviewMMProjNote(m)
+	buildRendered := func(textWidth int) string {
+		r := m.ui.styles.launchPreviewContent.Width(textWidth).Render(cmd)
+		if note != "" {
+			r = r + "\n" + m.ui.styles.warnLine.Render(note)
+		}
+		return r
+	}
 	m.preview.viewport.SetWidth(innerW)
-	rendered := m.ui.styles.launchPreviewContent.Width(textW).Render(cmd)
+	rendered := buildRendered(textW)
 	m.preview.viewport.SetContent(rendered)
 	m.preview.viewport.SetHeight(outerH)
 	if m.preview.viewport.TotalLineCount() > m.preview.viewport.VisibleLineCount() {
@@ -714,7 +724,7 @@ func (m Model) syncLaunchPreviewViewport(innerW int) Model {
 		if textW < MinTextDisplayWidth {
 			textW = MinTextDisplayWidth
 		}
-		rendered = m.ui.styles.launchPreviewContent.Width(textW).Render(cmd)
+		rendered = buildRendered(textW)
 		m.preview.viewport.SetContent(rendered)
 		m.preview.viewport.SetHeight(outerH)
 	}
