@@ -34,9 +34,11 @@ type serverSpec struct {
 
 // profileHasMMProj reports whether params already contains a --mmproj / -mm flag token,
 // meaning the user has manually specified the projector and auto-injection should be skipped.
+// Matches both space-separated form ("--mmproj /path") and equals form ("--mmproj=/path").
 func profileHasMMProj(params ModelParams) bool {
 	for _, a := range params.Args {
-		if a == "--mmproj" || a == "-mm" {
+		if a == "--mmproj" || a == "-mm" ||
+			strings.HasPrefix(a, "--mmproj=") || strings.HasPrefix(a, "-mm=") {
 			return true
 		}
 	}
@@ -376,20 +378,21 @@ func launchPreviewCommandLine(m Model) string {
 	return spec.previewLine()
 }
 
-// launchPreviewMMProjNote returns the mmprojNote for the current selection, or "".
-// Called during preview sync to surface mmproj warnings in the launch preview pane.
-func launchPreviewMMProjNote(m Model) string {
+// launchPreviewCmdAndNote returns both the preview command line and the mmproj note from a single
+// buildServerSpec call, avoiding the double os.ReadDir that occurs when the two are fetched
+// independently via launchPreviewCommandLine + launchPreviewMMProjNote.
+func launchPreviewCmdAndNote(m Model) (string, string) {
 	modelPath, _ := m.SelectedModel()
 	if modelPath == "" {
-		return ""
+		return "", ""
 	}
 	params, ok := modelParamsForLaunchPreview(m)
 	if !ok {
-		return ""
+		return "", ""
 	}
 	be := m.resolveEffectiveBackend()
 	spec, _ := buildServerSpec(be, modelPath, params, m.runtime, false)
-	return spec.mmprojNote()
+	return spec.previewLine(), spec.mmprojNote()
 }
 
 func scanReaderLines(r io.Reader, ch chan<- tea.Msg, wg *sync.WaitGroup) {

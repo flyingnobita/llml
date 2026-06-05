@@ -696,7 +696,7 @@ func (m Model) syncLaunchPreviewViewport(innerW int) Model {
 		m.preview.lastCmd = ""
 		return m
 	}
-	cmd := launchPreviewCommandLine(m)
+	cmd, note := launchPreviewCmdAndNote(m)
 	if cmd != m.preview.lastCmd {
 		m.preview.viewport.GotoTop()
 		m.preview.lastCmd = cmd
@@ -709,8 +709,6 @@ func (m Model) syncLaunchPreviewViewport(innerW int) Model {
 	}
 	pvFrV := m.preview.viewport.Style.GetVerticalFrameSize()
 	outerH := launchPreviewVisibleLines + pvFrV
-
-	note := launchPreviewMMProjNote(m)
 	buildRendered := func(textWidth int) string {
 		r := m.ui.styles.launchPreviewContent.Width(textWidth).Render(cmd)
 		if note != "" {

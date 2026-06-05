@@ -156,13 +156,12 @@ func (m Model) renderCheckboxRow(
 		prefix = "› "
 	}
 	const sep = "  " // 2-space gap between chips
-	sepW := lipgloss.Width(sep)
+	const sepW = 2   // visual width of sep (two ASCII spaces)
 
 	labelPart := m.renderLabelPart(prefix, label)
 	labelPartW := lipgloss.Width(labelPart)
 	contIndent := labelPartW + sepW // where chips start on line 1; continuation aligns there
-	firstAvail := width - contIndent
-	contAvail := width - contIndent
+	avail := width - contIndent
 
 	var rows []string
 	var lineChips []string
@@ -182,11 +181,6 @@ func (m Model) renderCheckboxRow(
 			chipRendered = m.ui.styles.paramTagSelected.Render(chipText)
 		} else {
 			chipRendered = m.ui.styles.paramDetailContent.Render(chipText)
-		}
-
-		avail := firstAvail
-		if !isFirst {
-			avail = contAvail
 		}
 		needed := chipW
 		if len(lineChips) > 0 {
@@ -244,8 +238,7 @@ func (m Model) renderRadioRow(
 	labelPart := m.renderLabelPart(prefix, label)
 	labelPartW := lipgloss.Width(labelPart)
 	contIndent := labelPartW + sepW
-	firstAvail := width - contIndent
-	contAvail := width - contIndent
+	avail := width - contIndent
 
 	var rows []string
 	var lineChips []string
@@ -267,10 +260,6 @@ func (m Model) renderRadioRow(
 			chipRendered = m.ui.styles.paramDetailContent.Render(chipText)
 		}
 
-		avail := firstAvail
-		if !isFirst {
-			avail = contAvail
-		}
 		needed := chipW
 		if len(lineChips) > 0 {
 			needed += sepW

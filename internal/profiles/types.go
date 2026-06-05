@@ -31,12 +31,6 @@ const (
 	UseCaseEval        UseCasePrimary = "eval"
 )
 
-var validUseCasePrimary = []UseCasePrimary{
-	UseCaseChat,
-	UseCaseToolCalling,
-	UseCaseEval,
-}
-
 // UseCasePrimaries is a set of primary use-case values for a profile.
 // It handles both the legacy single-string JSON form ("chat") and the current
 // array form (["chat","tool-calling"]) when reading from model-params.json.
@@ -167,11 +161,6 @@ func CopyProfiles(in []Profile) []Profile {
 		out[i] = CopyProfile(in[i])
 	}
 	return out
-}
-
-// ValidUseCasePrimary reports whether v is a supported non-empty primary use case.
-func ValidUseCasePrimary(v UseCasePrimary) bool {
-	return slices.Contains(validUseCasePrimary, v)
 }
 
 // ValidHardwareClass reports whether v is a supported non-empty hardware class.
