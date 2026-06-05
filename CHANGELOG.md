@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
+- Jun-05, 2026 - 09:47 PM +0800 - [v0.7.1 release: multimodal mmproj injection, simplified profile metadata, and p panel UX overhaul]
 - Jun-05, 2026 - [v0.7.0 release: multimodal mmproj injection, multi-value use_case.primary, and p panel UX overhaul]
 - Jun-05, 2026 - [mmproj auto-detection: for llama.cpp and KoboldCpp backends, llml now auto-detects a sibling mmproj GGUF in the model directory and injects --mmproj at launch; opt-in via image/audio use_case tag in p panel; ambiguous multi-mmproj setups surface a warn alert; missing mmproj warned in launch preview and alert history]
 - Jun-05, 2026 - [Portable schema v3: use_case.primary is now a TOML array (primary = ["general"]); v2 single-string files are migrated on import; enum trimmed to general and eval]
