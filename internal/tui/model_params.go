@@ -49,9 +49,7 @@ func activeProfileNameForPreview(m Model) string {
 	}
 	if m.params.open {
 		if modelParamsKey(m.params.modelPath) == modelParamsKey(sel) {
-			if m.params.profileIndex >= 0 && m.params.profileIndex < len(m.params.profiles) {
-				return m.params.profiles[m.params.profileIndex].Name
-			}
+			return m.params.editor.ActiveProfile().Name
 		}
 	}
 	ent, err := loadModelEntry(modelParamsKey(sel))
@@ -71,15 +69,8 @@ func modelParamsForLaunchPreview(m Model) (ModelParams, bool) {
 	}
 	if m.params.open {
 		if modelParamsKey(m.params.modelPath) == modelParamsKey(sel) {
-			var uc profiles.UseCaseMetadata
-			if m.params.profileIndex >= 0 && m.params.profileIndex < len(m.params.profiles) {
-				uc = m.params.profiles[m.params.profileIndex].UseCase
-			}
-			return normalizeModelParams(ModelParams{
-				Env:     append([]EnvVar(nil), m.params.env...),
-				Args:    flattenArgLines(m.params.args),
-				UseCase: uc,
-			}), true
+			ap := m.params.editor.ActiveProfile()
+			return ModelParams{Env: ap.Env, Args: ap.Args, UseCase: ap.UseCase}, true
 		}
 	}
 	p, err := loadModelParamsForRun(sel)

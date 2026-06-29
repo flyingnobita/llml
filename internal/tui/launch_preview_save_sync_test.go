@@ -85,10 +85,11 @@ func TestPersistParamPanel_refreshesLaunchPreview(t *testing.T) {
 	m.params.open = true
 	m.params.modelPath = filepath.Clean(modelPath)
 	m.params.modelDisplayName = filepath.Base(modelPath)
-	m.params.profiles = copyProfiles([]ParameterProfile{{Name: "default", Env: nil, Args: nil}})
-	m.params.profileIndex = 0
-	m.params.loadCurrentProfileIn()
-	m.params.args = []string{"--ctx-size 4096"}
+	m.params.editor = newProfileEditor(modelEntry{
+		Profiles:    []ParameterProfile{{Name: "default", Env: nil, Args: nil}},
+		ActiveIndex: 0,
+	})
+	m.params.editor.args = []string{"--ctx-size 4096"}
 
 	m, cmd := m.persistParamPanel()
 	if cmd != nil {

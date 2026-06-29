@@ -48,8 +48,8 @@ func (m Model) renderConfirmBlock(cw int) string {
 	switch k {
 	case paramConfirmProfile:
 		pName := ""
-		if m.params.profileIndex >= 0 && m.params.profileIndex < len(m.params.profiles) {
-			pName = m.params.profiles[m.params.profileIndex].Name
+		if m.params.editor.index >= 0 && m.params.editor.index < len(m.params.editor.profiles) {
+			pName = m.params.editor.profiles[m.params.editor.index].Name
 		}
 		if pName == "" {
 			pName = "(unnamed)"
@@ -61,8 +61,8 @@ func (m Model) renderConfirmBlock(cw int) string {
 		confirmRows = []string{m.ui.styles.body.Render("Delete This Parameter Profile?"), nameLine}
 	case paramConfirmEnvRow:
 		line := ""
-		if m.params.envCursor >= 0 && m.params.envCursor < m.paramEnvLen() {
-			line = formatEnvVar(m.params.env[m.params.envCursor])
+		if m.params.editor.envCursor >= 0 && m.params.editor.envCursor < m.paramEnvLen() {
+			line = formatEnvVar(m.params.editor.env[m.params.editor.envCursor])
 		}
 		confirmRows = []string{
 			m.ui.styles.body.Render("Delete This Environment Variable Line?"),
@@ -70,8 +70,8 @@ func (m Model) renderConfirmBlock(cw int) string {
 		}
 	case paramConfirmArgRow:
 		line := ""
-		if m.params.argsCursor >= 0 && m.params.argsCursor < m.paramArgsLen() {
-			line = m.params.args[m.params.argsCursor]
+		if m.params.editor.argsCursor >= 0 && m.params.editor.argsCursor < m.paramArgsLen() {
+			line = m.params.editor.args[m.params.editor.argsCursor]
 		}
 		confirmRows = []string{
 			m.ui.styles.body.Render("Delete This Extra Argument Line?"),
@@ -93,12 +93,12 @@ func (m Model) renderProfileSection(cw, maxSec int, secBox lipgloss.Style) strin
 		),
 		"",
 	}
-	for i := range m.params.profiles {
-		name := m.params.profiles[i].Name
+	for i := range m.params.editor.profiles {
+		name := m.params.editor.profiles[i].Name
 		if name == "" {
 			name = "(unnamed)"
 		}
-		activeRow := i == m.params.profileIndex
+		activeRow := i == m.params.editor.index
 		focused := m.params.focus == paramFocusProfiles && activeRow
 		if focused && m.params.editKind == paramEditProfileName {
 			rows = append(rows, m.params.editInput.View())
@@ -126,7 +126,7 @@ func (m Model) renderProfileSection(cw, maxSec int, secBox lipgloss.Style) strin
 			nameStyle.Render(truncateParamLine(displayName, nameW)),
 		))
 	}
-	if len(m.params.profiles) == 0 {
+	if len(m.params.editor.profiles) == 0 {
 		rows = append(rows, m.ui.styles.body.Render("  (none)"))
 	}
 	return secBox.Width(cw).Render(lipgloss.JoinVertical(lipgloss.Left, rows...))
@@ -345,8 +345,8 @@ func (m Model) renderMetadataSection(cw, maxSec int, secBox lipgloss.Style) stri
 		),
 		"",
 	}
-	if m.params.profileIndex >= 0 && m.params.profileIndex < len(m.params.profiles) {
-		p := m.params.profiles[m.params.profileIndex]
+	if len(m.params.editor.profiles) > 0 {
+		p := m.params.editor.ActiveProfile()
 		// Build []string slices for checkbox rows.
 		primaryStrs := make([]string, len(p.UseCase.Primary))
 		for i, v := range p.UseCase.Primary {
@@ -511,13 +511,13 @@ func (m Model) renderDetailSections(cw, maxSec int, secBox lipgloss.Style) strin
 		)
 	}
 	rows = append(rows, sectionLine("Environment Variables (e.g. PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True)"), "")
-	envItems := make([]string, len(m.params.env))
-	for i, e := range m.params.env {
+	envItems := make([]string, len(m.params.editor.env))
+	for i, e := range m.params.editor.env {
 		envItems[i] = formatEnvVar(e)
 	}
-	rows = append(rows, m.renderEditableListItems(envItems, paramFocusEnv, m.params.envCursor, paramEditEnvLine, maxSec)...)
+	rows = append(rows, m.renderEditableListItems(envItems, paramFocusEnv, m.params.editor.envCursor, paramEditEnvLine, maxSec)...)
 	rows = append(rows, "", sectionLine("Extra Arguments (e.g. --max-model-len 131072)"), "")
-	rows = append(rows, m.renderEditableListItems(m.params.args, paramFocusArgs, m.params.argsCursor, paramEditArgLine, maxSec)...)
+	rows = append(rows, m.renderEditableListItems(m.params.editor.args, paramFocusArgs, m.params.editor.argsCursor, paramEditArgLine, maxSec)...)
 	return secBox.Width(cw).Render(lipgloss.JoinVertical(lipgloss.Left, rows...))
 }
 

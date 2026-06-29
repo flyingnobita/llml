@@ -10,26 +10,6 @@ import (
 	"github.com/flyingnobita/llml/internal/profiles"
 )
 
-func (ps *paramsState) syncCurrentProfileOut() {
-	if ps.profileIndex < 0 || ps.profileIndex >= len(ps.profiles) {
-		return
-	}
-	ps.profiles[ps.profileIndex].Env = append([]EnvVar(nil), ps.env...)
-	ps.profiles[ps.profileIndex].Args = flattenArgLines(ps.args)
-	ps.profiles[ps.profileIndex] = profiles.NormalizeProfile(ps.profiles[ps.profileIndex])
-}
-
-func (ps *paramsState) loadCurrentProfileIn() {
-	if ps.profileIndex < 0 || ps.profileIndex >= len(ps.profiles) {
-		return
-	}
-	p := ps.profiles[ps.profileIndex]
-	ps.env = append([]EnvVar(nil), p.Env...)
-	ps.args = pairFlagValueForShellDisplay(p.Args)
-	ps.envCursor = 0
-	ps.argsCursor = 0
-}
-
 // isEditingNotes reports whether the Notes textarea is the active edit widget.
 func (m Model) isEditingNotes() bool {
 	return m.params.editKind == paramEditMetadataValue &&
@@ -49,8 +29,9 @@ func (m Model) commitParamLineEdit() Model {
 	case paramEditEnvLine:
 		if strings.TrimSpace(line) == "" {
 			m = m.cancelParamLineEdit()
-			if m.params.envCursor >= 0 && m.params.envCursor < m.paramEnvLen() {
-				e := m.params.env[m.params.envCursor]
+			cur := m.params.editor.envCursor
+			if cur >= 0 && cur < m.paramEnvLen() {
+				e := m.params.editor.env[cur]
 				if strings.TrimSpace(e.Key) == "" && strings.TrimSpace(e.Value) == "" {
 					m = m.deleteParamRow()
 				}
@@ -60,8 +41,9 @@ func (m Model) commitParamLineEdit() Model {
 	case paramEditArgLine:
 		if strings.TrimSpace(line) == "" {
 			m = m.cancelParamLineEdit()
-			if m.params.argsCursor >= 0 && m.params.argsCursor < m.paramArgsLen() &&
-				strings.TrimSpace(m.params.args[m.params.argsCursor]) == "" {
+			cur := m.params.editor.argsCursor
+			if cur >= 0 && cur < m.paramArgsLen() &&
+				strings.TrimSpace(m.params.editor.args[cur]) == "" {
 				m = m.deleteParamRow()
 			}
 			return m
@@ -72,39 +54,23 @@ func (m Model) commitParamLineEdit() Model {
 	m = m.blurParamEdit()
 	switch kind {
 	case paramEditProfileName:
-		if m.params.profileIndex >= 0 && m.params.profileIndex < len(m.params.profiles) {
+		idx := m.params.editor.index
+		if idx >= 0 && idx < len(m.params.editor.profiles) {
 			name := strings.TrimSpace(line)
 			if name == "" {
-				name = fmt.Sprintf("Parameter Profile %d", m.params.profileIndex+1)
+				name = fmt.Sprintf("Parameter Profile %d", idx+1)
 			}
-			if profileNameTaken(m.params.profiles, name, m.params.profileIndex) {
-				name = nextProfileName(m.params.profiles)
+			if profileNameTaken(m.params.editor.profiles, name, idx) {
+				name = nextProfileName(m.params.editor.profiles)
 			}
-			m.params.profiles[m.params.profileIndex].Name = name
+			m.params.editor.SetProfileName(name)
 		}
 	case paramEditEnvLine:
-		if m.params.envCursor >= 0 && m.params.envCursor < m.paramEnvLen() {
-			m.params.env[m.params.envCursor] = parseEnvLine(line)
-		}
+		m.params.editor.SetEnvRow(m.params.editor.envCursor, parseEnvLine(line))
 	case paramEditArgLine:
-		if m.params.argsCursor >= 0 && m.params.argsCursor < m.paramArgsLen() {
-			m.params.args[m.params.argsCursor] = models.ExpandTildePath(strings.TrimSpace(line))
-		}
+		m.params.editor.SetArgRow(m.params.editor.argsCursor, models.ExpandTildePath(strings.TrimSpace(line)))
 	case paramEditMetadataValue:
-		if m.params.profileIndex >= 0 && m.params.profileIndex < len(m.params.profiles) {
-			p := m.params.profiles[m.params.profileIndex]
-			switch paramMetadataField(m.params.metadataCursor) {
-			case paramMetadataHardwareGPUCount:
-				p.Hardware.GPUCount = profiles.ParseOptionalPositiveInt(line)
-			case paramMetadataHardwareMinVRAM:
-				p.Hardware.MinVRAMGB = profiles.ParseOptionalPositiveInt(line)
-			case paramMetadataHardwareMaxVRAM:
-				p.Hardware.MaxVRAMGB = profiles.ParseOptionalPositiveInt(line)
-			case paramMetadataHardwareNotes:
-				p.Hardware.Notes = strings.TrimSpace(line)
-			}
-			m.params.profiles[m.params.profileIndex] = profiles.NormalizeProfile(p)
-		}
+		m.params.editor.SetHardwareField(paramMetadataField(m.params.metadataCursor), line)
 	}
 	m.params.editInput.SetValue("")
 	m.params.notesInput.Reset()
@@ -128,13 +94,13 @@ func (m Model) startParamLineEdit() (Model, tea.Cmd) {
 			return m, nil
 		}
 		m.params.editKind = paramEditEnvLine
-		m.params.editInput.SetValue(formatEnvVar(m.params.env[m.params.envCursor]))
+		m.params.editInput.SetValue(formatEnvVar(m.params.editor.env[m.params.editor.envCursor]))
 	case paramFocusArgs:
 		if m.paramArgsLen() == 0 {
 			return m, nil
 		}
 		m.params.editKind = paramEditArgLine
-		m.params.editInput.SetValue(m.params.args[m.params.argsCursor])
+		m.params.editInput.SetValue(m.params.editor.args[m.params.editor.argsCursor])
 	default:
 		return m, nil
 	}
@@ -143,26 +109,24 @@ func (m Model) startParamLineEdit() (Model, tea.Cmd) {
 }
 
 func (m Model) startProfileNameEdit() (Model, tea.Cmd) {
-	if m.params.profileIndex < 0 || m.params.profileIndex >= len(m.params.profiles) {
+	idx := m.params.editor.index
+	if idx < 0 || idx >= len(m.params.editor.profiles) {
 		return m, nil
 	}
 	m.params.editKind = paramEditProfileName
-	m.params.editInput.SetValue(m.params.profiles[m.params.profileIndex].Name)
+	m.params.editInput.SetValue(m.params.editor.profiles[idx].Name)
 	m.params.editInput.SetWidth(m.paramEditInnerWidth())
 	return m.focusParamEdit()
 }
 
 func (m Model) addParamRow() (Model, tea.Cmd) {
-	m.params.syncCurrentProfileOut()
 	switch m.params.focus {
 	case paramFocusEnv:
-		m.params.env = append(m.params.env, EnvVar{})
-		m.params.envCursor = m.paramEnvLen() - 1
+		m.params.editor.AddEnvRow()
 		m.params.editKind = paramEditEnvLine
 		m.params.editInput.SetValue("")
 	case paramFocusArgs:
-		m.params.args = append(m.params.args, "")
-		m.params.argsCursor = m.paramArgsLen() - 1
+		m.params.editor.AddArgRow()
 		m.params.editKind = paramEditArgLine
 		m.params.editInput.SetValue("")
 	default:
@@ -173,24 +137,17 @@ func (m Model) addParamRow() (Model, tea.Cmd) {
 }
 
 func (m Model) deleteParamRow() Model {
-	m.params.syncCurrentProfileOut()
 	switch m.params.focus {
 	case paramFocusEnv:
-		if m.paramEnvLen() == 0 || m.params.envCursor < 0 || m.params.envCursor >= m.paramEnvLen() {
+		if m.paramEnvLen() == 0 {
 			return m
 		}
-		m.params.env = append(m.params.env[:m.params.envCursor], m.params.env[m.params.envCursor+1:]...)
-		if m.params.envCursor >= m.paramEnvLen() && m.paramEnvLen() > 0 {
-			m.params.envCursor = m.paramEnvLen() - 1
-		}
+		m.params.editor.DeleteEnvRow()
 	case paramFocusArgs:
-		if m.paramArgsLen() == 0 || m.params.argsCursor < 0 || m.params.argsCursor >= m.paramArgsLen() {
+		if m.paramArgsLen() == 0 {
 			return m
 		}
-		m.params.args = append(m.params.args[:m.params.argsCursor], m.params.args[m.params.argsCursor+1:]...)
-		if m.params.argsCursor >= m.paramArgsLen() && m.paramArgsLen() > 0 {
-			m.params.argsCursor = m.paramArgsLen() - 1
-		}
+		m.params.editor.DeleteArgRow()
 	default:
 		return m
 	}
@@ -198,54 +155,32 @@ func (m Model) deleteParamRow() Model {
 }
 
 func (m Model) addProfile() Model {
-	m.params.syncCurrentProfileOut()
-	nm := nextProfileName(m.params.profiles)
-	m.params.profiles = append(m.params.profiles, ParameterProfile{Name: nm, Env: nil, Args: nil})
-	m.params.profileIndex = len(m.params.profiles) - 1
+	nm := nextProfileName(m.params.editor.profiles)
+	m.params.editor.AddProfile(nm)
 	m.params.metadataCursor = 0
-	m.params.loadCurrentProfileIn()
-	m.params.envCursor = 0
-	m.params.argsCursor = 0
 	return m
 }
 
 func (m Model) duplicateProfile() Model {
-	m.params.syncCurrentProfileOut()
-	if m.params.profileIndex < 0 || m.params.profileIndex >= len(m.params.profiles) {
+	idx := m.params.editor.index
+	if idx < 0 || idx >= len(m.params.editor.profiles) {
 		return m
 	}
-	p := m.params.profiles[m.params.profileIndex]
-	nm := cloneProfileName(p.Name, m.params.profiles)
-	clone := profiles.CopyProfile(p)
-	clone.Name = nm
-	i := m.params.profileIndex
-	m.params.profiles = append(m.params.profiles[:i+1], append([]ParameterProfile{clone}, m.params.profiles[i+1:]...)...)
-	m.params.profileIndex = i + 1
+	nm := cloneProfileName(m.params.editor.profiles[idx].Name, m.params.editor.profiles)
+	m.params.editor.DuplicateProfile(nm)
 	m.params.metadataCursor = 0
-	m.params.loadCurrentProfileIn()
-	m.params.envCursor = 0
-	m.params.argsCursor = 0
 	return m
 }
 
 func (m Model) deleteProfile() Model {
-	if len(m.params.profiles) <= 1 {
+	if !m.params.editor.DeleteProfile() {
 		return m
 	}
-	m.params.syncCurrentProfileOut()
-	m.params.profiles = append(m.params.profiles[:m.params.profileIndex], m.params.profiles[m.params.profileIndex+1:]...)
-	if m.params.profileIndex >= len(m.params.profiles) {
-		m.params.profileIndex = len(m.params.profiles) - 1
-	}
 	m.params.metadataCursor = 0
-	m.params.loadCurrentProfileIn()
-	m.params.envCursor = 0
-	m.params.argsCursor = 0
 	return m
 }
 
 func (m Model) cycleParamFocus(delta int) Model {
-	m.params.syncCurrentProfileOut()
 	if delta >= 0 {
 		switch m.params.focus {
 		case paramFocusProfiles:
@@ -269,21 +204,10 @@ func (m Model) cycleParamFocus(delta int) Model {
 }
 
 func (m Model) moveProfile(delta int) Model {
-	m.params.syncCurrentProfileOut()
-	n := len(m.params.profiles)
-	if n == 0 {
+	if !m.params.editor.MoveActive(delta) {
 		return m
 	}
-	next := m.params.profileIndex + delta
-	if next < 0 || next >= n {
-		return m
-	}
-	m.params.profileIndex = next
 	m.params.metadataCursor = 0
-	m.params.loadCurrentProfileIn()
-	m.params.envCursor = 0
-	m.params.argsCursor = 0
-	// Reset radio cursors to match the new profile's current values.
 	m.params.backendCursor = m.backendCurrentIndex()
 	m.params.hardwareClassCursor = m.hardwareClassCurrentIndex()
 	return m
@@ -302,26 +226,21 @@ func (m Model) paramsModelIsGGUF() bool {
 }
 
 func (m Model) persistParamPanelState() (Model, tea.Cmd, bool) {
-	m.params.syncCurrentProfileOut()
-	profiles := copyProfiles(m.params.profiles)
+	ent := m.params.editor.Entry()
 	if !m.paramsModelIsGGUF() {
 		hadBackend := false
-		for i := range profiles {
-			if profiles[i].Backend != "" {
+		for i := range ent.Profiles {
+			if ent.Profiles[i].Backend != "" {
 				hadBackend = true
 			}
-			profiles[i].Backend = ""
+			ent.Profiles[i].Backend = ""
 		}
-		for i := range m.params.profiles {
-			m.params.profiles[i].Backend = ""
+		for i := range m.params.editor.profiles {
+			m.params.editor.profiles[i].Backend = ""
 		}
 		if hadBackend {
 			m = m.withLastRunError("Backend override cleared: only GGUF models support profile backend selection")
 		}
-	}
-	ent := modelEntry{
-		Profiles:    profiles,
-		ActiveIndex: m.params.profileIndex,
 	}
 	if err := saveModelEntry(m.params.modelPath, ent); err != nil {
 		m = m.withLastRunError(err.Error())
@@ -378,31 +297,31 @@ func (m Model) moveParamCursor(delta int) (Model, tea.Cmd) {
 		if n == 0 {
 			if delta > 0 && m.paramArgsLen() > 0 {
 				m.params.focus = paramFocusArgs
-				m.params.argsCursor = 0
+				m.params.editor.argsCursor = 0
 			}
 			break
 		}
-		if delta > 0 && m.params.envCursor >= n-1 && m.paramArgsLen() > 0 {
+		if delta > 0 && m.params.editor.envCursor >= n-1 && m.paramArgsLen() > 0 {
 			m.params.focus = paramFocusArgs
-			m.params.argsCursor = 0
+			m.params.editor.argsCursor = 0
 			break
 		}
-		m.params.envCursor = clampInt(m.params.envCursor+delta, 0, n-1)
+		m.params.editor.envCursor = clampInt(m.params.editor.envCursor+delta, 0, n-1)
 	case paramFocusArgs:
 		n := m.paramArgsLen()
 		if n == 0 {
 			if delta < 0 && m.paramEnvLen() > 0 {
 				m.params.focus = paramFocusEnv
-				m.params.envCursor = m.paramEnvLen() - 1
+				m.params.editor.envCursor = m.paramEnvLen() - 1
 			}
 			break
 		}
-		if delta < 0 && m.params.argsCursor <= 0 && m.paramEnvLen() > 0 {
+		if delta < 0 && m.params.editor.argsCursor <= 0 && m.paramEnvLen() > 0 {
 			m.params.focus = paramFocusEnv
-			m.params.envCursor = m.paramEnvLen() - 1
+			m.params.editor.envCursor = m.paramEnvLen() - 1
 			break
 		}
-		m.params.argsCursor = clampInt(m.params.argsCursor+delta, 0, n-1)
+		m.params.editor.argsCursor = clampInt(m.params.editor.argsCursor+delta, 0, n-1)
 	}
 	return m, nil
 }
@@ -574,7 +493,7 @@ func (m Model) handleNavKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	case "d":
 		switch m.params.focus {
 		case paramFocusProfiles:
-			if len(m.params.profiles) <= 1 {
+			if len(m.params.editor.profiles) <= 1 {
 				return m, nil
 			}
 			m.params.confirmDelete = paramConfirmProfile

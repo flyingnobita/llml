@@ -165,10 +165,6 @@ func cloneProfileName(base string, profiles []ParameterProfile) string {
 	return profilepkg.CloneProfileName(base, profiles)
 }
 
-func copyProfiles(in []ParameterProfile) []ParameterProfile {
-	return profilepkg.CopyProfiles(in)
-}
-
 func (m Model) openParamPanel() (Model, tea.Cmd) {
 	p := m.SelectedPath()
 	if p == "" {
@@ -196,11 +192,9 @@ func (m Model) openParamPanel() (Model, tea.Cmd) {
 			ActiveIndex: 0,
 		}
 	}
-	m.params.profiles = copyProfiles(ent.Profiles)
-	m.params.profileIndex = clampInt(ent.ActiveIndex, 0, max(0, len(m.params.profiles)-1))
+	m.params.editor = newProfileEditor(ent)
 	m.params.metadataCursor = 0
 	m.params.focus = paramFocusProfiles
-	m.params.loadCurrentProfileIn()
 	m.params.editInput.SetWidth(m.paramEditInnerWidth())
 	return m, cmd
 }
@@ -224,9 +218,7 @@ func (m Model) closeParamPanel() Model {
 	m.params.editInput.SetValue("")
 	m.params.notesInput.Reset()
 	m.params.notesInput.Blur()
-	m.params.env = nil
-	m.params.args = nil
-	m.params.profiles = nil
+	m.params.editor = profileEditor{}
 	m.params.modelPath = ""
 	m.params.modelDisplayName = ""
 	m.params.metadataCursor = 0
@@ -265,10 +257,8 @@ func formatOptionalInt(v *int) string {
 	return fmt.Sprintf("%d", *v)
 }
 
-func (m Model) paramEnvLen() int { return len(m.params.env) }
-func (m Model) paramArgsLen() int {
-	return len(m.params.args)
-}
+func (m Model) paramEnvLen() int  { return len(m.params.editor.env) }
+func (m Model) paramArgsLen() int { return len(m.params.editor.args) }
 
 func hasTag(tags []string, tag string) bool {
 	for _, t := range tags {
@@ -280,10 +270,10 @@ func hasTag(tags []string, tag string) bool {
 }
 
 func (m Model) metadataFieldValue(field paramMetadataField) string {
-	if m.params.profileIndex < 0 || m.params.profileIndex >= len(m.params.profiles) {
+	if len(m.params.editor.profiles) == 0 {
 		return ""
 	}
-	p := m.params.profiles[m.params.profileIndex]
+	p := m.params.editor.ActiveProfile()
 	switch field {
 	case paramMetadataBackend:
 		return p.Backend
@@ -311,7 +301,7 @@ func (m Model) metadataFieldValue(field paramMetadataField) string {
 }
 
 func (m Model) startMetadataValueEdit() (Model, tea.Cmd) {
-	if m.params.focus != paramFocusMetadata || m.params.profileIndex < 0 || m.params.profileIndex >= len(m.params.profiles) {
+	if m.params.focus != paramFocusMetadata || len(m.params.editor.profiles) == 0 {
 		return m, nil
 	}
 	switch paramMetadataField(m.params.metadataCursor) {
@@ -345,10 +335,10 @@ func (m Model) startMetadataValueEdit() (Model, tea.Cmd) {
 // backendCurrentIndex returns the index of the current profile's Backend value
 // within paramBackendOptionsForModel(), or 0 if not found.
 func (m Model) backendCurrentIndex() int {
-	if m.params.profileIndex < 0 || m.params.profileIndex >= len(m.params.profiles) {
+	if len(m.params.editor.profiles) == 0 {
 		return 0
 	}
-	p := m.params.profiles[m.params.profileIndex]
+	p := m.params.editor.ActiveProfile()
 	for i, o := range m.paramBackendOptionsForModel() {
 		if o == p.Backend {
 			return i
@@ -360,10 +350,10 @@ func (m Model) backendCurrentIndex() int {
 // hardwareClassCurrentIndex returns the index of the current profile's Hardware.Class
 // within paramHardwareClassOptions, or 0 if not found.
 func (m Model) hardwareClassCurrentIndex() int {
-	if m.params.profileIndex < 0 || m.params.profileIndex >= len(m.params.profiles) {
+	if len(m.params.editor.profiles) == 0 {
 		return 0
 	}
-	p := m.params.profiles[m.params.profileIndex]
+	p := m.params.editor.ActiveProfile()
 	for i, o := range paramHardwareClassOptions {
 		if o == p.Hardware.Class {
 			return i
@@ -374,30 +364,20 @@ func (m Model) hardwareClassCurrentIndex() int {
 
 // selectBackend selects the backend at the current backendCursor position and persists.
 func (m Model) selectBackend() (Model, tea.Cmd) {
-	if m.params.profileIndex < 0 || m.params.profileIndex >= len(m.params.profiles) {
-		return m, nil
-	}
 	opts := m.paramBackendOptionsForModel()
 	if len(opts) == 0 || m.params.backendCursor < 0 || m.params.backendCursor >= len(opts) {
 		return m, nil
 	}
-	p := m.params.profiles[m.params.profileIndex]
-	p.Backend = opts[m.params.backendCursor]
-	m.params.profiles[m.params.profileIndex] = profilepkg.NormalizeProfile(p)
+	m.params.editor.SetBackend(opts[m.params.backendCursor])
 	return m.persistParamPanel()
 }
 
 // selectHardwareClass selects the hardware class at the current hardwareClassCursor position and persists.
 func (m Model) selectHardwareClass() (Model, tea.Cmd) {
-	if m.params.profileIndex < 0 || m.params.profileIndex >= len(m.params.profiles) {
-		return m, nil
-	}
 	if m.params.hardwareClassCursor < 0 || m.params.hardwareClassCursor >= len(paramHardwareClassOptions) {
 		return m, nil
 	}
-	p := m.params.profiles[m.params.profileIndex]
-	p.Hardware.Class = paramHardwareClassOptions[m.params.hardwareClassCursor]
-	m.params.profiles[m.params.profileIndex] = profilepkg.NormalizeProfile(p)
+	m.params.editor.SetHardwareClass(paramHardwareClassOptions[m.params.hardwareClassCursor])
 	return m.persistParamPanel()
 }
 
@@ -413,41 +393,21 @@ func toggleTag(tags []string, tag string) []string {
 
 // toggleCurrentPrimary toggles the canonical primary value at the current primaryCursor position.
 func (m Model) toggleCurrentPrimary() (Model, tea.Cmd) {
-	if m.params.profileIndex < 0 || m.params.profileIndex >= len(m.params.profiles) {
-		return m, nil
-	}
 	if m.params.primaryCursor < 0 || m.params.primaryCursor >= len(profilepkg.CanonicalPrimaries) {
 		return m, nil
 	}
 	primStr := string(profilepkg.CanonicalPrimaries[m.params.primaryCursor])
-	p := m.params.profiles[m.params.profileIndex]
-	// Convert to []string for toggleTag, then back to UseCasePrimaries.
-	strs := make([]string, len(p.UseCase.Primary))
-	for i, v := range p.UseCase.Primary {
-		strs[i] = string(v)
-	}
-	strs = toggleTag(strs, primStr)
-	newPrimary := make(profilepkg.UseCasePrimaries, len(strs))
-	for i, s := range strs {
-		newPrimary[i] = profilepkg.UseCasePrimary(s)
-	}
-	p.UseCase.Primary = newPrimary
-	m.params.profiles[m.params.profileIndex] = profilepkg.NormalizeProfile(p)
+	m.params.editor.TogglePrimary(primStr)
 	return m.persistParamPanel()
 }
 
 // toggleCurrentTag toggles the canonical tag at the current tagCursor position.
 func (m Model) toggleCurrentTag() (Model, tea.Cmd) {
-	if m.params.profileIndex < 0 || m.params.profileIndex >= len(m.params.profiles) {
-		return m, nil
-	}
 	if m.params.tagCursor < 0 || m.params.tagCursor >= len(profilepkg.CanonicalTags) {
 		return m, nil
 	}
 	tag := profilepkg.CanonicalTags[m.params.tagCursor]
-	p := m.params.profiles[m.params.profileIndex]
-	p.UseCase.Tags = toggleTag(p.UseCase.Tags, tag)
-	m.params.profiles[m.params.profileIndex] = profilepkg.NormalizeProfile(p)
+	m.params.editor.ToggleTag(tag)
 	return m.persistParamPanel()
 }
 

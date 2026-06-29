@@ -64,17 +64,12 @@ type paramsState struct {
 	modelPath           string
 	modelDisplayName    string
 	focus               paramFocus
-	profileIndex        int
-	profiles            []ParameterProfile
+	editor              profileEditor
 	metadataCursor      int
 	primaryCursor       int // horizontal cursor within the Use Case Primary checkbox row
 	tagCursor           int // horizontal cursor within the Tags checkbox row
 	backendCursor       int // horizontal cursor within the Backend radio row
 	hardwareClassCursor int // horizontal cursor within the Hardware Class radio row
-	envCursor           int
-	argsCursor          int
-	env                 []EnvVar
-	args                []string
 	editKind            paramEditKind
 	editInput           textinput.Model
 	notesInput          textarea.Model // multi-line editor for the Notes metadata field
@@ -396,10 +391,8 @@ func (m Model) activeProfileBackendForSelected() models.ModelBackend {
 	}
 	if m.params.open {
 		if modelParamsKey(m.params.modelPath) == modelParamsKey(sel) {
-			if m.params.profileIndex >= 0 && m.params.profileIndex < len(m.params.profiles) {
-				b, _ := models.ParseBackend(m.params.profiles[m.params.profileIndex].Backend)
-				return b
-			}
+			b, _ := models.ParseBackend(m.params.editor.ActiveProfile().Backend)
+			return b
 		}
 	}
 	ent, err := loadModelEntry(modelParamsKey(sel))

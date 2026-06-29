@@ -138,10 +138,8 @@ func TestCloseParamPanel_NoRestoreWithoutSnapshot(t *testing.T) {
 	m.preview.focused = true
 	m.table.tbl.Blur()
 	m.params.open = true
-	m.params.profiles = []ParameterProfile{{Name: "p"}}
-	m.params.profileIndex = 0
+	m.params.editor = newProfileEditor(modelEntry{Profiles: []ParameterProfile{{Name: "p"}}, ActiveIndex: 0})
 	m.params.modelPath = "/x.gguf"
-	m.params.loadCurrentProfileIn()
 
 	m = m.closeParamPanel()
 	if !m.preview.focused {
