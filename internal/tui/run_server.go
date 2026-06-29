@@ -32,6 +32,102 @@ type serverSpec struct {
 	mmprojMissing    bool     // image/audio tagged but no mmproj file found; launch proceeds without multimodal support
 }
 
+type launchArg struct {
+	value       string
+	quoteAlways bool
+}
+
+func rawLaunchArg(value string) launchArg {
+	return launchArg{value: value}
+}
+
+func quotedLaunchArg(value string) launchArg {
+	return launchArg{value: value, quoteAlways: true}
+}
+
+func (a launchArg) shellWord() string {
+	if a.quoteAlways {
+		return shellSingleQuoted(a.value)
+	}
+	return shellWord(a.value)
+}
+
+type launchBackend interface {
+	args(serverSpec) []launchArg
+}
+
+type llamaLaunchBackend struct{}
+type vllmLaunchBackend struct{}
+type koboldLaunchBackend struct{}
+type ollamaLaunchBackend struct{}
+
+func (llamaLaunchBackend) args(s serverSpec) []launchArg {
+	args := []launchArg{
+		rawLaunchArg("--model"), quotedLaunchArg(s.modelPath),
+		rawLaunchArg("--alias"), quotedLaunchArg(llamaServerAlias(s.modelPath)),
+		rawLaunchArg("--host"), rawLaunchArg(s.host),
+		rawLaunchArg("--port"), rawLaunchArg(fmt.Sprintf("%d", s.port)),
+	}
+	if s.mmprojPath != "" {
+		args = append(args, rawLaunchArg("--mmproj"), quotedLaunchArg(s.mmprojPath))
+	}
+	return args
+}
+
+func (vllmLaunchBackend) args(s serverSpec) []launchArg {
+	return []launchArg{
+		rawLaunchArg("serve"), quotedLaunchArg(s.modelPath),
+		rawLaunchArg("--served-model-name"), quotedLaunchArg(models.InferModelID(s.modelPath)),
+		rawLaunchArg("--host"), rawLaunchArg(s.host),
+		rawLaunchArg("--port"), rawLaunchArg(fmt.Sprintf("%d", s.port)),
+	}
+}
+
+func (koboldLaunchBackend) args(s serverSpec) []launchArg {
+	args := []launchArg{
+		quotedLaunchArg(s.modelPath),
+		rawLaunchArg("--port"), rawLaunchArg(fmt.Sprintf("%d", s.port)),
+	}
+	if s.mmprojPath != "" {
+		args = append(args, rawLaunchArg("--mmproj"), quotedLaunchArg(s.mmprojPath))
+	}
+	return args
+}
+
+func (ollamaLaunchBackend) args(serverSpec) []launchArg {
+	return []launchArg{rawLaunchArg("serve")}
+}
+
+func (s serverSpec) launchBackend() launchBackend {
+	switch s.backend {
+	case models.BackendOllama:
+		return ollamaLaunchBackend{}
+	case models.BackendVLLM:
+		return vllmLaunchBackend{}
+	case models.BackendKobold:
+		return koboldLaunchBackend{}
+	default:
+		return llamaLaunchBackend{}
+	}
+}
+
+func (s serverSpec) launchArgv() []launchArg {
+	args := []launchArg{quotedLaunchArg(s.bin)}
+	args = append(args, s.launchBackend().args(s)...)
+	for _, a := range s.params.Args {
+		args = append(args, rawLaunchArg(a))
+	}
+	return args
+}
+
+func launchArgValues(args []launchArg) []string {
+	out := make([]string, len(args))
+	for i, a := range args {
+		out[i] = a.value
+	}
+	return out
+}
+
 // profileHasMMProj reports whether params already contains a --mmproj / -mm flag token,
 // meaning the user has manually specified the projector and auto-injection should be skipped.
 // Matches both space-separated form ("--mmproj /path") and equals form ("--mmproj=/path").
@@ -187,43 +283,10 @@ func (s serverSpec) mmprojNote() string {
 
 // commandWords returns the escaped shell tokens for the server invocation (same order as directArgs).
 func (s serverSpec) commandWords() []string {
-	var words []string
-	switch s.backend {
-	case models.BackendOllama:
-		words = []string{
-			shellSingleQuoted(s.bin), "serve",
-		}
-	case models.BackendVLLM:
-		words = []string{
-			shellSingleQuoted(s.bin), "serve",
-			shellSingleQuoted(s.modelPath),
-			"--served-model-name", shellSingleQuoted(models.InferModelID(s.modelPath)),
-			"--host", s.host,
-			"--port", fmt.Sprintf("%d", s.port),
-		}
-	case models.BackendKobold:
-		words = []string{
-			shellSingleQuoted(s.bin),
-			shellSingleQuoted(s.modelPath),
-			"--port", fmt.Sprintf("%d", s.port),
-		}
-		if s.mmprojPath != "" {
-			words = append(words, "--mmproj", shellSingleQuoted(s.mmprojPath))
-		}
-	default:
-		words = []string{
-			shellSingleQuoted(s.bin),
-			"--model", shellSingleQuoted(s.modelPath),
-			"--alias", shellSingleQuoted(llamaServerAlias(s.modelPath)),
-			"--host", s.host,
-			"--port", fmt.Sprintf("%d", s.port),
-		}
-		if s.mmprojPath != "" {
-			words = append(words, "--mmproj", shellSingleQuoted(s.mmprojPath))
-		}
-	}
-	for _, a := range s.params.Args {
-		words = append(words, shellWord(a))
+	argv := s.launchArgv()
+	words := make([]string, len(argv))
+	for i, a := range argv {
+		words[i] = a.shellWord()
 	}
 	return words
 }
@@ -235,37 +298,7 @@ func (s serverSpec) commandLine() string {
 
 // directArgs builds the argv slice for direct binary execution (no sh wrapper).
 func (s serverSpec) directArgs() []string {
-	var args []string
-	switch s.backend {
-	case models.BackendOllama:
-		args = []string{"serve"}
-	case models.BackendVLLM:
-		args = []string{
-			"serve", s.modelPath,
-			"--served-model-name", models.InferModelID(s.modelPath),
-			"--host", s.host,
-			"--port", fmt.Sprintf("%d", s.port),
-		}
-	case models.BackendKobold:
-		args = []string{
-			s.modelPath,
-			"--port", fmt.Sprintf("%d", s.port),
-		}
-		if s.mmprojPath != "" {
-			args = append(args, "--mmproj", s.mmprojPath)
-		}
-	default:
-		args = []string{
-			"-m", s.modelPath,
-			"--alias", llamaServerAlias(s.modelPath),
-			"--host", s.host,
-			"--port", fmt.Sprintf("%d", s.port),
-		}
-		if s.mmprojPath != "" {
-			args = append(args, "--mmproj", s.mmprojPath)
-		}
-	}
-	return append(args, s.params.Args...)
+	return launchArgValues(s.launchArgv()[1:])
 }
 
 // unixForegroundScript returns the sh -c script used for foreground launch on Unix:

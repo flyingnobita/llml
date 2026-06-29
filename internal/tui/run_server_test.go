@@ -3,6 +3,7 @@ package tui
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -28,6 +29,33 @@ func llamaSpec(bin, modelPath string, port int, params ModelParams) serverSpec {
 
 func vllmSpec(bin, modelPath string, port int, activateScript string, params ModelParams) serverSpec {
 	return serverSpec{backend: models.BackendVLLM, bin: bin, host: "127.0.0.1", port: port, modelPath: modelPath, params: params, activateScript: activateScript}
+}
+
+func TestServerSpecDirectArgsUseLaunchArgvSource(t *testing.T) {
+	specs := map[string]serverSpec{
+		"llama":  llamaSpec("/bin/llama-server", "/m/a.gguf", 9090, ModelParams{Args: []string{"--threads", "8"}}),
+		"vllm":   vllmSpec("/bin/vllm", "/m/hf-model", 8000, "", ModelParams{Args: []string{"--dtype", "auto"}}),
+		"kobold": mmprojKoboldSpec("/bin/koboldcpp", "/m/a.gguf", "/m/mmproj.gguf", 5001, ModelParams{Args: []string{"--gpulayers", "99"}}),
+		"ollama": {backend: models.BackendOllama, bin: "/bin/ollama", host: "127.0.0.1:11434", modelPath: "qwen:latest"},
+	}
+	for name, spec := range specs {
+		t.Run(name, func(t *testing.T) {
+			want := launchArgValues(spec.launchArgv()[1:])
+			if got := spec.directArgs(); !slices.Equal(got, want) {
+				t.Fatalf("directArgs = %v, want launch argv tail %v", got, want)
+			}
+		})
+	}
+}
+
+func TestLlamaDirectArgsMatchDisplayedModelFlag(t *testing.T) {
+	spec := llamaSpec("/bin/llama-server", "/m/a.gguf", 9090, ModelParams{})
+	if got := spec.directArgs(); len(got) < 2 || got[0] != "--model" || got[1] != "/m/a.gguf" {
+		t.Fatalf("directArgs = %v, want --model followed by model path", got)
+	}
+	if words := spec.commandWords(); len(words) < 3 || words[1] != "--model" || words[2] != "'/m/a.gguf'" {
+		t.Fatalf("commandWords = %v, want displayed --model followed by quoted path", words)
+	}
 }
 
 func TestFormatLlamaServerInvocation(t *testing.T) {
