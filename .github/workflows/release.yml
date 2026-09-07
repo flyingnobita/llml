@@ -20,16 +20,19 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
-          cache: true
+      # Go and GoReleaser both come from mise.toml, the same source CI uses, so
+      # the release build cannot drift from the build that was tested.
+      - uses: jdx/mise-action@v4
 
-      - uses: goreleaser/goreleaser-action@v7
+      - uses: actions/cache@v4
         with:
-          distribution: goreleaser
-          version: "~> v2"
-          args: release --clean
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('go.sum') }}
+          restore-keys: ${{ runner.os }}-go-
+
+      - run: goreleaser release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}

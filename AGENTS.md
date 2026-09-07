@@ -142,6 +142,20 @@ Set machine-specific env (for example `LLAMA_CPP_PATH`) in `mise.local.toml` (gi
 | Pull latest (`origin/main` + submodule remote) | `mise run pull-latest`    |
 | New worktree (deps + import ignored paths)     | `mise run worktree-setup` |
 
+### Toolchain pinning
+
+Go, GoReleaser, and golangci-lint are pinned to exact versions in `mise.toml`;
+`.github/workflows/ci.yml` and `release.yml` both resolve them from that one
+file. Two constraints must hold when bumping any of them:
+
+- `go` in `mise.toml` matches the `go` directive in `go.mod`. `mise run lint`
+  runs `scripts/go-version-check.sh`, which fails the build on drift.
+- `github:golangci/golangci-lint` is a release built against that Go version.
+  A linter built with an older Go panics on packages compiled by a newer one
+  (`file requires newer Go version`). Check with `golangci-lint --version`.
+
+Bump Go by editing `go.mod` and `mise.toml` together, then run `mise install`.
+
 ### Docs formatting
 
 Markdown, YAML, and JSON are formatted with **Prettier** and linted with
