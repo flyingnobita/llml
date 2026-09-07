@@ -16,6 +16,7 @@ goreleaser = "2.12.2"
 [tasks]
 run = "go run ./cmd/llml"
 build = "go build -o bin/llml ./cmd/llml"
+gguf-dump = "go run ./cmd/gguf-dump"  # Developer tool: print a GGUF file's metadata. Not shipped in releases.
 fmt = "go fmt ./..."
 fmt-check = "scripts/gofmt-check.sh"
 vet = "go vet ./..."

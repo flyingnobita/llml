@@ -39,7 +39,8 @@ archives it to `BOARD.md`.
 ## Source Layout
 
 ```text
-cmd/llml/            # Binary entrypoint (main.go)
+cmd/llml/            # Binary entrypoint (main.go). The only binary GoReleaser ships.
+cmd/gguf-dump/       # Developer-only tool: dumps a GGUF file's metadata (mise run gguf-dump -- path.gguf). Deliberately NOT in .goreleaser.yaml or the README; it is a debugging aid, not a user-facing command. Its output logic lives in internal/models/gguf_dump.go and is tested there.
 internal/
   settings/          # Resolved runtime configuration: Settings, Layer, Resolve, FromEnv, Defaults. Owns the env var names and built-in defaults; imports nothing from config/models/tui
   config/            # TOML persistence ({UserConfigDir}/llml/config.toml): runtime, discovery cache, [[models]]. Converts to and from settings via RuntimeConfig.Layer / RuntimeConfigFromSettings

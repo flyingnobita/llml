@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
+- Sep-07, 2026 - 09:27 AM +0800 - [Repo hygiene: trim .gitignore from a generic multi-language template to this repo's Go and Node reality (and ignore asciinema recordings), and give cmd/gguf-dump a documented status as a developer-only tool with a `mise run gguf-dump` task and tests for its report output]
 - Sep-07, 2026 - 09:24 AM +0800 - [Tests: split the 1977-line export panel test file into seven behavior-focused files, add golden-file coverage for the rendered main view, runtime panel, help panel, and alert pane, and raise internal/fsutil coverage from 44% to 79%]
 - Sep-07, 2026 - 09:20 AM +0800 - [Discovery: a symlink loop under a model directory no longer causes the same models to be found repeatedly. Each directory is now visited once, keyed by its resolved path, and only symlinked entries cost an extra stat]
 - Sep-07, 2026 - 09:18 AM +0800 - [Lint: enable nolintlint, errorlint, revive, gocognit (30), funlen (120/60), unparam, and copyloopvar, and split the seven functions that exceeded the new thresholds into per-focus and per-message handlers; connection-refused and DNS errors are now matched with errors.Is/errors.As instead of substring checks on the message]

@@ -5,36 +5,7 @@
 mise.local.toml
 mise.*.local.toml
 
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-*.egg-info/
-*.egg
-.venv/
-venv/
-.uv/
-
-# Node
-node_modules/
-.npm
-.pnpm-store/
-bun.lock
-dist/
-.next/
-.nuxt/
-.cache/
-
-# Rust
-target/
-Cargo.lock
-
-# Go
+# Go build output
 *.exe
 *.exe~
 *.dll
@@ -43,26 +14,18 @@ Cargo.lock
 vendor/
 /bin/
 /llml
+/gguf-dump
 
-# Java / JVM
-*.class
-*.jar
-*.war
-.gradle/
-build/
-target/
-.idea/
-*.iml
+# GoReleaser output
+dist/
 
-# Database (local dev)
-*.db
-*.db-journal
-*.db-wal
-*.sqlite
-*.sqlite3
+# Node (Prettier + markdownlint only; see package.json)
+node_modules/
+.npm
 
 # IDE
 .vscode/
+.idea/
 *.swp
 *.swo
 *~
@@ -71,12 +34,12 @@ target/
 .DS_Store
 Thumbs.db
 
-# Testing & coverage
-.coverage
-htmlcov/
-.pytest_cache/
-.mypy_cache/
+# Coverage
 coverage/
+*.out
+
+# Terminal recordings (asciinema)
+*.cast
 
 # Logs (logs/app.log.example tracked as format template)
 logs/*
