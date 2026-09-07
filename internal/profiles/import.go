@@ -4,118 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
-
-	"github.com/BurntSushi/toml"
 )
-
-// stripEnvByBackend maps backend → uppercase env key → true for model-location env
-// vars that must be stripped on import (llml supplies the model path at launch).
-var stripEnvByBackend = map[string]map[string]bool{
-	"llama": {
-		"LLAMA_CACHE":             true,
-		"LLAMA_ARG_MODEL":         true,
-		"LLAMA_ARG_MODEL_URL":     true,
-		"LLAMA_ARG_MODEL_DRAFT":   true,
-		"LLAMA_ARG_HF_REPO":       true,
-		"LLAMA_ARG_HF_FILE":       true,
-		"LLAMA_ARG_HFD_REPO":      true,
-		"LLAMA_ARG_HF_REPO_V":     true,
-		"LLAMA_ARG_HF_FILE_V":     true,
-		"LLAMA_ARG_DOCKER_REPO":   true,
-		"LLAMA_ARG_MMPROJ":        true,
-		"LLAMA_ARG_MMPROJ_URL":    true,
-		"LLAMA_ARG_MODELS_DIR":    true,
-		"LLAMA_ARG_MODELS_PRESET": true,
-		"HF_TOKEN":                true,
-	},
-	"koboldcpp": {
-		"LLAMA_CACHE":             true,
-		"LLAMA_ARG_MODEL":         true,
-		"LLAMA_ARG_MODEL_URL":     true,
-		"LLAMA_ARG_MODEL_DRAFT":   true,
-		"LLAMA_ARG_HF_REPO":       true,
-		"LLAMA_ARG_HF_FILE":       true,
-		"LLAMA_ARG_HFD_REPO":      true,
-		"LLAMA_ARG_HF_REPO_V":     true,
-		"LLAMA_ARG_HF_FILE_V":     true,
-		"LLAMA_ARG_DOCKER_REPO":   true,
-		"LLAMA_ARG_MMPROJ":        true,
-		"LLAMA_ARG_MMPROJ_URL":    true,
-		"LLAMA_ARG_MODELS_DIR":    true,
-		"LLAMA_ARG_MODELS_PRESET": true,
-		"HF_TOKEN":                true,
-	},
-	"vllm": {
-		"HF_HOME":                  true,
-		"HF_TOKEN":                 true,
-		"HF_HUB_TOKEN":             true,
-		"HUGGINGFACE_HUB_CACHE":    true,
-		"HUGGING_FACE_HUB_TOKEN":   true,
-		"TRANSFORMERS_CACHE":       true,
-		"VLLM_CACHE_ROOT":          true,
-		"VLLM_ASSETS_CACHE":        true,
-		"VLLM_MODEL_REDIRECT_PATH": true,
-		"VLLM_XLA_CACHE_PATH":      true,
-		"VLLM_USE_MODELSCOPE":      true,
-		"MODELSCOPE_CACHE":         true,
-	},
-}
-
-// stripArgByBackend maps backend → arg first token → true for model-location args
-// that must be stripped on import.
-var stripArgByBackend = map[string]map[string]bool{
-	"llama": {
-		"-m": true, "--model": true,
-		"-mu": true, "--model-url": true,
-		"-md": true, "--model-draft": true,
-		"-mv": true, "--model-vocoder": true,
-		"-hf": true, "-hfr": true, "--hf-repo": true,
-		"-hff": true, "--hf-file": true,
-		"-hfd": true, "-hfrd": true, "--hf-repo-draft": true,
-		"-hfv": true, "-hfrv": true, "--hf-repo-v": true,
-		"-hffv": true, "--hf-file-v": true,
-		"-hft": true, "--hf-token": true,
-		"-dr": true, "--docker-repo": true,
-		"-mm": true, "--mmproj": true,
-		"-mmu": true, "--mmproj-url": true,
-		"--lora": true, "--lora-scaled": true, "--lora-init-without-apply": true,
-		"--control-vector": true, "--control-vector-scaled": true,
-		"--models-dir": true, "--models-preset": true,
-		"-lcs": true, "--lookup-cache-static": true,
-		"-lcd": true, "--lookup-cache-dynamic": true,
-	},
-	"koboldcpp": {
-		"-m": true, "--model": true,
-		"-mu": true, "--model-url": true,
-		"-md": true, "--model-draft": true,
-		"-mv": true, "--model-vocoder": true,
-		"-hf": true, "-hfr": true, "--hf-repo": true,
-		"-hff": true, "--hf-file": true,
-		"-hfd": true, "-hfrd": true, "--hf-repo-draft": true,
-		"-hfv": true, "-hfrv": true, "--hf-repo-v": true,
-		"-hffv": true, "--hf-file-v": true,
-		"-hft": true, "--hf-token": true,
-		"-dr": true, "--docker-repo": true,
-		"-mm": true, "--mmproj": true,
-		"-mmu": true, "--mmproj-url": true,
-		"--lora": true, "--lora-scaled": true, "--lora-init-without-apply": true,
-		"--control-vector": true, "--control-vector-scaled": true,
-		"--models-dir": true, "--models-preset": true,
-		"-lcs": true, "--lookup-cache-static": true,
-		"-lcd": true, "--lookup-cache-dynamic": true,
-	},
-	"vllm": {
-		"--model": true, "--tokenizer": true,
-		"--revision": true, "--code-revision": true, "--tokenizer-revision": true,
-		"--hf-config-path": true, "--hf-token": true, "--hf-overrides": true,
-		"--download-dir": true, "--load-format": true,
-		"--model-loader-extra-config": true, "--config": true,
-		"--qlora-adapter-name-or-path": true,
-		"--lora-modules":               true, "--prompt-adapters": true,
-		"--speculative-config": true, "--speculative-model": true,
-		"--tokenizer-pool-extra-config": true,
-	},
-}
 
 // argFirstToken extracts the flag part (first token) from a panel-row arg string.
 func argFirstToken(panelRow string) string {
@@ -134,13 +23,12 @@ func argFirstToken(panelRow string) string {
 // backend. Returns kept env, kept args, descriptions of dropped env, and descriptions
 // of dropped args.
 func StripModelLocationParams(backend string, env []PortableEnvVar, args []string) ([]PortableEnvVar, []string, []string, []string) {
-	envTable := stripEnvByBackend[backend]
-	argTable := stripArgByBackend[backend]
+	rules := rulesByBackend[backend]
 
 	var keptEnv []PortableEnvVar
 	var droppedEnv []string
 	for _, e := range env {
-		if envTable != nil && envTable[strings.ToUpper(e.Key)] {
+		if rules.isEnv(e.Key) {
 			droppedEnv = append(droppedEnv, e.Key+"="+e.Value)
 		} else {
 			keptEnv = append(keptEnv, e)
@@ -150,7 +38,7 @@ func StripModelLocationParams(backend string, env []PortableEnvVar, args []strin
 	var keptArgs []string
 	var droppedArgs []string
 	for _, a := range args {
-		if argTable != nil && argTable[argFirstToken(a)] {
+		if rules.isArg(a) {
 			droppedArgs = append(droppedArgs, a)
 		} else {
 			keptArgs = append(keptArgs, a)
@@ -158,29 +46,6 @@ func StripModelLocationParams(backend string, env []PortableEnvVar, args []strin
 	}
 
 	return keptEnv, keptArgs, droppedEnv, droppedArgs
-}
-
-// portableUseCaseLegacyV2 is the v2 use_case block where primary was a single string.
-type portableUseCaseLegacyV2 struct {
-	Primary string   `toml:"primary,omitempty"`
-	Tags    []string `toml:"tags,omitempty"`
-}
-
-// portableProfileLegacyV2 mirrors PortableProfile with a v2 use_case.
-type portableProfileLegacyV2 struct {
-	Name      string                  `toml:"name"`
-	Backend   string                  `toml:"backend"`
-	ModelHint string                  `toml:"model_hint,omitempty"`
-	Args      []string                `toml:"args,omitempty"`
-	Env       []PortableEnvVar        `toml:"env,omitempty"`
-	UseCase   portableUseCaseLegacyV2 `toml:"use_case,omitempty"`
-	Hardware  PortableHardware        `toml:"hardware,omitempty"`
-}
-
-// portableFileLegacyV2 is the top-level v2 portable TOML document.
-type portableFileLegacyV2 struct {
-	SchemaVersion int                       `toml:"schema_version"`
-	Profiles      []portableProfileLegacyV2 `toml:"profiles"`
 }
 
 // ReadPortable reads and validates a portable profile TOML file.
@@ -192,54 +57,10 @@ func ReadPortable(path string) (*PortableFile, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Peek at the schema version without a full parse.
-	type versionOnly struct {
-		SchemaVersion int `toml:"schema_version"`
-	}
-	var vo versionOnly
-	if err := toml.Unmarshal(b, &vo); err != nil {
-		return nil, fmt.Errorf("invalid TOML: %w", err)
-	}
-	switch vo.SchemaVersion {
-	case SchemaVersion: // v3 — current
-		var f PortableFile
-		if err := toml.Unmarshal(b, &f); err != nil {
-			return nil, fmt.Errorf("invalid TOML: %w", err)
-		}
-		return &f, nil
-	case 2: // legacy — migrate primary from string → single-element array
-		var lf portableFileLegacyV2
-		if err := toml.Unmarshal(b, &lf); err != nil {
-			return nil, fmt.Errorf("invalid TOML: %w", err)
-		}
-		out := &PortableFile{
-			SchemaVersion: SchemaVersion,
-			Profiles:      make([]PortableProfile, len(lf.Profiles)),
-		}
-		for i, lp := range lf.Profiles {
-			pp := PortableProfile{
-				Name:      lp.Name,
-				Backend:   lp.Backend,
-				ModelHint: lp.ModelHint,
-				Args:      lp.Args,
-				Env:       lp.Env,
-				Hardware:  lp.Hardware,
-				UseCase: PortableUseCase{
-					Tags: lp.UseCase.Tags,
-				},
-			}
-			if lp.UseCase.Primary != "" {
-				pp.UseCase.Primary = []string{lp.UseCase.Primary}
-			}
-			out.Profiles[i] = pp
-		}
-		return out, nil
-	default:
-		return nil, fmt.Errorf("unsupported schema_version %d (expected %d)", vo.SchemaVersion, SchemaVersion)
-	}
+	return parsePortable(b)
 }
 
-// PortableToProfile converts one portable profile to an internal Profile,
+// PortableToProfile converts a portable profile to the internal representation,
 // applying all normalizers.
 func PortableToProfile(pp PortableProfile) Profile {
 	backend := NormalizeBackendInput(pp.Backend)

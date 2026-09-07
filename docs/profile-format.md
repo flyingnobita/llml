@@ -338,15 +338,41 @@ follow these rules:
    `hardware.notes`. Put short compatibility notes or test context in `notes`. If
    the source does not justify a field, omit it.
 
-8. **Do not extract model-location parameters into the portable profile.** Exclude
-   flags and env vars that identify where to load the model from, because llml
-   supplies the model path itself. Examples to exclude: `LLAMA_CACHE`, `-hf`,
-   `--model`, `--lora`, `HF_HOME`, `--tokenizer`, and similar source-location or
-   cache-location settings. For `koboldcpp`, exclude `--model`, `--lora`,
-   `--mmproj`, `--tokenizer`, `--models-dir`, and any `-hf*` / `--hf-*` flags,
-   as well as `LLAMA_CACHE`, `LLAMA_ARG_MODEL`, and `LLAMA_ARG_*` env vars
-   that specify model file paths — the same model-location parameters that
-   apply to `llama` also apply to `koboldcpp`.
+8. **Do not extract model-location parameters into the portable profile.** These
+   identify _which_ model to load or where to find it, and llml supplies them
+   itself at launch. It strips them on import and omits them on export, so
+   including them achieves nothing.
+
+   The authoritative list is `rulesByBackend` in
+   `internal/profiles/model_location.go`. `llama` and `koboldcpp` share one rule
+   set, since they accept the same flags.
+
+   **`llama` and `koboldcpp`**
+   - Env: `LLAMA_CACHE`, `HF_TOKEN`, any `LLAMA_ARG_*`, and `KOBOLDCPP_MODEL`,
+     `KOBOLDCPP_LORA`, `KOBOLDCPP_MMPROJ`, `KOBOLDCPP_TOKENIZER`,
+     `KOBOLDCPP_MODELS_DIR`.
+   - Args: `-m` / `--model`, `-mu` / `--model-url`, `-md` / `--model-draft`,
+     `-mv` / `--model-vocoder`, every `-hf*` / `--hf-*` form, `-dr` /
+     `--docker-repo`, `-mm` / `--mmproj`, `-mmu` / `--mmproj-url`, `--lora`,
+     `--lora-scaled`, `--lora-init-without-apply`, `--control-vector`,
+     `--control-vector-scaled`, `--models-dir`, `--models-preset`,
+     `-lcs` / `--lookup-cache-static`, `-lcd` / `--lookup-cache-dynamic`.
+
+   **`vllm`**
+   - Env: `HF_HOME`, `HF_TOKEN`, `HF_HUB_TOKEN`, `HUGGINGFACE_HUB_CACHE`,
+     `HUGGING_FACE_HUB_TOKEN`, `TRANSFORMERS_CACHE`, `VLLM_CACHE_ROOT`,
+     `VLLM_ASSETS_CACHE`, `VLLM_MODEL_REDIRECT_PATH`, `VLLM_XLA_CACHE_PATH`,
+     `VLLM_USE_MODELSCOPE`, `MODELSCOPE_CACHE`.
+   - Args: `--model`, `--tokenizer`, `--revision`, `--code-revision`,
+     `--tokenizer-revision`, `--hf-config-path`, `--hf-token`, `--hf-overrides`,
+     `--download-dir`, `--load-format`, `--model-loader-extra-config`,
+     `--config`, `--qlora-adapter-name-or-path`, `--lora-modules`,
+     `--prompt-adapters`, `--speculative-config`, `--speculative-model`,
+     `--tokenizer-pool-extra-config`.
+
+   Env keys are matched case-insensitively; args are matched on their first
+   token, so `-m /models/a.gguf` and a bare `-m` are both stripped. Export has no
+   backend context, so it excludes the **union** of every backend's env keys.
 
    **`--mmproj` note (image/audio models):** `--mmproj` injection for `llama`
    and `koboldcpp` backends is **opt-in**: llml only injects a `--mmproj <path>`

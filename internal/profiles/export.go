@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -17,25 +16,6 @@ import (
 
 // SchemaVersion is the current portable profile format version.
 const SchemaVersion = 3
-
-// envExcludePatterns are env var keys excluded from portable export
-// (model-location parameters per docs/profile-format.md §8).
-var envExcludePatterns = []string{
-	"LLAMA_CACHE",
-	"LLAMA_ARG_MODEL",
-	"HF_HOME",
-	"HUGGINGFACE_HUB_CACHE",
-	"KOBOLDCPP_MODEL",
-	"KOBOLDCPP_LORA",
-	"KOBOLDCPP_MMPROJ",
-	"KOBOLDCPP_TOKENIZER",
-	"KOBOLDCPP_MODELS_DIR",
-}
-
-// envExcludePrefixes are env var key prefixes to exclude.
-var envExcludePrefixes = []string{
-	"LLAMA_ARG_",
-}
 
 // PortableProfile is one profile in the portable TOML format.
 type PortableProfile struct {
@@ -136,18 +116,9 @@ func ModelHint(key string) string {
 }
 
 // ShouldExcludeEnv reports whether an env var key is a model-location
-// parameter that should be excluded from portable export.
+// parameter that should be excluded from portable export. See model_location.go.
 func ShouldExcludeEnv(key string) bool {
-	upper := strings.ToUpper(key)
-	if slices.Contains(envExcludePatterns, upper) {
-		return true
-	}
-	for _, prefix := range envExcludePrefixes {
-		if strings.HasPrefix(upper, prefix) {
-			return true
-		}
-	}
-	return false
+	return isAnyBackendLocationEnv(key)
 }
 
 // ProfileToPortable converts one internal profile to its portable representation.

@@ -14,8 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/BurntSushi/toml"
-
 	"github.com/flyingnobita/llml/internal/fsutil"
 	"github.com/flyingnobita/llml/internal/userdata"
 )
@@ -118,60 +116,23 @@ func (ft Fetcher) FetchPortable(ctx context.Context, rawURL string) (*PortableFi
 		return nil, fmt.Errorf("profile body exceeds 256KB cap")
 	}
 
-	// Peek at schema_version before full parse.
-	type versionOnly struct {
-		SchemaVersion int `toml:"schema_version"`
-	}
-	var vo versionOnly
-	if err := toml.Unmarshal(body, &vo); err != nil {
-		preview := string(body)
-		if len(preview) > 80 {
-			preview = preview[:80]
-		}
-		return nil, fmt.Errorf("response is not valid TOML at %s (got %q)", rawURL, preview)
-	}
-
-	var f *PortableFile
-	switch vo.SchemaVersion {
-	case SchemaVersion:
-		var pf PortableFile
-		if err := toml.Unmarshal(body, &pf); err != nil {
-			return nil, fmt.Errorf("response is not valid TOML at %s: %w", rawURL, err)
-		}
-		f = &pf
-	case 2:
-		// Legacy v2: primary was a single string; migrate to single-element array.
-		var lf portableFileLegacyV2
-		if err := toml.Unmarshal(body, &lf); err != nil {
-			return nil, fmt.Errorf("response is not valid TOML at %s: %w", rawURL, err)
-		}
-		out := &PortableFile{
-			SchemaVersion: SchemaVersion,
-			Profiles:      make([]PortableProfile, len(lf.Profiles)),
-		}
-		for i, lp := range lf.Profiles {
-			pp := PortableProfile{
-				Name:      lp.Name,
-				Backend:   lp.Backend,
-				ModelHint: lp.ModelHint,
-				Args:      lp.Args,
-				Env:       lp.Env,
-				Hardware:  lp.Hardware,
-				UseCase:   PortableUseCase{Tags: lp.UseCase.Tags},
+	f, err := parsePortable(body)
+	if err != nil {
+		// A URL needs different advice than a file path, so the error is
+		// rewritten here rather than in the shared parser.
+		var badSchema *unsupportedSchemaError
+		var badName *missingNameError
+		switch {
+		case errors.Is(err, errInvalidTOML):
+			preview := string(body)
+			if len(preview) > 80 {
+				preview = preview[:80]
 			}
-			if lp.UseCase.Primary != "" {
-				pp.UseCase.Primary = []string{lp.UseCase.Primary}
-			}
-			out.Profiles[i] = pp
-		}
-		f = out
-	default:
-		return nil, fmt.Errorf("invalid profile schema at %s: schema_version %d (expected %d)", rawURL, vo.SchemaVersion, SchemaVersion)
-	}
-
-	for i, p := range f.Profiles {
-		if p.Name == "" {
-			return nil, fmt.Errorf("invalid profile schema at %s: profile %d missing name", rawURL, i+1)
+			return nil, fmt.Errorf("response is not valid TOML at %s (got %q)", rawURL, preview)
+		case errors.As(err, &badSchema), errors.As(err, &badName):
+			return nil, fmt.Errorf("invalid profile schema at %s: %w", rawURL, err)
+		default:
+			return nil, fmt.Errorf("invalid profile at %s: %w", rawURL, err)
 		}
 	}
 
