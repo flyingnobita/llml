@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 
 	"charm.land/bubbles/v2/filepicker"
@@ -177,6 +178,7 @@ func (m Model) updateImportKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case msg.String() == " ":
 			if len(m.import_.groups) > 0 && m.import_.cursor < len(m.import_.groups) {
+				m = m.withImportGroupsCloned()
 				m.import_.groups[m.import_.cursor].checked = !m.import_.groups[m.import_.cursor].checked
 			}
 			return m, nil
@@ -199,11 +201,13 @@ func (m Model) updateImportKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.import_.cursor = min(m.import_.cursor+5, len(m.import_.groups)-1)
 			return m, nil
 		case msg.String() == "a":
+			m = m.withImportGroupsCloned()
 			for i := range m.import_.groups {
 				m.import_.groups[i].checked = true
 			}
 			return m, nil
 		case msg.String() == "A":
+			m = m.withImportGroupsCloned()
 			for i := range m.import_.groups {
 				m.import_.groups[i].checked = false
 			}
@@ -471,4 +475,11 @@ func (m Model) importMaxVisibleItems() int {
 func isDir(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && info.IsDir()
+}
+
+// withImportGroupsCloned returns a Model whose import groups are safe to write
+// element-wise. See [Model.withExportItemsCloned] for why this is needed.
+func (m Model) withImportGroupsCloned() Model {
+	m.import_.groups = slices.Clone(m.import_.groups)
+	return m
 }

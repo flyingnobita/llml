@@ -406,7 +406,7 @@ func TestExportFilterTextPersistsWhenRefocusedFromList(t *testing.T) {
 		{kind: exportItemProfile, modelDisplay: "Model-B", backend: "vllm", profileName: "cpu", checked: false},
 	}
 	m.export.filterInput.SetValue("gpu")
-	m.rebuildExportFilter()
+	m = m.rebuildExportFilter()
 
 	tm, _ := m.updateExportKey(tea.KeyPressMsg{Code: '/', Text: "/"})
 	m2 := asModel(tm)
@@ -429,7 +429,7 @@ func TestExportFilterTextPersistsWhenRefocusedFromPath(t *testing.T) {
 		{kind: exportItemProfile, modelDisplay: "Model-B", backend: "vllm", profileName: "cpu", checked: false},
 	}
 	m.export.filterInput.SetValue("gpu")
-	m.rebuildExportFilter()
+	m = m.rebuildExportFilter()
 
 	tm, _ := m.updateExportKey(tea.KeyPressMsg{Code: '/', Text: "/"})
 	m2 := asModel(tm)
@@ -828,7 +828,7 @@ func TestExportFilterFiltersItems(t *testing.T) {
 	// Activate filter and type "gpu".
 	m.export.focus = exportFocusFilter
 	m.export.filterInput.SetValue("gpu")
-	m.rebuildExportFilter()
+	m = m.rebuildExportFilter()
 
 	visible := m.exportVisibleItems()
 	if len(visible) != 2 {
@@ -859,7 +859,7 @@ func TestExportFilterNoMatches(t *testing.T) {
 	// Activate filter with no-matching term.
 	m.export.focus = exportFocusFilter
 	m.export.filterInput.SetValue("zzz")
-	m.rebuildExportFilter()
+	m = m.rebuildExportFilter()
 
 	block := m.exportModalBlock()
 	if !contains(block, FooterExportNoMatch) {
@@ -877,7 +877,7 @@ func TestExportFilterClearOnEsc(t *testing.T) {
 	}
 	m.export.cursor = 0
 	m.export.filterInput.SetValue("p1")
-	m.rebuildExportFilter()
+	m = m.rebuildExportFilter()
 
 	// Verify filtered.
 	if m.exportVisibleCount() != 1 {
@@ -916,7 +916,7 @@ func TestExportTogglePersistsAcrossFilter(t *testing.T) {
 
 	// Apply filter that hides gpu.
 	m2.export.filterInput.SetValue("cpu")
-	m2.rebuildExportFilter()
+	m2 = m2.rebuildExportFilter()
 
 	// Toggle the visible "cpu" profile.
 	m2.export.cursor = 0 // cpu is the only visible item (index 0 in filtered view)
@@ -925,7 +925,7 @@ func TestExportTogglePersistsAcrossFilter(t *testing.T) {
 
 	// Clear filter.
 	m3.export.filterInput.SetValue("")
-	m3.rebuildExportFilter()
+	m3 = m3.rebuildExportFilter()
 
 	// gpu should still be checked (toggled before filter).
 	if !m3.export.items[0].checked {
@@ -950,7 +950,7 @@ func TestExportFilterNavigation(t *testing.T) {
 
 	// Filter to only "p1" and "p3".
 	m.export.filterInput.SetValue("p1")
-	m.rebuildExportFilter()
+	m = m.rebuildExportFilter()
 	// Only p1 matches.
 	if m.exportVisibleCount() != 1 {
 		t.Fatalf("visible count = %d, want 1", m.exportVisibleCount())
@@ -986,7 +986,7 @@ func TestExportSelectAllAffectsOnlyVisibleWhenFiltered(t *testing.T) {
 
 	// Filter to only first two profiles.
 	m.export.filterInput.SetValue("Model-A")
-	m.rebuildExportFilter()
+	m = m.rebuildExportFilter()
 
 	msg := tea.KeyPressMsg{Code: 'a', Text: "a"}
 	tm, _ := m.updateExportKey(msg)
@@ -1018,7 +1018,7 @@ func TestExportSelectNoneAffectsOnlyVisibleWhenFiltered(t *testing.T) {
 
 	// Filter to only first two profiles.
 	m.export.filterInput.SetValue("Model-A")
-	m.rebuildExportFilter()
+	m = m.rebuildExportFilter()
 
 	msg := tea.KeyPressMsg{Code: 'A', Text: "A"}
 	tm, _ := m.updateExportKey(msg)
@@ -1051,7 +1051,7 @@ func TestExportFilterHeaderVisibility(t *testing.T) {
 
 	// Filter matches only Model-B's profile.
 	m.export.filterInput.SetValue("default")
-	m.rebuildExportFilter()
+	m = m.rebuildExportFilter()
 
 	visible := m.exportVisibleItems()
 	if len(visible) != 2 {
@@ -1079,7 +1079,7 @@ func TestExportFilterMatchOnModelName(t *testing.T) {
 
 	// Filter matches a model name directly.
 	m.export.filterInput.SetValue("Mistral")
-	m.rebuildExportFilter()
+	m = m.rebuildExportFilter()
 
 	visible := m.exportVisibleItems()
 	if len(visible) != 2 {
@@ -1122,10 +1122,10 @@ func TestExportFilterHeaderCheckboxReflectsVisible(t *testing.T) {
 
 	// Filter to only "cpu" (which is unchecked).
 	m.export.filterInput.SetValue("cpu")
-	m.rebuildExportFilter()
+	m = m.rebuildExportFilter()
 
 	// Header should show ☐ since the only visible profile (cpu) is unchecked.
-	m.syncHeaderStates()
+	m = m.syncHeaderStates()
 	if m.export.items[0].checked {
 		t.Error("header should be unchecked when visible profile is unchecked")
 	}
@@ -1314,7 +1314,7 @@ func TestAdjustExportScroll_CursorAboveScrollOffset(t *testing.T) {
 	m.export.cursor = 0
 	m.export.scrollOffset = 5
 
-	m.adjustExportScroll()
+	m = m.adjustExportScroll()
 	if m.export.scrollOffset != 0 {
 		t.Errorf("scrollOffset = %d, want 0 (cursor above offset)", m.export.scrollOffset)
 	}
@@ -1327,13 +1327,13 @@ func TestAdjustExportScroll_CursorBelowScrollWindow(t *testing.T) {
 	m.export.cursor = 20
 	m.export.scrollOffset = 0
 
-	m.adjustExportScroll()
+	m = m.adjustExportScroll()
 	// maxVis = max(40-13, 3) = 27
 	// cursor (20) >= scrollOffset(0) + maxVis(27)? No. So offset stays 0.
 	// Let me make cursor far enough.
 	m.export.cursor = 30
 	m.export.scrollOffset = 0
-	m.adjustExportScroll()
+	m = m.adjustExportScroll()
 	// maxVis = 27, cursor(30) >= 0+27 = 27, so offset = 30-27+1 = 4
 	if m.export.scrollOffset != 4 {
 		t.Errorf("scrollOffset = %d, want 4", m.export.scrollOffset)
@@ -1569,7 +1569,7 @@ func TestExportModalBlock_FilteredNoMatches(t *testing.T) {
 	// Activate filter with no matches.
 	m.export.focus = exportFocusFilter
 	m.export.filterInput.SetValue("zzz")
-	m.rebuildExportFilter()
+	m = m.rebuildExportFilter()
 
 	block := m.exportModalBlock()
 	if !contains(block, FooterExportNoMatch) {
@@ -1701,7 +1701,7 @@ func TestToggleGroup_InvalidCursorNoop(t *testing.T) {
 	m.export.cursor = 5 // out of bounds
 
 	// Should not panic.
-	m.toggleGroup(true)
+	m = m.toggleGroup(true)
 	// Items should be unchanged.
 	if m.export.items[0].checked {
 		t.Error("items should be unchanged when cursor is invalid")
@@ -1719,7 +1719,7 @@ func TestToggleGroup_ProfileCursorNoop(t *testing.T) {
 	m.export.cursor = 1 // profile, not header
 
 	// Should be a no-op (guard returns when not header).
-	m.toggleGroup(true)
+	m = m.toggleGroup(true)
 	if m.export.items[1].checked {
 		t.Error("profile should not be changed by toggleGroup on non-header")
 	}
@@ -1777,7 +1777,7 @@ func TestRebuildExportFilter_CursorClamping(t *testing.T) {
 
 	m.export.focus = exportFocusFilter
 	m.export.filterInput.SetValue("p1")
-	m.rebuildExportFilter()
+	m = m.rebuildExportFilter()
 
 	// Cursor should be clamped to 0 (only 1 visible item).
 	if m.export.cursor != 0 {

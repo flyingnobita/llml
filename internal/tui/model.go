@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"maps"
 	"os/exec"
 	"strings"
 	"time"
@@ -43,13 +44,18 @@ type themeState struct {
 
 // tableState holds the file list, sort state, table component, and scroll viewport.
 type tableState struct {
-	tbl               btable.Model
-	hscroll           viewport.Model
-	files             []models.ModelFile
-	sortCol           tableSortCol // default Runtime ascending
-	sortDesc          bool         // false = ascending
-	lastScan          time.Time
-	effectiveBackends map[string]models.ModelBackend // keyed by model identity
+	tbl      btable.Model
+	hscroll  viewport.Model
+	files    []models.ModelFile
+	sortCol  tableSortCol // default Runtime ascending
+	sortDesc bool         // false = ascending
+	lastScan time.Time
+	// effectiveBackends maps model identity to the backend its active profile
+	// selects. Model is copied by value throughout the TUI, and a map is a
+	// reference, so this field is copy-on-write: every mutator clones it before
+	// writing. Mutating it in place would make one copy's edit visible to all
+	// the others, silently breaking the value semantics the rest of the type has.
+	effectiveBackends map[string]models.ModelBackend
 }
 
 // runtimeConfigState holds the runtime-config modal's open/focus/input state.
@@ -446,18 +452,27 @@ func (m Model) updateEffectiveBackendForPath(modelPath string) Model {
 }
 
 // loadEffectiveBackendForIdentity reads the active profile for identity and
-// sets or deletes the effectiveBackends map entry accordingly.
+// sets or deletes the effectiveBackends map entry accordingly. It clones the
+// map first, so the returned Model is the only one that sees the change.
 func (m Model) loadEffectiveBackendForIdentity(identity string) Model {
 	key := modelParamsKey(identity)
-	ent, err := loadModelEntry(key)
-	if err != nil || len(ent.Profiles) == 0 {
-		delete(m.table.effectiveBackends, key)
-		return m
+	backend, keep := models.BackendLlama, false
+	if ent, err := loadModelEntry(key); err == nil && len(ent.Profiles) > 0 {
+		idx := clampInt(ent.ActiveIndex, 0, len(ent.Profiles)-1)
+		b, _ := models.ParseBackend(ent.Profiles[idx].Backend)
+		backend, keep = b, b != models.BackendLlama
 	}
-	idx := clampInt(ent.ActiveIndex, 0, len(ent.Profiles)-1)
-	b, _ := models.ParseBackend(ent.Profiles[idx].Backend)
-	if b != models.BackendLlama {
-		m.table.effectiveBackends[key] = b
+
+	_, had := m.table.effectiveBackends[key]
+	if !keep && !had {
+		return m // nothing to change; avoid an allocation on the common path
+	}
+	m.table.effectiveBackends = maps.Clone(m.table.effectiveBackends)
+	if m.table.effectiveBackends == nil {
+		m.table.effectiveBackends = make(map[string]models.ModelBackend)
+	}
+	if keep {
+		m.table.effectiveBackends[key] = backend
 	} else {
 		delete(m.table.effectiveBackends, key)
 	}

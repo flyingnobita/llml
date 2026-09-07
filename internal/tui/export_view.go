@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -153,7 +154,8 @@ func (m Model) exportVisibleCount() int {
 	return len(m.export.filteredIndices)
 }
 
-func (m *Model) setExportPathWidth() {
+// setExportPathWidth sizes the output-path input to the panel width.
+func (m Model) setExportPathWidth() Model {
 	cw := m.paramPanelContentWidth()
 	labelW := lipgloss.Width("Output: ")
 	promptW := lipgloss.Width(m.export.pathInput.Prompt)
@@ -163,6 +165,7 @@ func (m *Model) setExportPathWidth() {
 		inputW = 20
 	}
 	m.export.pathInput.SetWidth(inputW)
+	return m
 }
 
 func (m Model) exportRealCursorIndex() int {
@@ -184,11 +187,12 @@ func matchesExportFilter(it exportProfileItem, filter string) bool {
 		strings.Contains(strings.ToLower(it.backend), filter)
 }
 
-func (m *Model) rebuildExportFilter() {
+// rebuildExportFilter recomputes which item indices the current filter matches.
+func (m Model) rebuildExportFilter() Model {
 	filter := strings.ToLower(strings.TrimSpace(m.export.filterInput.Value()))
 	if filter == "" {
 		m.export.filteredIndices = nil
-		return
+		return m
 	}
 
 	indices := make([]int, 0)
@@ -237,6 +241,7 @@ func (m *Model) rebuildExportFilter() {
 		m.export.cursor = len(indices) - 1
 	}
 	m.export.scrollOffset = 0
+	return m
 }
 
 // exportMaxVisibleItems returns how many profile rows can fit in the terminal.
@@ -250,7 +255,7 @@ func (m Model) exportMaxVisibleItems() int {
 }
 
 // adjustExportScroll ensures the cursor is visible within the current scroll window.
-func (m *Model) adjustExportScroll() {
+func (m Model) adjustExportScroll() Model {
 	maxVis := m.exportMaxVisibleItems()
 	if m.export.cursor < m.export.scrollOffset {
 		m.export.scrollOffset = m.export.cursor
@@ -258,10 +263,19 @@ func (m *Model) adjustExportScroll() {
 	if m.export.cursor >= m.export.scrollOffset+maxVis {
 		m.export.scrollOffset = m.export.cursor - maxVis + 1
 	}
+	return m
+}
+
+// withExportItemsCloned returns a Model whose export items are safe to write
+// element-wise. Model is copied by value but a slice shares its backing array,
+// so writing items[i] on a copy would also change the original.
+func (m Model) withExportItemsCloned() Model {
+	m.export.items = slices.Clone(m.export.items)
+	return m
 }
 
 // syncHeaderStates updates each header's checked state based on visible profiles.
-func (m *Model) syncHeaderStates() {
+func (m Model) syncHeaderStates() Model {
 	items := m.exportVisibleItems()
 	groupChecked := make(map[string]bool)
 	groupAny := make(map[string]bool)
@@ -275,6 +289,7 @@ func (m *Model) syncHeaderStates() {
 			}
 		}
 	}
+	m = m.withExportItemsCloned()
 	for i := range m.export.items {
 		if m.export.items[i].kind == exportItemHeader {
 			key := m.export.items[i].modelKey
@@ -282,25 +297,27 @@ func (m *Model) syncHeaderStates() {
 			m.export.items[i].checked = ok && all && groupAny[key]
 		}
 	}
+	return m
 }
 
 // toggleGroup sets all profiles in the same group as the header at cursor
 // to the given checked state.
-func (m *Model) toggleGroup(checked bool) {
+func (m Model) toggleGroup(checked bool) Model {
 	idx := m.exportRealCursorIndex()
 	if idx < 0 || idx >= len(m.export.items) {
-		return
+		return m
 	}
 	header := m.export.items[idx]
 	if header.kind != exportItemHeader {
-		return
+		return m
 	}
+	m = m.withExportItemsCloned()
 	for i := range m.export.items {
 		if m.export.items[i].kind == exportItemProfile && m.export.items[i].modelKey == header.modelKey {
 			m.export.items[i].checked = checked
 		}
 	}
-	m.syncHeaderStates()
+	return m.syncHeaderStates()
 }
 
 func (m Model) updateExportKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
@@ -317,7 +334,7 @@ func (m Model) updateExportKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if isTabKey(msg) {
 			m.export.filterInput.Blur()
 			m.export.focus = exportFocusPath
-			m.setExportPathWidth()
+			m = m.setExportPathWidth()
 			m.export.pathInput.Focus()
 			m.export.pathInput.SetValue(m.export.outputPath)
 			m.export.pathInput.CursorEnd()
@@ -325,7 +342,7 @@ func (m Model) updateExportKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		var cmd tea.Cmd
 		m.export.filterInput, cmd = m.export.filterInput.Update(msg)
-		m.rebuildExportFilter()
+		m = m.rebuildExportFilter()
 		return m, cmd
 	}
 
@@ -335,7 +352,7 @@ func (m Model) updateExportKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.export.pathInput.Blur()
 			m.export.filterInput.Focus()
 			m.export.filterInput.CursorEnd()
-			m.rebuildExportFilter()
+			m = m.rebuildExportFilter()
 			return m, nil
 		}
 		if isEscapeKey(msg) {
@@ -362,7 +379,7 @@ func (m Model) updateExportKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	if isTabKey(msg) {
 		m.export.focus = exportFocusPath
-		m.setExportPathWidth()
+		m = m.setExportPathWidth()
 		m.export.pathInput.Focus()
 		m.export.pathInput.SetValue(m.export.outputPath)
 		m.export.pathInput.CursorEnd()
@@ -376,22 +393,23 @@ func (m Model) updateExportKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.export.focus = exportFocusFilter
 		m.export.filterInput.Focus()
 		m.export.filterInput.CursorEnd()
-		m.rebuildExportFilter()
+		m = m.rebuildExportFilter()
 		return m, nil
 	case "space":
 		idx := m.exportRealCursorIndex()
 		if idx >= 0 && idx < len(m.export.items) {
-			it := &m.export.items[idx]
-			switch it.kind {
+			switch m.export.items[idx].kind {
 			case exportItemHeader:
-				m.toggleGroup(!it.checked)
+				m = m.toggleGroup(!m.export.items[idx].checked)
 			case exportItemProfile:
-				it.checked = !it.checked
-				m.syncHeaderStates()
+				m = m.withExportItemsCloned()
+				m.export.items[idx].checked = !m.export.items[idx].checked
+				m = m.syncHeaderStates()
 			}
 		}
 		return m, nil
 	case "a":
+		m = m.withExportItemsCloned()
 		if m.export.filteredIndices != nil {
 			for _, idx := range m.export.filteredIndices {
 				if m.export.items[idx].kind == exportItemProfile {
@@ -405,9 +423,10 @@ func (m Model) updateExportKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				}
 			}
 		}
-		m.syncHeaderStates()
+		m = m.syncHeaderStates()
 		return m, nil
 	case "A":
+		m = m.withExportItemsCloned()
 		if m.export.filteredIndices != nil {
 			for _, idx := range m.export.filteredIndices {
 				if m.export.items[idx].kind == exportItemProfile {
@@ -421,29 +440,29 @@ func (m Model) updateExportKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				}
 			}
 		}
-		m.syncHeaderStates()
+		m = m.syncHeaderStates()
 		return m, nil
 	case "up", "k":
 		if m.export.cursor > 0 {
 			m.export.cursor--
-			m.adjustExportScroll()
+			m = m.adjustExportScroll()
 		}
 		return m, nil
 	case "down", "j":
 		if m.export.cursor < m.exportVisibleCount()-1 {
 			m.export.cursor++
-			m.adjustExportScroll()
+			m = m.adjustExportScroll()
 		}
 		return m, nil
 	case "ctrl+u":
 		pageSize := m.exportMaxVisibleItems()
 		m.export.cursor = max(m.export.cursor-pageSize, 0)
-		m.adjustExportScroll()
+		m = m.adjustExportScroll()
 		return m, nil
 	case "ctrl+d":
 		pageSize := m.exportMaxVisibleItems()
 		m.export.cursor = min(m.export.cursor+pageSize, m.exportVisibleCount()-1)
-		m.adjustExportScroll()
+		m = m.adjustExportScroll()
 		return m, nil
 	}
 	return m, nil
@@ -531,7 +550,7 @@ func (m Model) exportModalBlock() string {
 			listRows = append(listRows, "")
 		}
 	} else {
-		m.adjustExportScroll()
+		m = m.adjustExportScroll()
 		contentW := listInnerW - 2 // 1 for scrollbar glyph + 1 spacer
 		rowStyle := m.ui.styles.exportScrollRow.Width(contentW)
 
@@ -557,7 +576,7 @@ func (m Model) exportModalBlock() string {
 	// Output path.
 	pathLabel := "Output: "
 	if m.export.focus == exportFocusPath {
-		m.setExportPathWidth()
+		m = m.setExportPathWidth()
 		rows = append(rows, m.ui.styles.bodyBold.Render(pathLabel)+m.export.pathInput.View())
 	} else {
 		labelW := lipgloss.Width(bodyStyle.Render(pathLabel))
