@@ -24,222 +24,348 @@ import (
 // version is injected at link time by GoReleaser (-X main.version=...).
 var version = "dev"
 
+// cli carries the streams and terminal detection every subcommand needs, so no
+// command reaches for os.Stdout or os.Exit on its own. main is the only place
+// that touches the process.
+type cli struct {
+	stdin      io.Reader
+	stdout     io.Writer
+	stderr     io.Writer
+	isTerminal func() bool
+}
+
 func main() {
-	for _, arg := range os.Args[1:] {
-		switch arg {
-		case "-version", "--version", "-v":
-			fmt.Println(version)
-			return
+	os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
+}
+
+// run is main's body with the process boundary passed in, so tests can drive
+// every path with fake streams and read the exit code as a value. It returns
+// the process exit status; it never calls os.Exit.
+func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	c := cli{stdin: stdin, stdout: stdout, stderr: stderr, isTerminal: stdinIsTerminal}
+
+	if len(args) > 0 {
+		switch args[0] {
+		case "-h", "-help", "--help", "help":
+			printUsage(stdout)
+			return 0
 		}
 	}
-	if len(os.Args) >= 2 && os.Args[1] == "export" {
-		runExport(os.Args[2:])
-		return
+	for _, arg := range args {
+		switch arg {
+		case "-version", "--version", "-v":
+			fmt.Fprintln(stdout, version)
+			return 0
+		}
 	}
-	if len(os.Args) >= 2 && os.Args[1] == "import" {
-		runImport(os.Args[2:])
-		return
+	if len(args) == 0 {
+		return c.runTUI()
 	}
-	if err := userdata.MaybeBackupOnVersionChange(version); err != nil {
-		fmt.Fprintf(os.Stderr, "llml: warning: config backup: %v\n", err)
+
+	var err error
+	switch args[0] {
+	case "export":
+		err = c.runExport(args[1:])
+	case "import":
+		err = c.runImport(args[1:])
+	default:
+		// Anything else falls through to the TUI, which takes no arguments.
+		return c.runTUI()
 	}
-	if err := tui.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(1)
+	switch {
+	case err == nil:
+		return 0
+	case errors.Is(err, flag.ErrHelp):
+		// The flag set already printed the subcommand's usage.
+		return 0
+	case errors.Is(err, errCancelled):
+		// The user declined a prompt; that is not a failure.
+		return 0
+	default:
+		fmt.Fprintf(stderr, "llml: %v\n", err)
+		return 1
 	}
 }
 
-func runExport(args []string) {
-	fs := flag.NewFlagSet("llml export", flag.ExitOnError)
+// errCancelled means the user declined a prompt or the picker. It unwinds the
+// command but exits 0.
+var errCancelled = errors.New("cancelled")
+
+func printUsage(w io.Writer) {
+	fmt.Fprint(w, `llml - terminal UI for discovering and launching local LLMs
+
+Usage:
+  llml                      Start the terminal UI
+  llml export [flags]       Export parameter profiles to a portable TOML file
+  llml import [flags] SRC   Import profiles from a file or an https:// URL
+  llml --version            Print the version
+
+Run "llml export --help" or "llml import --help" for subcommand flags.
+`)
+}
+
+func (c cli) runTUI() int {
+	if err := userdata.MaybeBackupOnVersionChange(version); err != nil {
+		fmt.Fprintf(c.stderr, "llml: warning: config backup: %v\n", err)
+	}
+	if err := tui.Run(); err != nil {
+		fmt.Fprintf(c.stderr, "%v\n", err)
+		return 1
+	}
+	return 0
+}
+
+// newFlagSet returns a flag set that reports errors instead of exiting, so a
+// bad flag unwinds through run like any other error.
+func (c cli) newFlagSet(name string) *flag.FlagSet {
+	fs := flag.NewFlagSet(name, flag.ContinueOnError)
+	fs.SetOutput(c.stderr)
+	return fs
+}
+
+func (c cli) runExport(args []string) error {
+	fs := c.newFlagSet("llml export")
 	modelFilter := fs.String("model", "", "filter by model key (case-insensitive substring)")
 	profileFilter := fs.String("profile", "", "filter by profile name (case-insensitive substring)")
 	outputPath := fs.String("output", profiles.DefaultExportFilename(), "output file path")
 	force := fs.Bool("force", false, "overwrite without prompting")
 	all := fs.Bool("all", false, "export all profiles (default when no filters given)")
-	_ = fs.Parse(args)
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
 
 	allProfiles, err := profiles.AllToPortable()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "llml export: error reading profiles: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("export: reading profiles: %w", err)
 	}
 
-	var filtered []profiles.PortableProfile
-	hasModel := *modelFilter != ""
-	hasProfile := *profileFilter != ""
-	useAll := *all || (!hasModel && !hasProfile)
-
-	for _, p := range allProfiles {
-		if useAll {
-			filtered = append(filtered, p)
-			continue
-		}
-		modelMatch := !hasModel || strings.Contains(strings.ToLower(p.ModelHint), strings.ToLower(*modelFilter))
-		profileMatch := !hasProfile || strings.Contains(strings.ToLower(p.Name), strings.ToLower(*profileFilter))
-		if modelMatch && profileMatch {
-			filtered = append(filtered, p)
-		}
-	}
-
+	filtered := filterProfilesForExport(allProfiles, *modelFilter, *profileFilter, *all)
 	if len(filtered) == 0 {
-		fmt.Println("No profiles to export.")
-		os.Exit(0)
+		fmt.Fprintln(c.stdout, "No profiles to export.")
+		return nil
 	}
 
 	dest := *outputPath
 	if !filepath.IsAbs(dest) {
 		cwd, err := os.Getwd()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "llml export: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("export: %w", err)
 		}
 		dest = filepath.Join(cwd, dest)
 	}
 
 	if err := profiles.WritePortable(dest, filtered, *force); err != nil {
-		fmt.Fprintf(os.Stderr, "llml export: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("export: %w", err)
 	}
 
-	fmt.Printf("Exported %d profiles to %s\n", len(filtered), dest)
+	fmt.Fprintf(c.stdout, "Exported %d profiles to %s\n", len(filtered), dest)
+	return nil
 }
 
-func runImport(args []string) {
-	fs := flag.NewFlagSet("llml import", flag.ExitOnError)
+// filterProfilesForExport applies the --model and --profile substring filters.
+// With no filters, or with --all, everything is exported.
+func filterProfilesForExport(all []profiles.PortableProfile, modelFilter, profileFilter string, forceAll bool) []profiles.PortableProfile {
+	hasModel := modelFilter != ""
+	hasProfile := profileFilter != ""
+	if forceAll || (!hasModel && !hasProfile) {
+		return all
+	}
+	var out []profiles.PortableProfile
+	for _, p := range all {
+		modelMatch := !hasModel || strings.Contains(strings.ToLower(p.ModelHint), strings.ToLower(modelFilter))
+		profileMatch := !hasProfile || strings.Contains(strings.ToLower(p.Name), strings.ToLower(profileFilter))
+		if modelMatch && profileMatch {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// importOpts is the parsed form of the import subcommand's flags.
+type importOpts struct {
+	target   string
+	dryRun   bool
+	force    bool
+	activate bool
+	rescan   bool
+	yes      bool
+	source   string
+	isURL    bool
+}
+
+func (c cli) runImport(args []string) error {
+	opts, err := c.parseImportArgs(args)
+	if err != nil {
+		return err
+	}
+
+	f, err := c.loadPortable(opts)
+	if err != nil {
+		return err
+	}
+	if opts.activate && len(f.Profiles) > 1 {
+		return fmt.Errorf("import: --activate requires a single-profile file (got %d profiles)", len(f.Profiles))
+	}
+	if opts.dryRun {
+		fmt.Fprint(c.stdout, profiles.FormatPortablePreview(f, profiles.PreviewOpts{}))
+		return nil
+	}
+
+	targetModel, err := c.resolveImportTarget(f, opts)
+	if err != nil {
+		return err
+	}
+	return c.applyImport(f, targetModel, opts)
+}
+
+func (c cli) parseImportArgs(args []string) (importOpts, error) {
+	fs := c.newFlagSet("llml import")
 	target := fs.String("target", "", "local model path to attach imported profiles to")
 	dryRun := fs.Bool("dry-run", false, "parse and show profiles without writing")
 	force := fs.Bool("force", false, "overwrite existing profiles with same name")
 	activate := fs.Bool("activate", false, "set imported profile as active for the target model")
 	rescan := fs.Bool("rescan", false, "force fresh model discovery before picker")
 	yes := fs.Bool("yes", false, "skip confirmation prompt")
-	_ = fs.Parse(args)
-
+	if err := fs.Parse(args); err != nil {
+		return importOpts{}, err
+	}
 	if fs.NArg() < 1 {
-		fmt.Fprintf(os.Stderr, "usage: llml import [flags] <file.toml|https://...>\n")
-		os.Exit(1)
+		fs.Usage()
+		return importOpts{}, errors.New("import: a source file or https:// URL is required")
 	}
-	arg := fs.Arg(0)
+	src := fs.Arg(0)
+	return importOpts{
+		target:   *target,
+		dryRun:   *dryRun,
+		force:    *force,
+		activate: *activate,
+		rescan:   *rescan,
+		yes:      *yes,
+		source:   src,
+		isURL:    strings.HasPrefix(src, "https://"),
+	}, nil
+}
 
-	isURL := strings.HasPrefix(arg, "https://")
-
-	var f *profiles.PortableFile
-	var err error
-
-	if isURL {
-		f, err = profiles.FetchPortable(fsParseCtx(), arg)
-	} else {
-		f, err = profiles.ReadPortable(arg)
+// loadPortable reads the profile document from a file or a URL.
+func (c cli) loadPortable(opts importOpts) (*profiles.PortableFile, error) {
+	if !opts.isURL {
+		f, err := profiles.ReadPortable(opts.source)
+		if err != nil {
+			return nil, fmt.Errorf("import: %w", err)
+		}
+		return f, nil
 	}
+	// A fetch can hang, so let the user interrupt it.
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer cancel()
+	f, err := profiles.FetchPortable(ctx, opts.source)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "llml import: %v\n", err)
-		os.Exit(1)
+		return nil, fmt.Errorf("import: %w", err)
 	}
+	return f, nil
+}
 
-	if *activate && len(f.Profiles) > 1 {
-		fmt.Fprintf(os.Stderr, "llml import: --activate requires a single-profile file (got %d profiles)\n", len(f.Profiles))
-		os.Exit(1)
-	}
-
-	if *dryRun {
-		fmt.Print(profiles.FormatPortablePreview(f, profiles.PreviewOpts{}))
-		return
-	}
-
-	targetModel := *target
-
-	if targetModel == "" && !isURL {
-		fmt.Fprintf(os.Stderr, "llml import: --target is required (local model path to attach profiles to)\n")
-		os.Exit(1)
-	}
-
-	if isURL {
-		if targetModel == "" {
-			var pickErr error
-			targetModel, pickErr = pickTargetModel(f.Profiles, *rescan, stdinIsTerminal)
-			if pickErr != nil {
-				fmt.Fprintf(os.Stderr, "llml import: %v\n", pickErr)
-				os.Exit(1)
-			}
-		} else {
-			if err := validateTargetBackend(targetModel, f.Profiles, *rescan); err != nil {
-				fmt.Fprintf(os.Stderr, "llml import: %v\n", err)
-				os.Exit(1)
-			}
+// resolveImportTarget decides which model the profiles attach to, prompting or
+// validating as needed, and confirms the import on the URL path.
+func (c cli) resolveImportTarget(f *profiles.PortableFile, opts importOpts) (string, error) {
+	if !opts.isURL {
+		if opts.target == "" {
+			return "", errors.New("import: --target is required (local model path to attach profiles to)")
 		}
+		return opts.target, nil
+	}
 
-		preview := profiles.FormatPortablePreview(f, profiles.PreviewOpts{TargetModel: targetModel})
-		fmt.Print(preview)
+	targetModel := opts.target
+	if targetModel == "" {
+		picked, err := c.pickTargetModel(f.Profiles, opts.rescan)
+		if err != nil {
+			return "", fmt.Errorf("import: %w", err)
+		}
+		targetModel = picked
+	} else if err := c.validateTargetBackend(targetModel, f.Profiles, opts.rescan); err != nil {
+		return "", fmt.Errorf("import: %w", err)
+	}
 
-		if !*yes {
-			fmt.Print("\nSave this profile? [y/N]: ")
-			var response string
-			_, _ = fmt.Scanln(&response)
-			response = strings.TrimSpace(strings.ToLower(response))
-			if response != "y" && response != "yes" {
-				fmt.Println("Cancelled.")
-				os.Exit(0)
-			}
+	fmt.Fprint(c.stdout, profiles.FormatPortablePreview(f, profiles.PreviewOpts{TargetModel: targetModel}))
+	if !opts.yes {
+		if err := c.confirmImport(); err != nil {
+			return "", err
 		}
 	}
+	return targetModel, nil
+}
 
-	var imported []profiles.Profile
+// confirmImport asks for consent before writing. A declined prompt returns
+// errCancelled, which run treats as a clean exit.
+func (c cli) confirmImport() error {
+	fmt.Fprint(c.stdout, "\nSave this profile? [y/N]: ")
+	scanner := bufio.NewScanner(c.stdin)
+	response := ""
+	if scanner.Scan() {
+		response = strings.TrimSpace(strings.ToLower(scanner.Text()))
+	}
+	if response != "y" && response != "yes" {
+		fmt.Fprintln(c.stdout, "Cancelled.")
+		return errCancelled
+	}
+	return nil
+}
+
+// applyImport converts, warns, writes, and reports.
+func (c cli) applyImport(f *profiles.PortableFile, targetModel string, opts importOpts) error {
+	imported := make([]profiles.Profile, 0, len(f.Profiles))
 	for _, pp := range f.Profiles {
 		p := profiles.PortableToProfile(pp)
-		if _, _, droppedEnv, droppedArgs := profiles.StripModelLocationParams(p.Backend,
-			pp.Env, pp.Args); len(droppedEnv) > 0 || len(droppedArgs) > 0 {
-			for _, d := range droppedEnv {
-				fmt.Fprintf(os.Stderr, "warning: stripped model-location env %s from profile %q\n", d, p.Name)
-			}
-			for _, d := range droppedArgs {
-				fmt.Fprintf(os.Stderr, "warning: stripped model-location arg %s from profile %q\n", d, p.Name)
-			}
-		}
+		c.warnStrippedParams(pp, p)
 		if targetModel != "" && pp.ModelHint != "" && modelHintsDiffer(pp.ModelHint, targetModel) {
-			targetHint := profiles.ModelHint(targetModel)
-			fmt.Fprintf(os.Stderr, "warning: profile %q was created for %q but is being imported to %q\n", p.Name, pp.ModelHint, targetHint)
+			fmt.Fprintf(c.stderr, "warning: profile %q was created for %q but is being imported to %q\n",
+				p.Name, pp.ModelHint, profiles.ModelHint(targetModel))
 		}
-
 		imported = append(imported, p)
 	}
 
-	result, err := profiles.ImportProfiles(targetModel, imported, *force)
+	result, err := profiles.ImportProfiles(targetModel, imported, opts.force)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "llml import: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("import: %w", err)
 	}
-
-	if *activate && len(imported) == 1 {
+	if opts.activate && len(imported) == 1 {
 		if err := profiles.SetActiveProfile(targetModel, imported[0].Name); err != nil {
-			fmt.Fprintf(os.Stderr, "llml import: setting active profile: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("import: setting active profile: %w", err)
 		}
 	}
 
-	fmt.Printf("Imported to %s: %d added", targetModel, result.Added)
+	fmt.Fprintf(c.stdout, "Imported to %s: %d added", targetModel, result.Added)
 	if result.Replaced > 0 {
-		fmt.Printf(", %d replaced", result.Replaced)
+		fmt.Fprintf(c.stdout, ", %d replaced", result.Replaced)
 	}
 	if result.Skipped > 0 {
-		fmt.Printf(", %d skipped (name conflict, use --force to overwrite)", result.Skipped)
+		fmt.Fprintf(c.stdout, ", %d skipped (name conflict, use --force to overwrite)", result.Skipped)
 	}
-	fmt.Println()
+	fmt.Fprintln(c.stdout)
+	return nil
 }
 
-// fsParseCtx returns a context for use during flag-set parsing / fetch operations.
-func fsParseCtx() context.Context {
-	return context.Background()
+// warnStrippedParams reports the model-location parameters import dropped, so
+// the user is not surprised that a flag they wrote is missing.
+func (c cli) warnStrippedParams(pp profiles.PortableProfile, p profiles.Profile) {
+	_, _, droppedEnv, droppedArgs := profiles.StripModelLocationParams(p.Backend, pp.Env, pp.Args)
+	for _, d := range droppedEnv {
+		fmt.Fprintf(c.stderr, "warning: stripped model-location env %s from profile %q\n", d, p.Name)
+	}
+	for _, d := range droppedArgs {
+		fmt.Fprintf(c.stderr, "warning: stripped model-location arg %s from profile %q\n", d, p.Name)
+	}
 }
 
 // pickTargetModel resolves a target model for URL imports. It uses cached discovery
 // when available, auto-runs discovery on empty cache (2A-revised), and presents an
 // interactive picker filtered by backend compatibility.
-// isTerminal reports whether the picker can be shown interactively. Passing it
-// in keeps stdin detection out of the discovery logic and lets tests drive both
-// branches without a package-level override.
-func pickTargetModel(portableProfiles []profiles.PortableProfile, rescan bool, isTerminal func() bool) (string, error) {
+// Terminal detection and the input stream come from the cli value, so tests can
+// drive both branches without a package-level override.
+func (c cli) pickTargetModel(portableProfiles []profiles.PortableProfile, rescan bool) (string, error) {
 	backends := uniqueBackendsFromPortable(portableProfiles)
 
-	modelFiles, err := resolveModels(rescan)
+	modelFiles, err := c.resolveModels(rescan)
 	if err != nil {
 		return "", fmt.Errorf("model discovery failed: %w", err)
 	}
@@ -255,20 +381,20 @@ func pickTargetModel(portableProfiles []profiles.PortableProfile, rescan bool, i
 			strings.Join(backends, ", "), strings.Join(discovered, ", "))
 	}
 
-	if !isTerminal() {
-		return "", fmt.Errorf("not a terminal and no --target provided; cannot show picker")
+	if !c.isTerminal() {
+		return "", errors.New("not a terminal and no --target provided; cannot show picker")
 	}
 
-	return presentModelPicker(compatible, os.Stdin)
+	return c.presentModelPicker(compatible)
 }
 
 // validateTargetBackend checks that the given target model is compatible with the
 // profiles' backends. It runs discovery if needed and returns an error when the
 // target is found but its backend doesn't match.
-func validateTargetBackend(target string, portables []profiles.PortableProfile, rescan bool) error {
+func (c cli) validateTargetBackend(target string, portables []profiles.PortableProfile, rescan bool) error {
 	backends := uniqueBackendsFromPortable(portables)
 
-	modelFiles, err := resolveModels(rescan)
+	modelFiles, err := c.resolveModels(rescan)
 	if err != nil {
 		return err
 	}
@@ -300,25 +426,25 @@ func validateTargetBackend(target string, portables []profiles.PortableProfile, 
 // resolveModels returns cached or freshly-scanned models based on the rescan flag
 // and cache freshness. A scan resolves settings from the environment, config.toml,
 // and the built-in defaults, in that order of precedence.
-func resolveModels(rescan bool) ([]models.ModelFile, error) {
+func (c cli) resolveModels(rescan bool) ([]models.ModelFile, error) {
 	scan := func() ([]models.ModelFile, error) {
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 		defer cancel()
 		return config.RunDiscovery(ctx, config.Resolve(settings.OSGetenv))
 	}
 	if rescan {
-		fmt.Fprintln(os.Stderr, "Scanning local models...")
+		fmt.Fprintln(c.stderr, "Scanning local models...")
 		return scan()
 	}
 	modelFiles, err := config.CachedModels()
 	var stale *config.CacheStaleError
 	if errors.As(err, &stale) {
-		fmt.Fprintf(os.Stderr, "Discovery cache is stale (last scan: %s). Scanning local models...\n",
+		fmt.Fprintf(c.stderr, "Discovery cache is stale (last scan: %s). Scanning local models...\n",
 			stale.LastScan.Format("2006-01-02 15:04:05"))
 		return scan()
 	}
 	if err == nil && len(modelFiles) == 0 {
-		fmt.Fprintln(os.Stderr, "Scanning local models...")
+		fmt.Fprintln(c.stderr, "Scanning local models...")
 		return scan()
 	}
 	return modelFiles, err
@@ -352,31 +478,30 @@ func stdinIsTerminal() bool {
 }
 
 // presentModelPicker shows a numbered list of models and reads a selection from r.
-func presentModelPicker(models []models.ModelFile, r io.Reader) (string, error) {
-	fmt.Fprintf(os.Stderr, "\nCompatible local models:\n")
-	for i, m := range models {
-		loc := m.DisplayLocation()
-		fmt.Fprintf(os.Stderr, "  %d) %s  (%s, %s)\n", i+1, m.Name, m.Backend.String(), loc)
+func (c cli) presentModelPicker(candidates []models.ModelFile) (string, error) {
+	fmt.Fprintf(c.stderr, "\nCompatible local models:\n")
+	for i, m := range candidates {
+		fmt.Fprintf(c.stderr, "  %d) %s  (%s, %s)\n", i+1, m.Name, m.Backend.String(), m.DisplayLocation())
 	}
-	fmt.Fprintf(os.Stderr, "\nPick a model (1-%d) or q to cancel: ", len(models))
+	fmt.Fprintf(c.stderr, "\nPick a model (1-%d) or q to cancel: ", len(candidates))
 
-	scanner := bufio.NewScanner(r)
+	scanner := bufio.NewScanner(c.stdin)
 	for scanner.Scan() {
 		input := strings.TrimSpace(scanner.Text())
 		if input == "q" || input == "Q" {
-			return "", fmt.Errorf("cancelled")
+			return "", errCancelled
 		}
 		n, convErr := strconv.Atoi(input)
-		if convErr != nil || n < 1 || n > len(models) {
-			fmt.Fprintf(os.Stderr, "Pick a model (1-%d) or q to cancel: ", len(models))
+		if convErr != nil || n < 1 || n > len(candidates) {
+			fmt.Fprintf(c.stderr, "Pick a model (1-%d) or q to cancel: ", len(candidates))
 			continue
 		}
-		return models[n-1].Identity(), nil
+		return candidates[n-1].Identity(), nil
 	}
 	if err := scanner.Err(); err != nil {
 		return "", fmt.Errorf("reading input: %w", err)
 	}
-	return "", fmt.Errorf("cancelled")
+	return "", errCancelled
 }
 
 // modelHintsDiffer returns true when the profile's model_hint and the target

@@ -22,6 +22,15 @@ linters:
     govet:
       disable:
         - fieldalignment
+    errcheck:
+      # Writes to the CLI's own stdout/stderr. A failure there cannot be
+      # reported (the place to report it is what failed) and is not
+      # actionable, so checking these returns would add noise, not safety.
+      # Every other io.Writer error is still checked.
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
 
   exclusions:
     generated: strict

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -62,7 +63,7 @@ func TestPresentModelPicker_SelectFirst(t *testing.T) {
 		{Backend: models.BackendLlama, Path: "/m2.gguf", Name: "m2.gguf"},
 	}
 	r := strings.NewReader("1\n")
-	got, err := presentModelPicker(mdls, r)
+	got, err := testCLI(r).presentModelPicker(mdls)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +77,7 @@ func TestPresentModelPicker_Cancel(t *testing.T) {
 		{Backend: models.BackendLlama, Path: "/m1.gguf", Name: "m1.gguf"},
 	}
 	r := strings.NewReader("q\n")
-	_, err := presentModelPicker(mdls, r)
+	_, err := testCLI(r).presentModelPicker(mdls)
 	if err == nil {
 		t.Fatal("expected cancel error")
 	}
@@ -90,7 +91,7 @@ func TestPresentModelPicker_InvalidThenSelect(t *testing.T) {
 		{Backend: models.BackendLlama, Path: "/m1.gguf", Name: "m1.gguf"},
 	}
 	r := strings.NewReader("abc\n5\n1\n")
-	got, err := presentModelPicker(mdls, r)
+	got, err := testCLI(r).presentModelPicker(mdls)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +105,7 @@ func TestPresentModelPicker_OutOfRange(t *testing.T) {
 		{Backend: models.BackendLlama, Path: "/m1.gguf", Name: "m1.gguf"},
 	}
 	r := strings.NewReader("0\n2\n")
-	_, err := presentModelPicker(mdls, r)
+	_, err := testCLI(r).presentModelPicker(mdls)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -115,7 +116,7 @@ func TestPresentModelPicker_EOF(t *testing.T) {
 		{Backend: models.BackendLlama, Path: "/m1.gguf", Name: "m1.gguf"},
 	}
 	r := strings.NewReader("")
-	_, err := presentModelPicker(mdls, r)
+	_, err := testCLI(r).presentModelPicker(mdls)
 	if err == nil {
 		t.Fatal("expected cancel error on EOF")
 	}
@@ -126,7 +127,7 @@ func TestPresentModelPicker_OllamaIdentity(t *testing.T) {
 		{Backend: models.BackendOllama, ID: "qwen3.5:latest", Location: "ollama://qwen3.5:latest", Name: "qwen3.5:latest"},
 	}
 	r := strings.NewReader("1\n")
-	got, err := presentModelPicker(mdls, r)
+	got, err := testCLI(r).presentModelPicker(mdls)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,6 +138,12 @@ func TestPresentModelPicker_OllamaIdentity(t *testing.T) {
 
 // notATerminal drives the non-interactive branch of pickTargetModel.
 func notATerminal() bool { return false }
+
+// testCLI returns a cli wired to the given stdin and to discarded output, for
+// tests that only care about the returned error.
+func testCLI(stdin io.Reader) cli {
+	return cli{stdin: stdin, stdout: io.Discard, stderr: io.Discard, isTerminal: notATerminal}
+}
 
 // pickTargetModel tests — these pass notATerminal so we test
 // error paths without hitting stdin. Ollama API is disabled via dead host.
@@ -169,7 +176,7 @@ func TestPickTargetModel_NoCachedModels(t *testing.T) {
 	// No config.toml — CachedModels returns nil,nil.
 	// Auto-runs discovery, finds nothing → "no local model files found".
 	pp := []profiles.PortableProfile{{Backend: "llama"}}
-	_, err := pickTargetModel(pp, false, notATerminal)
+	_, err := testCLI(nil).pickTargetModel(pp, false)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -195,7 +202,7 @@ func TestPickTargetModel_NoCompatibleBackend(t *testing.T) {
 
 	// Profile requests vllm backend, but only llama models are on disk.
 	pp := []profiles.PortableProfile{{Backend: "vllm"}}
-	_, err := pickTargetModel(pp, false, notATerminal)
+	_, err := testCLI(nil).pickTargetModel(pp, false)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -227,7 +234,7 @@ func TestPickTargetModel_NonTTY(t *testing.T) {
 	}
 
 	pp := []profiles.PortableProfile{{Backend: "llama"}}
-	_, err := pickTargetModel(pp, false, notATerminal)
+	_, err := testCLI(nil).pickTargetModel(pp, false)
 	if err == nil {
 		t.Fatal("expected non-TTY error")
 	}
@@ -263,7 +270,7 @@ func TestPickTargetModel_StaleCache(t *testing.T) {
 	}
 
 	pp := []profiles.PortableProfile{{Backend: "llama"}}
-	_, err := pickTargetModel(pp, false, notATerminal)
+	_, err := testCLI(nil).pickTargetModel(pp, false)
 	// Stale cache → rescan → finds model → non-TTY error (mocked).
 	if err == nil {
 		t.Fatal("expected error after rescan")
@@ -289,7 +296,7 @@ func TestPickTargetModel_Rescan(t *testing.T) {
 	t.Setenv(settings.EnvModelPaths, modelsDir)
 
 	pp := []profiles.PortableProfile{{Backend: "llama"}}
-	_, err := pickTargetModel(pp, true, notATerminal) // --rescan
+	_, err := testCLI(nil).pickTargetModel(pp, true) // --rescan
 	if err == nil {
 		t.Fatal("expected non-TTY error after rescan")
 	}
@@ -304,7 +311,7 @@ func TestPickTargetModel_EmptyDiscovery(t *testing.T) {
 	disableTerminal(t)
 
 	pp := []profiles.PortableProfile{{Backend: "llama"}}
-	_, err := pickTargetModel(pp, false, notATerminal)
+	_, err := testCLI(nil).pickTargetModel(pp, false)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -330,7 +337,7 @@ func TestValidateTargetBackend_Compatible(t *testing.T) {
 	}
 
 	pp := []profiles.PortableProfile{{Backend: "llama"}}
-	err := validateTargetBackend("/m.gguf", pp, false)
+	err := testCLI(nil).validateTargetBackend("/m.gguf", pp, false)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -351,7 +358,7 @@ func TestValidateTargetBackend_Incompatible(t *testing.T) {
 	}
 
 	pp := []profiles.PortableProfile{{Backend: "vllm"}}
-	err := validateTargetBackend("/m.gguf", pp, false)
+	err := testCLI(nil).validateTargetBackend("/m.gguf", pp, false)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -376,7 +383,7 @@ func TestValidateTargetBackend_TargetNotInCache(t *testing.T) {
 
 	pp := []profiles.PortableProfile{{Backend: "llama"}}
 	// Target not in discovered models — should pass (user knows better).
-	err := validateTargetBackend("/m.gguf", pp, false)
+	err := testCLI(nil).validateTargetBackend("/m.gguf", pp, false)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -389,7 +396,7 @@ func TestValidateTargetBackend_EmptyCache(t *testing.T) {
 	pp := []profiles.PortableProfile{{Backend: "llama"}}
 	// No cache, no models on disk — resolveModels returns empty, validateTargetBackend
 	// returns nil (lets user proceed).
-	err := validateTargetBackend("/m.gguf", pp, false)
+	err := testCLI(nil).validateTargetBackend("/m.gguf", pp, false)
 	if err != nil {
 		t.Fatalf("expected no error on empty cache, got %v", err)
 	}
@@ -410,7 +417,7 @@ func TestValidateTargetBackend_OllamaTarget(t *testing.T) {
 	}
 
 	pp := []profiles.PortableProfile{{Backend: "ollama"}}
-	err := validateTargetBackend("qwen3.5:latest", pp, false)
+	err := testCLI(nil).validateTargetBackend("qwen3.5:latest", pp, false)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -432,7 +439,7 @@ func TestValidateTargetBackend_Rescan(t *testing.T) {
 
 	pp := []profiles.PortableProfile{{Backend: "vllm"}}
 	// Rescan finds llama models, but profile wants vllm → incompatible.
-	err := validateTargetBackend(filepath.Join(modelsDir, "test.gguf"), pp, true)
+	err := testCLI(nil).validateTargetBackend(filepath.Join(modelsDir, "test.gguf"), pp, true)
 	if err == nil {
 		t.Fatal("expected error")
 	}
