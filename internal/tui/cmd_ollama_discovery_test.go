@@ -109,7 +109,7 @@ func TestApplyAndFullScanCmd_StartsOllamaForDiscovery(t *testing.T) {
 		return []models.ModelFile{testOllamaRow("live:latest")}, nil
 	}
 
-	msgs := collectCmdMsgs(t, svc.applyAndFullScanCmd(t.Context()))
+	msgs := collectCmdMsgs(t, svc.discoveryScanCmd(t.Context(), scanModeFull))
 	if len(msgs) != 2 {
 		t.Fatalf("got %d msgs", len(msgs))
 	}
@@ -120,10 +120,11 @@ func TestApplyAndFullScanCmd_StartsOllamaForDiscovery(t *testing.T) {
 	if !strings.Contains(started.note, "Starting Ollama") {
 		t.Fatalf("started note %q", started.note)
 	}
-	done, ok := msgs[1].(fullScanDoneMsg)
+	scan, ok := msgs[1].(scanDoneMsg)
 	if !ok {
 		t.Fatalf("msg[1] %T", msgs[1])
 	}
+	done := scan.result
 	if !done.runtime.OllamaRunning {
 		t.Fatal("expected runtime refresh after successful startup")
 	}
@@ -306,8 +307,8 @@ func TestApplyAndFullScanCmd_FailedStartupMergesCachedOllamaRows(t *testing.T) {
 		}, nil
 	}
 
-	msgs := collectCmdMsgs(t, svc.applyAndFullScanCmd(t.Context()))
-	done := msgs[len(msgs)-1].(fullScanDoneMsg)
+	msgs := collectCmdMsgs(t, svc.discoveryScanCmd(t.Context(), scanModeFull))
+	done := msgs[len(msgs)-1].(scanDoneMsg).result
 	if done.ollamaNote != "" {
 		t.Fatalf("note %q", done.ollamaNote)
 	}
@@ -345,8 +346,8 @@ func TestApplyAndFullScanCmd_FailedStartupWithoutCacheKeepsNonOllamaRows(t *test
 		}, nil
 	}
 
-	msgs := collectCmdMsgs(t, svc.applyAndFullScanCmd(t.Context()))
-	done := msgs[len(msgs)-1].(fullScanDoneMsg)
+	msgs := collectCmdMsgs(t, svc.discoveryScanCmd(t.Context(), scanModeFull))
+	done := msgs[len(msgs)-1].(scanDoneMsg).result
 	if len(done.files) != 1 || done.files[0].Backend != models.BackendLlama {
 		t.Fatalf("files %+v", done.files)
 	}
@@ -381,8 +382,8 @@ func TestRescanModelsCmd_StartsOllamaAndReturnsDiscoveryNote(t *testing.T) {
 		return []models.ModelFile{testOllamaRow("live:latest")}, nil
 	}
 
-	msgs := collectCmdMsgs(t, svc.rescanModelsCmd(t.Context(), "/models"))
-	done := msgs[len(msgs)-1].(modelRescanDoneMsg)
+	msgs := collectCmdMsgs(t, svc.discoveryScanCmd(t.Context(), scanModeModelsOnly, "/models"))
+	done := msgs[len(msgs)-1].(scanDoneMsg).result
 	if !strings.Contains(done.ollamaNote, "Started Ollama for model discovery") {
 		t.Fatalf("note %q", done.ollamaNote)
 	}
@@ -425,11 +426,14 @@ func TestUpdate_OllamaDiscoveryMessages(t *testing.T) {
 		t.Fatalf("current status %q", m.alerts.current)
 	}
 
-	next, cmd = m.Update(fullScanDoneMsg{
-		runtime:    models.RuntimeInfo{},
-		files:      []models.ModelFile{},
-		lastScan:   time.Now(),
-		ollamaWarn: "startup failed",
+	next, cmd = m.Update(scanDoneMsg{
+		mode: scanModeFull,
+		result: scanResult{
+			runtime:    models.RuntimeInfo{},
+			files:      []models.ModelFile{},
+			lastScan:   time.Now(),
+			ollamaWarn: "startup failed",
+		},
 	})
 	m = next.(Model)
 	if m.alerts.current != "" {

@@ -48,19 +48,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.applyScanResult(&msg.runtime, msg.files, msg.lastScan, msg.configPaths, msg.writeErr, true)
 
 	case startupNeedFullScanMsg:
-		return m.startScan(scanStartFull)
+		return m.startScan(scanModeFull)
 
-	case fullScanDoneMsg:
+	case scanDoneMsg:
 		m = m.cancelInFlightScan()
-		m.settings = msg.settings
-		m2, cmd := m.applyScanResult(&msg.runtime, msg.files, msg.lastScan, msg.configPaths, msg.writeErr, true)
-		return applyOllamaDiscoveryResult(m2, cmd, msg.ollamaNote, msg.ollamaWarn)
-
-	case modelRescanDoneMsg:
-		m = m.cancelInFlightScan()
-		m.settings = msg.settings
-		m2, cmd := m.applyScanResult(nil, msg.files, msg.lastScan, msg.configPaths, msg.writeErr, false)
-		return applyOllamaDiscoveryResult(m2, cmd, msg.ollamaNote, msg.ollamaWarn)
+		res := msg.result
+		m.settings = res.settings
+		// A full pass also adopts the refreshed runtime; a models-only rescan
+		// leaves whatever the last runtime probe found in place.
+		var runtime *models.RuntimeInfo
+		if msg.mode == scanModeFull {
+			runtime = &res.runtime
+		}
+		m2, cmd := m.applyScanResult(runtime, res.files, res.lastScan, res.configPaths, res.writeErr, msg.mode == scanModeFull)
+		return applyOllamaDiscoveryResult(m2, cmd, res.ollamaNote, res.ollamaWarn)
 
 	case runtimeReloadErrMsg:
 		m = m.addAlert(alertSeverityError, "Config", msg.err.Error())
@@ -499,7 +500,7 @@ func (m Model) tryRescan(allowWhileExited bool) (Model, tea.Cmd) {
 	m.loading = true
 	m.loadErr = nil
 	m = m.withLastRunCleared()
-	return m.startScan(scanStartModelsOnly)
+	return m.startScan(scanModeModelsOnly)
 }
 
 // tryReloadRuntime initiates a runtime reload if preconditions allow.

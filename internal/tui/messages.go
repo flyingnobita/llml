@@ -21,10 +21,17 @@ type modelsLoadedMsg struct {
 	files []models.ModelFile
 }
 
-// startupNeedFullScanMsg triggers a full runtime probe and model discovery (writes config.toml).
+// scanDoneMsg completes one discovery pass. mode says whether the refreshed
+// runtime in the result should be applied.
+type scanDoneMsg struct {
+	mode   scanMode
+	result scanResult
+}
+
+// startupNeedFullScanMsg triggers a full runtime probe and model discovery.
 type startupNeedFullScanMsg struct{}
 
-// startupCacheHitMsg loads models from config.toml cache (no filesystem walk).
+// startupCacheHitMsg loads models from the discovery cache (no filesystem walk).
 type startupCacheHitMsg struct {
 	// settings are the values this scan resolved and wrote; the model adopts them.
 	settings    settings.Settings
@@ -33,31 +40,6 @@ type startupCacheHitMsg struct {
 	lastScan    time.Time
 	configPaths []string
 	writeErr    error
-}
-
-// fullScanDoneMsg completes a full discovery pass (startup or refresh-all path).
-type fullScanDoneMsg struct {
-	// settings are the values this scan resolved and wrote; the model adopts them.
-	settings    settings.Settings
-	runtime     models.RuntimeInfo
-	files       []models.ModelFile
-	writeErr    error
-	lastScan    time.Time
-	configPaths []string
-	ollamaNote  string
-	ollamaWarn  string
-}
-
-// modelRescanDoneMsg completes an S-key model-only re-scan.
-type modelRescanDoneMsg struct {
-	// settings are the values this scan resolved and wrote; the model adopts them.
-	settings    settings.Settings
-	files       []models.ModelFile
-	writeErr    error
-	lastScan    time.Time
-	configPaths []string
-	ollamaNote  string
-	ollamaWarn  string
 }
 
 // runtimeReloadErrMsg reports failure to reload [runtime] from config.toml (r key).

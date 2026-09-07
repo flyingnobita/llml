@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
+- Sep-07, 2026 - 08:44 AM +0800 - [TUI internals: collapse the two near-identical discovery scan commands and their two done-messages into one discoveryScanCmd with a scanMode and a single scanResult struct, replacing a seven-value return that needed a lint suppression]
 - Sep-07, 2026 - 08:42 AM +0800 - [TUI internals: give Model one receiver convention (all value receivers) and make its mutable map and slice fields copy-on-write, so copying a Model no longer shares state with the original]
 - Sep-07, 2026 - 08:37 AM +0800 - [Config: move the model discovery cache out of config.toml into {UserConfigDir}/llml/cache/models.toml (schema_version 4). config.toml is now user-owned and rewritten only when you save from the c or m panels, so a model scan no longer touches it; a version 3 file is migrated once on first read, after a backup]
 - Sep-07, 2026 - 08:27 AM +0800 - [Cancellation and HTTP hygiene: every network and subprocess call now takes a context, so a hung Ollama daemon can no longer stall startup, r, or S; runtime probes run concurrently; model discovery is filesystem-only with Ollama rows merged by the caller; internal/models shares one HTTP client with keep-alives instead of allocating one per call]

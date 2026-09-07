@@ -164,7 +164,7 @@ func (m Model) saveDiscoveryPaths() (Model, tea.Cmd) {
 	m = m.withLastRunSuccess("Model Paths Saved. Rescanning Models...")
 	m.loading = true
 	m.loadErr = nil
-	m, scan := m.startScan(scanStartModelsOnly, m.discovery.paths...)
+	m, scan := m.startScan(scanModeModelsOnly, m.discovery.paths...)
 	return m, tea.Batch(scan, clearLastRunNoteAfterCmd())
 }
 

@@ -10,15 +10,15 @@ import (
 	"github.com/flyingnobita/llml/internal/config"
 )
 
-// extractModelRescanDoneMsg walks nested tea.BatchMsg trees (e.g. rescanModelsCmd when
+// extractModelRescanDoneMsg walks nested tea.BatchMsg trees (e.g. discoveryScanCmd when
 // Ollama is installed but stopped returns a batch before the scan completes).
-func extractModelRescanDoneMsg(msg tea.Msg) (modelRescanDoneMsg, bool) {
-	if rm, ok := msg.(modelRescanDoneMsg); ok {
+func extractModelRescanDoneMsg(msg tea.Msg) (scanDoneMsg, bool) {
+	if rm, ok := msg.(scanDoneMsg); ok {
 		return rm, true
 	}
 	batch, ok := msg.(tea.BatchMsg)
 	if !ok {
-		return modelRescanDoneMsg{}, false
+		return scanDoneMsg{}, false
 	}
 	for _, c := range batch {
 		if c == nil {
@@ -28,12 +28,12 @@ func extractModelRescanDoneMsg(msg tea.Msg) (modelRescanDoneMsg, bool) {
 			return rm, true
 		}
 	}
-	return modelRescanDoneMsg{}, false
+	return scanDoneMsg{}, false
 }
 
-// modelRescanFromSaveCmd unwraps modelRescanDoneMsg from saveDiscoveryPaths tea.Cmd
+// modelRescanFromSaveCmd unwraps scanDoneMsg from saveDiscoveryPaths tea.Cmd
 // (either a direct rescan cmd or tea.Batch with rescan + clearLastRunNoteAfterCmd).
-func modelRescanFromSaveCmd(t *testing.T, cmd tea.Cmd) modelRescanDoneMsg {
+func modelRescanFromSaveCmd(t *testing.T, cmd tea.Cmd) scanDoneMsg {
 	t.Helper()
 	if cmd == nil {
 		t.Fatal("expected non-nil cmd")
@@ -41,8 +41,8 @@ func modelRescanFromSaveCmd(t *testing.T, cmd tea.Cmd) modelRescanDoneMsg {
 	if rm, ok := extractModelRescanDoneMsg(cmd()); ok {
 		return rm
 	}
-	t.Fatal("expected modelRescanDoneMsg in cmd output tree")
-	return modelRescanDoneMsg{}
+	t.Fatal("expected scanDoneMsg in cmd output tree")
+	return scanDoneMsg{}
 }
 
 func TestDiscoveryPathsModal_opensAndLoadsPaths(t *testing.T) {
@@ -210,7 +210,7 @@ func TestDiscoveryPathsModal_SaveTriggersRescanIfChanged(t *testing.T) {
 		t.Fatalf("got note: %s", m2.lastRunNote)
 	}
 	if cmd == nil {
-		t.Fatal("expected rescanModelsCmd, got nil")
+		t.Fatal("expected a scan command, got nil")
 	}
 
 	_ = modelRescanFromSaveCmd(t, cmd)
@@ -296,8 +296,8 @@ func TestDiscoveryPathsModal_E2EFlow(t *testing.T) {
 	rescanMsg := modelRescanFromSaveCmd(t, cmd)
 
 	// Check state from msg
-	if len(rescanMsg.configPaths) != 1 || rescanMsg.configPaths[0] != "/e2e/test/path" {
-		t.Fatalf("expected path in rescan message, got %v", rescanMsg.configPaths)
+	if len(rescanMsg.result.configPaths) != 1 || rescanMsg.result.configPaths[0] != "/e2e/test/path" {
+		t.Fatalf("expected path in rescan message, got %v", rescanMsg.result.configPaths)
 	}
 
 	// Verify config written to disk
