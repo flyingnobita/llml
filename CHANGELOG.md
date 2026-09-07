@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
+- Sep-07, 2026 - 08:37 AM +0800 - [Config: move the model discovery cache out of config.toml into {UserConfigDir}/llml/cache/models.toml (schema_version 4). config.toml is now user-owned and rewritten only when you save from the c or m panels, so a model scan no longer touches it; a version 3 file is migrated once on first read, after a backup]
 - Sep-07, 2026 - 08:27 AM +0800 - [Cancellation and HTTP hygiene: every network and subprocess call now takes a context, so a hung Ollama daemon can no longer stall startup, r, or S; runtime probes run concurrently; model discovery is filesystem-only with Ollama rows merged by the caller; internal/models shares one HTTP client with keep-alives instead of allocating one per call]
 - Sep-07, 2026 - 08:20 AM +0800 - [TUI internals: collect the config file, discovery, Ollama daemon, environment, and clipboard into an injected services struct on Model instead of 15 package-level function variables that tests reassigned; internal/profiles gains a Fetcher owning its HTTP client, and cmd/llml takes isTerminal as a parameter]
 - Sep-07, 2026 - 02:56 AM +0800 - [Configuration internals: resolve runtime values once into a settings.Settings (new internal/settings) instead of threading them through the process environment; env still overrides config.toml which overrides built-in defaults, but precedence is now one function and no production code calls os.Setenv]

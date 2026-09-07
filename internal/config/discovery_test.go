@@ -123,7 +123,7 @@ func TestCachedModels_NoConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 	if models != nil {
-		t.Fatal("expected nil models when no config exists")
+		t.Fatal("expected nil models when no cache exists")
 	}
 }
 
@@ -133,16 +133,13 @@ func TestCachedModels_Valid(t *testing.T) {
 	t.Setenv("HOME", dir)
 	t.Setenv("AppData", dir)
 
-	c := Config{
-		SchemaVersion: SchemaVersion,
-		Discovery: DiscoveryConfig{
-			LastScan: time.Now(),
-		},
+	c := CacheFile{
+		LastScan: time.Now(),
 		Models: []ModelEntry{
 			{Backend: "llama", Path: "/m.gguf", Name: "m.gguf", Size: 100, ModTime: time.Now()},
 		},
 	}
-	if err := WriteFile(c); err != nil {
+	if err := WriteCache(c); err != nil {
 		t.Fatal(err)
 	}
 
@@ -161,16 +158,13 @@ func TestCachedModels_Stale(t *testing.T) {
 	t.Setenv("HOME", dir)
 	t.Setenv("AppData", dir)
 
-	c := Config{
-		SchemaVersion: SchemaVersion,
-		Discovery: DiscoveryConfig{
-			LastScan: time.Now().Add(-48 * time.Hour),
-		},
+	c := CacheFile{
+		LastScan: time.Now().Add(-48 * time.Hour),
 		Models: []ModelEntry{
 			{Backend: "llama", Path: "/m.gguf", Name: "m.gguf", Size: 100, ModTime: time.Now()},
 		},
 	}
-	if err := WriteFile(c); err != nil {
+	if err := WriteCache(c); err != nil {
 		t.Fatal(err)
 	}
 
@@ -193,14 +187,8 @@ func TestCachedModels_EmptyModels(t *testing.T) {
 	t.Setenv("HOME", dir)
 	t.Setenv("AppData", dir)
 
-	c := Config{
-		SchemaVersion: SchemaVersion,
-		Discovery: DiscoveryConfig{
-			LastScan: time.Now(),
-		},
-		Models: nil,
-	}
-	if err := WriteFile(c); err != nil {
+	c := CacheFile{LastScan: time.Now(), Models: nil}
+	if err := WriteCache(c); err != nil {
 		t.Fatal(err)
 	}
 
@@ -241,7 +229,7 @@ func TestCachedModels_WrongSchema(t *testing.T) {
 	}
 }
 
-func TestRunDiscovery_WritesConfig(t *testing.T) {
+func TestRunDiscovery_WritesCache(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
 	t.Setenv("HOME", dir)
@@ -268,16 +256,16 @@ func TestRunDiscovery_WritesConfig(t *testing.T) {
 		t.Fatal("expected at least one discovered model")
 	}
 
-	// Verify config.toml was written.
-	cfg, err := ReadFile()
+	// The discovery cache, not config.toml, holds the results.
+	cached, err := ReadCache()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.SchemaVersion != SchemaVersion {
-		t.Fatalf("schema %d", cfg.SchemaVersion)
+	if cached.SchemaVersion != CacheSchemaVersion {
+		t.Fatalf("cache schema %d", cached.SchemaVersion)
 	}
-	if !cfg.ValidForCache() {
-		t.Fatal("config should be valid for cache after discovery")
+	if !cached.ValidForCache() {
+		t.Fatal("cache should be valid after discovery")
 	}
 }
 

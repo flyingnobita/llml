@@ -14,7 +14,7 @@ import (
 const cacheMaxAge = 24 * time.Hour
 
 // RunDiscovery runs a full model scan (filesystem plus the Ollama API), writes
-// the results to config.toml, and returns the discovered models. The extra
+// the results to the discovery cache, and returns the discovered models. The extra
 // search roots already carry both the environment and config.toml entries,
 // because s was resolved from both. Callers that only need the cached models
 // should use CachedModels instead.
@@ -29,37 +29,37 @@ func RunDiscovery(ctx context.Context, s settings.Settings) ([]models.ModelFile,
 		files = append(files, rows...)
 	}
 
-	now := time.Now()
-	disc := DiscoveryConfigFromInputs(s.ExtraModelPaths, now)
-	cfg := BuildConfig(RuntimeConfigFromSettings(s), disc, files)
-	if err := WriteFile(cfg); err != nil {
-		return files, fmt.Errorf("writing config after discovery: %w", err)
+	// Only the cache is written. config.toml is the user's file: the extra roots
+	// this scan used came out of it (or the environment), so there is nothing
+	// new to record there, and rewriting it would discard their comments.
+	if err := WriteCache(CacheFromFiles(files, time.Now())); err != nil {
+		return files, fmt.Errorf("writing discovery cache: %w", err)
 	}
 
 	return files, nil
 }
 
-// CachedModels returns the models from the discovery cache in config.toml.
-// Returns (nil, nil) if config.toml doesn't exist.
+// CachedModels returns the models from cache/models.toml.
+// Returns (nil, nil) if the cache is missing or unusable.
 // Returns (models, nil) if the cache is valid.
 // Returns (models, CacheStaleError) if the cache exists but is stale (>24h).
 func CachedModels() ([]models.ModelFile, error) {
-	cfg, err := ReadFile()
-	if err != nil {
-		return nil, nil // no config file — return nil, no error
-	}
+	// Read config.toml first so a version 3 file is migrated before the cache
+	// is consulted; otherwise the first run after an upgrade always rescans.
+	_, _ = ReadFile()
 
-	if !cfg.ValidForCache() {
+	cached, err := ReadCache()
+	if err != nil || !cached.ValidForCache() {
 		return nil, nil
 	}
 
-	files := ModelFilesFromEntries(cfg.Models)
+	files := ModelFilesFromEntries(cached.Models)
 	if len(files) == 0 {
 		return nil, nil
 	}
 
-	if time.Since(cfg.Discovery.LastScan) > cacheMaxAge {
-		return files, &CacheStaleError{LastScan: cfg.Discovery.LastScan}
+	if time.Since(cached.LastScan) > cacheMaxAge {
+		return files, &CacheStaleError{LastScan: cached.LastScan}
 	}
 
 	return files, nil

@@ -4,7 +4,6 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -227,7 +226,6 @@ func TestDiscoveryPathsModal_SaveSkipsRescanIfUnchanged(t *testing.T) {
 		SchemaVersion: config.SchemaVersion,
 		Discovery: config.DiscoveryConfig{
 			ExtraModelPaths: []string{"/unchanged"},
-			LastScan:        time.Now(),
 		},
 	}
 	if err := config.WriteFile(cfg); err != nil {

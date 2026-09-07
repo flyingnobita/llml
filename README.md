@@ -30,7 +30,7 @@ llml is the profile manager for whatever backend you already run.
 
 - **Model discovery** — auto-scans common paths for GGUF files and safetensors model
   directories; add extra roots via `LLML_MODEL_PATHS` and/or `config.toml`. Results are
-  cached under **`{UserConfigDir}/llml/config.toml`** so the next launch can skip the
+  cached under **`{UserConfigDir}/llml/cache/models.toml`** so the next launch can skip the
   filesystem walk when the cache is still valid.
 - **Runtime detection** — finds installed `llama-server`, `vllm`, and `koboldcpp` binaries and maps
   installed `ollama` plus the configured Ollama host, then maps each model to its
@@ -175,7 +175,7 @@ llml
 | `hjkl/↑↓←→` | Move selection; horizontal scroll when the path column is wider than the terminal                                                                     |
 | `E`         | Open profile export modal — select profiles by model group, filter by name or backend, and save to a portable TOML file you can share across machines |
 | `r`         | Reload **`[runtime]`** from `config.toml` and re-detect binaries (no model rescan)                                                                    |
-| `S`         | Full model filesystem rescan; refresh cached **`[[models]]`** in `config.toml`                                                                        |
+| `S`         | Full model filesystem rescan; refresh the discovery cache (`cache/models.toml`)                                                                       |
 | `R`         | Run server (split view: table + log pane)                                                                                                             |
 | `ctrl`+`R`  | Run server full-screen                                                                                                                                |
 | `c`         | Edit runtime environment (paths, ports)                                                                                                               |
@@ -296,7 +296,11 @@ User data and settings are stored in a dedicated folder. Routine app upgrades **
 
 **Key Files:**
 
-- **`config.toml`**: Stores global settings (ports, binary paths) and the model discovery cache.
+- **`config.toml`**: Stores your global settings (ports, binary paths, extra model roots). llml
+  rewrites it only when you save from the `c` or `m` panels, so comments and formatting survive
+  model scans.
+- **`cache/models.toml`**: The model discovery cache. Machine-owned and safe to delete; llml
+  rebuilds it on the next scan.
 - **`model-params.json`**: Stores your [named parameter profiles](#parameter-profiles-p) (args/env) for each model.
 - **`backups/`**: Automatic timestamped snapshots created before the app overwrites configuration.
 

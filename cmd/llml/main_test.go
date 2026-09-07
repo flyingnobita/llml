@@ -216,16 +216,13 @@ func TestPickTargetModel_NonTTY(t *testing.T) {
 	disableTerminal(t)
 
 	// Write a valid cache with a llama model.
-	c := config.Config{
-		SchemaVersion: config.SchemaVersion,
-		Discovery: config.DiscoveryConfig{
-			LastScan: time.Now(),
-		},
+	c := config.CacheFile{
+		LastScan: time.Now(),
 		Models: []config.ModelEntry{
 			{Backend: "llama", Path: "/m.gguf", Name: "m.gguf", Size: 100, ModTime: time.Now()},
 		},
 	}
-	if err := config.WriteFile(c); err != nil {
+	if err := config.WriteCache(c); err != nil {
 		t.Fatal(err)
 	}
 
@@ -255,16 +252,13 @@ func TestPickTargetModel_StaleCache(t *testing.T) {
 	t.Setenv(settings.EnvModelPaths, modelsDir)
 
 	// Write a stale cache.
-	c := config.Config{
-		SchemaVersion: config.SchemaVersion,
-		Discovery: config.DiscoveryConfig{
-			LastScan: time.Now().Add(-48 * time.Hour),
-		},
+	c := config.CacheFile{
+		LastScan: time.Now().Add(-48 * time.Hour),
 		Models: []config.ModelEntry{
 			{Backend: "llama", Path: "/old.gguf", Name: "old.gguf", Size: 100, ModTime: time.Now()},
 		},
 	}
-	if err := config.WriteFile(c); err != nil {
+	if err := config.WriteCache(c); err != nil {
 		t.Fatal(err)
 	}
 
@@ -325,14 +319,13 @@ func TestValidateTargetBackend_Compatible(t *testing.T) {
 	setupConfigDir(t)
 	disableOllama(t)
 
-	c := config.Config{
-		SchemaVersion: config.SchemaVersion,
-		Discovery:     config.DiscoveryConfig{LastScan: time.Now()},
+	c := config.CacheFile{
+		LastScan: time.Now(),
 		Models: []config.ModelEntry{
 			{Backend: "llama", Path: "/m.gguf", Name: "m.gguf", Size: 100, ModTime: time.Now()},
 		},
 	}
-	if err := config.WriteFile(c); err != nil {
+	if err := config.WriteCache(c); err != nil {
 		t.Fatal(err)
 	}
 
@@ -347,14 +340,13 @@ func TestValidateTargetBackend_Incompatible(t *testing.T) {
 	setupConfigDir(t)
 	disableOllama(t)
 
-	c := config.Config{
-		SchemaVersion: config.SchemaVersion,
-		Discovery:     config.DiscoveryConfig{LastScan: time.Now()},
+	c := config.CacheFile{
+		LastScan: time.Now(),
 		Models: []config.ModelEntry{
 			{Backend: "llama", Path: "/m.gguf", Name: "m.gguf", Size: 100, ModTime: time.Now()},
 		},
 	}
-	if err := config.WriteFile(c); err != nil {
+	if err := config.WriteCache(c); err != nil {
 		t.Fatal(err)
 	}
 
@@ -372,14 +364,13 @@ func TestValidateTargetBackend_TargetNotInCache(t *testing.T) {
 	setupConfigDir(t)
 	disableOllama(t)
 
-	c := config.Config{
-		SchemaVersion: config.SchemaVersion,
-		Discovery:     config.DiscoveryConfig{LastScan: time.Now()},
+	c := config.CacheFile{
+		LastScan: time.Now(),
 		Models: []config.ModelEntry{
 			{Backend: "llama", Path: "/other.gguf", Name: "other.gguf", Size: 100, ModTime: time.Now()},
 		},
 	}
-	if err := config.WriteFile(c); err != nil {
+	if err := config.WriteCache(c); err != nil {
 		t.Fatal(err)
 	}
 
@@ -408,14 +399,13 @@ func TestValidateTargetBackend_OllamaTarget(t *testing.T) {
 	setupConfigDir(t)
 	disableOllama(t) // disable real Ollama API, but use a cached Ollama entry
 
-	c := config.Config{
-		SchemaVersion: config.SchemaVersion,
-		Discovery:     config.DiscoveryConfig{LastScan: time.Now()},
+	c := config.CacheFile{
+		LastScan: time.Now(),
 		Models: []config.ModelEntry{
 			{Backend: "ollama", ID: "qwen3.5:latest", Location: "ollama://qwen3.5:latest", Name: "qwen3.5:latest", Size: 100, ModTime: time.Now()},
 		},
 	}
-	if err := config.WriteFile(c); err != nil {
+	if err := config.WriteCache(c); err != nil {
 		t.Fatal(err)
 	}
 

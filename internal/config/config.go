@@ -3,6 +3,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,7 +12,6 @@ import (
 	"github.com/BurntSushi/toml"
 
 	"github.com/flyingnobita/llml/internal/fsutil"
-	"github.com/flyingnobita/llml/internal/models"
 	"github.com/flyingnobita/llml/internal/settings"
 	"github.com/flyingnobita/llml/internal/userdata"
 )
@@ -19,14 +19,24 @@ import (
 // SchemaVersion is the current on-disk format for config.toml.
 // When bumping this, migrate after backing up (WriteFile already snapshots the
 // previous file under backups/ before overwrite).
-const SchemaVersion = 3
+//
+// Version 4 moved the [[models]] discovery cache out to cache/models.toml, so
+// config.toml holds only what the user owns. [ReadFile] migrates a version 3
+// file on first read.
+const SchemaVersion = 4
 
-// Config is the root document stored at [ConfigPath].
+// Config is the root document stored at [ConfigPath]. It is user-owned: llml
+// rewrites it only when the user saves from a panel, never as a side effect of
+// a background scan. Discovery results live in [CacheFile].
 type Config struct {
 	SchemaVersion int             `toml:"schema_version"`
 	Runtime       RuntimeConfig   `toml:"runtime"`
 	Discovery     DiscoveryConfig `toml:"discovery"`
-	Models        []ModelEntry    `toml:"models"`
+
+	// LegacyModels carries the [[models]] table written by schema version 3.
+	// It is only ever populated by a read of an unmigrated file; [ReadFile]
+	// drains it into cache/models.toml and clears it. Nothing else should use it.
+	LegacyModels []ModelEntry `toml:"models,omitempty"`
 }
 
 // RuntimeConfig mirrors env vars LLAMA_CPP_PATH, VLLM_PATH, VLLM_VENV, and server ports.
@@ -45,10 +55,15 @@ type RuntimeConfig struct {
 	DefaultKoboldCppPort   *int   `toml:"default_koboldcpp_port,omitempty"`
 }
 
-// DiscoveryConfig holds extra search roots and the last full filesystem scan time.
+// DiscoveryConfig holds the user's extra search roots. The last scan time is
+// machine state and lives in [CacheFile], not here.
 type DiscoveryConfig struct {
-	ExtraModelPaths []string  `toml:"extra_model_paths"`
-	LastScan        time.Time `toml:"last_scan"`
+	ExtraModelPaths []string `toml:"extra_model_paths"`
+
+	// LegacyLastScan carries the last_scan value written by schema version 3.
+	// Like [Config.LegacyModels] it exists only so migration can move it to the
+	// cache; it is cleared afterwards and never written back.
+	LegacyLastScan time.Time `toml:"last_scan,omitempty"`
 }
 
 // ModelEntry is one cached model row from discovery.
@@ -88,18 +103,47 @@ func ReadFile() (Config, error) {
 	if _, err := toml.Decode(string(b), &c); err != nil {
 		return Config{}, err
 	}
-	return c, nil
+	return migrateToCurrentSchema(c)
 }
 
-// ValidForCache reports whether the file is usable for instant startup (skip filesystem walk).
-func (c Config) ValidForCache() bool {
-	if c.SchemaVersion != SchemaVersion {
-		return false
+// migrateToCurrentSchema moves a version 3 document to version 4 by draining its
+// [[models]] table into cache/models.toml and rewriting config.toml without it.
+//
+// Only version 3 is migrated. Older schemas stored model rows in shapes this
+// cache cannot trust, and the pre-split code already discarded them and
+// rescanned; that stays the behavior.
+//
+// A failure to write either file is not fatal: the caller still gets a usable
+// in-memory Config, and the migration is retried on the next read. Losing the
+// cache costs one rescan; refusing to start would cost the user their session.
+func migrateToCurrentSchema(c Config) (Config, error) {
+	if c.SchemaVersion != 3 || len(c.LegacyModels) == 0 {
+		c.LegacyModels = nil
+		c.Discovery.LegacyLastScan = time.Time{}
+		return c, nil
 	}
-	if len(c.Models) < 1 {
-		return false
+
+	// Carry the old scan time across so the migrated cache is not treated as
+	// infinitely stale, which would cost the user a rescan on first launch.
+	cached := CacheFile{
+		SchemaVersion: CacheSchemaVersion,
+		LastScan:      c.Discovery.LegacyLastScan,
+		Models:        c.LegacyModels,
 	}
-	return true
+	c.LegacyModels = nil
+	c.Discovery.LegacyLastScan = time.Time{}
+	c.SchemaVersion = SchemaVersion
+
+	if err := WriteCache(cached); err != nil {
+		debugMigration("writing cache during migration: %v", err)
+		return c, nil
+	}
+	// WriteFile snapshots the previous config.toml under backups/ first, so the
+	// pre-migration file remains recoverable.
+	if err := WriteFile(c); err != nil {
+		debugMigration("rewriting config during migration: %v", err)
+	}
+	return c, nil
 }
 
 // Layer converts the persisted [runtime] table into a settings layer. Empty
@@ -198,39 +242,30 @@ func MergeExtraRoots(lists ...[]string) []string {
 	return ps.Slice()
 }
 
-// BuildConfig builds a full Config for writing from runtime, discovery, and models.
-func BuildConfig(runtime RuntimeConfig, discovery DiscoveryConfig, files []models.ModelFile) Config {
-	c := Config{
+// BuildConfig builds a full Config for writing from runtime and discovery
+// settings. Discovered models are not part of it; they go to [WriteCache].
+func BuildConfig(runtime RuntimeConfig, discovery DiscoveryConfig) Config {
+	return Config{
 		SchemaVersion: SchemaVersion,
 		Runtime:       runtime,
 		Discovery:     discovery,
 	}
-	for _, f := range files {
-		c.Models = append(c.Models, ModelEntryFromFile(f))
-	}
-	return c
 }
 
-// DiscoveryConfigFromInputs builds a DiscoveryConfig from explicit config-owned paths plus lastScan.
+// DiscoveryConfigFromInputs builds a DiscoveryConfig from explicit config-owned paths.
 // It normalizes and deduplicates paths without merging environment variables.
-func DiscoveryConfigFromInputs(configPaths []string, lastScan time.Time) DiscoveryConfig {
-	return DiscoveryConfig{
-		ExtraModelPaths: MergeExtraRoots(configPaths),
-		LastScan:        lastScan,
-	}
+func DiscoveryConfigFromInputs(configPaths []string) DiscoveryConfig {
+	return DiscoveryConfig{ExtraModelPaths: MergeExtraRoots(configPaths)}
 }
 
 // DiscoveryConfigForWrite merges extra model paths from a previous on-disk config
 // with the resolved extra roots, so hand-edited TOML entries survive a write.
-func DiscoveryConfigForWrite(prev *Config, s settings.Settings, lastScan time.Time) DiscoveryConfig {
+func DiscoveryConfigForWrite(prev *Config, s settings.Settings) DiscoveryConfig {
 	var fromFile []string
 	if prev != nil {
 		fromFile = prev.Discovery.ExtraModelPaths
 	}
-	return DiscoveryConfig{
-		ExtraModelPaths: MergeExtraRoots(fromFile, s.ExtraModelPaths),
-		LastScan:        lastScan,
-	}
+	return DiscoveryConfig{ExtraModelPaths: MergeExtraRoots(fromFile, s.ExtraModelPaths)}
 }
 
 // WriteFile writes config.toml atomically (write temp + rename).
@@ -250,4 +285,13 @@ func WriteFile(c Config) error {
 		return err
 	}
 	return fsutil.WriteFileAtomic(path, []byte(buf.String()), 0o644)
+}
+
+// debugMigration reports a non-fatal migration problem. Migration runs before
+// the TUI exists, so there is nowhere to surface it but the debug log.
+func debugMigration(format string, args ...any) {
+	if os.Getenv("LLML_DEBUG") == "" {
+		return
+	}
+	fmt.Fprintf(os.Stderr, "llml: config migration: "+format+"\n", args...)
 }

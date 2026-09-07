@@ -44,6 +44,8 @@ func testServices() services {
 	svc := defaultServices()
 	svc.readConfig = func() (config.Config, error) { return config.Config{}, os.ErrNotExist }
 	svc.writeConfig = func(config.Config) error { return nil }
+	svc.readCache = func() (config.CacheFile, error) { return config.CacheFile{}, os.ErrNotExist }
+	svc.writeCache = func(config.CacheFile) error { return nil }
 	svc.discoverRuntime = func(context.Context, settings.Settings) models.RuntimeInfo { return models.RuntimeInfo{} }
 	svc.discoverModels = func(context.Context, models.Options) ([]models.ModelFile, error) { return nil, nil }
 	svc.discoverOllama = func(context.Context, string) ([]models.ModelFile, error) { return nil, nil }
@@ -74,17 +76,17 @@ func TestApplyAndFullScanCmd_StartsOllamaForDiscovery(t *testing.T) {
 	svc := testServices()
 
 	svc.readConfig = func() (config.Config, error) {
-		return config.Config{
-			SchemaVersion: config.SchemaVersion,
+		return config.Config{SchemaVersion: config.SchemaVersion}, nil
+	}
+	svc.readCache = func() (config.CacheFile, error) {
+		return config.CacheFile{
+			SchemaVersion: config.CacheSchemaVersion,
 			Models: []config.ModelEntry{
 				config.ModelEntryFromFile(testOllamaRow("cached:latest")),
 			},
 		}, nil
 	}
 	svc.writeConfig = func(config.Config) error { return nil }
-	svc.discoveryConfig = func(configPaths []string, lastScan time.Time) config.DiscoveryConfig {
-		return config.DiscoveryConfig{ExtraModelPaths: configPaths, LastScan: lastScan}
-	}
 	svc.buildConfig = config.BuildConfig
 
 	runtimeCalls := 0
@@ -137,9 +139,9 @@ func TestApplyAndFullScanCmd_StartsOllamaForDiscovery(t *testing.T) {
 }
 
 // TestStartupCmd_InvalidCacheStillResolvesRuntimeFromFile guards the invariant
-// that used to need an eager os.Setenv: when the config file reads but its cache
-// is unusable, the runtime values in that file must still reach the settings the
-// subsequent write path uses, or the on-disk [runtime] table would be blanked.
+// that used to need an eager os.Setenv: when config.toml reads but the discovery
+// cache is unusable, the runtime values in that file must still reach the
+// settings the subsequent write path uses, or [runtime] would be blanked.
 func TestStartupCmd_InvalidCacheStillResolvesRuntimeFromFile(t *testing.T) {
 	t.Parallel()
 
@@ -147,10 +149,14 @@ func TestStartupCmd_InvalidCacheStillResolvesRuntimeFromFile(t *testing.T) {
 
 	wantPath := "/test/llama.cpp"
 	cfg := config.Config{
-		SchemaVersion: config.SchemaVersion - 1, // invalid cache
+		SchemaVersion: config.SchemaVersion,
 		Runtime:       config.RuntimeConfig{DefaultLlamaCppPath: wantPath},
 	}
 	svc.readConfig = func() (config.Config, error) { return cfg, nil }
+	// A cache at the wrong schema version is unusable, forcing a full scan.
+	svc.readCache = func() (config.CacheFile, error) {
+		return config.CacheFile{SchemaVersion: config.CacheSchemaVersion - 1}, nil
+	}
 
 	msgs := collectCmdMsgs(t, svc.startupCmd())
 	if len(msgs) != 1 {
@@ -175,8 +181,11 @@ func TestStartupCmd_CacheHitWithStoppedOllamaFallsBackToFullScan(t *testing.T) {
 	svc := testServices()
 
 	svc.readConfig = func() (config.Config, error) {
-		return config.Config{
-			SchemaVersion: config.SchemaVersion,
+		return config.Config{SchemaVersion: config.SchemaVersion}, nil
+	}
+	svc.readCache = func() (config.CacheFile, error) {
+		return config.CacheFile{
+			SchemaVersion: config.CacheSchemaVersion,
 			Models: []config.ModelEntry{
 				config.ModelEntryFromFile(testOllamaRow("cached:latest")),
 			},
@@ -204,10 +213,14 @@ func TestStartupCmd_CacheHitWithRunningOllamaRefreshesLiveOllamaRows(t *testing.
 
 	svc := testServices()
 
-	var wrote config.Config
+	var wrote config.CacheFile
 	svc.readConfig = func() (config.Config, error) {
-		return config.Config{
-			SchemaVersion: config.SchemaVersion,
+		return config.Config{SchemaVersion: config.SchemaVersion}, nil
+	}
+	svc.readCache = func() (config.CacheFile, error) {
+		return config.CacheFile{
+			SchemaVersion: config.CacheSchemaVersion,
+			LastScan:      time.Unix(2, 0),
 			Models: []config.ModelEntry{
 				config.ModelEntryFromFile(testOllamaRow("cached:latest")),
 				config.ModelEntryFromFile(models.ModelFile{
@@ -218,10 +231,9 @@ func TestStartupCmd_CacheHitWithRunningOllamaRefreshesLiveOllamaRows(t *testing.
 					ModTime: time.Unix(1, 0),
 				}),
 			},
-			Discovery: config.DiscoveryConfig{LastScan: time.Unix(2, 0)},
 		}, nil
 	}
-	svc.writeConfig = func(c config.Config) error {
+	svc.writeCache = func(c config.CacheFile) error {
 		wrote = c
 		return nil
 	}
@@ -269,17 +281,17 @@ func TestApplyAndFullScanCmd_FailedStartupMergesCachedOllamaRows(t *testing.T) {
 	svc := testServices()
 
 	svc.readConfig = func() (config.Config, error) {
-		return config.Config{
-			SchemaVersion: config.SchemaVersion,
+		return config.Config{SchemaVersion: config.SchemaVersion}, nil
+	}
+	svc.readCache = func() (config.CacheFile, error) {
+		return config.CacheFile{
+			SchemaVersion: config.CacheSchemaVersion,
 			Models: []config.ModelEntry{
 				config.ModelEntryFromFile(testOllamaRow("cached:latest")),
 			},
 		}, nil
 	}
 	svc.writeConfig = func(config.Config) error { return nil }
-	svc.discoveryConfig = func(configPaths []string, lastScan time.Time) config.DiscoveryConfig {
-		return config.DiscoveryConfig{ExtraModelPaths: configPaths, LastScan: lastScan}
-	}
 	svc.buildConfig = config.BuildConfig
 
 	svc.discoverRuntime = func(context.Context, settings.Settings) models.RuntimeInfo {
@@ -319,9 +331,6 @@ func TestApplyAndFullScanCmd_FailedStartupWithoutCacheKeepsNonOllamaRows(t *test
 		return config.Config{}, os.ErrNotExist
 	}
 	svc.writeConfig = func(config.Config) error { return nil }
-	svc.discoveryConfig = func(configPaths []string, lastScan time.Time) config.DiscoveryConfig {
-		return config.DiscoveryConfig{ExtraModelPaths: configPaths, LastScan: lastScan}
-	}
 	svc.buildConfig = config.BuildConfig
 
 	svc.discoverRuntime = func(context.Context, settings.Settings) models.RuntimeInfo {
@@ -355,9 +364,6 @@ func TestRescanModelsCmd_StartsOllamaAndReturnsDiscoveryNote(t *testing.T) {
 		return config.Config{SchemaVersion: config.SchemaVersion}, nil
 	}
 	svc.writeConfig = func(config.Config) error { return nil }
-	svc.discoveryConfig = func(configPaths []string, lastScan time.Time) config.DiscoveryConfig {
-		return config.DiscoveryConfig{ExtraModelPaths: configPaths, LastScan: lastScan}
-	}
 	svc.buildConfig = config.BuildConfig
 
 	runtimeCalls := 0
@@ -386,8 +392,10 @@ func TestRescanModelsCmd_StartsOllamaAndReturnsDiscoveryNote(t *testing.T) {
 }
 
 func TestMergeCachedOllamaRows_AppendsOnlyWhenLiveRowsMissing(t *testing.T) {
-	cfg := config.Config{
-		SchemaVersion: config.SchemaVersion,
+	t.Parallel()
+
+	cfg := config.CacheFile{
+		SchemaVersion: config.CacheSchemaVersion,
 		Models: []config.ModelEntry{
 			config.ModelEntryFromFile(testOllamaRow("cached:latest")),
 		},

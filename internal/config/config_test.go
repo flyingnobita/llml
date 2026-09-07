@@ -20,7 +20,7 @@ func TestConfigRoundTrip(t *testing.T) {
 	p1 := 8080
 	p2 := 8000
 	c := Config{
-		SchemaVersion: 3,
+		SchemaVersion: SchemaVersion,
 		Runtime: RuntimeConfig{
 			DefaultLlamaCppPath:    "/opt/llama",
 			DefaultLlamaServerPort: &p1,
@@ -28,17 +28,6 @@ func TestConfigRoundTrip(t *testing.T) {
 		},
 		Discovery: DiscoveryConfig{
 			ExtraModelPaths: []string{"/extra/models"},
-			LastScan:        time.Unix(1700000000, 0).UTC(),
-		},
-		Models: []ModelEntry{
-			{
-				Backend:    "llama",
-				Path:       "/models/a.gguf",
-				Name:       "a.gguf",
-				Size:       100,
-				ModTime:    time.Unix(1600000000, 0).UTC(),
-				Parameters: "llama · 4096 ctx",
-			},
 		},
 	}
 	if err := WriteFile(c); err != nil {
@@ -54,21 +43,18 @@ func TestConfigRoundTrip(t *testing.T) {
 	if got.Runtime.DefaultLlamaCppPath != c.Runtime.DefaultLlamaCppPath {
 		t.Fatalf("runtime path %q", got.Runtime.DefaultLlamaCppPath)
 	}
-	if len(got.Models) != 1 || got.Models[0].Path != "/models/a.gguf" {
-		t.Fatalf("models %+v", got.Models)
-	}
 }
 
 func TestValidForCache(t *testing.T) {
 	t.Parallel()
-	if (Config{SchemaVersion: 0}).ValidForCache() {
+	if (CacheFile{SchemaVersion: 0, Models: []ModelEntry{{Path: "/x"}}}).ValidForCache() {
 		t.Fatal("wrong schema should not validate")
 	}
-	if (Config{SchemaVersion: 3, Models: nil}).ValidForCache() {
+	if (CacheFile{SchemaVersion: CacheSchemaVersion}).ValidForCache() {
 		t.Fatal("empty models should not validate")
 	}
-	if !(Config{SchemaVersion: 3, Models: []ModelEntry{{Path: "/x"}}}).ValidForCache() {
-		t.Fatal("valid config should validate")
+	if !(CacheFile{SchemaVersion: CacheSchemaVersion, Models: []ModelEntry{{Path: "/x"}}}).ValidForCache() {
+		t.Fatal("valid cache should validate")
 	}
 }
 
@@ -119,16 +105,12 @@ func TestDiscoveryConfigForWrite_merge(t *testing.T) {
 	prev := &Config{
 		Discovery: DiscoveryConfig{
 			ExtraModelPaths: []string{"/a"},
-			LastScan:        time.Unix(100, 0).UTC(),
 		},
 	}
 	s := settings.Settings{ExtraModelPaths: []string{"/b"}}
-	d := DiscoveryConfigForWrite(prev, s, time.Unix(200, 0).UTC())
+	d := DiscoveryConfigForWrite(prev, s)
 	if len(d.ExtraModelPaths) != 2 {
 		t.Fatalf("paths %v", d.ExtraModelPaths)
-	}
-	if !d.LastScan.Equal(time.Unix(200, 0).UTC()) {
-		t.Fatalf("last scan %v", d.LastScan)
 	}
 }
 
@@ -142,7 +124,7 @@ func TestConfigRoundTrip_koboldCpp(t *testing.T) {
 	p2 := 8000
 	kp := 5001
 	c := Config{
-		SchemaVersion: 3,
+		SchemaVersion: SchemaVersion,
 		Runtime: RuntimeConfig{
 			DefaultLlamaCppPath:    "/opt/llama",
 			DefaultKoboldCppPath:   "/opt/koboldcpp",
@@ -152,17 +134,6 @@ func TestConfigRoundTrip_koboldCpp(t *testing.T) {
 		},
 		Discovery: DiscoveryConfig{
 			ExtraModelPaths: []string{"/extra/models"},
-			LastScan:        time.Unix(1700000000, 0).UTC(),
-		},
-		Models: []ModelEntry{
-			{
-				Backend:    "llama",
-				Path:       "/models/a.gguf",
-				Name:       "a.gguf",
-				Size:       100,
-				ModTime:    time.Unix(1600000000, 0).UTC(),
-				Parameters: "llama · 4096 ctx",
-			},
 		},
 	}
 	if err := WriteFile(c); err != nil {
@@ -184,8 +155,7 @@ func TestDiscoveryConfigFromInputs(t *testing.T) {
 	t.Parallel()
 
 	paths := []string{" /a ", "  ", ".", "/b/../c", "/a"}
-	lastScan := time.Unix(300, 0).UTC()
-	d := DiscoveryConfigFromInputs(paths, lastScan)
+	d := DiscoveryConfigFromInputs(paths)
 
 	if len(d.ExtraModelPaths) != 2 {
 		t.Fatalf("want 2 paths, got %v", d.ExtraModelPaths)
@@ -195,9 +165,6 @@ func TestDiscoveryConfigFromInputs(t *testing.T) {
 	}
 	if filepath.ToSlash(d.ExtraModelPaths[1]) != "/c" {
 		t.Errorf("got %q", d.ExtraModelPaths[1])
-	}
-	if !d.LastScan.Equal(lastScan) {
-		t.Fatalf("last scan %v", d.LastScan)
 	}
 }
 

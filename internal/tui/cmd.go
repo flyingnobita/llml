@@ -34,7 +34,7 @@ func (svc services) resolveSettings(cfg config.Config, haveCfg bool, explicitPat
 	return settings.Resolve(append(layers, settings.Defaults())...)
 }
 
-func mergeCachedOllamaRows(cfg config.Config, files []models.ModelFile, rt models.RuntimeInfo) []models.ModelFile {
+func mergeCachedOllamaRows(cached config.CacheFile, files []models.ModelFile, rt models.RuntimeInfo) []models.ModelFile {
 	if rt.OllamaRunning {
 		return files
 	}
@@ -48,8 +48,7 @@ func mergeCachedOllamaRows(cfg config.Config, files []models.ModelFile, rt model
 	if haveLive {
 		return files
 	}
-	cached := config.ModelFilesFromEntries(cfg.Models)
-	for _, f := range cached {
+	for _, f := range config.ModelFilesFromEntries(cached.Models) {
 		if f.Backend == models.BackendOllama {
 			files = append(files, f)
 		}
@@ -71,6 +70,7 @@ func mergeLiveOllamaRows(files []models.ModelFile, live []models.ModelFile) []mo
 
 type discoveryScanPlan struct {
 	cfg      config.Config
+	cache    config.CacheFile
 	haveCfg  bool
 	fromFile []string
 	settings settings.Settings
@@ -82,6 +82,7 @@ func (svc services) prepareDiscoveryScan(ctx context.Context, explicitPaths []st
 	cfg, err := svc.readConfig()
 	haveCfg := err == nil
 	s := svc.resolveSettings(cfg, haveCfg, explicitPaths)
+	cache, _ := svc.readCache() // a missing cache is normal; the scan repopulates it
 
 	fromFile := explicitPaths
 	if len(fromFile) == 0 && haveCfg {
@@ -93,6 +94,7 @@ func (svc services) prepareDiscoveryScan(ctx context.Context, explicitPaths []st
 	debugf("prepareDiscoveryScan: runtime ollamaPath=%q ollamaHost=%q ollamaRunning=%t", rt.OllamaPath, rt.OllamaHost, rt.OllamaRunning)
 	return discoveryScanPlan{
 		cfg:      cfg,
+		cache:    cache,
 		haveCfg:  haveCfg,
 		fromFile: fromFile,
 		settings: s,
@@ -137,15 +139,15 @@ func (svc services) runDiscoveryScan(ctx context.Context, plan discoveryScanPlan
 	} else {
 		debugf("runDiscoveryScan: ollama discovery failed, continuing: %v", oerr)
 	}
-	if plan.haveCfg {
-		files = mergeCachedOllamaRows(plan.cfg, files, rt)
-		debugf("runDiscoveryScan: after cache merge -> %d files", len(files))
-	}
+	files = mergeCachedOllamaRows(plan.cache, files, rt)
+	debugf("runDiscoveryScan: after cache merge -> %d files", len(files))
+
 	now := time.Now()
-	disc := svc.discoveryConfig(plan.fromFile, now)
-	werr := svc.writeConfig(svc.buildConfig(svc.runtimeConfig(plan.settings), disc, files))
+	// Only the cache is written. config.toml belongs to the user and is
+	// rewritten solely when the user saves from a panel.
+	werr := svc.writeCache(config.CacheFromFiles(files, now))
 	if werr != nil {
-		debugf("runDiscoveryScan: writeConfig failed: %v", werr)
+		debugf("runDiscoveryScan: writeCache failed: %v", werr)
 	}
 	debugf("runDiscoveryScan: done ollamaNote=%q ollamaWarn=%q", ollamaNote, ollamaWarn)
 	return rt, files, now, nil, werr, ollamaNote, ollamaWarn
@@ -236,19 +238,20 @@ func (svc services) startupCmd() tea.Cmd {
 		// no handle to cancel it, so the timeout is what bounds it.
 		ctx, cancel := context.WithTimeout(context.Background(), scanTimeout)
 		defer cancel()
-		cfg, err := svc.readConfig()
-		s := svc.resolveSettings(cfg, err == nil, nil)
-		if err != nil || !cfg.ValidForCache() {
-			debugf("startupCmd: no valid cache, falling back to full scan err=%v valid=%t", err, err == nil && cfg.ValidForCache())
+		cfg, cfgErr := svc.readConfig()
+		s := svc.resolveSettings(cfg, cfgErr == nil, nil)
+		cached, err := svc.readCache()
+		if err != nil || !cached.ValidForCache() {
+			debugf("startupCmd: no valid cache, falling back to full scan err=%v valid=%t", err, err == nil && cached.ValidForCache())
 			return startupNeedFullScanMsg{}
 		}
 		rt := svc.discoverRuntime(ctx, s)
-		debugf("startupCmd: cache valid, runtime ollamaPath=%q ollamaRunning=%t cachedModels=%d", rt.OllamaPath, rt.OllamaRunning, len(cfg.Models))
+		debugf("startupCmd: cache valid, runtime ollamaPath=%q ollamaRunning=%t cachedModels=%d", rt.OllamaPath, rt.OllamaRunning, len(cached.Models))
 		if rt.OllamaPath != "" && !rt.OllamaRunning {
 			debugf("startupCmd: Ollama installed but stopped, forcing full scan")
 			return startupNeedFullScanMsg{}
 		}
-		files := svc.filterExisting(svc.modelFilesFromCfg(cfg.Models))
+		files := svc.filterExisting(svc.modelFilesFromCfg(cached.Models))
 		if len(files) == 0 {
 			debugf("startupCmd: cache had no surviving files, forcing full scan")
 			return startupNeedFullScanMsg{}
@@ -261,9 +264,9 @@ func (svc services) startupCmd() tea.Cmd {
 			} else {
 				files = mergeLiveOllamaRows(files, liveOllama)
 				debugf("startupCmd: merged %d live Ollama rows into cache hit", len(liveOllama))
-				writeErr = svc.writeConfig(svc.buildConfig(svc.runtimeConfig(s), cfg.Discovery, files))
+				writeErr = svc.writeCache(config.CacheFromFiles(files, cached.LastScan))
 				if writeErr != nil {
-					debugf("startupCmd: writeConfig after live Ollama refresh failed: %v", writeErr)
+					debugf("startupCmd: writeCache after live Ollama refresh failed: %v", writeErr)
 				}
 			}
 		}
@@ -272,7 +275,7 @@ func (svc services) startupCmd() tea.Cmd {
 			runtime:     rt,
 			settings:    s,
 			files:       files,
-			lastScan:    cfg.Discovery.LastScan,
+			lastScan:    cached.LastScan,
 			configPaths: cfg.Discovery.ExtraModelPaths,
 			writeErr:    writeErr,
 		}

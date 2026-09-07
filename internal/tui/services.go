@@ -23,8 +23,9 @@ type services struct {
 	// Config file access.
 	readConfig        func() (config.Config, error)
 	writeConfig       func(config.Config) error
-	discoveryConfig   func(configPaths []string, lastScan time.Time) config.DiscoveryConfig
-	buildConfig       func(config.RuntimeConfig, config.DiscoveryConfig, []models.ModelFile) config.Config
+	buildConfig       func(config.RuntimeConfig, config.DiscoveryConfig) config.Config
+	readCache         func() (config.CacheFile, error)
+	writeCache        func(config.CacheFile) error
 	runtimeConfig     func(settings.Settings) config.RuntimeConfig
 	modelFilesFromCfg func([]config.ModelEntry) []models.ModelFile
 	filterExisting    func([]models.ModelFile) []models.ModelFile
@@ -52,8 +53,9 @@ func defaultServices() services {
 	return services{
 		readConfig:        config.ReadFile,
 		writeConfig:       config.WriteFile,
-		discoveryConfig:   config.DiscoveryConfigFromInputs,
 		buildConfig:       config.BuildConfig,
+		readCache:         config.ReadCache,
+		writeCache:        config.WriteCache,
 		runtimeConfig:     config.RuntimeConfigFromSettings,
 		modelFilesFromCfg: config.ModelFilesFromEntries,
 		filterExisting:    config.FilterExistingPaths,

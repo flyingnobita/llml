@@ -100,7 +100,11 @@ scripts/             # gofmt-check.sh, precommit-docs-fix.sh
 
 ### Configuration
 
-- **On-disk config** lives at **`{UserConfigDir}/llml/config.toml`** (see `internal/config`). It stores **`[runtime]`** (default paths, ports, and Ollama host), **`[discovery]`** (extra model roots and last full-scan time), and **`[[models]]`** (cached discovery rows, including Ollama API rows). **`schema_version`** is reserved for future migrations; migrations should backup via existing write paths before transforming.
+- **On-disk config** lives at **`{UserConfigDir}/llml/config.toml`** (see `internal/config`). It is **user-owned** and stores only **`[runtime]`** (default paths, ports, and hosts) and **`[discovery].extra_model_paths`**. llml rewrites it **only when the user saves** from the **`c`** or model-paths panels — never as a side effect of a scan, so hand edits survive discovery.
+
+- **Discovery cache** lives at **`{UserConfigDir}/llml/cache/models.toml`** (`internal/config/cache.go`: `CacheFile`, `ReadCache`, `WriteCache`). It is **machine-owned and disposable**: `schema_version`, `last_scan`, and `[[models]]` (including Ollama API rows). Deleting it costs one rescan, so it is not backed up. **Do not move machine state back into `config.toml`.**
+
+- **Schema migration:** `config.toml` is at **`schema_version = 4`**. Version 3 kept the model cache inline; `ReadFile` migrates such a file once, moving `[[models]]` and `last_scan` into the cache and rewriting `config.toml` (the previous file is snapshotted under `backups/` first). Only version 3 is migrated — older schemas stored rows in shapes the cache cannot trust, and their models are discarded in favor of a rescan. A migration that cannot write is logged and retried next read, never fatal. Note that the one-time rewrite does **not** preserve comments, because the TOML encoder cannot; ordinary scans leave the file untouched byte for byte.
 
 - **Updates vs user data:** Release packaging (Homebrew cask, archives) ships **only the `llml` binary** — not the config tree. User data stays under **`{UserConfigDir}/llml/`**. **`backups/`** holds timestamped copies before overwrites (pruned to 10 per logical file); **`.last-run-version`** triggers an extra snapshot of `config.toml` and `model-params.json` when the embedded version changes (skipped for `dev` / empty version). See `internal/userdata`, `internal/fsutil.WriteFileAtomic`.
 

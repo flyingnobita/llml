@@ -151,6 +151,16 @@ func (m Model) saveDiscoveryPaths() (Model, tea.Cmd) {
 	}
 
 	m = m.closeDiscoveryPathsModal()
+
+	// Saving the paths is a user edit of config.toml, so this is where the file
+	// is written; the rescan that follows only refreshes the discovery cache.
+	m.settings.ExtraModelPaths = newNorm
+	if err := writeConfigFromModel(m); err != nil {
+		m = m.addAlert(alertSeverityWarn, "Config", "Could not save model paths: "+err.Error())
+		m = m.withLastRunError("Could not save model paths: " + err.Error())
+		return m, clearLastRunNoteAfterCmd()
+	}
+
 	m = m.withLastRunSuccess("Model Paths Saved. Rescanning Models...")
 	m.loading = true
 	m.loadErr = nil
