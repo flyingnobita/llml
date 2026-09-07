@@ -154,7 +154,7 @@ func runImport(args []string) {
 	if isURL {
 		if targetModel == "" {
 			var pickErr error
-			targetModel, pickErr = pickTargetModel(f.Profiles, *rescan)
+			targetModel, pickErr = pickTargetModel(f.Profiles, *rescan, stdinIsTerminal)
 			if pickErr != nil {
 				fmt.Fprintf(os.Stderr, "llml import: %v\n", pickErr)
 				os.Exit(1)
@@ -232,7 +232,10 @@ func fsParseCtx() context.Context {
 // pickTargetModel resolves a target model for URL imports. It uses cached discovery
 // when available, auto-runs discovery on empty cache (2A-revised), and presents an
 // interactive picker filtered by backend compatibility.
-func pickTargetModel(portableProfiles []profiles.PortableProfile, rescan bool) (string, error) {
+// isTerminal reports whether the picker can be shown interactively. Passing it
+// in keeps stdin detection out of the discovery logic and lets tests drive both
+// branches without a package-level override.
+func pickTargetModel(portableProfiles []profiles.PortableProfile, rescan bool, isTerminal func() bool) (string, error) {
 	backends := uniqueBackendsFromPortable(portableProfiles)
 
 	modelFiles, err := resolveModels(rescan)
@@ -336,9 +339,8 @@ func uniqueBackendsFromPortable(pp []profiles.PortableProfile) []string {
 	return out
 }
 
-// isTerminal reports whether stdin is a character device (TTY).
-// Exposed as a variable so tests can override it.
-var isTerminal = func() bool {
+// stdinIsTerminal reports whether stdin is a character device (TTY).
+func stdinIsTerminal() bool {
 	fi, err := os.Stdin.Stat()
 	if err != nil {
 		return false

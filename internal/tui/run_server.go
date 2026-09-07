@@ -10,10 +10,8 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/atotto/clipboard"
 
 	"github.com/flyingnobita/llml/internal/models"
 	"github.com/flyingnobita/llml/internal/settings"
@@ -512,41 +510,21 @@ func startOllamaDaemon(spec serverSpec) error {
 	return cmd.Start()
 }
 
-var (
-	startOllamaDaemonFn = startOllamaDaemon
-	waitForOllamaFn     = waitForOllama
-	probeOllamaFn       = models.ProbeOllama
-	preloadOllamaFn     = models.PreloadOllamaModel
-)
-
-// waitForOllama polls the daemon at host until it answers or the startup
-// timeout elapses.
-func waitForOllama(host string) bool {
-	deadline := time.Now().Add(OllamaStartupTimeout)
-	for time.Now().Before(deadline) {
-		if probeOllamaFn(host) {
-			return true
-		}
-		time.Sleep(OllamaPollInterval)
-	}
-	return probeOllamaFn(host)
-}
-
 type ollamaReadyResult struct {
 	Started bool
 }
 
-func ensureOllamaReady(spec serverSpec) (ollamaReadyResult, error) {
+func (svc services) ensureOllamaReady(spec serverSpec) (ollamaReadyResult, error) {
 	debugf("ensureOllamaReady: probe start bin=%q host=%q", spec.bin, spec.host)
-	if probeOllamaFn(spec.host) {
+	if svc.probeOllama(spec.host) {
 		debugf("ensureOllamaReady: Ollama already reachable")
 		return ollamaReadyResult{}, nil
 	}
-	if err := startOllamaDaemonFn(spec); err != nil {
+	if err := svc.startOllamaDaemon(spec); err != nil {
 		debugf("ensureOllamaReady: start failed: %v", err)
 		return ollamaReadyResult{}, err
 	}
-	if !waitForOllamaFn(spec.host) {
+	if !svc.waitForOllamaOrDefault(spec.host) {
 		debugf("ensureOllamaReady: waitForOllama timed out")
 		return ollamaReadyResult{}, fmt.Errorf("ollama did not become ready on %s", spec.host)
 	}
@@ -563,16 +541,16 @@ func discoveryOllamaSpec(rt models.RuntimeInfo) serverSpec {
 	}
 }
 
-func runOllamaLaunchCmd(spec serverSpec) tea.Cmd {
+func (svc services) runOllamaLaunchCmd(spec serverSpec) tea.Cmd {
 	startNote := fmt.Sprintf("Loading %s into Ollama on %s...", spec.modelPath, spec.host)
 	return tea.Batch(
 		func() tea.Msg { return ollamaLaunchStartedMsg{note: startNote} },
 		func() tea.Msg {
-			ready, err := ensureOllamaReady(spec)
+			ready, err := svc.ensureOllamaReady(spec)
 			if err != nil {
 				return ollamaLaunchDoneMsg{err: err}
 			}
-			if err := preloadOllamaFn(spec.host, spec.modelPath); err != nil {
+			if err := svc.preloadOllama(spec.host, spec.modelPath); err != nil {
 				return ollamaLaunchDoneMsg{err: err}
 			}
 			note := fmt.Sprintf("Loaded %s into Ollama on %s", spec.modelPath, spec.host)
@@ -601,7 +579,7 @@ func copyLaunchCommandToClipboard(m Model) (Model, tea.Cmd) {
 	if cmd == "" {
 		return m.flashError(CopyCommandFeedbackFailure)
 	}
-	if err := clipboard.WriteAll(cmd); err != nil {
+	if err := m.svc.clipboardWrite(cmd); err != nil {
 		return m.flashError(CopyCommandFeedbackFailure)
 	}
 	return m.flashSuccess(CopyCommandFeedbackSuccess)

@@ -288,7 +288,7 @@ func (m Model) commitRuntimeConfig() (Model, tea.Cmd) {
 		return m, clearLastRunNoteAfterCmd()
 	}
 	m.settings = next
-	m.runtime = discoverRuntimeFn(m.settings)
+	m.runtime = m.svc.discoverRuntime(m.settings)
 	var cmd tea.Cmd
 	if err := writeConfigFromModel(m); err != nil {
 		m = m.withLastRunError("Could not save config: " + err.Error())

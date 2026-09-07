@@ -51,7 +51,7 @@ func TestUniqueBackendsFromPortable_WhitespaceTrimmed(t *testing.T) {
 
 func TestIsTerminal(t *testing.T) {
 	// In test environment, stdin is typically not a TTY.
-	if isTerminal() {
+	if stdinIsTerminal() {
 		t.Log("stdin is a TTY (unusual in tests)")
 	}
 }
@@ -135,7 +135,10 @@ func TestPresentModelPicker_OllamaIdentity(t *testing.T) {
 	}
 }
 
-// pickTargetModel tests — these mock isTerminal to return false so we test
+// notATerminal drives the non-interactive branch of pickTargetModel.
+func notATerminal() bool { return false }
+
+// pickTargetModel tests — these pass notATerminal so we test
 // error paths without hitting stdin. Ollama API is disabled via dead host.
 
 func disableOllama(t *testing.T) {
@@ -145,9 +148,7 @@ func disableOllama(t *testing.T) {
 
 func disableTerminal(t *testing.T) {
 	t.Helper()
-	old := isTerminal
-	isTerminal = func() bool { return false }
-	t.Cleanup(func() { isTerminal = old })
+
 }
 
 func setupConfigDir(t *testing.T) string {
@@ -168,7 +169,7 @@ func TestPickTargetModel_NoCachedModels(t *testing.T) {
 	// No config.toml — CachedModels returns nil,nil.
 	// Auto-runs discovery, finds nothing → "no local model files found".
 	pp := []profiles.PortableProfile{{Backend: "llama"}}
-	_, err := pickTargetModel(pp, false)
+	_, err := pickTargetModel(pp, false, notATerminal)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -194,7 +195,7 @@ func TestPickTargetModel_NoCompatibleBackend(t *testing.T) {
 
 	// Profile requests vllm backend, but only llama models are on disk.
 	pp := []profiles.PortableProfile{{Backend: "vllm"}}
-	_, err := pickTargetModel(pp, false)
+	_, err := pickTargetModel(pp, false, notATerminal)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -229,7 +230,7 @@ func TestPickTargetModel_NonTTY(t *testing.T) {
 	}
 
 	pp := []profiles.PortableProfile{{Backend: "llama"}}
-	_, err := pickTargetModel(pp, false)
+	_, err := pickTargetModel(pp, false, notATerminal)
 	if err == nil {
 		t.Fatal("expected non-TTY error")
 	}
@@ -268,7 +269,7 @@ func TestPickTargetModel_StaleCache(t *testing.T) {
 	}
 
 	pp := []profiles.PortableProfile{{Backend: "llama"}}
-	_, err := pickTargetModel(pp, false)
+	_, err := pickTargetModel(pp, false, notATerminal)
 	// Stale cache → rescan → finds model → non-TTY error (mocked).
 	if err == nil {
 		t.Fatal("expected error after rescan")
@@ -294,7 +295,7 @@ func TestPickTargetModel_Rescan(t *testing.T) {
 	t.Setenv(settings.EnvModelPaths, modelsDir)
 
 	pp := []profiles.PortableProfile{{Backend: "llama"}}
-	_, err := pickTargetModel(pp, true) // --rescan
+	_, err := pickTargetModel(pp, true, notATerminal) // --rescan
 	if err == nil {
 		t.Fatal("expected non-TTY error after rescan")
 	}
@@ -309,7 +310,7 @@ func TestPickTargetModel_EmptyDiscovery(t *testing.T) {
 	disableTerminal(t)
 
 	pp := []profiles.PortableProfile{{Backend: "llama"}}
-	_, err := pickTargetModel(pp, false)
+	_, err := pickTargetModel(pp, false, notATerminal)
 	if err == nil {
 		t.Fatal("expected error")
 	}

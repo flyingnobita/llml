@@ -154,7 +154,7 @@ func (m Model) saveDiscoveryPaths() (Model, tea.Cmd) {
 	m = m.withLastRunSuccess("Model Paths Saved. Rescanning Models...")
 	m.loading = true
 	m.loadErr = nil
-	return m, tea.Batch(rescanModelsCmd(m.discovery.paths...), clearLastRunNoteAfterCmd())
+	return m, tea.Batch(m.svc.rescanModelsCmd(m.discovery.paths...), clearLastRunNoteAfterCmd())
 }
 
 // updateDiscoveryPathsKey handles keys while the discovery paths modal is open.

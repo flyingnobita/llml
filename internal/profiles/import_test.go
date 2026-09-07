@@ -531,10 +531,10 @@ func TestFetchAndImportIntegration(t *testing.T) {
 		w.Write([]byte(singleProfileTOML("url-profile")))
 	}))
 	defer srv.Close()
-	defer useTestServerClient(srv)()
+	ft := testFetcher(srv)
 
 	// Step 1: Fetch from URL
-	f, err := FetchPortable(context.Background(), srv.URL+"/profile.toml")
+	f, err := ft.FetchPortable(context.Background(), srv.URL+"/profile.toml")
 	if err != nil {
 		t.Fatalf("fetch: %v", err)
 	}
@@ -599,9 +599,9 @@ func TestFetchAndImportIntegration_Collision(t *testing.T) {
 		w.Write([]byte(singleProfileTOML("url-profile")))
 	}))
 	defer srv.Close()
-	defer useTestServerClient(srv)()
+	ft := testFetcher(srv)
 
-	f, err := FetchPortable(context.Background(), srv.URL+"/profile.toml")
+	f, err := ft.FetchPortable(context.Background(), srv.URL+"/profile.toml")
 	if err != nil {
 		t.Fatalf("fetch: %v", err)
 	}
@@ -635,9 +635,9 @@ func TestMultiProfileActivateCheck(t *testing.T) {
 		w.Write([]byte(multiProfileTOML()))
 	}))
 	defer srv.Close()
-	defer useTestServerClient(srv)()
+	ft := testFetcher(srv)
 
-	f, err := FetchPortable(context.Background(), srv.URL+"/multi.toml")
+	f, err := ft.FetchPortable(context.Background(), srv.URL+"/multi.toml")
 	if err != nil {
 		t.Fatalf("fetch: %v", err)
 	}

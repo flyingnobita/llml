@@ -15,29 +15,12 @@ import (
 
 const themeToastVisibleDuration = 2 * time.Second
 
-var (
-	readConfigFileFn        = config.ReadFile
-	writeConfigFileFn       = config.WriteFile
-	discoveryConfigInputsFn = config.DiscoveryConfigFromInputs
-	buildConfigFn           = config.BuildConfig
-	runtimeConfigFn         = config.RuntimeConfigFromSettings
-	modelFilesFromEntriesFn = config.ModelFilesFromEntries
-	filterExistingPathsFn   = config.FilterExistingPaths
-	discoverRuntimeFn       = models.DiscoverRuntime
-	discoverModelsFn        = models.Discover
-	discoverOllamaModelsFn  = models.DiscoverOllamaModels
-
-	// getenvFn is the process environment as seen by settings resolution. Tests
-	// replace it instead of mutating the real environment.
-	getenvFn settings.Getenv = settings.OSGetenv
-)
-
 // resolveSettings folds the environment, an optional config file, and the
 // built-in defaults into one value, in that order of precedence. explicitPaths,
 // when non-empty, replaces the extra model roots the config file carries;
 // roots from the environment still apply.
-func resolveSettings(cfg config.Config, haveCfg bool, explicitPaths []string) settings.Settings {
-	layers := []settings.Layer{settings.FromEnv(getenvFn)}
+func (svc services) resolveSettings(cfg config.Config, haveCfg bool, explicitPaths []string) settings.Settings {
+	layers := []settings.Layer{settings.FromEnv(svc.getenv)}
 	if haveCfg {
 		layer := cfg.Layer()
 		if len(explicitPaths) > 0 {
@@ -94,10 +77,10 @@ type discoveryScanPlan struct {
 	runtime  models.RuntimeInfo
 }
 
-func prepareDiscoveryScan(explicitPaths []string) discoveryScanPlan {
-	cfg, err := readConfigFileFn()
+func (svc services) prepareDiscoveryScan(explicitPaths []string) discoveryScanPlan {
+	cfg, err := svc.readConfig()
 	haveCfg := err == nil
-	s := resolveSettings(cfg, haveCfg, explicitPaths)
+	s := svc.resolveSettings(cfg, haveCfg, explicitPaths)
 
 	fromFile := explicitPaths
 	if len(fromFile) == 0 && haveCfg {
@@ -105,7 +88,7 @@ func prepareDiscoveryScan(explicitPaths []string) discoveryScanPlan {
 	}
 	opts := models.Options{Settings: s, IncludeOllama: true}
 	debugf("prepareDiscoveryScan: haveCfg=%t explicitPaths=%v fromFile=%v extraRoots=%v", haveCfg, explicitPaths, fromFile, s.ExtraModelPaths)
-	rt := discoverRuntimeFn(s)
+	rt := svc.discoverRuntime(s)
 	debugf("prepareDiscoveryScan: runtime ollamaPath=%q ollamaHost=%q ollamaRunning=%t", rt.OllamaPath, rt.OllamaHost, rt.OllamaRunning)
 	return discoveryScanPlan{
 		cfg:      cfg,
@@ -123,24 +106,24 @@ func discoveryStartNote(rt models.RuntimeInfo) string {
 }
 
 //nolint:staticcheck // ST1008: note strings follow error returns — caller unpacks by position.
-func runDiscoveryScan(plan discoveryScanPlan) (models.RuntimeInfo, []models.ModelFile, time.Time, error, error, string, string) {
+func (svc services) runDiscoveryScan(plan discoveryScanPlan) (models.RuntimeInfo, []models.ModelFile, time.Time, error, error, string, string) {
 	rt := plan.runtime
 	var ollamaNote, ollamaWarn string
 	debugf("runDiscoveryScan: start haveCfg=%t ollamaPath=%q ollamaRunning=%t", plan.haveCfg, rt.OllamaPath, rt.OllamaRunning)
 	if rt.OllamaPath != "" && !rt.OllamaRunning {
 		spec := discoveryOllamaSpec(rt)
 		debugf("runDiscoveryScan: ensuring Ollama ready via bin=%q host=%q", spec.bin, spec.host)
-		ready, err := ensureOllamaReady(spec)
+		ready, err := svc.ensureOllamaReady(spec)
 		if err != nil {
 			ollamaWarn = err.Error()
 			debugf("runDiscoveryScan: ensureOllamaReady failed: %v", err)
 		} else if ready.Started {
-			rt = discoverRuntimeFn(plan.settings)
+			rt = svc.discoverRuntime(plan.settings)
 			ollamaNote = fmt.Sprintf("Started Ollama for model discovery on %s", spec.host)
 			debugf("runDiscoveryScan: Ollama started successfully, refreshed runtime running=%t", rt.OllamaRunning)
 		}
 	}
-	files, derr := discoverModelsFn(plan.opts)
+	files, derr := svc.discoverModels(plan.opts)
 	if derr != nil {
 		debugf("runDiscoveryScan: discoverModels failed: %v", derr)
 		return rt, nil, time.Time{}, derr, nil, ollamaNote, ollamaWarn
@@ -151,8 +134,8 @@ func runDiscoveryScan(plan discoveryScanPlan) (models.RuntimeInfo, []models.Mode
 		debugf("runDiscoveryScan: after cache merge -> %d files", len(files))
 	}
 	now := time.Now()
-	disc := discoveryConfigInputsFn(plan.fromFile, now)
-	werr := writeConfigFileFn(buildConfigFn(runtimeConfigFn(plan.settings), disc, files))
+	disc := svc.discoveryConfig(plan.fromFile, now)
+	werr := svc.writeConfig(svc.buildConfig(svc.runtimeConfig(plan.settings), disc, files))
 	if werr != nil {
 		debugf("runDiscoveryScan: writeConfig failed: %v", werr)
 	}
@@ -161,11 +144,11 @@ func runDiscoveryScan(plan discoveryScanPlan) (models.RuntimeInfo, []models.Mode
 }
 
 // applyAndFullScanCmd applies [runtime] from config.toml when present, then runs a full discovery and writes config.toml.
-func applyAndFullScanCmd(explicitPaths ...string) tea.Cmd {
-	plan := prepareDiscoveryScan(explicitPaths)
+func (svc services) applyAndFullScanCmd(explicitPaths ...string) tea.Cmd {
+	plan := svc.prepareDiscoveryScan(explicitPaths)
 	scanCmd := func() tea.Msg {
 		debugf("applyAndFullScanCmd: executing scan")
-		rt, files, now, derr, werr, ollamaNote, ollamaWarn := runDiscoveryScan(plan)
+		rt, files, now, derr, werr, ollamaNote, ollamaWarn := svc.runDiscoveryScan(plan)
 		if derr != nil {
 			return modelsErrMsg{err: derr}
 		}
@@ -192,11 +175,11 @@ func applyAndFullScanCmd(explicitPaths ...string) tea.Cmd {
 }
 
 // rescanModelsCmd runs filesystem discovery only (S key); preserves current runtime env and merges discovery metadata into config.toml.
-func rescanModelsCmd(explicitPaths ...string) tea.Cmd {
-	plan := prepareDiscoveryScan(explicitPaths)
+func (svc services) rescanModelsCmd(explicitPaths ...string) tea.Cmd {
+	plan := svc.prepareDiscoveryScan(explicitPaths)
 	scanCmd := func() tea.Msg {
 		debugf("rescanModelsCmd: executing scan")
-		_, files, now, derr, werr, ollamaNote, ollamaWarn := runDiscoveryScan(plan)
+		_, files, now, derr, werr, ollamaNote, ollamaWarn := svc.runDiscoveryScan(plan)
 		if derr != nil {
 			return modelsErrMsg{err: derr}
 		}
@@ -222,49 +205,49 @@ func rescanModelsCmd(explicitPaths ...string) tea.Cmd {
 }
 
 // reloadRuntimeCmd re-reads [runtime] from config.toml and re-probes binaries (r key).
-func reloadRuntimeCmd() tea.Cmd {
+func (svc services) reloadRuntimeCmd() tea.Cmd {
 	return func() tea.Msg {
-		cfg, err := readConfigFileFn()
+		cfg, err := svc.readConfig()
 		if err != nil {
 			if errors.Is(err, os.ErrNotExist) {
 				return runtimeReloadErrMsg{err: errors.New("config.toml not found — run a full scan first (restart llml or fix config path)")}
 			}
 			return runtimeReloadErrMsg{err: err}
 		}
-		s := resolveSettings(cfg, true, nil)
-		return runtimeReadyMsg{runtime: discoverRuntimeFn(s), settings: s}
+		s := svc.resolveSettings(cfg, true, nil)
+		return runtimeReadyMsg{runtime: svc.discoverRuntime(s), settings: s}
 	}
 }
 
 // startupCmd tries the on-disk cache; on miss runs a full scan.
-func startupCmd() tea.Cmd {
+func (svc services) startupCmd() tea.Cmd {
 	return func() tea.Msg {
-		cfg, err := readConfigFileFn()
-		s := resolveSettings(cfg, err == nil, nil)
+		cfg, err := svc.readConfig()
+		s := svc.resolveSettings(cfg, err == nil, nil)
 		if err != nil || !cfg.ValidForCache() {
 			debugf("startupCmd: no valid cache, falling back to full scan err=%v valid=%t", err, err == nil && cfg.ValidForCache())
 			return startupNeedFullScanMsg{}
 		}
-		rt := discoverRuntimeFn(s)
+		rt := svc.discoverRuntime(s)
 		debugf("startupCmd: cache valid, runtime ollamaPath=%q ollamaRunning=%t cachedModels=%d", rt.OllamaPath, rt.OllamaRunning, len(cfg.Models))
 		if rt.OllamaPath != "" && !rt.OllamaRunning {
 			debugf("startupCmd: Ollama installed but stopped, forcing full scan")
 			return startupNeedFullScanMsg{}
 		}
-		files := filterExistingPathsFn(modelFilesFromEntriesFn(cfg.Models))
+		files := svc.filterExisting(svc.modelFilesFromCfg(cfg.Models))
 		if len(files) == 0 {
 			debugf("startupCmd: cache had no surviving files, forcing full scan")
 			return startupNeedFullScanMsg{}
 		}
 		var writeErr error
 		if rt.OllamaRunning {
-			liveOllama, err := discoverOllamaModelsFn(s.OllamaHost)
+			liveOllama, err := svc.discoverOllama(s.OllamaHost)
 			if err != nil {
 				debugf("startupCmd: live Ollama refresh failed, keeping cache: %v", err)
 			} else {
 				files = mergeLiveOllamaRows(files, liveOllama)
 				debugf("startupCmd: merged %d live Ollama rows into cache hit", len(liveOllama))
-				writeErr = writeConfigFileFn(buildConfigFn(runtimeConfigFn(s), cfg.Discovery, files))
+				writeErr = svc.writeConfig(svc.buildConfig(svc.runtimeConfig(s), cfg.Discovery, files))
 				if writeErr != nil {
 					debugf("startupCmd: writeConfig after live Ollama refresh failed: %v", writeErr)
 				}

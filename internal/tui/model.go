@@ -228,6 +228,8 @@ type Model struct {
 	paneFocus mainPaneFocusSnap
 
 	keys KeyMap
+	// svc holds every dependency the TUI reaches outside its own state. See services.go.
+	svc services
 	// settings holds every resolved runtime value. It is set from the message a
 	// scan or reload produces, and from the c panel on save; nothing in the TUI
 	// reads the process environment for these values.
@@ -303,7 +305,14 @@ func newRuntimeConfigInputs() [runtimeFieldCount]textinput.Model {
 }
 
 // New returns a model with default key bindings and an empty table; Init triggers discovery.
+// New returns an initialized model wired to the real config file, discovery,
+// Ollama daemon, environment, and clipboard.
 func New() Model {
+	return NewWithServices(defaultServices())
+}
+
+// NewWithServices is [New] with injectable dependencies, for tests.
+func NewWithServices(svc services) Model {
 	homeDir := fsutil.HomeDir()
 	pick := initialThemePick()
 	th := resolveTheme()
@@ -322,6 +331,7 @@ func New() Model {
 		export:    exportViewState{pathInput: newPathTextInput(), filterInput: newFilterTextInput()},
 		import_:   importViewState{pathInput: newPathTextInput(), picker: filepicker.New()},
 		keys:      DefaultKeyMap(),
+		svc:       svc,
 		// Built-in defaults keep hosts and ports usable until the first scan
 		// message arrives with the fully resolved values.
 		settings: settings.Resolve(settings.Defaults()),
@@ -331,7 +341,7 @@ func New() Model {
 
 // Init implements tea.Model.
 func (m Model) Init() tea.Cmd {
-	return startupCmd()
+	return m.svc.startupCmd()
 }
 
 // SelectedModelFile returns the highlighted model row.

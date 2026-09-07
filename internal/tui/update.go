@@ -47,7 +47,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.applyScanResult(&msg.runtime, msg.files, msg.lastScan, msg.configPaths, msg.writeErr, true)
 
 	case startupNeedFullScanMsg:
-		return m, applyAndFullScanCmd()
+		return m, m.svc.applyAndFullScanCmd()
 
 	case fullScanDoneMsg:
 		m.settings = msg.settings
@@ -354,7 +354,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 					filepath.Dir(p)))
 		}
 		if be == models.BackendOllama {
-			return m, runOllamaLaunchCmd(spec)
+			return m, m.svc.runOllamaLaunchCmd(spec)
 		}
 		if mode == runServerModeFullscreen {
 			return m, runForegroundServerCmd(spec)
@@ -495,7 +495,7 @@ func (m Model) tryRescan(allowWhileExited bool) (Model, tea.Cmd) {
 	m.loading = true
 	m.loadErr = nil
 	m = m.withLastRunCleared()
-	return m, rescanModelsCmd()
+	return m, m.svc.rescanModelsCmd()
 }
 
 // tryReloadRuntime initiates a runtime reload if preconditions allow.
@@ -508,5 +508,5 @@ func (m Model) tryReloadRuntime(allowWhileExited bool) (Model, tea.Cmd) {
 		return m.flashError("Stop the server before reloading runtime.")
 	}
 	m = m.withLastRunCleared()
-	return m, reloadRuntimeCmd()
+	return m, m.svc.reloadRuntimeCmd()
 }

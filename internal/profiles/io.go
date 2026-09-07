@@ -26,29 +26,48 @@ const maxProfileBody = 256 * 1024
 // maxRedirects is the maximum number of HTTP redirects to follow.
 const maxRedirects = 5
 
-// httpClient is the HTTP client used by FetchPortable. Exposed as a package
-// variable so tests can replace it with a client that trusts test server certs.
-var httpClient = &http.Client{
-	Timeout: 30 * time.Second,
-	CheckRedirect: func(req *http.Request, via []*http.Request) error {
-		if len(via) >= maxRedirects {
-			return fmt.Errorf("too many redirects (max %d)", maxRedirects)
-		}
-		if req.URL.Scheme != "https" {
-			return fmt.Errorf("refusing redirect from https to non-https")
-		}
-		return nil
-	},
-	Transport: &http.Transport{
-		DialContext: (&net.Dialer{
-			Timeout: 10 * time.Second,
-		}).DialContext,
-	},
+// Fetcher fetches portable profiles over HTTPS. The zero value is not usable;
+// take [DefaultFetcher], or construct one with a client that trusts a test
+// server's certificates.
+type Fetcher struct {
+	Client *http.Client
+}
+
+// newHTTPClient returns the client policy FetchPortable relies on: an overall
+// deadline, a dial timeout, a redirect cap, and a refusal to be redirected off
+// HTTPS.
+func newHTTPClient() *http.Client {
+	return &http.Client{
+		Timeout: 30 * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= maxRedirects {
+				return fmt.Errorf("too many redirects (max %d)", maxRedirects)
+			}
+			if req.URL.Scheme != "https" {
+				return fmt.Errorf("refusing redirect from https to non-https")
+			}
+			return nil
+		},
+		Transport: &http.Transport{
+			DialContext: (&net.Dialer{
+				Timeout: 10 * time.Second,
+			}).DialContext,
+		},
+	}
+}
+
+// DefaultFetcher is the Fetcher used by [FetchPortable].
+var DefaultFetcher = Fetcher{Client: newHTTPClient()}
+
+// FetchPortable fetches and parses a portable profile TOML from an HTTPS URL
+// using [DefaultFetcher]. Plain http:// URLs are rejected without a network call.
+func FetchPortable(ctx context.Context, rawURL string) (*PortableFile, error) {
+	return DefaultFetcher.FetchPortable(ctx, rawURL)
 }
 
 // FetchPortable fetches and parses a portable profile TOML from an HTTPS URL.
 // Plain http:// URLs are rejected without making a network call.
-func FetchPortable(ctx context.Context, rawURL string) (*PortableFile, error) {
+func (ft Fetcher) FetchPortable(ctx context.Context, rawURL string) (*PortableFile, error) {
 	u, err := url.Parse(rawURL)
 	if err != nil {
 		return nil, fmt.Errorf("cannot parse URL %q: %w", rawURL, err)
@@ -62,7 +81,7 @@ func FetchPortable(ctx context.Context, rawURL string) (*PortableFile, error) {
 		return nil, fmt.Errorf("cannot create request: %w", err)
 	}
 
-	resp, err := httpClient.Do(req)
+	resp, err := ft.Client.Do(req)
 	if err != nil {
 		var netErr net.Error
 		if errors.As(err, &netErr) && netErr.Timeout() {

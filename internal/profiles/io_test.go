@@ -38,14 +38,12 @@ backend = "llama"
 `)
 }
 
-// useTestServerClient swaps the package-level httpClient with one that trusts
-// the test TLS server's certificate. Returns a reset function.
-func useTestServerClient(srv *httptest.Server) func() {
-	orig := httpClient
-	tsClient := srv.Client()
-	httpClient = &http.Client{
-		Timeout:   orig.Timeout,
-		Transport: tsClient.Transport,
+// testFetcher returns a Fetcher that trusts the test TLS server's certificate
+// while keeping the redirect policy the real client uses.
+func testFetcher(srv *httptest.Server) Fetcher {
+	return Fetcher{Client: &http.Client{
+		Timeout:   DefaultFetcher.Client.Timeout,
+		Transport: srv.Client().Transport,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= maxRedirects {
 				return fmt.Errorf("too many redirects (max %d)", maxRedirects)
@@ -55,8 +53,7 @@ func useTestServerClient(srv *httptest.Server) func() {
 			}
 			return nil
 		},
-	}
-	return func() { httpClient = orig }
+	}}
 }
 
 // ---------------------------------------------------------------------------
@@ -70,9 +67,9 @@ func TestFetchPortable(t *testing.T) {
 			w.Write([]byte(singleProfileTOML("fast")))
 		}))
 		defer srv.Close()
-		defer useTestServerClient(srv)()
+		ft := testFetcher(srv)
 
-		f, err := FetchPortable(context.Background(), srv.URL+"/profile.toml")
+		f, err := ft.FetchPortable(context.Background(), srv.URL+"/profile.toml")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -93,9 +90,9 @@ func TestFetchPortable(t *testing.T) {
 			w.Write([]byte(multiProfileTOML()))
 		}))
 		defer srv.Close()
-		defer useTestServerClient(srv)()
+		ft := testFetcher(srv)
 
-		f, err := FetchPortable(context.Background(), srv.URL+"/multi.toml")
+		f, err := ft.FetchPortable(context.Background(), srv.URL+"/multi.toml")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -121,9 +118,9 @@ func TestFetchPortable(t *testing.T) {
 			w.WriteHeader(404)
 		}))
 		defer srv.Close()
-		defer useTestServerClient(srv)()
+		ft := testFetcher(srv)
 
-		_, err := FetchPortable(context.Background(), srv.URL+"/nope.toml")
+		_, err := ft.FetchPortable(context.Background(), srv.URL+"/nope.toml")
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -138,9 +135,9 @@ func TestFetchPortable(t *testing.T) {
 			w.WriteHeader(500)
 		}))
 		defer srv.Close()
-		defer useTestServerClient(srv)()
+		ft := testFetcher(srv)
 
-		_, err := FetchPortable(context.Background(), srv.URL+"/error.toml")
+		_, err := ft.FetchPortable(context.Background(), srv.URL+"/error.toml")
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -188,9 +185,9 @@ func TestFetchPortable(t *testing.T) {
 			http.Redirect(w, r, r.URL.String(), http.StatusFound)
 		}))
 		defer srv.Close()
-		defer useTestServerClient(srv)()
+		ft := testFetcher(srv)
 
-		_, err := FetchPortable(context.Background(), srv.URL+"/loop.toml")
+		_, err := ft.FetchPortable(context.Background(), srv.URL+"/loop.toml")
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -205,9 +202,9 @@ func TestFetchPortable(t *testing.T) {
 			http.Redirect(w, r, "http://example.com/evil.toml", http.StatusFound)
 		}))
 		defer srv.Close()
-		defer useTestServerClient(srv)()
+		ft := testFetcher(srv)
 
-		_, err := FetchPortable(context.Background(), srv.URL+"/redirect.toml")
+		_, err := ft.FetchPortable(context.Background(), srv.URL+"/redirect.toml")
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -220,9 +217,9 @@ func TestFetchPortable(t *testing.T) {
 			w.Write([]byte(body))
 		}))
 		defer srv.Close()
-		defer useTestServerClient(srv)()
+		ft := testFetcher(srv)
 
-		_, err := FetchPortable(context.Background(), srv.URL+"/huge.toml")
+		_, err := ft.FetchPortable(context.Background(), srv.URL+"/huge.toml")
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -237,9 +234,9 @@ func TestFetchPortable(t *testing.T) {
 			w.Write([]byte("<html><body>404 Not Found</body></html>"))
 		}))
 		defer srv.Close()
-		defer useTestServerClient(srv)()
+		ft := testFetcher(srv)
 
-		_, err := FetchPortable(context.Background(), srv.URL+"/page.html")
+		_, err := ft.FetchPortable(context.Background(), srv.URL+"/page.html")
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -257,9 +254,9 @@ backend = "llama"
 `))
 		}))
 		defer srv.Close()
-		defer useTestServerClient(srv)()
+		ft := testFetcher(srv)
 
-		_, err := FetchPortable(context.Background(), srv.URL+"/noschema.toml")
+		_, err := ft.FetchPortable(context.Background(), srv.URL+"/noschema.toml")
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -279,9 +276,9 @@ backend = "llama"
 `))
 		}))
 		defer srv.Close()
-		defer useTestServerClient(srv)()
+		ft := testFetcher(srv)
 
-		_, err := FetchPortable(context.Background(), srv.URL+"/v1.toml")
+		_, err := ft.FetchPortable(context.Background(), srv.URL+"/v1.toml")
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -300,9 +297,9 @@ backend = "llama"
 `))
 		}))
 		defer srv.Close()
-		defer useTestServerClient(srv)()
+		ft := testFetcher(srv)
 
-		_, err := FetchPortable(context.Background(), srv.URL+"/noname.toml")
+		_, err := ft.FetchPortable(context.Background(), srv.URL+"/noname.toml")
 		if err == nil {
 			t.Fatal("expected error")
 		}

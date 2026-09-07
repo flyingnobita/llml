@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
+- Sep-07, 2026 - 08:20 AM +0800 - [TUI internals: collect the config file, discovery, Ollama daemon, environment, and clipboard into an injected services struct on Model instead of 15 package-level function variables that tests reassigned; internal/profiles gains a Fetcher owning its HTTP client, and cmd/llml takes isTerminal as a parameter]
 - Sep-07, 2026 - 02:56 AM +0800 - [Configuration internals: resolve runtime values once into a settings.Settings (new internal/settings) instead of threading them through the process environment; env still overrides config.toml which overrides built-in defaults, but precedence is now one function and no production code calls os.Setenv]
 - Sep-07, 2026 - 02:37 AM +0800 - [Toolchain: pin Go, golangci-lint, and GoReleaser to exact versions in mise.toml; release.yml now resolves both Go and GoReleaser from mise instead of setup-go and a `~> v2` range; new scripts/go-version-check.sh fails `mise run lint` when mise.toml and go.mod disagree, fixing the golangci-lint panic on a drifted toolchain]
 - Jun-29, 2026 - 08:09 PM +0800 - [TUI internals: give server launch command construction a backend adapter so direct argv and shell preview output share one source of truth]
