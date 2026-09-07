@@ -1,0 +1,30 @@
+  L╭────────────────────────────────────────────────────────────────────────────────────────────╮
+  ╭│                                                                                            │
+  ││  Runtime Environment                                                                       │
+  ││                                                                                            │
+  ││                                                                                            │
+  ││  Active Configuration                                                                      │
+  ││  koboldcpp path    —                                                                       │
+  ││  koboldcpp port    5001                                                                    │
+  ││  llama-server path /opt/llama/bin/llama-server                                             │
+  ││  llama.cpp host    127.0.0.1                                                               │
+  ││  llama.cpp port    8080                                                                    │
+  ││  ollama host       127.0.0.1:11434                                                         │
+  ││  ollama path       /usr/local/bin/ollama                                                   │
+  ││  vllm host         127.0.0.1                                                               │
+  ││  vllm path         —                                                                       │
+  ││  vllm port         8000                                                                    │
+  ││  vllm venv path    —                                                                       │
+  ││                                                                                            │
+  ╰│                                                                                            │
+   │  Overrides                                                                                 │
+   │  Overrides saved to config.toml. Shell environment variables take precedence.              │
+  L│                                                                                            │
+  ╭│  Llama.cpp                                    vLLM                                         │
+  ││                                                                                            │
+  ││  › Path (llama-cli / llama-server)              Path (vllm binary)                         │
+  ││  > /opt/llama/bin                             >                                            │
+  ││                                                                                            │
+  ╰│    Port                                         Venv Root (Optional)                       │
+   │  > 8080                                       >                                            │
+  t│                                                                                            │· ?

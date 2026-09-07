@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
+- Sep-07, 2026 - 09:24 AM +0800 - [Tests: split the 1977-line export panel test file into seven behavior-focused files, add golden-file coverage for the rendered main view, runtime panel, help panel, and alert pane, and raise internal/fsutil coverage from 44% to 79%]
 - Sep-07, 2026 - 09:20 AM +0800 - [Discovery: a symlink loop under a model directory no longer causes the same models to be found repeatedly. Each directory is now visited once, keyed by its resolved path, and only symlinked entries cost an extra stat]
 - Sep-07, 2026 - 09:18 AM +0800 - [Lint: enable nolintlint, errorlint, revive, gocognit (30), funlen (120/60), unparam, and copyloopvar, and split the seven functions that exceeded the new thresholds into per-focus and per-message handlers; connection-refused and DNS errors are now matched with errors.Is/errors.As instead of substring checks on the message]
 - Sep-07, 2026 - 09:03 AM +0800 - [Cleanup: read LLML_DEBUG once instead of on every debug call, drop a duplicate branch in ModelParamsKey, convert the remaining sort.Slice/sort.Strings calls to the slices package, and use errors.New for messages with no format verbs]

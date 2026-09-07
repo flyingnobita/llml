@@ -1,0 +1,4 @@
+  LLM Launcher
+  No GGUF or safetensors models found. Press 'm' to add search paths, or place models under ~/models, ~/.cache/huggingface/hub, etc.
+
+  tab: section · hjkl/↑↓←→: nav · R: run (split) · p: Parameter Profiles · I: import · a: alerts · ?: more

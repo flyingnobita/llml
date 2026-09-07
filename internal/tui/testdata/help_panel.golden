@@ -1,0 +1,30 @@
+  LLM Launcher              ╭──────────────────────────────────────────╮
+  ╭─────────────────────────│                                          │────────────────────────╮
+  │ Model ID                │  Keyboard Shortcuts                      │          File Name     │
+  │ qwen3-8b-q4             │                                          │          qwen3-8b-q4.g │
+  │ llama3.2:latest         │  Navigation                              │:latest   llama3.2:late │
+  │                         │       ↑/k  Move up                       │                        │
+  │                         │       ↓/j  Move down                     │                        │
+  │                         │       ←/h  Scroll left                   │                        │
+  │                         │       →/l  Scroll right                  │                        │
+  │                         │       tab  Section                       │                        │
+  │                         │                                          │                        │
+  │                         │  Model Actions                           │                        │
+  │                         │         R  Run server (split pane)       │                        │
+  │                         │    ctrl+R  Run server (full terminal)    │                        │
+  │                         │     enter  Copy launch command           │                        │
+  │                         │       [/]  Scroll launch preview         │                        │
+  │                         │                                          │                        │
+  │                         │  Configuration                           │                        │
+  ╰─────────────────────────│         c  Runtime Environment           │────────────────────────╯
+    ░░░░░░░░░░░░░░░░░░░░░░░░│         p  Parameter Profiles            │░░░░░░░░░░░░░░░░░░░░░░░
+                            │         E  Export profiles               │
+  Launch Command · default  │         m  Model Paths                   │
+  ╭─────────────────────────│         r  Reload runtime                │───────────────────────╮░
+  │ '/opt/llama/bin/llama-se│         S  Rescan models                 │                       │░
+  │   --model '/home/u/model│                                          │                       │░
+  │   --alias 'qwen3-8b-q4.g│  Table                                   │                       │░
+  │   --host 127.0.0.1 \    │         ,  Cycle sort column             │                       │░
+  ╰─────────────────────────│         .  Reverse sort order            │───────────────────────╯░
+                            │                                          │
+  tab: section · hjkl/↑↓←→: │  General                                 │ · I: import · a: alerts · ?

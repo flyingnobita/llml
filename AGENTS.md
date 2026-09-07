@@ -225,6 +225,15 @@ The pre-commit hook handles staged files automatically.
 - Unit tests for `scripts/` cover agent-skill sync behavior, including workspace/user
   install flows and parity between the canonical `.agents` skill and the tracked
   Claude compatibility copy.
+- **Golden files** (`internal/tui/testdata/*.golden`) pin the rendered layout of
+  the main view, the runtime panel, the help panel, and the alert pane. They
+  catch shifts an assertion-based test misses (a column that moves, a title that
+  truncates). Regenerate with `go test ./internal/tui -run Golden -update` and
+  **read the diff** — a changed golden file is either the change you intended or
+  a regression. ANSI styling is stripped and the alert clock is blanked, so
+  theme and time do not churn them.
+- Keep test files focused: when one passes roughly 500 lines, split it by
+  behavior (see `internal/tui/export_view_*_test.go`).
 - Do not mark a feature complete until `mise run check` passes.
 - **Platform portability:** When tests control `os.UserConfigDir()` or
   `os.UserHomeDir()`, set the relevant env vars (`HOME`, `XDG_CONFIG_HOME`)
