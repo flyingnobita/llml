@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -77,7 +78,7 @@ type discoveryScanPlan struct {
 	runtime  models.RuntimeInfo
 }
 
-func (svc services) prepareDiscoveryScan(explicitPaths []string) discoveryScanPlan {
+func (svc services) prepareDiscoveryScan(ctx context.Context, explicitPaths []string) discoveryScanPlan {
 	cfg, err := svc.readConfig()
 	haveCfg := err == nil
 	s := svc.resolveSettings(cfg, haveCfg, explicitPaths)
@@ -86,9 +87,9 @@ func (svc services) prepareDiscoveryScan(explicitPaths []string) discoveryScanPl
 	if len(fromFile) == 0 && haveCfg {
 		fromFile = cfg.Discovery.ExtraModelPaths
 	}
-	opts := models.Options{Settings: s, IncludeOllama: true}
+	opts := models.Options{Settings: s}
 	debugf("prepareDiscoveryScan: haveCfg=%t explicitPaths=%v fromFile=%v extraRoots=%v", haveCfg, explicitPaths, fromFile, s.ExtraModelPaths)
-	rt := svc.discoverRuntime(s)
+	rt := svc.discoverRuntime(ctx, s)
 	debugf("prepareDiscoveryScan: runtime ollamaPath=%q ollamaHost=%q ollamaRunning=%t", rt.OllamaPath, rt.OllamaHost, rt.OllamaRunning)
 	return discoveryScanPlan{
 		cfg:      cfg,
@@ -106,29 +107,36 @@ func discoveryStartNote(rt models.RuntimeInfo) string {
 }
 
 //nolint:staticcheck // ST1008: note strings follow error returns — caller unpacks by position.
-func (svc services) runDiscoveryScan(plan discoveryScanPlan) (models.RuntimeInfo, []models.ModelFile, time.Time, error, error, string, string) {
+func (svc services) runDiscoveryScan(ctx context.Context, plan discoveryScanPlan) (models.RuntimeInfo, []models.ModelFile, time.Time, error, error, string, string) {
 	rt := plan.runtime
 	var ollamaNote, ollamaWarn string
 	debugf("runDiscoveryScan: start haveCfg=%t ollamaPath=%q ollamaRunning=%t", plan.haveCfg, rt.OllamaPath, rt.OllamaRunning)
 	if rt.OllamaPath != "" && !rt.OllamaRunning {
 		spec := discoveryOllamaSpec(rt)
 		debugf("runDiscoveryScan: ensuring Ollama ready via bin=%q host=%q", spec.bin, spec.host)
-		ready, err := svc.ensureOllamaReady(spec)
+		ready, err := svc.ensureOllamaReady(ctx, spec)
 		if err != nil {
 			ollamaWarn = err.Error()
 			debugf("runDiscoveryScan: ensureOllamaReady failed: %v", err)
 		} else if ready.Started {
-			rt = svc.discoverRuntime(plan.settings)
+			rt = svc.discoverRuntime(ctx, plan.settings)
 			ollamaNote = fmt.Sprintf("Started Ollama for model discovery on %s", spec.host)
 			debugf("runDiscoveryScan: Ollama started successfully, refreshed runtime running=%t", rt.OllamaRunning)
 		}
 	}
-	files, derr := svc.discoverModels(plan.opts)
+	files, derr := svc.discoverModels(ctx, plan.opts)
 	if derr != nil {
 		debugf("runDiscoveryScan: discoverModels failed: %v", derr)
 		return rt, nil, time.Time{}, derr, nil, ollamaNote, ollamaWarn
 	}
 	debugf("runDiscoveryScan: discoverModels returned %d files", len(files))
+	// Ollama rows are fetched separately from the filesystem walk; a daemon
+	// that is down must not fail the scan.
+	if rows, oerr := svc.discoverOllama(ctx, plan.settings.OllamaHost); oerr == nil {
+		files = append(files, rows...)
+	} else {
+		debugf("runDiscoveryScan: ollama discovery failed, continuing: %v", oerr)
+	}
 	if plan.haveCfg {
 		files = mergeCachedOllamaRows(plan.cfg, files, rt)
 		debugf("runDiscoveryScan: after cache merge -> %d files", len(files))
@@ -144,11 +152,11 @@ func (svc services) runDiscoveryScan(plan discoveryScanPlan) (models.RuntimeInfo
 }
 
 // applyAndFullScanCmd applies [runtime] from config.toml when present, then runs a full discovery and writes config.toml.
-func (svc services) applyAndFullScanCmd(explicitPaths ...string) tea.Cmd {
-	plan := svc.prepareDiscoveryScan(explicitPaths)
+func (svc services) applyAndFullScanCmd(ctx context.Context, explicitPaths ...string) tea.Cmd {
+	plan := svc.prepareDiscoveryScan(ctx, explicitPaths)
 	scanCmd := func() tea.Msg {
 		debugf("applyAndFullScanCmd: executing scan")
-		rt, files, now, derr, werr, ollamaNote, ollamaWarn := svc.runDiscoveryScan(plan)
+		rt, files, now, derr, werr, ollamaNote, ollamaWarn := svc.runDiscoveryScan(ctx, plan)
 		if derr != nil {
 			return modelsErrMsg{err: derr}
 		}
@@ -175,11 +183,11 @@ func (svc services) applyAndFullScanCmd(explicitPaths ...string) tea.Cmd {
 }
 
 // rescanModelsCmd runs filesystem discovery only (S key); preserves current runtime env and merges discovery metadata into config.toml.
-func (svc services) rescanModelsCmd(explicitPaths ...string) tea.Cmd {
-	plan := svc.prepareDiscoveryScan(explicitPaths)
+func (svc services) rescanModelsCmd(ctx context.Context, explicitPaths ...string) tea.Cmd {
+	plan := svc.prepareDiscoveryScan(ctx, explicitPaths)
 	scanCmd := func() tea.Msg {
 		debugf("rescanModelsCmd: executing scan")
-		_, files, now, derr, werr, ollamaNote, ollamaWarn := svc.runDiscoveryScan(plan)
+		_, files, now, derr, werr, ollamaNote, ollamaWarn := svc.runDiscoveryScan(ctx, plan)
 		if derr != nil {
 			return modelsErrMsg{err: derr}
 		}
@@ -214,21 +222,27 @@ func (svc services) reloadRuntimeCmd() tea.Cmd {
 			}
 			return runtimeReloadErrMsg{err: err}
 		}
+		ctx, cancel := context.WithTimeout(context.Background(), runtimeProbeTimeout)
+		defer cancel()
 		s := svc.resolveSettings(cfg, true, nil)
-		return runtimeReadyMsg{runtime: svc.discoverRuntime(s), settings: s}
+		return runtimeReadyMsg{runtime: svc.discoverRuntime(ctx, s), settings: s}
 	}
 }
 
 // startupCmd tries the on-disk cache; on miss runs a full scan.
 func (svc services) startupCmd() tea.Cmd {
 	return func() tea.Msg {
+		// Startup owns its context end to end: it runs once, and the model has
+		// no handle to cancel it, so the timeout is what bounds it.
+		ctx, cancel := context.WithTimeout(context.Background(), scanTimeout)
+		defer cancel()
 		cfg, err := svc.readConfig()
 		s := svc.resolveSettings(cfg, err == nil, nil)
 		if err != nil || !cfg.ValidForCache() {
 			debugf("startupCmd: no valid cache, falling back to full scan err=%v valid=%t", err, err == nil && cfg.ValidForCache())
 			return startupNeedFullScanMsg{}
 		}
-		rt := svc.discoverRuntime(s)
+		rt := svc.discoverRuntime(ctx, s)
 		debugf("startupCmd: cache valid, runtime ollamaPath=%q ollamaRunning=%t cachedModels=%d", rt.OllamaPath, rt.OllamaRunning, len(cfg.Models))
 		if rt.OllamaPath != "" && !rt.OllamaRunning {
 			debugf("startupCmd: Ollama installed but stopped, forcing full scan")
@@ -241,7 +255,7 @@ func (svc services) startupCmd() tea.Cmd {
 		}
 		var writeErr error
 		if rt.OllamaRunning {
-			liveOllama, err := svc.discoverOllama(s.OllamaHost)
+			liveOllama, err := svc.discoverOllama(ctx, s.OllamaHost)
 			if err != nil {
 				debugf("startupCmd: live Ollama refresh failed, keeping cache: %v", err)
 			} else {
@@ -277,4 +291,37 @@ func clearLastRunNoteAfterCmd() tea.Cmd {
 	return tea.Tick(lastRunNoteVisibleDuration, func(time.Time) tea.Msg {
 		return lastRunNoteClearMsg{}
 	})
+}
+
+// startScan begins a discovery pass, storing the pass's CancelFunc on the model
+// so quitting (or starting another scan) can abandon it. A scan makes network
+// calls and walks the filesystem, so leaving one running after the user quits
+// would keep the process alive doing work nobody is waiting for.
+func (m Model) startScan(mode scanStartMode, explicitPaths ...string) (Model, tea.Cmd) {
+	m = m.cancelInFlightScan()
+	ctx, cancel := context.WithTimeout(context.Background(), scanTimeout)
+	m.scanCancel = cancel
+	if mode == scanStartFull {
+		return m, m.svc.applyAndFullScanCmd(ctx, explicitPaths...)
+	}
+	return m, m.svc.rescanModelsCmd(ctx, explicitPaths...)
+}
+
+// scanStartMode selects between a full pass (runtime probe plus models) and a
+// models-only rescan.
+type scanStartMode int
+
+const (
+	scanStartFull scanStartMode = iota
+	scanStartModelsOnly
+)
+
+// cancelInFlightScan cancels any scan still running and clears the handle.
+// Safe to call when no scan is in flight.
+func (m Model) cancelInFlightScan() Model {
+	if m.scanCancel != nil {
+		m.scanCancel()
+		m.scanCancel = nil
+	}
+	return m
 }

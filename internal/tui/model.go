@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"os/exec"
 	"strings"
 	"time"
@@ -230,6 +231,9 @@ type Model struct {
 	keys KeyMap
 	// svc holds every dependency the TUI reaches outside its own state. See services.go.
 	svc services
+	// scanCancel abandons the discovery pass currently in flight, if any. Set by
+	// startScan and called on quit so an abandoned scan stops doing work.
+	scanCancel context.CancelFunc
 	// settings holds every resolved runtime value. It is set from the message a
 	// scan or reload produces, and from the c panel on save; nothing in the TUI
 	// reads the process environment for these values.

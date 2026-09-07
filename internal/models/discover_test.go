@@ -42,7 +42,7 @@ func TestDiscover_findsSafetensorsModelDir(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := Discover(Options{ExtraRoots: []string{tmp}, MaxDepth: 8, SkipDefaultRoots: true})
+	got, err := Discover(t.Context(), Options{ExtraRoots: []string{tmp}, MaxDepth: 8, SkipDefaultRoots: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +77,7 @@ func TestDiscover_vllmNameUsesHFRepoID(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := Discover(Options{ExtraRoots: []string{tmp}, MaxDepth: 12, SkipDefaultRoots: true})
+	got, err := Discover(t.Context(), Options{ExtraRoots: []string{tmp}, MaxDepth: 12, SkipDefaultRoots: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +101,7 @@ func TestDiscover_findsGGUF(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := Discover(Options{ExtraRoots: []string{tmp}, MaxDepth: 8, SkipDefaultRoots: true})
+	got, err := Discover(t.Context(), Options{ExtraRoots: []string{tmp}, MaxDepth: 8, SkipDefaultRoots: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +131,7 @@ func TestDiscover_symlinkGGUF_reportsTargetSize(t *testing.T) {
 		t.Skip("symlink not supported:", err)
 	}
 
-	got, err := Discover(Options{ExtraRoots: []string{tmp}, MaxDepth: 8, SkipDefaultRoots: true})
+	got, err := Discover(t.Context(), Options{ExtraRoots: []string{tmp}, MaxDepth: 8, SkipDefaultRoots: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -163,7 +163,7 @@ func TestDiscover_followsSymlinkedRepoDir(t *testing.T) {
 		t.Skip("symlink not supported:", err)
 	}
 
-	got, err := Discover(Options{ExtraRoots: []string{hub}, MaxDepth: 12, SkipDefaultRoots: true})
+	got, err := Discover(t.Context(), Options{ExtraRoots: []string{hub}, MaxDepth: 12, SkipDefaultRoots: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -216,7 +216,7 @@ func TestDiscover_findsGGUFAndSafetensorsUnderSameRoot(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := Discover(Options{ExtraRoots: []string{tmp}, MaxDepth: 4, SkipDefaultRoots: true})
+	got, err := Discover(t.Context(), Options{ExtraRoots: []string{tmp}, MaxDepth: 4, SkipDefaultRoots: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -260,7 +260,7 @@ func TestDiscover_filtersAuxiliaryVLLMModel(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := Discover(Options{ExtraRoots: []string{tmp}, MaxDepth: 4, SkipDefaultRoots: true})
+	got, err := Discover(t.Context(), Options{ExtraRoots: []string{tmp}, MaxDepth: 4, SkipDefaultRoots: true})
 	if err != nil {
 		t.Fatal(err)
 	}

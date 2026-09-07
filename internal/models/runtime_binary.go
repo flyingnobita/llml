@@ -1,7 +1,9 @@
 package models
 
 import (
+	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -9,7 +11,6 @@ import (
 	"runtime"
 	"slices"
 	"strings"
-	"time"
 )
 
 var commonBinaryDirs = []string{
@@ -200,19 +201,22 @@ func findKoboldCppBinary(koboldCppPath string) string {
 	return ""
 }
 
-// probeHealthEndpoint GETs /health on host:port. Used by both llama-server and KoboldCpp.
-func probeHealthEndpoint(host string, port int) bool {
+// probeHealthEndpoint GETs /health on host:port, bounded by ctx. Used by both
+// llama-server and KoboldCpp. It shares the package HTTP client so repeated
+// probes reuse connections.
+func probeHealthEndpoint(ctx context.Context, host string, port int) bool {
 	url := fmt.Sprintf("http://%s:%d/health", host, port)
-	client := &http.Client{Timeout: 2 * time.Second}
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return false
 	}
-	resp, err := client.Do(req)
+	resp, err := sharedHTTPClient.Do(req)
 	if err != nil {
 		return false
 	}
 	defer func() { _ = resp.Body.Close() }()
+	// Drain so the connection returns to the pool.
+	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4<<10))
 	return resp.StatusCode == http.StatusOK
 }
 

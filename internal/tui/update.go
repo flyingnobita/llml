@@ -43,18 +43,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case startupCacheHitMsg:
+		m = m.cancelInFlightScan()
 		m.settings = msg.settings
 		return m.applyScanResult(&msg.runtime, msg.files, msg.lastScan, msg.configPaths, msg.writeErr, true)
 
 	case startupNeedFullScanMsg:
-		return m, m.svc.applyAndFullScanCmd()
+		return m.startScan(scanStartFull)
 
 	case fullScanDoneMsg:
+		m = m.cancelInFlightScan()
 		m.settings = msg.settings
 		m2, cmd := m.applyScanResult(&msg.runtime, msg.files, msg.lastScan, msg.configPaths, msg.writeErr, true)
 		return applyOllamaDiscoveryResult(m2, cmd, msg.ollamaNote, msg.ollamaWarn)
 
 	case modelRescanDoneMsg:
+		m = m.cancelInFlightScan()
 		m.settings = msg.settings
 		m2, cmd := m.applyScanResult(nil, msg.files, msg.lastScan, msg.configPaths, msg.writeErr, false)
 		return applyOllamaDiscoveryResult(m2, cmd, msg.ollamaNote, msg.ollamaWarn)
@@ -78,6 +81,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.maybeSetMissingRuntimeFooterNote()
 
 	case modelsErrMsg:
+		m = m.cancelInFlightScan()
 		m.loading = false
 		m.loadErr = msg.err
 		m = m.addAlert(alertSeverityError, "Discovery", msg.err.Error())
@@ -302,7 +306,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.updateServerSplitKeys(msg)
 	}
 	if key.Matches(msg, m.keys.Quit) {
-		return m, tea.Quit
+		return m.cancelInFlightScan(), tea.Quit
 	}
 	if key.Matches(msg, m.keys.Help) {
 		m.helpOpen = true
@@ -495,7 +499,7 @@ func (m Model) tryRescan(allowWhileExited bool) (Model, tea.Cmd) {
 	m.loading = true
 	m.loadErr = nil
 	m = m.withLastRunCleared()
-	return m, m.svc.rescanModelsCmd()
+	return m.startScan(scanStartModelsOnly)
 }
 
 // tryReloadRuntime initiates a runtime reload if preconditions allow.

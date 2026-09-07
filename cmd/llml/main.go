@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -301,7 +302,9 @@ func validateTargetBackend(target string, portables []profiles.PortableProfile, 
 // and the built-in defaults, in that order of precedence.
 func resolveModels(rescan bool) ([]models.ModelFile, error) {
 	scan := func() ([]models.ModelFile, error) {
-		return config.RunDiscovery(config.Resolve(settings.OSGetenv))
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+		defer cancel()
+		return config.RunDiscovery(ctx, config.Resolve(settings.OSGetenv))
 	}
 	if rescan {
 		fmt.Fprintln(os.Stderr, "Scanning local models...")

@@ -16,7 +16,7 @@ func TestWalkSearchTree_filesOnly(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "subdir", "c.gguf"), []byte("z"), 0o644)
 
 	var found []string
-	err := walkSearchTree(dir, 10, func(fullPath, _ string, _ os.DirEntry, _ int) error {
+	err := walkSearchTree(t.Context(), dir, 10, func(fullPath, _ string, _ os.DirEntry, _ int) error {
 		found = append(found, filepath.Base(fullPath))
 		return nil
 	})
@@ -32,7 +32,7 @@ func TestWalkSearchTree_emptyDir(t *testing.T) {
 	dir := t.TempDir()
 
 	var calls int
-	err := walkSearchTree(dir, 10, func(_, _ string, _ os.DirEntry, _ int) error {
+	err := walkSearchTree(t.Context(), dir, 10, func(_, _ string, _ os.DirEntry, _ int) error {
 		calls++
 		return nil
 	})
@@ -45,7 +45,7 @@ func TestWalkSearchTree_emptyDir(t *testing.T) {
 }
 
 func TestWalkSearchTree_nonexistent(t *testing.T) {
-	err := walkSearchTree("/nonexistent/path/12345", 10, func(_, _ string, _ os.DirEntry, _ int) error {
+	err := walkSearchTree(t.Context(), "/nonexistent/path/12345", 10, func(_, _ string, _ os.DirEntry, _ int) error {
 		return nil
 	})
 	if err != nil {

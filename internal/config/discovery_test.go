@@ -260,7 +260,7 @@ func TestRunDiscovery_WritesConfig(t *testing.T) {
 	t.Setenv("HOME", dir)
 
 	s := settings.Resolve(settings.Layer{ExtraModelPaths: []string{modelsDir}}, settings.Defaults())
-	models, err := RunDiscovery(s)
+	models, err := RunDiscovery(t.Context(), s)
 	if err != nil {
 		t.Fatal(err)
 	}

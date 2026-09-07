@@ -148,7 +148,7 @@ func (m Model) updateQuitConfirmKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch strings.ToLower(strings.TrimSpace(msg.String())) {
 	case "y":
 		m.quit.open = false
-		return m, tea.Quit
+		return m.cancelInFlightScan(), tea.Quit
 	case "n", "q":
 		m.quit.open = false
 		return m, nil

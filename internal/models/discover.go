@@ -3,6 +3,7 @@
 package models
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"slices"
@@ -87,9 +88,6 @@ type Options struct {
 	MaxDepth   int
 	// SkipDefaultRoots omits the home-directory defaults, which isolated scans and tests rely on.
 	SkipDefaultRoots bool
-	// IncludeOllama merges rows from the Ollama daemon at Settings.OllamaHost
-	// into the result. The filesystem walk itself never reaches the network.
-	IncludeOllama bool
 }
 
 // candidate is an internal (source-index, path) pair used during filesystem scan.
@@ -100,14 +98,14 @@ type candidate struct {
 
 // collectCandidates walks all roots and returns deduplicated (source, path) pairs in
 // walk order. Non-existent roots are silently skipped.
-func collectCandidates(roots []string, sources []modelSource, maxD int) ([]candidate, error) {
+func collectCandidates(ctx context.Context, roots []string, sources []modelSource, maxD int) ([]candidate, error) {
 	seen := make(map[candidate]struct{})
 	var ordered []candidate
 	for _, root := range roots {
 		if st, err := os.Stat(root); err != nil || !st.IsDir() {
 			continue
 		}
-		if err := walkSearchTree(root, maxD, func(full, parentDir string, ent os.DirEntry, _ int) error {
+		if err := walkSearchTree(ctx, root, maxD, func(full, parentDir string, ent os.DirEntry, _ int) error {
 			for i, src := range sources {
 				if p := src.match(full, parentDir, ent); p != "" {
 					c := candidate{i, p}
@@ -144,7 +142,14 @@ func buildModelFiles(candidates []candidate, sources []modelSource) []ModelFile 
 // Discover scans configured paths for .gguf files and Hugging Face-style safetensors directories
 // (config.json + *.safetensors) in a single filesystem walk, dedupes, sorts by path, and fills
 // Parameters. isAuxiliaryModel is applied to both backends after Parameters is populated.
-func Discover(opts Options) ([]ModelFile, error) {
+//
+// Discover touches the filesystem only. Rows from the Ollama API are the
+// caller's business: fetch them with [OllamaClient.Tags] and merge. Keeping the
+// network out of what reads as a filesystem walk is what lets a scan stay
+// responsive when a daemon hangs.
+//
+// The walk stops early if ctx is cancelled, returning ctx.Err().
+func Discover(ctx context.Context, opts Options) ([]ModelFile, error) {
 	maxD := opts.MaxDepth
 	if maxD <= 0 {
 		maxD = DefaultMaxDepth
@@ -152,17 +157,12 @@ func Discover(opts Options) ([]ModelFile, error) {
 	roots := opts.Settings.SearchRoots(opts.ExtraRoots, opts.SkipDefaultRoots)
 	sources := []modelSource{ggufSource{}, safetensorsSource{}}
 
-	candidates, err := collectCandidates(roots, sources, maxD)
+	candidates, err := collectCandidates(ctx, roots, sources, maxD)
 	if err != nil {
 		return nil, err
 	}
 
 	out := buildModelFiles(candidates, sources)
-	if opts.IncludeOllama {
-		if ollamaRows, err := DiscoverOllamaModels(opts.Settings.OllamaHost); err == nil {
-			out = append(out, ollamaRows...)
-		}
-	}
 	slices.SortFunc(out, compareForDefaultOrder)
 	return out, nil
 }

@@ -113,6 +113,19 @@ const (
 	// in split-pane mode.
 	ServerSplitChannelBuffer = 64
 
+	// runtimeProbeTimeout bounds the health and daemon probes DiscoverRuntime
+	// makes. They run concurrently, so this is the worst case for the whole set.
+	runtimeProbeTimeout = 3 * time.Second
+
+	// scanTimeout bounds a full discovery pass: the filesystem walk plus the
+	// Ollama query. Generous, because a cold walk over a large model directory
+	// is legitimately slow; it exists so a wedged scan cannot hang forever.
+	scanTimeout = 5 * time.Minute
+
+	// ollamaPreloadTimeout bounds loading a model into the Ollama daemon, which
+	// can mean reading tens of gigabytes from disk.
+	ollamaPreloadTimeout = 5 * time.Minute
+
 	// OllamaStartupTimeout is how long to wait for ollama serve to accept connections.
 	OllamaStartupTimeout = 8 * time.Second
 

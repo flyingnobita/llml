@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,9 +11,15 @@ import (
 // discovery. For each file (non-directory) within maxDepth, onFile is called with the
 // full path, parent directory, directory entry, and depth (path segments below root).
 // Unlike [filepath.WalkDir], symbolic links to directories are followed so HF hub layouts work.
-func walkSearchTree(root string, maxDepth int, onFile func(fullPath, parentDir string, ent os.DirEntry, depth int) error) error {
+//
+// The walk checks ctx before each directory and returns ctx.Err() when it is
+// done, so an abandoned scan does not keep reading the filesystem.
+func walkSearchTree(ctx context.Context, root string, maxDepth int, onFile func(fullPath, parentDir string, ent os.DirEntry, depth int) error) error {
 	var walk func(string) error
 	walk = func(dir string) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		entries, err := os.ReadDir(dir)
 		if err != nil {
 			return nil

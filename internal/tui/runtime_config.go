@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -288,7 +289,12 @@ func (m Model) commitRuntimeConfig() (Model, tea.Cmd) {
 		return m, clearLastRunNoteAfterCmd()
 	}
 	m.settings = next
-	m.runtime = m.svc.discoverRuntime(m.settings)
+	// Re-probing is synchronous here because the panel must show the result of
+	// the save immediately; the timeout keeps an unreachable backend from
+	// freezing the UI.
+	ctx, cancel := context.WithTimeout(context.Background(), runtimeProbeTimeout)
+	defer cancel()
+	m.runtime = m.svc.discoverRuntime(ctx, m.settings)
 	var cmd tea.Cmd
 	if err := writeConfigFromModel(m); err != nil {
 		m = m.withLastRunError("Could not save config: " + err.Error())

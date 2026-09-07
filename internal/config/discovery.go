@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"fmt"
 	"slices"
 	"time"
@@ -17,12 +18,15 @@ const cacheMaxAge = 24 * time.Hour
 // search roots already carry both the environment and config.toml entries,
 // because s was resolved from both. Callers that only need the cached models
 // should use CachedModels instead.
-func RunDiscovery(s settings.Settings) ([]models.ModelFile, error) {
-	opts := models.Options{Settings: s, IncludeOllama: true}
-
-	files, err := models.Discover(opts)
+func RunDiscovery(ctx context.Context, s settings.Settings) ([]models.ModelFile, error) {
+	files, err := models.Discover(ctx, models.Options{Settings: s})
 	if err != nil {
 		return nil, fmt.Errorf("model discovery failed: %w", err)
+	}
+	// Ollama rows come from the daemon, separately from the filesystem walk. A
+	// daemon that is down or slow must not fail or stall the whole scan.
+	if rows, err := models.NewOllamaClient(s.OllamaHost).Tags(ctx); err == nil {
+		files = append(files, rows...)
 	}
 
 	now := time.Now()

@@ -1,8 +1,10 @@
 package models
 
 import (
+	"context"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/flyingnobita/llml/internal/settings"
 )
@@ -104,8 +106,12 @@ func (r RuntimeInfo) Summary() string {
 
 // DiscoverRuntime locates llama-cli and llama-server using s.LlamaCppPath, common install
 // directories (including Homebrew on Apple Silicon), then PATH. If neither binary exists,
-// it probes http://{s.LlamaServerHost}:{s.LlamaServerPort}/health with a short timeout.
-func DiscoverRuntime(s settings.Settings) RuntimeInfo {
+// it probes http://{s.LlamaServerHost}:{s.LlamaServerPort}/health.
+//
+// The three network probes run concurrently, so an unreachable backend costs one
+// timeout rather than three in sequence, and all of them observe ctx: a cancelled
+// or expired context returns whatever the filesystem lookups found.
+func DiscoverRuntime(ctx context.Context, s settings.Settings) RuntimeInfo {
 	cli := findLlamaBinary("llama-cli", s.LlamaCppPath)
 	srv := findLlamaBinary("llama-server", s.LlamaCppPath)
 	info := RuntimeInfo{
@@ -125,15 +131,32 @@ func DiscoverRuntime(s settings.Settings) RuntimeInfo {
 		VLLMVenv:           s.VLLMVenv,
 		VLLMConfiguredPath: s.VLLMPath,
 	}
+
+	var wg sync.WaitGroup
+	var llamaRunning, ollamaRunning, koboldRunning bool
+
+	// Probing llama-server is only informative when neither binary was found.
 	if cli == "" && srv == "" {
-		if probeHealthEndpoint(s.LlamaServerHost, s.LlamaServerPort) {
-			info.ServerRunning = true
-		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			llamaRunning = probeHealthEndpoint(ctx, s.LlamaServerHost, s.LlamaServerPort)
+		}()
 	}
-	if ProbeOllama(s.OllamaHost) {
-		info.OllamaRunning = true
-	}
-	if probeHealthEndpoint(defaultProbeHost, s.KoboldCppPort) {
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		ollamaRunning = NewOllamaClient(s.OllamaHost).Probe(ctx)
+	}()
+	go func() {
+		defer wg.Done()
+		koboldRunning = probeHealthEndpoint(ctx, defaultProbeHost, s.KoboldCppPort)
+	}()
+	wg.Wait()
+
+	info.ServerRunning = llamaRunning
+	info.OllamaRunning = ollamaRunning
+	if koboldRunning {
 		info.KoboldCppRunning = true
 		info.KoboldCppProbePort = s.KoboldCppPort
 	}

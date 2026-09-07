@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"time"
 
 	"github.com/atotto/clipboard"
@@ -28,16 +29,17 @@ type services struct {
 	modelFilesFromCfg func([]config.ModelEntry) []models.ModelFile
 	filterExisting    func([]models.ModelFile) []models.ModelFile
 
-	// Discovery.
-	discoverRuntime func(settings.Settings) models.RuntimeInfo
-	discoverModels  func(models.Options) ([]models.ModelFile, error)
-	discoverOllama  func(host string) ([]models.ModelFile, error)
+	// Discovery. Every call that can block on I/O takes a context so an
+	// abandoned scan stops instead of running to a fixed timeout.
+	discoverRuntime func(context.Context, settings.Settings) models.RuntimeInfo
+	discoverModels  func(context.Context, models.Options) ([]models.ModelFile, error)
+	discoverOllama  func(ctx context.Context, host string) ([]models.ModelFile, error)
 
 	// Ollama daemon lifecycle.
 	startOllamaDaemon func(serverSpec) error
-	waitForOllama     func(host string) bool
-	probeOllama       func(host string) bool
-	preloadOllama     func(host, modelID string) error
+	waitForOllama     func(ctx context.Context, host string) bool
+	probeOllama       func(ctx context.Context, host string) bool
+	preloadOllama     func(ctx context.Context, host, modelID string) error
 
 	// Environment and clipboard.
 	getenv         settings.Getenv
@@ -58,11 +60,17 @@ func defaultServices() services {
 
 		discoverRuntime: models.DiscoverRuntime,
 		discoverModels:  models.Discover,
-		discoverOllama:  models.DiscoverOllamaModels,
+		discoverOllama: func(ctx context.Context, host string) ([]models.ModelFile, error) {
+			return models.NewOllamaClient(host).Tags(ctx)
+		},
 
 		startOllamaDaemon: startOllamaDaemon,
-		probeOllama:       models.ProbeOllama,
-		preloadOllama:     models.PreloadOllamaModel,
+		probeOllama: func(ctx context.Context, host string) bool {
+			return models.NewOllamaClient(host).Probe(ctx)
+		},
+		preloadOllama: func(ctx context.Context, host, modelID string) error {
+			return models.NewOllamaClient(host).Preload(ctx, modelID)
+		},
 
 		getenv:         settings.OSGetenv,
 		clipboardWrite: clipboard.WriteAll,
@@ -72,16 +80,20 @@ func defaultServices() services {
 // waitForOllamaOrDefault returns the injected wait function, falling back to the
 // real poll loop. The fallback is here rather than in defaultServices because
 // the default implementation needs probeOllama from the same services value.
-func (s services) waitForOllamaOrDefault(host string) bool {
+func (s services) waitForOllamaOrDefault(ctx context.Context, host string) bool {
 	if s.waitForOllama != nil {
-		return s.waitForOllama(host)
+		return s.waitForOllama(ctx, host)
 	}
-	deadline := time.Now().Add(OllamaStartupTimeout)
-	for time.Now().Before(deadline) {
-		if s.probeOllama(host) {
+	ctx, cancel := context.WithTimeout(ctx, OllamaStartupTimeout)
+	defer cancel()
+	for {
+		if s.probeOllama(ctx, host) {
 			return true
 		}
-		time.Sleep(OllamaPollInterval)
+		select {
+		case <-ctx.Done():
+			return false
+		case <-time.After(OllamaPollInterval):
+		}
 	}
-	return s.probeOllama(host)
 }

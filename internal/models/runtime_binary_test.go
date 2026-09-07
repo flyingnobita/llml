@@ -134,7 +134,7 @@ func TestProbeHealthEndpoint(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !probeHealthEndpoint("127.0.0.1", port) {
+	if !probeHealthEndpoint(t.Context(), "127.0.0.1", port) {
 		t.Fatal("expected health probe success")
 	}
 }

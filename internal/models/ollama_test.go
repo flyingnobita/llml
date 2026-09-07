@@ -32,7 +32,7 @@ func TestDiscoverOllamaModels(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	got, err := DiscoverOllamaModels(strings.TrimPrefix(srv.URL, "http://"))
+	got, err := NewOllamaClient(strings.TrimPrefix(srv.URL, "http://")).Tags(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,7 +71,7 @@ func TestPreloadOllamaModel(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	if err := PreloadOllamaModel(strings.TrimPrefix(srv.URL, "http://"), "qwen3.5:latest"); err != nil {
+	if err := NewOllamaClient(strings.TrimPrefix(srv.URL, "http://")).Preload(t.Context(), "qwen3.5:latest"); err != nil {
 		t.Fatal(err)
 	}
 }

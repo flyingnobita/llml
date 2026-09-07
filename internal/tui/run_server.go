@@ -2,6 +2,7 @@ package tui
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -514,9 +515,9 @@ type ollamaReadyResult struct {
 	Started bool
 }
 
-func (svc services) ensureOllamaReady(spec serverSpec) (ollamaReadyResult, error) {
+func (svc services) ensureOllamaReady(ctx context.Context, spec serverSpec) (ollamaReadyResult, error) {
 	debugf("ensureOllamaReady: probe start bin=%q host=%q", spec.bin, spec.host)
-	if svc.probeOllama(spec.host) {
+	if svc.probeOllama(ctx, spec.host) {
 		debugf("ensureOllamaReady: Ollama already reachable")
 		return ollamaReadyResult{}, nil
 	}
@@ -524,7 +525,7 @@ func (svc services) ensureOllamaReady(spec serverSpec) (ollamaReadyResult, error
 		debugf("ensureOllamaReady: start failed: %v", err)
 		return ollamaReadyResult{}, err
 	}
-	if !svc.waitForOllamaOrDefault(spec.host) {
+	if !svc.waitForOllamaOrDefault(ctx, spec.host) {
 		debugf("ensureOllamaReady: waitForOllama timed out")
 		return ollamaReadyResult{}, fmt.Errorf("ollama did not become ready on %s", spec.host)
 	}
@@ -542,15 +543,19 @@ func discoveryOllamaSpec(rt models.RuntimeInfo) serverSpec {
 }
 
 func (svc services) runOllamaLaunchCmd(spec serverSpec) tea.Cmd {
+	// Preloading a model can mean reading tens of gigabytes, so it gets its own
+	// generous bound rather than the probe timeout.
 	startNote := fmt.Sprintf("Loading %s into Ollama on %s...", spec.modelPath, spec.host)
 	return tea.Batch(
 		func() tea.Msg { return ollamaLaunchStartedMsg{note: startNote} },
 		func() tea.Msg {
-			ready, err := svc.ensureOllamaReady(spec)
+			ctx, cancel := context.WithTimeout(context.Background(), ollamaPreloadTimeout)
+			defer cancel()
+			ready, err := svc.ensureOllamaReady(ctx, spec)
 			if err != nil {
 				return ollamaLaunchDoneMsg{err: err}
 			}
-			if err := svc.preloadOllama(spec.host, spec.modelPath); err != nil {
+			if err := svc.preloadOllama(ctx, spec.host, spec.modelPath); err != nil {
 				return ollamaLaunchDoneMsg{err: err}
 			}
 			note := fmt.Sprintf("Loaded %s into Ollama on %s", spec.modelPath, spec.host)
