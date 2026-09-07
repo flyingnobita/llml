@@ -336,7 +336,7 @@ func NewWithServices(svc services) Model {
 		preview:   launchPreviewState{viewport: newLaunchPreviewViewport(st)},
 		alerts:    alertsState{viewport: newAlertViewport(st)},
 		rc:        runtimeConfigState{inputs: newRuntimeConfigInputs()},
-		params:    paramsState{editInput: newParamLineTextInput(), notesInput: newNotesTextarea()},
+		params:    paramsState{editInput: newParamLineTextInput(), notesInput: newNotesTextarea(st)},
 		discovery: discoveryPathsState{editInput: newPathTextInput()},
 		export:    exportViewState{pathInput: newPathTextInput(), filterInput: newFilterTextInput()},
 		import_:   importViewState{pathInput: newPathTextInput(), picker: filepicker.New()},
@@ -896,6 +896,9 @@ func (m Model) cycleTheme() (Model, tea.Cmd) {
 	m.ui.themeToast = themeToastText(m.ui.themePick, m.ui.theme)
 	m.preview.viewport.Style = m.ui.styles.launchPreviewViewport
 	m.alerts.viewport.Style = m.ui.styles.alertPaneViewport
+	// The Notes textarea carries its own style copy, so it has to be restyled
+	// rather than just re-rendered.
+	m.params.notesInput.SetStyles(m.ui.styles.notesTextarea)
 	m = m.layoutTable()
 	return m, clearThemeToastAfterCmd()
 }

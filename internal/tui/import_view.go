@@ -336,15 +336,7 @@ func (m Model) importPickerModalBlock() string {
 
 	content := title + "\n" + pickerView + "\n" + footer
 
-	box := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(m.ui.theme.Border).
-		Padding(0, 2).
-		Width(w).
-		Height(h).
-		Render(content)
-
-	return box
+	return m.ui.styles.importBox.Width(w).Height(h).Render(content)
 }
 
 func (m Model) importFooter() string {

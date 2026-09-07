@@ -98,9 +98,10 @@ var paramHardwareClassOptions = []profiles.HardwareClass{
 	profiles.HardwareClassMixed,
 }
 
-// newNotesTextarea builds the textarea used for the Notes metadata field.
+// newNotesTextarea builds the textarea used for the Notes metadata field, using
+// the styling from newStyles so a theme change restyles it.
 // It has no prompt, no line numbers, dynamic height capped at notesMaxLines.
-func newNotesTextarea() textarea.Model {
+func newNotesTextarea(st styles) textarea.Model {
 	ta := textarea.New()
 	ta.Prompt = ""
 	ta.ShowLineNumbers = false
@@ -111,13 +112,7 @@ func newNotesTextarea() textarea.Model {
 	ta.EndOfBufferCharacter = ' '
 	// Width is set via SetWidth in startMetadataValueEdit; set a sane placeholder now.
 	ta.SetWidth(MinParamEditInnerWidth)
-	// Clear distracting defaults: no CursorLine background highlight.
-	s := ta.Styles()
-	s.Focused.CursorLine = lipgloss.NewStyle()
-	s.Focused.Base = lipgloss.NewStyle()
-	s.Blurred.CursorLine = lipgloss.NewStyle()
-	s.Blurred.Base = lipgloss.NewStyle()
-	ta.SetStyles(s)
+	ta.SetStyles(st.notesTextarea)
 	ta.Blur()
 	return ta
 }
@@ -168,7 +163,7 @@ func (m Model) openParamPanel() (Model, tea.Cmd) {
 	m.params.editKind = paramEditNone
 	m.params.editInput.Blur()
 	m.params.editInput.SetValue("")
-	m.params.notesInput = newNotesTextarea()
+	m.params.notesInput = newNotesTextarea(m.ui.styles)
 
 	ent, err := profiles.LoadEntry(m.params.modelPath)
 	var cmd tea.Cmd

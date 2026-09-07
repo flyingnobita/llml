@@ -93,20 +93,10 @@ func (m Model) helpPanelModalBlock() string {
 	}
 	keyColW := maxKeyW + 2 // padding
 
-	keyStyle := lipgloss.NewStyle().
-		Foreground(m.ui.theme.Title).
-		Bold(true).
-		Width(keyColW).
-		Align(lipgloss.Right)
-
-	descStyle := lipgloss.NewStyle().
-		Foreground(m.ui.theme.Body).
-		PaddingLeft(2)
-
-	sectionTitleStyle := lipgloss.NewStyle().
-		Foreground(m.ui.theme.ParamSectionHeading).
-		Bold(true).
-		MarginTop(1)
+	// Only the key column's width depends on the content; the rest is theme.
+	keyStyle := m.ui.styles.helpKey.Width(keyColW)
+	descStyle := m.ui.styles.helpDesc
+	sectionTitleStyle := m.ui.styles.helpSectionTitle
 
 	var rows []string
 	rows = append(rows, m.modalTitleRow(cw, m.ui.styles.portConfigTitle, "Keyboard Shortcuts"))

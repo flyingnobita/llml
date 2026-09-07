@@ -185,3 +185,39 @@ func TestCycleThemeRotatesPick(t *testing.T) {
 		t.Fatalf("after 3: want dark got %d", m.ui.themePick)
 	}
 }
+
+// Styles built once in newStyles must follow a theme change. The help panel
+// styles moved out of the render path into newStyles, so this guards that they
+// are rebuilt rather than captured once.
+func TestCycleTheme_restylesHelpPanel(t *testing.T) {
+	m := newTestModel()
+
+	m.ui.themePick = themePickDark
+	m.ui.theme = themeFromPick(m.ui.themePick, true)
+	m.ui.styles = newStyles(m.ui.theme)
+	darkKey := m.ui.styles.helpKey.GetForeground()
+	darkSection := m.ui.styles.helpSectionTitle.GetForeground()
+
+	m2, _ := m.cycleTheme() // dark -> light
+
+	if m2.ui.styles.helpKey.GetForeground() == darkKey {
+		t.Error("help key style did not follow the theme change")
+	}
+	if m2.ui.styles.helpSectionTitle.GetForeground() == darkSection {
+		t.Error("help section title style did not follow the theme change")
+	}
+}
+
+// The Notes textarea holds its own copy of its styles, so cycleTheme pushes the
+// current ones into it. Those styles are deliberately empty today (they exist to
+// clear distracting bubbles defaults), so this asserts the wiring, not a colour.
+func TestCycleTheme_refreshesNotesTextareaStyles(t *testing.T) {
+	m := newTestModel()
+	m2, _ := m.cycleTheme()
+
+	got := m2.params.notesInput.Styles()
+	want := m2.ui.styles.notesTextarea
+	if got.Focused.CursorLine.GetBackground() != want.Focused.CursorLine.GetBackground() {
+		t.Error("notes textarea styles were not refreshed on theme change")
+	}
+}

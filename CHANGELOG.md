@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
+- Sep-07, 2026 - 09:01 AM +0800 - [TUI internals: move the last inline lipgloss styles (help panel, import box, alert body, pane titles, Notes textarea) into newStyles so a theme change restyles them, and enforce the rule with a forbidigo lint; alert lines now measure the tag by display width instead of byte length]
 - Sep-07, 2026 - 08:57 AM +0800 - [CLI: add `llml --help` with a usage listing of the subcommands, and make the entrypoint testable — os.Exit is now called once in main, subcommands return errors, and a bad flag no longer exits the process from inside flag parsing. cmd/llml test coverage rises from 29% to 73%]
 - Sep-07, 2026 - 08:53 AM +0800 - [TUI internals: delete the internal/tui/model_params.go alias shim and call internal/profiles directly; four of its wrappers had no non-test callers, and the tests that covered real behavior moved to the package that owns it]
 - Sep-07, 2026 - 08:49 AM +0800 - [Profiles: one portable parser shared by file and URL import (the v2 migration existed twice), and one model-location rule table shared by import and export (it existed three times and the three disagreed). Export now also excludes HF_TOKEN and the vLLM cache paths, so tokens no longer leak into exported profiles; docs/profile-format.md section 8 lists exactly what is stripped]

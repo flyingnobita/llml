@@ -10,6 +10,7 @@ linters:
     - gosec
     - gocritic
     - misspell
+    - forbidigo
 
   settings:
     gocritic:
@@ -22,6 +23,13 @@ linters:
     govet:
       disable:
         - fieldalignment
+    forbidigo:
+      # AGENTS.md: styles are built once in newStyles so a theme change
+      # restyles everything. An inline style silently ignores the active theme.
+      forbid:
+        - pattern: ^lipgloss\.NewStyle$
+          msg: build styles in internal/tui/styles.go (newStyles), not inline
+      analyze-types: true
     errcheck:
       # Writes to the CLI's own stdout/stderr. A failure there cannot be
       # reported (the place to report it is what failed) and is not
@@ -43,6 +51,10 @@ linters:
         linters:
           - gosec
           - errcheck
+      # styles.go is where styles are supposed to be built.
+      - path: internal/tui/styles\.go
+        linters:
+          - forbidigo
 
 formatters:
   enable:

@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"charm.land/bubbles/v2/textarea"
 	"charm.land/lipgloss/v2"
 
 	btable "charm.land/bubbles/v2/table"
@@ -59,6 +60,22 @@ type styles struct {
 	// launchPreviewContent styles the command string inside the viewport.
 	launchPreviewContent lipgloss.Style
 	table                btable.Styles
+
+	// paneTitleFocused and paneTitleDim are the bold split-pane titles; the
+	// caller applies the colour for the specific pane.
+	paneTitleFocused lipgloss.Style
+	paneTitleDim     lipgloss.Style
+	// alertMessage wraps an alert body to the width the caller sets.
+	alertMessage lipgloss.Style
+	// Help panel.
+	helpKey          lipgloss.Style
+	helpDesc         lipgloss.Style
+	helpSectionTitle lipgloss.Style
+	// importBox frames the import filepicker.
+	importBox lipgloss.Style
+	// notesTextarea is the Notes field's textarea styling, with the distracting
+	// bubbles defaults (cursor-line highlight, base padding) cleared.
+	notesTextarea textarea.Styles
 }
 
 // newStyles builds lipgloss styles from a Theme. Header and Cell use
@@ -203,5 +220,37 @@ func newStyles(theme Theme) styles {
 				Foreground(theme.TableSelected).
 				Background(theme.TableSelectedBg),
 		},
+
+		paneTitleFocused: lipgloss.NewStyle().Bold(true).Foreground(theme.SplitPaneBorderFocused),
+		paneTitleDim:     lipgloss.NewStyle().Bold(true).Foreground(theme.Border),
+		alertMessage:     lipgloss.NewStyle(),
+		helpKey: lipgloss.NewStyle().
+			Foreground(theme.Title).
+			Bold(true).
+			Align(lipgloss.Right),
+		helpDesc: lipgloss.NewStyle().
+			Foreground(theme.Body).
+			PaddingLeft(2),
+		helpSectionTitle: lipgloss.NewStyle().
+			Foreground(theme.ParamSectionHeading).
+			Bold(true).
+			MarginTop(1),
+		importBox: lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(theme.Border).
+			Padding(0, 2),
+		notesTextarea: newNotesTextareaStyles(),
 	}
+}
+
+// newNotesTextareaStyles returns the Notes textarea styling: the bubbles
+// defaults with the cursor-line highlight and base padding cleared, which are
+// distracting in a three-line field.
+func newNotesTextareaStyles() textarea.Styles {
+	var st textarea.Styles
+	st.Focused.CursorLine = lipgloss.NewStyle()
+	st.Focused.Base = lipgloss.NewStyle()
+	st.Blurred.CursorLine = lipgloss.NewStyle()
+	st.Blurred.Base = lipgloss.NewStyle()
+	return st
 }

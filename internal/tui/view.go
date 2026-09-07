@@ -19,21 +19,22 @@ func (m Model) mainPaneCaptionLine(title string, titleStyle lipgloss.Style) stri
 	return titleStyle.Width(iw).Render(title)
 }
 
-// titledPaneStyle returns a bold title style using focusedColor when focused, else dimColor.
-func titledPaneStyle(focused bool, focusedColor, dimColor color.Color) lipgloss.Style {
-	st := lipgloss.NewStyle().Bold(true)
+// titledPaneStyle returns the bold pane-title style carrying focusedColor when
+// focused, else dimColor. The base styles come from newStyles; only the colour
+// varies per pane.
+func (m Model) titledPaneStyle(focused bool, focusedColor, dimColor color.Color) lipgloss.Style {
 	if focused {
-		return st.Foreground(focusedColor)
+		return m.ui.styles.paneTitleFocused.Foreground(focusedColor)
 	}
-	return st.Foreground(dimColor)
+	return m.ui.styles.paneTitleDim.Foreground(dimColor)
 }
 
 func (m Model) launchPreviewPaneTitleStyle() lipgloss.Style {
-	return titledPaneStyle(m.preview.focused, m.ui.theme.SplitPaneBorderFocused, m.ui.theme.Border)
+	return m.titledPaneStyle(m.preview.focused, m.ui.theme.SplitPaneBorderFocused, m.ui.theme.Border)
 }
 
 func (m Model) serverLogPaneTitleStyle() lipgloss.Style {
-	return titledPaneStyle(m.server.splitFocused, m.ui.theme.SplitPaneBorderFocused, m.ui.theme.SplitPaneBorderDim)
+	return m.titledPaneStyle(m.server.splitFocused, m.ui.theme.SplitPaneBorderFocused, m.ui.theme.SplitPaneBorderDim)
 }
 
 // serverLogPaneView renders the bordered server log viewport and, when vertical
@@ -84,11 +85,11 @@ func (m Model) renderAlertLine(e alertEntry, width int) string {
 		tagStyle = m.ui.styles.alertTitleError
 	}
 	head := prefix + tagStyle.Render(tag) + " " + source
-	bodyW := width - lipgloss.Width(prefix) - len(tag) - 1 - lipgloss.Width(source)
+	bodyW := width - lipgloss.Width(prefix) - lipgloss.Width(tag) - 1 - lipgloss.Width(source)
 	if bodyW < 16 {
 		bodyW = 16
 	}
-	return head + lipgloss.NewStyle().Width(bodyW).Render(e.message)
+	return head + m.ui.styles.alertMessage.Width(bodyW).Render(e.message)
 }
 
 func (m Model) renderAlertHistoryContent(width int) string {
@@ -121,7 +122,7 @@ func (m Model) alertsFooterHint() string {
 }
 
 func (m Model) alertsTitleStyle() lipgloss.Style {
-	return titledPaneStyle(m.alerts.open, m.ui.theme.SplitPaneBorderFocused, m.ui.theme.Border)
+	return m.titledPaneStyle(m.alerts.open, m.ui.theme.SplitPaneBorderFocused, m.ui.theme.Border)
 }
 
 func (m Model) alertHistoryPaneView() string {
