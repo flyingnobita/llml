@@ -4,11 +4,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/flyingnobita/llml/internal/profiles"
+
 	"github.com/flyingnobita/llml/internal/models"
 )
 
 func TestBuildServerSpec_OllamaPreview(t *testing.T) {
-	spec, err := buildServerSpec(models.BackendOllama, "qwen3.5:latest", ModelParams{}, models.RuntimeInfo{
+	spec, err := buildServerSpec(models.BackendOllama, "qwen3.5:latest", profiles.ModelParams{}, models.RuntimeInfo{
 		OllamaHost: "127.0.0.1:11434",
 	}, false)
 	if err != nil {

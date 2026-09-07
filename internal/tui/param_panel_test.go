@@ -14,7 +14,7 @@ import (
 	"github.com/flyingnobita/llml/internal/profiles"
 )
 
-func setTestParamEditor(m *Model, ent modelEntry) {
+func setTestParamEditor(m *Model, ent profiles.Entry) {
 	m.params.editor = newProfileEditor(ent)
 }
 
@@ -29,12 +29,14 @@ func TestParseEnvLine_expandTilde(t *testing.T) {
 }
 
 func TestCloneProfileName(t *testing.T) {
-	profiles := []ParameterProfile{{Name: "cuda"}, {Name: "cuda copy"}}
-	if got := cloneProfileName("cuda", profiles); got != "cuda copy 2" {
-		t.Fatalf("cloneProfileName = %q", got)
+	t.Parallel()
+
+	existing := []profiles.Profile{{Name: "cuda"}, {Name: "cuda copy"}}
+	if got := profiles.CloneProfileName("cuda", existing); got != "cuda copy 2" {
+		t.Fatalf("CloneProfileName = %q", got)
 	}
-	if got := cloneProfileName("", []ParameterProfile{{Name: "x"}}); got == "" {
-		t.Fatal("empty base should fall back to nextProfileName")
+	if got := profiles.CloneProfileName("", []profiles.Profile{{Name: "x"}}); got == "" {
+		t.Fatal("empty base should fall back to NextProfileName")
 	}
 }
 
@@ -50,13 +52,13 @@ func TestParamPanelCloneProfile(t *testing.T) {
 	m.params.modelPath = "/m/a.gguf"
 	m.params.open = true
 	m.params.focus = paramFocusProfiles
-	setTestParamEditor(&m, modelEntry{Profiles: []ParameterProfile{
+	setTestParamEditor(&m, profiles.Entry{Profiles: []profiles.Profile{
 		{
 			Name:     "cuda",
 			Backend:  "koboldcpp",
 			UseCase:  profiles.UseCaseMetadata{Primary: profiles.UseCasePrimaries{profiles.UseCaseGeneral}, Tags: []string{"interactive"}},
 			Hardware: profiles.HardwareMetadata{Class: profiles.HardwareClassGPU},
-			Env:      []EnvVar{{Key: "FOO", Value: "bar"}},
+			Env:      []profiles.EnvVar{{Key: "FOO", Value: "bar"}},
 			Args:     []string{"--x"},
 		},
 		{Name: "cpu"},
@@ -96,7 +98,7 @@ func TestParamPanelDeleteConfirm(t *testing.T) {
 	m.layout.height = 24
 	m.params.open = true
 	m.params.focus = paramFocusProfiles
-	setTestParamEditor(&m, modelEntry{Profiles: []ParameterProfile{{Name: "a"}, {Name: "b"}}, ActiveIndex: 0})
+	setTestParamEditor(&m, profiles.Entry{Profiles: []profiles.Profile{{Name: "a"}, {Name: "b"}}, ActiveIndex: 0})
 
 	m, _ = m.updateParamPanelKey(tea.KeyPressMsg{Code: 'd', Text: "d"})
 	if m.params.confirmDelete != paramConfirmProfile {
@@ -111,7 +113,7 @@ func TestParamPanelDeleteConfirm(t *testing.T) {
 		t.Fatal("n should dismiss confirm dialog")
 	}
 
-	setTestParamEditor(&m, modelEntry{Profiles: []ParameterProfile{{Name: "only"}}, ActiveIndex: 0})
+	setTestParamEditor(&m, profiles.Entry{Profiles: []profiles.Profile{{Name: "only"}}, ActiveIndex: 0})
 	m.params.confirmDelete = paramConfirmNone
 	m, _ = m.updateParamPanelKey(tea.KeyPressMsg{Code: 'd', Text: "d"})
 	if m.params.confirmDelete != paramConfirmNone {
@@ -125,7 +127,7 @@ func TestParamPanelDeleteEnvRowConfirm(t *testing.T) {
 	m.layout.height = 24
 	m.params.open = true
 	m.params.focus = paramFocusEnv
-	setTestParamEditor(&m, modelEntry{Profiles: []ParameterProfile{{Name: "p", Env: []EnvVar{{Key: "K", Value: "V"}}, Args: nil}}, ActiveIndex: 0})
+	setTestParamEditor(&m, profiles.Entry{Profiles: []profiles.Profile{{Name: "p", Env: []profiles.EnvVar{{Key: "K", Value: "V"}}, Args: nil}}, ActiveIndex: 0})
 
 	m, _ = m.updateParamPanelKey(tea.KeyPressMsg{Code: 'd', Text: "d"})
 	if m.params.confirmDelete != paramConfirmEnvRow {
@@ -149,7 +151,7 @@ func TestParamPanelEscapeClosesPanelByKeyCode(t *testing.T) {
 	m.layout.height = 24
 	m.params.open = true
 	m.params.focus = paramFocusProfiles
-	setTestParamEditor(&m, modelEntry{Profiles: []ParameterProfile{{Name: "a"}}, ActiveIndex: 0})
+	setTestParamEditor(&m, profiles.Entry{Profiles: []profiles.Profile{{Name: "a"}}, ActiveIndex: 0})
 
 	m, _ = m.updateParamPanelKey(tea.KeyPressMsg{Code: tea.KeyEscape})
 	if m.params.open {
@@ -170,7 +172,7 @@ func TestParamPanelEscapeClosesEvenWithMissingRuntimeNote(t *testing.T) {
 	m.params.open = true
 	m.params.focus = paramFocusProfiles
 	m.params.modelPath = "/m/a.gguf"
-	setTestParamEditor(&m, modelEntry{Profiles: []ParameterProfile{{Name: "a", Backend: "koboldcpp"}}, ActiveIndex: 0})
+	setTestParamEditor(&m, profiles.Entry{Profiles: []profiles.Profile{{Name: "a", Backend: "koboldcpp"}}, ActiveIndex: 0})
 
 	m, _ = m.updateParamPanelKey(tea.KeyPressMsg{Code: tea.KeyEscape})
 	if m.params.open {
@@ -184,7 +186,7 @@ func TestParamPanelEscapeClosesEvenWithMissingRuntimeNote(t *testing.T) {
 func TestCommitParamLineEdit_blankEnvLikeCancel(t *testing.T) {
 	m := New()
 	m.params.focus = paramFocusEnv
-	m.params.editor.env = []EnvVar{{Key: "K", Value: "V"}}
+	m.params.editor.env = []profiles.EnvVar{{Key: "K", Value: "V"}}
 	m.params.editor.envCursor = 0
 	m.params.editKind = paramEditEnvLine
 	m.params.editInput.SetValue("   ")
@@ -201,7 +203,7 @@ func TestCommitParamLineEdit_blankEnvLikeCancel(t *testing.T) {
 func TestCommitParamLineEdit_blankEnvRemovesNewEmptyRow(t *testing.T) {
 	m := New()
 	m.params.focus = paramFocusEnv
-	m.params.editor.env = []EnvVar{{}}
+	m.params.editor.env = []profiles.EnvVar{{}}
 	m.params.editor.envCursor = 0
 	m.params.editKind = paramEditEnvLine
 	m.params.editInput.SetValue("")
@@ -245,7 +247,7 @@ func TestParamPanelEditTabDoesNotSwitchSections(t *testing.T) {
 	m.params.open = true
 	m.params.focus = paramFocusEnv
 	m.params.editKind = paramEditEnvLine
-	m.params.editor.env = []EnvVar{{Key: "K", Value: "V"}}
+	m.params.editor.env = []profiles.EnvVar{{Key: "K", Value: "V"}}
 	m.params.editor.envCursor = 0
 	m.params.editInput.SetValue("K=V")
 
@@ -270,7 +272,7 @@ func TestParamPanelIdleTabSkipsArgsAsSeparateSection(t *testing.T) {
 	m := New()
 	m.params.open = true
 	m.params.focus = paramFocusEnv
-	m.params.editor.env = []EnvVar{{Key: "K", Value: "V"}}
+	m.params.editor.env = []profiles.EnvVar{{Key: "K", Value: "V"}}
 	m.params.editor.args = []string{"--ctx-size 4096"}
 
 	m, _ = m.updateParamPanelKey(tea.KeyPressMsg{Code: tea.KeyTab, Text: "tab"})
@@ -289,7 +291,7 @@ func TestParamPanelCursorCrossesBetweenEnvAndArgs(t *testing.T) {
 	m := New()
 	m.params.open = true
 	m.params.focus = paramFocusEnv
-	m.params.editor.env = []EnvVar{{Key: "K", Value: "V"}}
+	m.params.editor.env = []profiles.EnvVar{{Key: "K", Value: "V"}}
 	m.params.editor.args = []string{"--ctx-size 4096", "--threads 8"}
 	m.params.editor.envCursor = 0
 
@@ -318,7 +320,7 @@ func TestParamPanelViewIncludesMainAppBackdrop(t *testing.T) {
 	m = m.layoutTable()
 	m.params.open = true
 	m.params.modelDisplayName = "test/model"
-	setTestParamEditor(&m, modelEntry{Profiles: []ParameterProfile{{
+	setTestParamEditor(&m, profiles.Entry{Profiles: []profiles.Profile{{
 		Name:    "default",
 		Backend: "vllm",
 		UseCase: profiles.UseCaseMetadata{Primary: profiles.UseCasePrimaries{profiles.UseCaseGeneral}, Tags: []string{"interactive"}},
@@ -363,7 +365,7 @@ func TestParamPanelMetadataTracksActiveProfile(t *testing.T) {
 	m.layout.height = 40
 	m.params.open = true
 	m.params.modelDisplayName = "test/model"
-	setTestParamEditor(&m, modelEntry{Profiles: []ParameterProfile{
+	setTestParamEditor(&m, profiles.Entry{Profiles: []profiles.Profile{
 		{
 			Name:    "general",
 			Backend: "vllm",
@@ -409,7 +411,7 @@ func TestParamPanelProfilesSectionUsesFocusedChrome(t *testing.T) {
 	m.layout.width = 100
 	m.layout.height = 40
 	m.params.open = true
-	setTestParamEditor(&m, modelEntry{Profiles: []ParameterProfile{{Name: "default"}}, ActiveIndex: 0})
+	setTestParamEditor(&m, profiles.Entry{Profiles: []profiles.Profile{{Name: "default"}}, ActiveIndex: 0})
 	m.params.focus = paramFocusProfiles
 	focused := m.paramPanelModalBlock()
 
@@ -447,7 +449,7 @@ func TestParamPanelMetadataTagsRowRendersCheckboxes(t *testing.T) {
 	m.params.focus = paramFocusMetadata
 	m.params.metadataCursor = int(paramMetadataUseCaseTags)
 	m.params.modelDisplayName = "test/model"
-	setTestParamEditor(&m, modelEntry{Profiles: []ParameterProfile{{
+	setTestParamEditor(&m, profiles.Entry{Profiles: []profiles.Profile{{
 		Name:    "default",
 		UseCase: profiles.UseCaseMetadata{Tags: []string{"thinking", "coding"}},
 	}}, ActiveIndex: 0})
@@ -476,8 +478,8 @@ func TestParamPanelMetadataEditsPersistAndSwitchProfiles(t *testing.T) {
 	t.Setenv("AppData", cfg)
 
 	modelPath := filepath.Join(cfg, "meta-edit.gguf")
-	if err := saveModelEntry(modelPath, modelEntry{
-		Profiles: []ParameterProfile{
+	if err := profiles.SaveEntry(modelPath, profiles.Entry{
+		Profiles: []profiles.Profile{
 			{Name: "general"},
 			{Name: "cpu", Backend: "ollama", Hardware: profiles.HardwareMetadata{Class: profiles.HardwareClassCPU}},
 		},
@@ -493,7 +495,7 @@ func TestParamPanelMetadataEditsPersistAndSwitchProfiles(t *testing.T) {
 	m.params.open = true
 	m.params.modelPath = filepath.Clean(modelPath)
 	m.params.modelDisplayName = "meta-edit.gguf"
-	ent, err := loadModelEntry(modelPath)
+	ent, err := profiles.LoadEntry(modelPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -532,7 +534,7 @@ func TestParamPanelMetadataEditsPersistAndSwitchProfiles(t *testing.T) {
 		t.Fatalf("second profile hardware class = %q", got)
 	}
 
-	got, err := loadModelEntry(modelPath)
+	got, err := profiles.LoadEntry(modelPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -554,8 +556,8 @@ func TestParamPanelHardwareMetadataPersistsAndClears(t *testing.T) {
 	t.Setenv("AppData", cfg)
 
 	modelPath := filepath.Join(cfg, "hardware-edit.gguf")
-	if err := saveModelEntry(modelPath, modelEntry{
-		Profiles:    []ParameterProfile{{Name: "gpu"}},
+	if err := profiles.SaveEntry(modelPath, profiles.Entry{
+		Profiles:    []profiles.Profile{{Name: "gpu"}},
 		ActiveIndex: 0,
 	}); err != nil {
 		t.Fatal(err)
@@ -565,7 +567,7 @@ func TestParamPanelHardwareMetadataPersistsAndClears(t *testing.T) {
 	m.params.open = true
 	m.params.modelPath = filepath.Clean(modelPath)
 	m.params.modelDisplayName = "hardware-edit.gguf"
-	ent, err := loadModelEntry(modelPath)
+	ent, err := profiles.LoadEntry(modelPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -598,7 +600,7 @@ func TestParamPanelHardwareMetadataPersistsAndClears(t *testing.T) {
 	setField(paramMetadataHardwareNotes, "  tested on 4090  ")
 	m, _ = m.persistParamPanel()
 
-	got, err := loadModelEntry(modelPath)
+	got, err := profiles.LoadEntry(modelPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -621,7 +623,7 @@ func TestParamPanelHardwareMetadataPersistsAndClears(t *testing.T) {
 	setField(paramMetadataHardwareNotes, "")
 	m, _ = m.persistParamPanel()
 
-	got, err = loadModelEntry(modelPath)
+	got, err = profiles.LoadEntry(modelPath)
 	if err != nil {
 		t.Fatal(err)
 	}

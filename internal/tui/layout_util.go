@@ -102,3 +102,14 @@ func clampRenderedHeightKeepTopBottom(s string, maxH int) string {
 	out = append(out, lines[len(lines)-bottomKeep:]...)
 	return strings.Join(out, "\n")
 }
+
+// clampInt returns v limited to the inclusive range [lo, hi].
+func clampInt(v, lo, hi int) int {
+	if v < lo {
+		return lo
+	}
+	if v > hi {
+		return hi
+	}
+	return v
+}

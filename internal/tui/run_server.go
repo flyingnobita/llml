@@ -12,6 +12,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/flyingnobita/llml/internal/profiles"
+
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/flyingnobita/llml/internal/models"
@@ -25,7 +27,7 @@ type serverSpec struct {
 	port             int
 	modelPath        string
 	host             string
-	params           ModelParams
+	params           profiles.ModelParams
 	activateScript   string   // vLLM only: path to venv activate script
 	mmprojPath       string   // auto-detected mmproj sidecar (llama/kobold only); empty when none found or profile already specifies one
 	mmprojCandidates []string // non-empty when multiple mmproj siblings exist and disambiguation failed (mmprojPath is empty)
@@ -131,7 +133,7 @@ func launchArgValues(args []launchArg) []string {
 // profileHasMMProj reports whether params already contains a --mmproj / -mm flag token,
 // meaning the user has manually specified the projector and auto-injection should be skipped.
 // Matches both space-separated form ("--mmproj /path") and equals form ("--mmproj=/path").
-func profileHasMMProj(params ModelParams) bool {
+func profileHasMMProj(params profiles.ModelParams) bool {
 	for _, a := range params.Args {
 		if a == "--mmproj" || a == "-mm" ||
 			strings.HasPrefix(a, "--mmproj=") || strings.HasPrefix(a, "-mm=") {
@@ -143,7 +145,7 @@ func profileHasMMProj(params ModelParams) bool {
 
 // profileWantsMMProj reports whether the active profile opts into mmproj injection
 // via an "image" or "audio" use_case tag.
-func profileWantsMMProj(params ModelParams) bool {
+func profileWantsMMProj(params profiles.ModelParams) bool {
 	for _, t := range params.UseCase.Tags {
 		tl := strings.ToLower(strings.TrimSpace(t))
 		if tl == "image" || tl == "audio" {
@@ -156,7 +158,7 @@ func profileWantsMMProj(params ModelParams) bool {
 // resolveMMProjForSpec returns (mmprojPath, mmprojCandidates, mmprojMissing).
 // Injection is opt-in: only resolves when the profile has an image/audio use_case tag.
 // Returns ("", nil, false) when the profile already carries --mmproj or has no image/audio tag.
-func resolveMMProjForSpec(modelPath string, params ModelParams) (string, []string, bool) {
+func resolveMMProjForSpec(modelPath string, params profiles.ModelParams) (string, []string, bool) {
 	if profileHasMMProj(params) {
 		return "", nil, false
 	}
@@ -193,7 +195,7 @@ func portOr(port, def int) int {
 // buildServerSpec resolves the binary, port, and venv for launching a server.
 // When strict is true it returns an error if the binary is missing; when false it substitutes
 // a placeholder name so display functions show a plausible command even before the runtime is configured.
-func buildServerSpec(backend models.ModelBackend, modelPath string, params ModelParams, rt models.RuntimeInfo, strict bool) (serverSpec, error) {
+func buildServerSpec(backend models.ModelBackend, modelPath string, params profiles.ModelParams, rt models.RuntimeInfo, strict bool) (serverSpec, error) {
 	switch backend {
 	case models.BackendOllama:
 		bin := models.ResolveOllamaPath(rt)
@@ -588,4 +590,31 @@ func copyLaunchCommandToClipboard(m Model) (Model, tea.Cmd) {
 		return m.flashError(CopyCommandFeedbackFailure)
 	}
 	return m.flashSuccess(CopyCommandFeedbackSuccess)
+}
+
+// mergeEnv overlays extra on base: keys present in extra replace any existing assignment.
+func mergeEnv(base []string, extra []profiles.EnvVar) []string {
+	drop := make(map[string]struct{})
+	for _, e := range extra {
+		if e.Key != "" {
+			drop[e.Key] = struct{}{}
+		}
+	}
+	var out []string
+	for _, line := range base {
+		k := line
+		if i := strings.IndexByte(line, '='); i >= 0 {
+			k = line[:i]
+		}
+		if _, ok := drop[k]; ok {
+			continue
+		}
+		out = append(out, line)
+	}
+	for _, e := range extra {
+		if e.Key != "" {
+			out = append(out, e.Key+"="+e.Value)
+		}
+	}
+	return out
 }

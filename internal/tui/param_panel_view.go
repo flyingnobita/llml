@@ -6,7 +6,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 
-	profilepkg "github.com/flyingnobita/llml/internal/profiles"
+	"github.com/flyingnobita/llml/internal/profiles"
 )
 
 // renderEditableListItems renders the rows for one editable param section (env vars or extra args).
@@ -352,8 +352,8 @@ func (m Model) renderMetadataSection(cw, maxSec int, secBox lipgloss.Style) stri
 		for i, v := range p.UseCase.Primary {
 			primaryStrs[i] = string(v)
 		}
-		canonicalPrimaryStrs := make([]string, len(profilepkg.CanonicalPrimaries))
-		for i, v := range profilepkg.CanonicalPrimaries {
+		canonicalPrimaryStrs := make([]string, len(profiles.CanonicalPrimaries))
+		for i, v := range profiles.CanonicalPrimaries {
 			canonicalPrimaryStrs[i] = string(v)
 		}
 		for field := paramMetadataField(0); field < paramMetadataFieldCount; field++ {
@@ -403,7 +403,7 @@ func (m Model) renderMetadataSection(cw, maxSec int, secBox lipgloss.Style) stri
 				)...)
 			case paramMetadataUseCaseTags:
 				rows = append(rows, m.renderCheckboxRow(
-					"Tags", profilepkg.CanonicalTags, p.UseCase.Tags,
+					"Tags", profiles.CanonicalTags, p.UseCase.Tags,
 					m.params.tagCursor, focused, maxSec,
 				)...)
 			case paramMetadataHardwareNotes:

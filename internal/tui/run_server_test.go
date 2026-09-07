@@ -24,19 +24,19 @@ func TestShellSingleQuoted(t *testing.T) {
 	}
 }
 
-func llamaSpec(bin, modelPath string, port int, params ModelParams) serverSpec {
+func llamaSpec(bin, modelPath string, port int, params profiles.ModelParams) serverSpec {
 	return serverSpec{backend: models.BackendLlama, bin: bin, host: "127.0.0.1", port: port, modelPath: modelPath, params: params}
 }
 
-func vllmSpec(bin, modelPath string, port int, activateScript string, params ModelParams) serverSpec {
+func vllmSpec(bin, modelPath string, port int, activateScript string, params profiles.ModelParams) serverSpec {
 	return serverSpec{backend: models.BackendVLLM, bin: bin, host: "127.0.0.1", port: port, modelPath: modelPath, params: params, activateScript: activateScript}
 }
 
 func TestServerSpecDirectArgsUseLaunchArgvSource(t *testing.T) {
 	specs := map[string]serverSpec{
-		"llama":  llamaSpec("/bin/llama-server", "/m/a.gguf", 9090, ModelParams{Args: []string{"--threads", "8"}}),
-		"vllm":   vllmSpec("/bin/vllm", "/m/hf-model", 8000, "", ModelParams{Args: []string{"--dtype", "auto"}}),
-		"kobold": mmprojKoboldSpec("/bin/koboldcpp", "/m/a.gguf", "/m/mmproj.gguf", 5001, ModelParams{Args: []string{"--gpulayers", "99"}}),
+		"llama":  llamaSpec("/bin/llama-server", "/m/a.gguf", 9090, profiles.ModelParams{Args: []string{"--threads", "8"}}),
+		"vllm":   vllmSpec("/bin/vllm", "/m/hf-model", 8000, "", profiles.ModelParams{Args: []string{"--dtype", "auto"}}),
+		"kobold": mmprojKoboldSpec("/bin/koboldcpp", "/m/a.gguf", "/m/mmproj.gguf", 5001, profiles.ModelParams{Args: []string{"--gpulayers", "99"}}),
 		"ollama": {backend: models.BackendOllama, bin: "/bin/ollama", host: "127.0.0.1:11434", modelPath: "qwen:latest"},
 	}
 	for name, spec := range specs {
@@ -50,7 +50,7 @@ func TestServerSpecDirectArgsUseLaunchArgvSource(t *testing.T) {
 }
 
 func TestLlamaDirectArgsMatchDisplayedModelFlag(t *testing.T) {
-	spec := llamaSpec("/bin/llama-server", "/m/a.gguf", 9090, ModelParams{})
+	spec := llamaSpec("/bin/llama-server", "/m/a.gguf", 9090, profiles.ModelParams{})
 	if got := spec.directArgs(); len(got) < 2 || got[0] != "--model" || got[1] != "/m/a.gguf" {
 		t.Fatalf("directArgs = %v, want --model followed by model path", got)
 	}
@@ -60,7 +60,7 @@ func TestLlamaDirectArgsMatchDisplayedModelFlag(t *testing.T) {
 }
 
 func TestFormatLlamaServerInvocation(t *testing.T) {
-	got := llamaSpec("/bin/llama-server", "/m/a.gguf", 9090, ModelParams{}).invocationEcho()
+	got := llamaSpec("/bin/llama-server", "/m/a.gguf", 9090, profiles.ModelParams{}).invocationEcho()
 	want := "" +
 		"+ '/bin/llama-server' \\\n" +
 		"  --model '/m/a.gguf' \\\n" +
@@ -70,8 +70,8 @@ func TestFormatLlamaServerInvocation(t *testing.T) {
 	if got != want {
 		t.Fatalf("got %q want %q", got, want)
 	}
-	p := ModelParams{
-		Env:  []EnvVar{{Key: "FOO", Value: "bar"}},
+	p := profiles.ModelParams{
+		Env:  []profiles.EnvVar{{Key: "FOO", Value: "bar"}},
 		Args: []string{"--n-gpu-layers", "99"},
 	}
 	got2 := llamaSpec("/bin/llama-server", "/m/a.gguf", 9090, p).invocationEcho()
@@ -81,7 +81,7 @@ func TestFormatLlamaServerInvocation(t *testing.T) {
 }
 
 func TestFormatVLLMServerInvocation(t *testing.T) {
-	got := vllmSpec("/bin/vllm", "/m/hf-model", 9090, "", ModelParams{}).invocationEcho()
+	got := vllmSpec("/bin/vllm", "/m/hf-model", 9090, "", profiles.ModelParams{}).invocationEcho()
 	want := "" +
 		"+ '/bin/vllm' \\\n" +
 		"  serve \\\n" +
@@ -92,7 +92,7 @@ func TestFormatVLLMServerInvocation(t *testing.T) {
 	if got != want {
 		t.Fatalf("got %q want %q", got, want)
 	}
-	got2 := vllmSpec("/bin/vllm", "/m/hf-model", 9090, "/proj/.venv/bin/activate", ModelParams{}).invocationEcho()
+	got2 := vllmSpec("/bin/vllm", "/m/hf-model", 9090, "/proj/.venv/bin/activate", profiles.ModelParams{}).invocationEcho()
 	want2 := "" +
 		"+ . '/proj/.venv/bin/activate' && \\\n" +
 		"  '/bin/vllm' \\\n" +
@@ -122,18 +122,18 @@ func TestSplitServerInvocationEcho_matchesLlamaSplitLogLine(t *testing.T) {
 	m.table.tbl.SetRows([]btable.Row{{"a", "a", "llama.cpp", "1 B", "", modelPath}})
 	m.table.tbl.SetCursor(0)
 
-	p := ModelParams{
-		Env:  []EnvVar{{Key: "FOO", Value: "bar"}},
+	p := profiles.ModelParams{
+		Env:  []profiles.EnvVar{{Key: "FOO", Value: "bar"}},
 		Args: []string{"--n-gpu-layers", "99"},
 	}
 	want := llamaSpec("/bin/llama-server", modelPath, 9090, p).invocationEcho()
-	ent := modelEntry{
-		Profiles: []ParameterProfile{
+	ent := profiles.Entry{
+		Profiles: []profiles.Profile{
 			{Name: "default", Env: p.Env, Args: p.Args},
 		},
 		ActiveIndex: 0,
 	}
-	if err := saveModelEntry(modelPath, ent); err != nil {
+	if err := profiles.SaveEntry(modelPath, ent); err != nil {
 		t.Fatal(err)
 	}
 
@@ -164,9 +164,9 @@ func TestLaunchPreviewCommandLine_vllmOmitsActivateWrapper(t *testing.T) {
 	m.table.tbl.SetRows([]btable.Row{{"m", "hf-model", "vllm", "1 B", "", modelPath}})
 	m.table.tbl.SetCursor(0)
 
-	p := ModelParams{Env: []EnvVar{{Key: "CUDA_VISIBLE_DEVICES", Value: "0"}}}
-	if err := saveModelEntry(modelPath, modelEntry{
-		Profiles:    []ParameterProfile{{Name: "default", Env: p.Env, Args: nil}},
+	p := profiles.ModelParams{Env: []profiles.EnvVar{{Key: "CUDA_VISIBLE_DEVICES", Value: "0"}}}
+	if err := profiles.SaveEntry(modelPath, profiles.Entry{
+		Profiles:    []profiles.Profile{{Name: "default", Env: p.Env, Args: nil}},
 		ActiveIndex: 0,
 	}); err != nil {
 		t.Fatal(err)
@@ -184,21 +184,21 @@ func TestLaunchPreviewCommandLine_vllmOmitsActivateWrapper(t *testing.T) {
 }
 
 func TestUnixVLLMServerScript_containsRead(t *testing.T) {
-	s := vllmSpec("/bin/vllm", "/m/model-dir", 8080, "", ModelParams{}).unixForegroundScript()
+	s := vllmSpec("/bin/vllm", "/m/model-dir", 8080, "", profiles.ModelParams{}).unixForegroundScript()
 	if !strings.Contains(s, "read -r _") {
 		t.Fatalf("expected read pause: %q", s)
 	}
 	if !strings.Contains(s, "'/bin/vllm' serve") {
 		t.Fatalf("expected vllm serve: %q", s)
 	}
-	s2 := vllmSpec("/bin/vllm", "/m/model-dir", 8080, "/x/.venv/bin/activate", ModelParams{}).unixForegroundScript()
+	s2 := vllmSpec("/bin/vllm", "/m/model-dir", 8080, "/x/.venv/bin/activate", profiles.ModelParams{}).unixForegroundScript()
 	if !strings.Contains(s2, ". '/x/.venv/bin/activate'") {
 		t.Fatalf("expected venv source: %q", s2)
 	}
 }
 
 func TestUnixLlamaServerScript_containsRead(t *testing.T) {
-	s := llamaSpec("/bin/llama-server", "/m/model.gguf", 8080, ModelParams{}).unixForegroundScript()
+	s := llamaSpec("/bin/llama-server", "/m/model.gguf", 8080, profiles.ModelParams{}).unixForegroundScript()
 	if !strings.Contains(s, "read -r _") {
 		t.Fatalf("expected read pause: %q", s)
 	}
@@ -211,7 +211,7 @@ func TestUnixLlamaServerScript_containsRead(t *testing.T) {
 }
 
 func TestUnixVLLMSplitScript_mergesStderr(t *testing.T) {
-	s := vllmSpec("/bin/vllm", "/m/model-dir", 8080, "", ModelParams{}).unixSplitScript()
+	s := vllmSpec("/bin/vllm", "/m/model-dir", 8080, "", profiles.ModelParams{}).unixSplitScript()
 	if !strings.HasSuffix(strings.TrimSpace(s), "2>&1") {
 		t.Fatalf("expected 2>&1 suffix: %q", s)
 	}
@@ -220,12 +220,12 @@ func TestUnixVLLMSplitScript_mergesStderr(t *testing.T) {
 	}
 }
 
-func koboldSpec(bin, modelPath string, port int, params ModelParams) serverSpec {
+func koboldSpec(bin, modelPath string, port int, params profiles.ModelParams) serverSpec {
 	return serverSpec{backend: models.BackendKobold, bin: bin, port: port, modelPath: modelPath, params: params}
 }
 
 func TestFormatKoboldCppInvocation(t *testing.T) {
-	got := koboldSpec("/bin/koboldcpp", "/m/a.gguf", 5001, ModelParams{}).invocationEcho()
+	got := koboldSpec("/bin/koboldcpp", "/m/a.gguf", 5001, profiles.ModelParams{}).invocationEcho()
 	want := "" +
 		"+ '/bin/koboldcpp' \\\n" +
 		"  '/m/a.gguf' \\\n" +
@@ -233,8 +233,8 @@ func TestFormatKoboldCppInvocation(t *testing.T) {
 	if got != want {
 		t.Fatalf("got %q want %q", got, want)
 	}
-	p := ModelParams{
-		Env:  []EnvVar{{Key: "FOO", Value: "bar"}},
+	p := profiles.ModelParams{
+		Env:  []profiles.EnvVar{{Key: "FOO", Value: "bar"}},
 		Args: []string{"--usecublas", "--gpulayers", "99"},
 	}
 	got2 := koboldSpec("/bin/koboldcpp", "/m/a.gguf", 5001, p).invocationEcho()
@@ -244,19 +244,19 @@ func TestFormatKoboldCppInvocation(t *testing.T) {
 }
 
 func TestKoboldCppCommandWords(t *testing.T) {
-	got := koboldSpec("/bin/koboldcpp", "/m/a.gguf", 5001, ModelParams{}).commandWords()
+	got := koboldSpec("/bin/koboldcpp", "/m/a.gguf", 5001, profiles.ModelParams{}).commandWords()
 	if len(got) != 4 || got[1] != "'/m/a.gguf'" || got[2] != "--port" || got[3] != "5001" {
 		t.Fatalf("got %v", got)
 	}
 }
 
 func TestKoboldCppDirectArgs(t *testing.T) {
-	got := koboldSpec("/bin/koboldcpp", "/m/a.gguf", 5001, ModelParams{}).directArgs()
+	got := koboldSpec("/bin/koboldcpp", "/m/a.gguf", 5001, profiles.ModelParams{}).directArgs()
 	if len(got) != 3 || got[0] != "/m/a.gguf" || got[1] != "--port" || got[2] != "5001" {
 		t.Fatalf("got %v", got)
 	}
 
-	gotWithArgs := koboldSpec("/bin/koboldcpp", "/m/a.gguf", 5001, ModelParams{Args: []string{"--usecublas", "--gpulayers", "99"}}).directArgs()
+	gotWithArgs := koboldSpec("/bin/koboldcpp", "/m/a.gguf", 5001, profiles.ModelParams{Args: []string{"--usecublas", "--gpulayers", "99"}}).directArgs()
 	if len(gotWithArgs) != 6 {
 		t.Fatalf("got len %d want 6: %v", len(gotWithArgs), gotWithArgs)
 	}
@@ -266,7 +266,7 @@ func TestKoboldCppDirectArgs(t *testing.T) {
 }
 
 func TestKoboldCppPreviewLine(t *testing.T) {
-	got := koboldSpec("/bin/koboldcpp", "/m/a.gguf", 5001, ModelParams{}).previewLine()
+	got := koboldSpec("/bin/koboldcpp", "/m/a.gguf", 5001, profiles.ModelParams{}).previewLine()
 	if !strings.Contains(got, "/bin/koboldcpp") || !strings.Contains(got, "/m/a.gguf") || !strings.Contains(got, "--port 5001") {
 		t.Fatalf("got %q", got)
 	}
@@ -277,7 +277,7 @@ func TestKoboldCppPreviewLine(t *testing.T) {
 
 func TestBuildServerSpec_koboldCppStrictMissing(t *testing.T) {
 	rt := models.RuntimeInfo{}
-	_, err := buildServerSpec(models.BackendKobold, "/m/a.gguf", ModelParams{}, rt, true)
+	_, err := buildServerSpec(models.BackendKobold, "/m/a.gguf", profiles.ModelParams{}, rt, true)
 	if err == nil || !strings.Contains(err.Error(), "koboldcpp not found") {
 		t.Fatalf("expected missing-koboldcpp error, got %v", err)
 	}
@@ -288,7 +288,7 @@ func TestBuildServerSpec_koboldCppStrictMissing(t *testing.T) {
 func TestBuildServerSpec_koboldCppNonStrict(t *testing.T) {
 	t.Parallel()
 	rt := models.RuntimeInfo{}
-	spec, err := buildServerSpec(models.BackendKobold, "/m/a.gguf", ModelParams{}, rt, false)
+	spec, err := buildServerSpec(models.BackendKobold, "/m/a.gguf", profiles.ModelParams{}, rt, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -316,14 +316,14 @@ func TestSplitServerInvocationEcho_koboldCppProfile(t *testing.T) {
 	m.table.tbl.SetRows([]btable.Row{{"a", "a", "llama.cpp", "1 B", "", modelPath}})
 	m.table.tbl.SetCursor(0)
 
-	p := ModelParams{Args: []string{"--usecublas"}}
-	ent := modelEntry{
-		Profiles: []ParameterProfile{
+	p := profiles.ModelParams{Args: []string{"--usecublas"}}
+	ent := profiles.Entry{
+		Profiles: []profiles.Profile{
 			{Name: "kobold", Backend: "koboldcpp", Env: p.Env, Args: p.Args},
 		},
 		ActiveIndex: 0,
 	}
-	if err := saveModelEntry(modelPath, ent); err != nil {
+	if err := profiles.SaveEntry(modelPath, ent); err != nil {
 		t.Fatal(err)
 	}
 
@@ -355,13 +355,13 @@ func TestLaunchPreviewCommandLine_koboldCppProfile(t *testing.T) {
 	m.table.tbl.SetRows([]btable.Row{{"a", "a", "llama.cpp", "1 B", "", modelPath}})
 	m.table.tbl.SetCursor(0)
 
-	ent := modelEntry{
-		Profiles: []ParameterProfile{
+	ent := profiles.Entry{
+		Profiles: []profiles.Profile{
 			{Name: "kobold", Backend: "koboldcpp"},
 		},
 		ActiveIndex: 0,
 	}
-	if err := saveModelEntry(modelPath, ent); err != nil {
+	if err := profiles.SaveEntry(modelPath, ent); err != nil {
 		t.Fatal(err)
 	}
 
@@ -375,7 +375,7 @@ func TestLaunchPreviewCommandLine_koboldCppProfile(t *testing.T) {
 }
 
 func TestKoboldCppSplitCmd(t *testing.T) {
-	s := koboldSpec("/bin/koboldcpp", "/m/a.gguf", 5001, ModelParams{})
+	s := koboldSpec("/bin/koboldcpp", "/m/a.gguf", 5001, profiles.ModelParams{})
 	cmd := s.splitCmd()
 	if cmd.Path != "/bin/koboldcpp" {
 		t.Fatalf("got %q", cmd.Path)
@@ -386,7 +386,7 @@ func TestKoboldCppSplitCmd(t *testing.T) {
 }
 
 func TestKoboldCppForegroundCmd(t *testing.T) {
-	s := koboldSpec("/bin/koboldcpp", "/m/a.gguf", 5001, ModelParams{})
+	s := koboldSpec("/bin/koboldcpp", "/m/a.gguf", 5001, profiles.ModelParams{})
 	cmd := s.foregroundCmd()
 	if !strings.Contains(strings.Join(cmd.Args, " "), "/bin/koboldcpp") {
 		t.Fatalf("expected koboldcpp in foreground cmd: %q", strings.Join(cmd.Args, " "))
@@ -396,7 +396,7 @@ func TestKoboldCppForegroundCmd(t *testing.T) {
 // --- mmproj auto-injection tests ---
 
 // mmprojSpec builds a llama serverSpec with a pre-set mmprojPath (bypassing filesystem).
-func mmprojLlamaSpec(bin, modelPath, mmprojPath string, port int, params ModelParams) serverSpec {
+func mmprojLlamaSpec(bin, modelPath, mmprojPath string, port int, params profiles.ModelParams) serverSpec {
 	return serverSpec{
 		backend:    models.BackendLlama,
 		bin:        bin,
@@ -408,7 +408,7 @@ func mmprojLlamaSpec(bin, modelPath, mmprojPath string, port int, params ModelPa
 	}
 }
 
-func mmprojKoboldSpec(bin, modelPath, mmprojPath string, port int, params ModelParams) serverSpec {
+func mmprojKoboldSpec(bin, modelPath, mmprojPath string, port int, params profiles.ModelParams) serverSpec {
 	return serverSpec{
 		backend:    models.BackendKobold,
 		bin:        bin,
@@ -420,7 +420,7 @@ func mmprojKoboldSpec(bin, modelPath, mmprojPath string, port int, params ModelP
 }
 
 func TestLlamaDirectArgs_mmprojectInjected(t *testing.T) {
-	got := mmprojLlamaSpec("/bin/llama-server", "/m/model.gguf", "/m/mmproj-BF16.gguf", 8080, ModelParams{}).directArgs()
+	got := mmprojLlamaSpec("/bin/llama-server", "/m/model.gguf", "/m/mmproj-BF16.gguf", 8080, profiles.ModelParams{}).directArgs()
 	// Expect: -m <model> --alias <alias> --host <h> --port <p> --mmproj <mmproj>
 	found := false
 	for i, a := range got {
@@ -435,7 +435,7 @@ func TestLlamaDirectArgs_mmprojectInjected(t *testing.T) {
 }
 
 func TestLlamaCommandWords_mmprojectInjected(t *testing.T) {
-	got := mmprojLlamaSpec("/bin/llama-server", "/m/model.gguf", "/m/mmproj-BF16.gguf", 8080, ModelParams{}).commandWords()
+	got := mmprojLlamaSpec("/bin/llama-server", "/m/model.gguf", "/m/mmproj-BF16.gguf", 8080, profiles.ModelParams{}).commandWords()
 	found := false
 	for i, a := range got {
 		if a == "--mmproj" && i+1 < len(got) {
@@ -449,7 +449,7 @@ func TestLlamaCommandWords_mmprojectInjected(t *testing.T) {
 }
 
 func TestKoboldDirectArgs_mmprojectInjected(t *testing.T) {
-	got := mmprojKoboldSpec("/bin/koboldcpp", "/m/model.gguf", "/m/mmproj-BF16.gguf", 5001, ModelParams{}).directArgs()
+	got := mmprojKoboldSpec("/bin/koboldcpp", "/m/model.gguf", "/m/mmproj-BF16.gguf", 5001, profiles.ModelParams{}).directArgs()
 	found := false
 	for i, a := range got {
 		if a == "--mmproj" && i+1 < len(got) && got[i+1] == "/m/mmproj-BF16.gguf" {
@@ -464,7 +464,7 @@ func TestKoboldDirectArgs_mmprojectInjected(t *testing.T) {
 
 func TestLlamaDirectArgs_noMmprojWhenEmpty(t *testing.T) {
 	// No mmprojPath → no --mmproj token in args.
-	got := llamaSpec("/bin/llama-server", "/m/model.gguf", 8080, ModelParams{}).directArgs()
+	got := llamaSpec("/bin/llama-server", "/m/model.gguf", 8080, profiles.ModelParams{}).directArgs()
 	for _, a := range got {
 		if a == "--mmproj" {
 			t.Fatalf("unexpected --mmproj in args with no mmprojPath: %v", got)
@@ -474,7 +474,7 @@ func TestLlamaDirectArgs_noMmprojWhenEmpty(t *testing.T) {
 
 func TestVLLMDirectArgs_noMmprojInjection(t *testing.T) {
 	// vLLM never injects --mmproj regardless of mmprojPath on the spec.
-	s := vllmSpec("/bin/vllm", "/m/model", 8000, "", ModelParams{})
+	s := vllmSpec("/bin/vllm", "/m/model", 8000, "", profiles.ModelParams{})
 	// Even if someone forcibly set mmprojPath (not possible via buildServerSpec for vllm),
 	// the directArgs for vllm branch does not read mmprojPath.
 	for _, a := range s.directArgs() {
@@ -495,7 +495,7 @@ func TestBuildServerSpec_mmprojInjectedFromSibling(t *testing.T) {
 		}
 	}
 	rt := models.RuntimeInfo{LlamaServerPath: "/bin/llama-server"}
-	imageParams := ModelParams{UseCase: profiles.UseCaseMetadata{Tags: []string{"image"}}}
+	imageParams := profiles.ModelParams{UseCase: profiles.UseCaseMetadata{Tags: []string{"image"}}}
 	spec, err := buildServerSpec(models.BackendLlama, modelPath, imageParams, rt, false)
 	if err != nil {
 		t.Fatal(err)
@@ -530,7 +530,7 @@ func TestBuildServerSpec_mmprojSkippedWhenProfileHasIt(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Profile already has --mmproj in its args.
-	params := ModelParams{Args: []string{"--mmproj", "/explicit/mmproj.gguf"}}
+	params := profiles.ModelParams{Args: []string{"--mmproj", "/explicit/mmproj.gguf"}}
 	rt := models.RuntimeInfo{LlamaServerPath: "/bin/llama-server"}
 	spec, err := buildServerSpec(models.BackendLlama, modelPath, params, rt, false)
 	if err != nil {
@@ -550,7 +550,7 @@ func TestBuildServerSpec_mmprojAmbiguous(t *testing.T) {
 		}
 	}
 	rt := models.RuntimeInfo{LlamaServerPath: "/bin/llama-server"}
-	imageParams := ModelParams{UseCase: profiles.UseCaseMetadata{Tags: []string{"image"}}}
+	imageParams := profiles.ModelParams{UseCase: profiles.UseCaseMetadata{Tags: []string{"image"}}}
 	spec, err := buildServerSpec(models.BackendLlama, modelPath, imageParams, rt, false)
 	if err != nil {
 		t.Fatal(err)
@@ -573,7 +573,7 @@ func TestBuildServerSpec_mmprojKoboldInjected(t *testing.T) {
 		}
 	}
 	rt := models.RuntimeInfo{KoboldCppPath: "/bin/koboldcpp"}
-	imageParams := ModelParams{UseCase: profiles.UseCaseMetadata{Tags: []string{"image"}}}
+	imageParams := profiles.ModelParams{UseCase: profiles.UseCaseMetadata{Tags: []string{"image"}}}
 	spec, err := buildServerSpec(models.BackendKobold, modelPath, imageParams, rt, false)
 	if err != nil {
 		t.Fatal(err)
@@ -591,7 +591,7 @@ func TestBuildServerSpec_mmprojNotInjectedForVLLM(t *testing.T) {
 	}
 	// No mmproj sibling for vllm models — but even if there were, vllm branch ignores it.
 	rt := models.RuntimeInfo{VLLMPath: "/bin/vllm"}
-	spec, err := buildServerSpec(models.BackendVLLM, modelPath, ModelParams{}, rt, false)
+	spec, err := buildServerSpec(models.BackendVLLM, modelPath, profiles.ModelParams{}, rt, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -610,7 +610,7 @@ func TestBuildServerSpec_mmprojSkippedWhenProfileHasShortFlag(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Profile uses -mm short form — auto-detection should be skipped.
-	params := ModelParams{Args: []string{"-mm", "/explicit/mmproj.gguf"}}
+	params := profiles.ModelParams{Args: []string{"-mm", "/explicit/mmproj.gguf"}}
 	rt := models.RuntimeInfo{LlamaServerPath: "/bin/llama-server"}
 	spec, err := buildServerSpec(models.BackendLlama, modelPath, params, rt, false)
 	if err != nil {
@@ -635,13 +635,13 @@ func TestHandleKey_mmprojAmbiguousWarningAdded(t *testing.T) {
 	}
 
 	// Save an image-tagged profile so loadModelParamsForRun returns UseCase with image tag.
-	ent := modelEntry{
-		Profiles: []ParameterProfile{
+	ent := profiles.Entry{
+		Profiles: []profiles.Profile{
 			{Name: "default", UseCase: profiles.UseCaseMetadata{Tags: []string{"image"}}},
 		},
 		ActiveIndex: 0,
 	}
-	if err := saveModelEntry(modelPath, ent); err != nil {
+	if err := profiles.SaveEntry(modelPath, ent); err != nil {
 		t.Fatal(err)
 	}
 
@@ -673,7 +673,7 @@ func TestHandleKey_mmprojAmbiguousWarningAdded(t *testing.T) {
 
 func TestMergeEnv(t *testing.T) {
 	base := []string{"PATH=/usr/bin", "FOO=old"}
-	ex := []EnvVar{{Key: "FOO", Value: "new"}}
+	ex := []profiles.EnvVar{{Key: "FOO", Value: "new"}}
 	got := mergeEnv(base, ex)
 	var path, foo string
 	for _, line := range got {
@@ -700,7 +700,7 @@ func TestBuildServerSpec_mmprojMissingWhenImageTagged(t *testing.T) {
 	}
 	// No mmproj sibling — but profile has image tag.
 	rt := models.RuntimeInfo{LlamaServerPath: "/bin/llama-server"}
-	imageParams := ModelParams{UseCase: profiles.UseCaseMetadata{Tags: []string{"image"}}}
+	imageParams := profiles.ModelParams{UseCase: profiles.UseCaseMetadata{Tags: []string{"image"}}}
 	spec, err := buildServerSpec(models.BackendLlama, modelPath, imageParams, rt, false)
 	if err != nil {
 		t.Fatal(err)
@@ -724,7 +724,7 @@ func TestBuildServerSpec_mmprojNotInjectedWithoutTag(t *testing.T) {
 	}
 	// Sibling mmproj exists but no image/audio tag — no injection.
 	rt := models.RuntimeInfo{LlamaServerPath: "/bin/llama-server"}
-	spec, err := buildServerSpec(models.BackendLlama, modelPath, ModelParams{}, rt, false)
+	spec, err := buildServerSpec(models.BackendLlama, modelPath, profiles.ModelParams{}, rt, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -746,7 +746,7 @@ func TestBuildServerSpec_mmprojInjectedForAudioTag(t *testing.T) {
 		}
 	}
 	rt := models.RuntimeInfo{LlamaServerPath: "/bin/llama-server"}
-	audioParams := ModelParams{UseCase: profiles.UseCaseMetadata{Tags: []string{"audio"}}}
+	audioParams := profiles.ModelParams{UseCase: profiles.UseCaseMetadata{Tags: []string{"audio"}}}
 	spec, err := buildServerSpec(models.BackendLlama, modelPath, audioParams, rt, false)
 	if err != nil {
 		t.Fatal(err)
@@ -768,13 +768,13 @@ func TestHandleKey_mmprojMissingWarningAdded(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ent := modelEntry{
-		Profiles: []ParameterProfile{
+	ent := profiles.Entry{
+		Profiles: []profiles.Profile{
 			{Name: "default", UseCase: profiles.UseCaseMetadata{Tags: []string{"image"}}},
 		},
 		ActiveIndex: 0,
 	}
-	if err := saveModelEntry(modelPath, ent); err != nil {
+	if err := profiles.SaveEntry(modelPath, ent); err != nil {
 		t.Fatal(err)
 	}
 

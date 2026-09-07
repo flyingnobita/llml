@@ -399,7 +399,7 @@ func (m Model) resolveEffectiveBackend() models.ModelBackend {
 		return models.BackendLlama
 	}
 	// Otherwise use the cached effective-backend map (no disk I/O per cursor move).
-	key := modelParamsKey(m.SelectedPath())
+	key := profiles.ModelParamsKey(m.SelectedPath())
 	if b, ok := m.table.effectiveBackends[key]; ok {
 		return b
 	}
@@ -419,12 +419,12 @@ func (m Model) activeProfileBackendForSelected() models.ModelBackend {
 		return models.BackendLlama
 	}
 	if m.params.open {
-		if modelParamsKey(m.params.modelPath) == modelParamsKey(sel) {
+		if profiles.ModelParamsKey(m.params.modelPath) == profiles.ModelParamsKey(sel) {
 			b, _ := models.ParseBackend(m.params.editor.ActiveProfile().Backend)
 			return b
 		}
 	}
-	ent, err := loadModelEntry(modelParamsKey(sel))
+	ent, err := profiles.LoadEntry(profiles.ModelParamsKey(sel))
 	if err != nil || len(ent.Profiles) == 0 {
 		return models.BackendLlama
 	}
@@ -455,9 +455,9 @@ func (m Model) updateEffectiveBackendForPath(modelPath string) Model {
 // sets or deletes the effectiveBackends map entry accordingly. It clones the
 // map first, so the returned Model is the only one that sees the change.
 func (m Model) loadEffectiveBackendForIdentity(identity string) Model {
-	key := modelParamsKey(identity)
+	key := profiles.ModelParamsKey(identity)
 	backend, keep := models.BackendLlama, false
-	if ent, err := loadModelEntry(key); err == nil && len(ent.Profiles) > 0 {
+	if ent, err := profiles.LoadEntry(key); err == nil && len(ent.Profiles) > 0 {
 		idx := clampInt(ent.ActiveIndex, 0, len(ent.Profiles)-1)
 		b, _ := models.ParseBackend(ent.Profiles[idx].Backend)
 		backend, keep = b, b != models.BackendLlama

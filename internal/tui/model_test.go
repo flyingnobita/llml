@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/flyingnobita/llml/internal/profiles"
+
 	btable "charm.land/bubbles/v2/table"
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -323,13 +325,13 @@ func TestResolveEffectiveBackend_GGUFWithKoboldProfile(t *testing.T) {
 	}
 	m.table.tbl.SetRows([]btable.Row{{"a", "a", "llama.cpp", "1 B", "", modelPath}})
 	m.table.tbl.SetCursor(0)
-	ent := modelEntry{
-		Profiles: []ParameterProfile{
+	ent := profiles.Entry{
+		Profiles: []profiles.Profile{
 			{Name: "kobold", Backend: "koboldcpp"},
 		},
 		ActiveIndex: 0,
 	}
-	if err := saveModelEntry(modelPath, ent); err != nil {
+	if err := profiles.SaveEntry(modelPath, ent); err != nil {
 		t.Fatal(err)
 	}
 
@@ -352,13 +354,13 @@ func TestResolveEffectiveBackend_GGUFWithLlamaProfile(t *testing.T) {
 	}
 	m.table.tbl.SetRows([]btable.Row{{"a", "a", "llama.cpp", "1 B", "", modelPath}})
 	m.table.tbl.SetCursor(0)
-	ent := modelEntry{
-		Profiles: []ParameterProfile{
+	ent := profiles.Entry{
+		Profiles: []profiles.Profile{
 			{Name: "default", Backend: ""},
 		},
 		ActiveIndex: 0,
 	}
-	if err := saveModelEntry(modelPath, ent); err != nil {
+	if err := profiles.SaveEntry(modelPath, ent); err != nil {
 		t.Fatal(err)
 	}
 
@@ -381,13 +383,13 @@ func TestResolveEffectiveBackend_VLLMIgnoresProfileOverride(t *testing.T) {
 	}
 	m.table.tbl.SetRows([]btable.Row{{"m", "hf-model", "vllm", "1 B", "", modelPath}})
 	m.table.tbl.SetCursor(0)
-	ent := modelEntry{
-		Profiles: []ParameterProfile{
+	ent := profiles.Entry{
+		Profiles: []profiles.Profile{
 			{Name: "kobold", Backend: "koboldcpp"},
 		},
 		ActiveIndex: 0,
 	}
-	if err := saveModelEntry(modelPath, ent); err != nil {
+	if err := profiles.SaveEntry(modelPath, ent); err != nil {
 		t.Fatal(err)
 	}
 
@@ -409,13 +411,13 @@ func TestResolveEffectiveBackend_OllamaIgnoresProfileOverride(t *testing.T) {
 	}
 	m.table.tbl.SetRows([]btable.Row{{"qwen:latest", "qwen:latest", "ollama", "1 B", "", "ollama://qwen:latest"}})
 	m.table.tbl.SetCursor(0)
-	ent := modelEntry{
-		Profiles: []ParameterProfile{
+	ent := profiles.Entry{
+		Profiles: []profiles.Profile{
 			{Name: "kobold", Backend: "koboldcpp"},
 		},
 		ActiveIndex: 0,
 	}
-	if err := saveModelEntry("ollama://qwen:latest", ent); err != nil {
+	if err := profiles.SaveEntry("ollama://qwen:latest", ent); err != nil {
 		t.Fatal(err)
 	}
 
@@ -435,7 +437,7 @@ func TestMaybeSetMissingRuntimeFooterNote_koboldCpp(t *testing.T) {
 		{Backend: models.BackendLlama, Path: "/a.gguf", Name: "a", Size: 1},
 	}
 	// Only rows with a koboldcpp active profile should trigger the missing note.
-	m.table.effectiveBackends[modelParamsKey("/a.gguf")] = models.BackendKobold
+	m.table.effectiveBackends[profiles.ModelParamsKey("/a.gguf")] = models.BackendKobold
 	m, _ = m.maybeSetMissingRuntimeFooterNote()
 	if !strings.Contains(m.lastRunNote, MissingKoboldCppFooterNote) {
 		t.Fatalf("expected missing koboldcpp note, got %q", m.lastRunNote)

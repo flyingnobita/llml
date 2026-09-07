@@ -61,8 +61,8 @@ func (m Model) commitParamLineEdit() Model {
 			if name == "" {
 				name = fmt.Sprintf("Parameter Profile %d", idx+1)
 			}
-			if profileNameTaken(m.params.editor.profiles, name, idx) {
-				name = nextProfileName(m.params.editor.profiles)
+			if profiles.ProfileNameTaken(m.params.editor.profiles, name, idx) {
+				name = profiles.NextProfileName(m.params.editor.profiles)
 			}
 			m.params.editor.SetProfileName(name)
 		}
@@ -156,7 +156,7 @@ func (m Model) deleteParamRow() Model {
 }
 
 func (m Model) addProfile() Model {
-	nm := nextProfileName(m.params.editor.profiles)
+	nm := profiles.NextProfileName(m.params.editor.profiles)
 	m.params.editor.AddProfile(nm)
 	m.params.metadataCursor = 0
 	return m
@@ -167,7 +167,7 @@ func (m Model) duplicateProfile() Model {
 	if idx < 0 || idx >= len(m.params.editor.profiles) {
 		return m
 	}
-	nm := cloneProfileName(m.params.editor.profiles[idx].Name, m.params.editor.profiles)
+	nm := profiles.CloneProfileName(m.params.editor.profiles[idx].Name, m.params.editor.profiles)
 	m.params.editor.DuplicateProfile(nm)
 	m.params.metadataCursor = 0
 	return m
@@ -243,7 +243,7 @@ func (m Model) persistParamPanelState() (Model, tea.Cmd, bool) {
 			m = m.withLastRunError("Backend override cleared: only GGUF models support profile backend selection")
 		}
 	}
-	if err := saveModelEntry(m.params.modelPath, ent); err != nil {
+	if err := profiles.SaveEntry(m.params.modelPath, ent); err != nil {
 		m = m.withLastRunError(err.Error())
 		return m, clearLastRunNoteAfterCmd(), true
 	}

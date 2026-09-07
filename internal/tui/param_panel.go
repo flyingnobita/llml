@@ -13,7 +13,7 @@ import (
 
 	"github.com/flyingnobita/llml/internal/fsutil"
 	"github.com/flyingnobita/llml/internal/models"
-	profilepkg "github.com/flyingnobita/llml/internal/profiles"
+	"github.com/flyingnobita/llml/internal/profiles"
 )
 
 type paramFocus int
@@ -91,11 +91,11 @@ func (m Model) paramBackendOptionsForModel() []string {
 	return paramBackendOptionsAll // fallback (shouldn't happen)
 }
 
-var paramHardwareClassOptions = []profilepkg.HardwareClass{
-	profilepkg.HardwareClassUnspecified,
-	profilepkg.HardwareClassCPU,
-	profilepkg.HardwareClassGPU,
-	profilepkg.HardwareClassMixed,
+var paramHardwareClassOptions = []profiles.HardwareClass{
+	profiles.HardwareClassUnspecified,
+	profiles.HardwareClassCPU,
+	profiles.HardwareClassGPU,
+	profiles.HardwareClassMixed,
 }
 
 // newNotesTextarea builds the textarea used for the Notes metadata field.
@@ -131,39 +131,26 @@ func newParamLineTextInput() textinput.Model {
 	return ti
 }
 
-func parseEnvLine(s string) EnvVar {
+func parseEnvLine(s string) profiles.EnvVar {
 	s = strings.TrimSpace(s)
 	if s == "" {
-		return EnvVar{}
+		return profiles.EnvVar{}
 	}
 	i := strings.IndexByte(s, '=')
 	if i < 0 {
-		return EnvVar{Key: s, Value: ""}
+		return profiles.EnvVar{Key: s, Value: ""}
 	}
 	key := strings.TrimSpace(s[:i])
 	val := strings.TrimSpace(s[i+1:])
 	val = fsutil.ExpandTildePath(val)
-	return EnvVar{Key: key, Value: val}
+	return profiles.EnvVar{Key: key, Value: val}
 }
 
-func formatEnvVar(e EnvVar) string {
+func formatEnvVar(e profiles.EnvVar) string {
 	if e.Key == "" {
 		return ""
 	}
 	return e.Key + "=" + e.Value
-}
-
-func profileNameTaken(profiles []ParameterProfile, name string, skip int) bool {
-	return profilepkg.ProfileNameTaken(profiles, name, skip)
-}
-
-func nextProfileName(profiles []ParameterProfile) string {
-	return profilepkg.NextProfileName(profiles)
-}
-
-// cloneProfileName picks a unique profile name derived from base (e.g. "foo copy", "foo copy 2").
-func cloneProfileName(base string, profiles []ParameterProfile) string {
-	return profilepkg.CloneProfileName(base, profiles)
 }
 
 func (m Model) openParamPanel() (Model, tea.Cmd) {
@@ -175,7 +162,7 @@ func (m Model) openParamPanel() (Model, tea.Cmd) {
 	m.params.open = true
 	m = m.saveMainPaneFocusForModal()
 	m.params.confirmDelete = paramConfirmNone
-	m.params.modelPath = modelParamsKey(p)
+	m.params.modelPath = profiles.ModelParamsKey(p)
 	m.params.modelDisplayName = modelDisplayNameForPath(m)
 	m = m.withLastRunCleared()
 	m.params.editKind = paramEditNone
@@ -183,13 +170,13 @@ func (m Model) openParamPanel() (Model, tea.Cmd) {
 	m.params.editInput.SetValue("")
 	m.params.notesInput = newNotesTextarea()
 
-	ent, err := loadModelEntry(m.params.modelPath)
+	ent, err := profiles.LoadEntry(m.params.modelPath)
 	var cmd tea.Cmd
 	if err != nil {
 		m = m.withLastRunError(err.Error())
 		cmd = clearLastRunNoteAfterCmd()
-		ent = modelEntry{
-			Profiles:    []ParameterProfile{{Name: "default", Env: nil, Args: nil}},
+		ent = profiles.Entry{
+			Profiles:    []profiles.Profile{{Name: "default", Env: nil, Args: nil}},
 			ActiveIndex: 0,
 		}
 	}
@@ -394,20 +381,20 @@ func toggleTag(tags []string, tag string) []string {
 
 // toggleCurrentPrimary toggles the canonical primary value at the current primaryCursor position.
 func (m Model) toggleCurrentPrimary() (Model, tea.Cmd) {
-	if m.params.primaryCursor < 0 || m.params.primaryCursor >= len(profilepkg.CanonicalPrimaries) {
+	if m.params.primaryCursor < 0 || m.params.primaryCursor >= len(profiles.CanonicalPrimaries) {
 		return m, nil
 	}
-	primStr := string(profilepkg.CanonicalPrimaries[m.params.primaryCursor])
+	primStr := string(profiles.CanonicalPrimaries[m.params.primaryCursor])
 	m.params.editor.TogglePrimary(primStr)
 	return m.persistParamPanel()
 }
 
 // toggleCurrentTag toggles the canonical tag at the current tagCursor position.
 func (m Model) toggleCurrentTag() (Model, tea.Cmd) {
-	if m.params.tagCursor < 0 || m.params.tagCursor >= len(profilepkg.CanonicalTags) {
+	if m.params.tagCursor < 0 || m.params.tagCursor >= len(profiles.CanonicalTags) {
 		return m, nil
 	}
-	tag := profilepkg.CanonicalTags[m.params.tagCursor]
+	tag := profiles.CanonicalTags[m.params.tagCursor]
 	m.params.editor.ToggleTag(tag)
 	return m.persistParamPanel()
 }

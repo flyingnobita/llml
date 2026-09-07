@@ -319,3 +319,56 @@ func TestSaveEntryWritesV3File(t *testing.T) {
 		t.Fatalf("version = %d", f.Version)
 	}
 }
+
+// These moved here from internal/tui when the alias shim over this package was
+// deleted. They exercise this package's behavior, so they belong with it.
+
+func TestNormalizeModelParams(t *testing.T) {
+	t.Parallel()
+
+	p := ModelParams{
+		Env:  []EnvVar{{Key: "  X  ", Value: "1"}, {Key: "   ", Value: "y"}},
+		Args: []string{"  ", "ok", " "},
+	}
+	n := NormalizeModelParams(p)
+	if len(n.Env) != 1 || n.Env[0].Key != "X" {
+		t.Fatalf("env = %+v", n.Env)
+	}
+	if len(n.Args) != 1 || n.Args[0] != "ok" {
+		t.Fatalf("args = %v", n.Args)
+	}
+}
+
+func TestNormalizeModelParams_splitsFlagValueLines(t *testing.T) {
+	t.Parallel()
+
+	n := NormalizeModelParams(ModelParams{
+		Args: []string{"  --max-model-len 4096  ", "--max-num-seqs 4"},
+	})
+	want := []string{"--max-model-len", "4096", "--max-num-seqs", "4"}
+	if !slices.Equal(n.Args, want) {
+		t.Fatalf("got %v want %v", n.Args, want)
+	}
+}
+
+func TestExpandArgLine_flagValuePairs(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		in   string
+		want []string
+	}{
+		{"--max-model-len 4096", []string{"--max-model-len", "4096"}},
+		// A path containing spaces stays one token; only the flag is split off.
+		{"-m /models/foo bar/model", []string{"-m", "/models/foo bar/model"}},
+		{"--gpu-memory-utilization 0.85", []string{"--gpu-memory-utilization", "0.85"}},
+		{"--port-only-flag", []string{"--port-only-flag"}},
+		// A row that is not a flag is left alone.
+		{"/abs/path only", []string{"/abs/path only"}},
+	}
+	for _, tc := range tests {
+		if got := ExpandArgLine(tc.in); !slices.Equal(got, tc.want) {
+			t.Errorf("ExpandArgLine(%q) = %v, want %v", tc.in, got, tc.want)
+		}
+	}
+}

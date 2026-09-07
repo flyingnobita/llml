@@ -9,11 +9,11 @@ import (
 // ── IRON RULE regression: ToggleTag must not discard in-progress env edits ──
 
 func TestProfileEditor_ToggleTagPreservesEnvBuffer(t *testing.T) {
-	e := newProfileEditor(modelEntry{
-		Profiles: []ParameterProfile{{Name: "default"}},
+	e := newProfileEditor(profiles.Entry{
+		Profiles: []profiles.Profile{{Name: "default"}},
 	})
 	// Simulate in-progress env edits in the buffer.
-	e.env = []EnvVar{{Key: "FOO", Value: "bar"}, {}} // second row: in-progress empty
+	e.env = []profiles.EnvVar{{Key: "FOO", Value: "bar"}, {}} // second row: in-progress empty
 	e.ToggleTag("thinking")
 
 	// Buffer must be unchanged after a metadata mutation.
@@ -41,8 +41,8 @@ func TestProfileEditor_ToggleTagPreservesEnvBuffer(t *testing.T) {
 // ── Working-vs-storage contract: empty row in buffer, absent from Entry ────
 
 func TestProfileEditor_AddEnvRow_EmptyRowInBufferAbsentFromEntry(t *testing.T) {
-	e := newProfileEditor(modelEntry{
-		Profiles: []ParameterProfile{{Name: "default", Env: []EnvVar{{Key: "A", Value: "1"}}}},
+	e := newProfileEditor(profiles.Entry{
+		Profiles: []profiles.Profile{{Name: "default", Env: []profiles.EnvVar{{Key: "A", Value: "1"}}}},
 	})
 	e.AddEnvRow() // appends empty row to buffer
 
@@ -65,8 +65,8 @@ func TestProfileEditor_AddEnvRow_EmptyRowInBufferAbsentFromEntry(t *testing.T) {
 }
 
 func TestProfileEditor_AddArgRow_EmptyRowInBufferAbsentFromEntry(t *testing.T) {
-	e := newProfileEditor(modelEntry{
-		Profiles: []ParameterProfile{{Name: "default", Args: []string{"--x"}}},
+	e := newProfileEditor(profiles.Entry{
+		Profiles: []profiles.Profile{{Name: "default", Args: []string{"--x"}}},
 	})
 	e.AddArgRow()
 
@@ -87,14 +87,14 @@ func TestProfileEditor_AddArgRow_EmptyRowInBufferAbsentFromEntry(t *testing.T) {
 // ── Lifecycle: flush outgoing edits before switching ─────────────────────
 
 func TestProfileEditor_MoveActive_FlushesOutgoingEdits(t *testing.T) {
-	e := newProfileEditor(modelEntry{
-		Profiles: []ParameterProfile{
+	e := newProfileEditor(profiles.Entry{
+		Profiles: []profiles.Profile{
 			{Name: "a"},
 			{Name: "b"},
 		},
 	})
 	// Edit the buffer for profile 0 without persisting.
-	e.env = []EnvVar{{Key: "K", Value: "V"}}
+	e.env = []profiles.EnvVar{{Key: "K", Value: "V"}}
 
 	moved := e.MoveActive(1)
 	if !moved {
@@ -114,10 +114,10 @@ func TestProfileEditor_MoveActive_FlushesOutgoingEdits(t *testing.T) {
 }
 
 func TestProfileEditor_AddProfile_FlushesOutgoingEdits(t *testing.T) {
-	e := newProfileEditor(modelEntry{
-		Profiles: []ParameterProfile{{Name: "a"}},
+	e := newProfileEditor(profiles.Entry{
+		Profiles: []profiles.Profile{{Name: "a"}},
 	})
-	e.env = []EnvVar{{Key: "X", Value: "1"}}
+	e.env = []profiles.EnvVar{{Key: "X", Value: "1"}}
 
 	e.AddProfile("b")
 
@@ -137,8 +137,8 @@ func TestProfileEditor_AddProfile_FlushesOutgoingEdits(t *testing.T) {
 // ── DeleteProfile: guards len==1 ──────────────────────────────────────────
 
 func TestProfileEditor_DeleteProfile_GuardsLen1(t *testing.T) {
-	e := newProfileEditor(modelEntry{
-		Profiles: []ParameterProfile{{Name: "only"}},
+	e := newProfileEditor(profiles.Entry{
+		Profiles: []profiles.Profile{{Name: "only"}},
 	})
 	if ok := e.DeleteProfile(); ok {
 		t.Fatal("DeleteProfile() on single profile returned true, want false")
@@ -149,9 +149,9 @@ func TestProfileEditor_DeleteProfile_GuardsLen1(t *testing.T) {
 }
 
 func TestProfileEditor_DeleteProfile_SwitchesToNextProfile(t *testing.T) {
-	e := newProfileEditor(modelEntry{
-		Profiles: []ParameterProfile{
-			{Name: "a", Env: []EnvVar{{Key: "A", Value: "1"}}},
+	e := newProfileEditor(profiles.Entry{
+		Profiles: []profiles.Profile{
+			{Name: "a", Env: []profiles.EnvVar{{Key: "A", Value: "1"}}},
 			{Name: "b"},
 		},
 	})
@@ -174,8 +174,8 @@ func TestProfileEditor_DeleteProfile_SwitchesToNextProfile(t *testing.T) {
 
 func TestProfileEditor_ArgsRoundTrip_PairedDisplay_FlatStorage(t *testing.T) {
 	flat := []string{"--max-model-len", "8192", "--max-num-seqs", "4", "--enable-auto-tool-choice"}
-	e := newProfileEditor(modelEntry{
-		Profiles: []ParameterProfile{{Name: "default", Args: flat}},
+	e := newProfileEditor(profiles.Entry{
+		Profiles: []profiles.Profile{{Name: "default", Args: flat}},
 	})
 
 	// load() should pair them for display.
@@ -206,15 +206,15 @@ func TestProfileEditor_ArgsRoundTrip_PairedDisplay_FlatStorage(t *testing.T) {
 // ── ActiveProfile overlays buffer over stale profiles[index] env/args ─────
 
 func TestProfileEditor_ActiveProfile_OverlaysBuffer(t *testing.T) {
-	e := newProfileEditor(modelEntry{
-		Profiles: []ParameterProfile{{
+	e := newProfileEditor(profiles.Entry{
+		Profiles: []profiles.Profile{{
 			Name:    "p",
 			Backend: "llama",
-			Env:     []EnvVar{{Key: "OLD", Value: "x"}},
+			Env:     []profiles.EnvVar{{Key: "OLD", Value: "x"}},
 		}},
 	})
 	// Overwrite buffer with new env rows (simulating in-progress edits).
-	e.env = []EnvVar{{Key: "NEW", Value: "y"}}
+	e.env = []profiles.EnvVar{{Key: "NEW", Value: "y"}}
 
 	p := e.ActiveProfile()
 	// Metadata from profiles[index] — Backend should be present.
@@ -230,11 +230,11 @@ func TestProfileEditor_ActiveProfile_OverlaysBuffer(t *testing.T) {
 // ── Entry: normalizes active profile (strips empty env/args) ──────────────
 
 func TestProfileEditor_Entry_NormalizesActiveProfile(t *testing.T) {
-	e := newProfileEditor(modelEntry{
-		Profiles: []ParameterProfile{{Name: "default"}},
+	e := newProfileEditor(profiles.Entry{
+		Profiles: []profiles.Profile{{Name: "default"}},
 	})
-	e.env = []EnvVar{{Key: "K", Value: "V"}, {}} // trailing empty
-	e.args = []string{"--ctx-size 4096", ""}     // trailing empty
+	e.env = []profiles.EnvVar{{Key: "K", Value: "V"}, {}} // trailing empty
+	e.args = []string{"--ctx-size 4096", ""}              // trailing empty
 
 	ent := e.Entry()
 	p := ent.Profiles[0]
@@ -250,11 +250,11 @@ func TestProfileEditor_Entry_NormalizesActiveProfile(t *testing.T) {
 // ── DuplicateProfile includes buffer contents in the clone ────────────────
 
 func TestProfileEditor_DuplicateProfile_ClonesBufferContents(t *testing.T) {
-	e := newProfileEditor(modelEntry{
-		Profiles: []ParameterProfile{{Name: "original", Env: []EnvVar{{Key: "K", Value: "V"}}}},
+	e := newProfileEditor(profiles.Entry{
+		Profiles: []profiles.Profile{{Name: "original", Env: []profiles.EnvVar{{Key: "K", Value: "V"}}}},
 	})
 	// Simulate in-progress env edits.
-	e.env = append(e.env, EnvVar{Key: "NEW", Value: "2"})
+	e.env = append(e.env, profiles.EnvVar{Key: "NEW", Value: "2"})
 
 	e.DuplicateProfile("clone")
 
@@ -273,8 +273,8 @@ func TestProfileEditor_DuplicateProfile_ClonesBufferContents(t *testing.T) {
 // ── Cursor management ─────────────────────────────────────────────────────
 
 func TestProfileEditor_DeleteEnvRow_ClampsCursor(t *testing.T) {
-	e := newProfileEditor(modelEntry{Profiles: []ParameterProfile{{Name: "p"}}})
-	e.env = []EnvVar{{Key: "A"}, {Key: "B"}, {Key: "C"}}
+	e := newProfileEditor(profiles.Entry{Profiles: []profiles.Profile{{Name: "p"}}})
+	e.env = []profiles.EnvVar{{Key: "A"}, {Key: "B"}, {Key: "C"}}
 	e.envCursor = 2
 
 	e.DeleteEnvRow() // delete index 2, cursor should clamp to 1
@@ -287,7 +287,7 @@ func TestProfileEditor_DeleteEnvRow_ClampsCursor(t *testing.T) {
 }
 
 func TestProfileEditor_DeleteArgRow_ClampsCursor(t *testing.T) {
-	e := newProfileEditor(modelEntry{Profiles: []ParameterProfile{{Name: "p"}}})
+	e := newProfileEditor(profiles.Entry{Profiles: []profiles.Profile{{Name: "p"}}})
 	e.args = []string{"--a", "--b"}
 	e.argsCursor = 1
 
@@ -303,7 +303,7 @@ func TestProfileEditor_DeleteArgRow_ClampsCursor(t *testing.T) {
 // ── Metadata: NormalizeProfile after mutation ─────────────────────────────
 
 func TestProfileEditor_SetHardwareField_SwapsMinMaxVRAM(t *testing.T) {
-	e := newProfileEditor(modelEntry{Profiles: []ParameterProfile{{Name: "p"}}})
+	e := newProfileEditor(profiles.Entry{Profiles: []profiles.Profile{{Name: "p"}}})
 	e.SetHardwareField(paramMetadataHardwareMinVRAM, "48")
 	e.SetHardwareField(paramMetadataHardwareMaxVRAM, "24")
 
@@ -319,8 +319,8 @@ func TestProfileEditor_SetHardwareField_SwapsMinMaxVRAM(t *testing.T) {
 
 func TestProfileEditor_SetHardwareClass_CPU_ClearsGPUFields(t *testing.T) {
 	two := 2
-	e := newProfileEditor(modelEntry{
-		Profiles: []ParameterProfile{{
+	e := newProfileEditor(profiles.Entry{
+		Profiles: []profiles.Profile{{
 			Name:     "p",
 			Hardware: profiles.HardwareMetadata{Class: profiles.HardwareClassGPU, GPUCount: &two},
 		}},
@@ -335,7 +335,7 @@ func TestProfileEditor_SetHardwareClass_CPU_ClearsGPUFields(t *testing.T) {
 // ── newProfileEditor: empty entry gets a default profile ─────────────────
 
 func TestNewProfileEditor_EmptyEntry_GetsDefaultProfile(t *testing.T) {
-	e := newProfileEditor(modelEntry{})
+	e := newProfileEditor(profiles.Entry{})
 	if len(e.profiles) != 1 || e.profiles[0].Name != "default" {
 		t.Fatalf("profiles = %v, want [{default}]", e.profiles)
 	}

@@ -4,6 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/flyingnobita/llml/internal/profiles"
+
 	"github.com/flyingnobita/llml/internal/models"
 )
 
@@ -138,7 +140,7 @@ func TestCloseParamPanel_NoRestoreWithoutSnapshot(t *testing.T) {
 	m.preview.focused = true
 	m.table.tbl.Blur()
 	m.params.open = true
-	m.params.editor = newProfileEditor(modelEntry{Profiles: []ParameterProfile{{Name: "p"}}, ActiveIndex: 0})
+	m.params.editor = newProfileEditor(profiles.Entry{Profiles: []profiles.Profile{{Name: "p"}}, ActiveIndex: 0})
 	m.params.modelPath = "/x.gguf"
 
 	m = m.closeParamPanel()

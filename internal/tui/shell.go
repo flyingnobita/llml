@@ -4,6 +4,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/flyingnobita/llml/internal/profiles"
 )
 
 // llamaServerAlias returns the API model id alias: leaf name of the GGUF path (matches File Name column).
@@ -29,7 +31,7 @@ func shellWord(a string) string {
 }
 
 // shellEnvPrefix emits VAR='value' assignments for a shell command prefix (empty if none).
-func shellEnvPrefix(env []EnvVar) string {
+func shellEnvPrefix(env []profiles.EnvVar) string {
 	var b strings.Builder
 	for _, e := range env {
 		if e.Key == "" {
@@ -83,7 +85,7 @@ func pairFlagValueForShellDisplay(tokens []string) []string {
 // with [shellDisplayArgIndent] when withPlusPrefix is false (launch preview, clipboard). If
 // withPlusPrefix is true, the first line starts with "+ " (split-pane log style) and every
 // continuation line is indented to align under the prefix.
-func shellCommandDisplayMultiline(withPlusPrefix bool, activateScript string, env []EnvVar, words []string) string {
+func shellCommandDisplayMultiline(withPlusPrefix bool, activateScript string, env []profiles.EnvVar, words []string) string {
 	words = pairFlagValueForShellDisplay(words)
 	var raw []string
 	if activateScript != "" {

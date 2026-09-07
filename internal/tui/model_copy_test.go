@@ -20,8 +20,8 @@ func TestModelCopy_effectiveBackendsIsCopyOnWrite(t *testing.T) {
 	t.Setenv("AppData", dir)
 
 	modelPath := filepath.Join(dir, "a.gguf")
-	if err := saveModelEntry(modelPath, modelEntry{
-		Profiles:    []ParameterProfile{{Name: "kobold", Backend: "koboldcpp"}},
+	if err := profiles.SaveEntry(modelPath, profiles.Entry{
+		Profiles:    []profiles.Profile{{Name: "kobold", Backend: "koboldcpp"}},
 		ActiveIndex: 0,
 	}); err != nil {
 		t.Fatal(err)
@@ -32,7 +32,7 @@ func TestModelCopy_effectiveBackendsIsCopyOnWrite(t *testing.T) {
 
 	m2 = m2.loadEffectiveBackendForIdentity(modelPath)
 
-	key := modelParamsKey(modelPath)
+	key := profiles.ModelParamsKey(modelPath)
 	if got, ok := m2.table.effectiveBackends[key]; !ok || got != models.BackendKobold {
 		t.Fatalf("the copy should see the new backend, got %v (present=%t)", got, ok)
 	}
@@ -48,7 +48,7 @@ func TestModelCopy_effectiveBackendsDeleteDoesNotLeak(t *testing.T) {
 	t.Setenv("AppData", dir)
 
 	modelPath := filepath.Join(dir, "a.gguf")
-	key := modelParamsKey(modelPath)
+	key := profiles.ModelParamsKey(modelPath)
 
 	m := New()
 	m.table.effectiveBackends[key] = models.BackendKobold

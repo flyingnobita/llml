@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/flyingnobita/llml/internal/profiles"
+
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
@@ -342,7 +344,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m.flashError("Select a model row first.")
 		}
 		m = m.withLastRunCleared()
-		params, _ := loadModelParamsForRun(p)
+		params, _ := profiles.LoadParamsForRun(p)
 		be := m.resolveEffectiveBackend()
 		spec, err := buildServerSpec(be, p, params, m.runtime, true)
 		if err != nil {

@@ -10,9 +10,9 @@ import (
 // working-form env/args buffers. Callers issue intent methods; the editor
 // materializes storage only inside the flush+normalize read accessors.
 type profileEditor struct {
-	profiles   []ParameterProfile
+	profiles   []profiles.Profile
 	index      int
-	env        []EnvVar // working form: may have in-progress empty rows
+	env        []profiles.EnvVar // working form: may have in-progress empty rows
 	envCursor  int
 	args       []string // working form: display-paired (e.g. "--ctx-size 4096" on one row)
 	argsCursor int
@@ -24,8 +24,8 @@ func (e *profileEditor) flush() {
 	if e.index < 0 || e.index >= len(e.profiles) {
 		return
 	}
-	e.profiles[e.index].Env = append([]EnvVar(nil), e.env...)
-	e.profiles[e.index].Args = flattenArgLines(e.args)
+	e.profiles[e.index].Env = append([]profiles.EnvVar(nil), e.env...)
+	e.profiles[e.index].Args = profiles.FlattenArgLines(e.args)
 	e.profiles[e.index] = profiles.NormalizeProfile(e.profiles[e.index])
 }
 
@@ -36,7 +36,7 @@ func (e *profileEditor) load() {
 		return
 	}
 	p := e.profiles[e.index]
-	e.env = append([]EnvVar(nil), p.Env...)
+	e.env = append([]profiles.EnvVar(nil), p.Env...)
 	e.args = pairFlagValueForShellDisplay(p.Args)
 	e.envCursor = 0
 	e.argsCursor = 0
@@ -44,46 +44,46 @@ func (e *profileEditor) load() {
 
 // ── no-flush buffer reads ──────────────────────────────────────────────────
 
-func (e *profileEditor) EnvRows() []EnvVar { return e.env }
-func (e *profileEditor) ArgRows() []string { return e.args }
-func (e *profileEditor) EnvCursor() int    { return e.envCursor }
-func (e *profileEditor) ArgsCursor() int   { return e.argsCursor }
+func (e *profileEditor) EnvRows() []profiles.EnvVar { return e.env }
+func (e *profileEditor) ArgRows() []string          { return e.args }
+func (e *profileEditor) EnvCursor() int             { return e.envCursor }
+func (e *profileEditor) ArgsCursor() int            { return e.argsCursor }
 
 // ── flush+normalize reads ──────────────────────────────────────────────────
 
 // ActiveProfile materializes the active profile: it overlays the working-form
 // buffers on top of profiles[index] (which holds the current metadata) and
 // returns the normalized result. Does not mutate editor state.
-func (e *profileEditor) ActiveProfile() ParameterProfile {
+func (e *profileEditor) ActiveProfile() profiles.Profile {
 	if e.index < 0 || e.index >= len(e.profiles) {
 		return profiles.DefaultProfile()
 	}
 	p := profiles.CopyProfile(e.profiles[e.index])
-	p.Env = append([]EnvVar(nil), e.env...)
-	p.Args = flattenArgLines(e.args)
+	p.Env = append([]profiles.EnvVar(nil), e.env...)
+	p.Args = profiles.FlattenArgLines(e.args)
 	return profiles.NormalizeProfile(p)
 }
 
 // Entry materializes all profiles into a storage entry: the active profile is
 // built via ActiveProfile(); all others are taken from the profiles slice as-is.
-func (e *profileEditor) Entry() modelEntry {
+func (e *profileEditor) Entry() profiles.Entry {
 	ps := profiles.CopyProfiles(e.profiles)
 	if e.index >= 0 && e.index < len(ps) {
 		ps[e.index] = e.ActiveProfile()
 	}
-	return modelEntry{Profiles: ps, ActiveIndex: e.index}
+	return profiles.Entry{Profiles: ps, ActiveIndex: e.index}
 }
 
 // ── env/args intent methods ────────────────────────────────────────────────
 
 // AddEnvRow appends an empty env row and advances the cursor to the new row.
 func (e *profileEditor) AddEnvRow() {
-	e.env = append(e.env, EnvVar{})
+	e.env = append(e.env, profiles.EnvVar{})
 	e.envCursor = len(e.env) - 1
 }
 
 // SetEnvRow replaces the env row at index i.
-func (e *profileEditor) SetEnvRow(i int, ev EnvVar) {
+func (e *profileEditor) SetEnvRow(i int, ev profiles.EnvVar) {
 	if i >= 0 && i < len(e.env) {
 		e.env[i] = ev
 	}
@@ -214,7 +214,7 @@ func (e *profileEditor) SetProfileName(name string) {
 // given name, switches to it, and loads its (empty) state into the buffer.
 func (e *profileEditor) AddProfile(name string) {
 	e.flush()
-	e.profiles = append(e.profiles, ParameterProfile{Name: name})
+	e.profiles = append(e.profiles, profiles.Profile{Name: name})
 	e.index = len(e.profiles) - 1
 	e.load()
 }
@@ -230,7 +230,7 @@ func (e *profileEditor) DuplicateProfile(name string) {
 	clone := profiles.CopyProfile(e.profiles[e.index])
 	clone.Name = name
 	i := e.index
-	e.profiles = append(e.profiles[:i+1], append([]ParameterProfile{clone}, e.profiles[i+1:]...)...)
+	e.profiles = append(e.profiles[:i+1], append([]profiles.Profile{clone}, e.profiles[i+1:]...)...)
 	e.index = i + 1
 	e.load()
 }
@@ -272,10 +272,10 @@ func (e *profileEditor) MoveActive(delta int) bool {
 
 // newProfileEditor builds a profileEditor from a model entry, deep-copying the
 // profiles slice and loading the active profile's env/args into the buffer.
-func newProfileEditor(ent modelEntry) profileEditor {
+func newProfileEditor(ent profiles.Entry) profileEditor {
 	var e profileEditor
 	if len(ent.Profiles) == 0 {
-		e.profiles = []ParameterProfile{profiles.DefaultProfile()}
+		e.profiles = []profiles.Profile{profiles.DefaultProfile()}
 	} else {
 		e.profiles = profiles.CopyProfiles(ent.Profiles)
 	}

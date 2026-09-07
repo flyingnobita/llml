@@ -68,8 +68,8 @@ func TestPersistParamPanel_refreshesLaunchPreview(t *testing.T) {
 	t.Setenv("AppData", cfg)
 
 	modelPath := filepath.Join(cfg, "with-params.gguf")
-	if err := saveModelEntry(modelPath, modelEntry{
-		Profiles:    []ParameterProfile{{Name: "default", Env: nil, Args: nil}},
+	if err := profiles.SaveEntry(modelPath, profiles.Entry{
+		Profiles:    []profiles.Profile{{Name: "default", Env: nil, Args: nil}},
 		ActiveIndex: 0,
 	}); err != nil {
 		t.Fatal(err)
@@ -83,8 +83,8 @@ func TestPersistParamPanel_refreshesLaunchPreview(t *testing.T) {
 	m.params.open = true
 	m.params.modelPath = filepath.Clean(modelPath)
 	m.params.modelDisplayName = filepath.Base(modelPath)
-	m.params.editor = newProfileEditor(modelEntry{
-		Profiles:    []ParameterProfile{{Name: "default", Env: nil, Args: nil}},
+	m.params.editor = newProfileEditor(profiles.Entry{
+		Profiles:    []profiles.Profile{{Name: "default", Env: nil, Args: nil}},
 		ActiveIndex: 0,
 	})
 	m.params.editor.args = []string{"--ctx-size 4096"}
@@ -113,13 +113,13 @@ func TestMetadataOnlyDifferencesDoNotChangeLaunchPreview(t *testing.T) {
 	t.Setenv("AppData", cfg)
 
 	modelPath := filepath.Join(cfg, "meta.gguf")
-	if err := saveModelEntry(modelPath, modelEntry{
-		Profiles: []ParameterProfile{{
+	if err := profiles.SaveEntry(modelPath, profiles.Entry{
+		Profiles: []profiles.Profile{{
 			Name:     "default",
 			Backend:  "vllm",
 			UseCase:  profiles.UseCaseMetadata{Primary: profiles.UseCasePrimaries{profiles.UseCaseGeneral}, Tags: []string{"interactive"}},
 			Hardware: profiles.HardwareMetadata{Class: profiles.HardwareClassGPU},
-			Env:      []EnvVar{{Key: "CUDA_VISIBLE_DEVICES", Value: "0"}},
+			Env:      []profiles.EnvVar{{Key: "CUDA_VISIBLE_DEVICES", Value: "0"}},
 			Args:     []string{"--ctx-size", "4096"},
 		}},
 		ActiveIndex: 0,
@@ -129,13 +129,13 @@ func TestMetadataOnlyDifferencesDoNotChangeLaunchPreview(t *testing.T) {
 	m := baseModelForPreview(t, modelPath)
 	gotA := launchPreviewCommandLine(m)
 
-	if err := saveModelEntry(modelPath, modelEntry{
-		Profiles: []ParameterProfile{{
+	if err := profiles.SaveEntry(modelPath, profiles.Entry{
+		Profiles: []profiles.Profile{{
 			Name:     "default",
 			Backend:  "",
 			UseCase:  profiles.UseCaseMetadata{},
 			Hardware: profiles.HardwareMetadata{Class: profiles.HardwareClassCPU, Notes: "quiet"},
-			Env:      []EnvVar{{Key: "CUDA_VISIBLE_DEVICES", Value: "0"}},
+			Env:      []profiles.EnvVar{{Key: "CUDA_VISIBLE_DEVICES", Value: "0"}},
 			Args:     []string{"--ctx-size", "4096"},
 		}},
 		ActiveIndex: 0,
