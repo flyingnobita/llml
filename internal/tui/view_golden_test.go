@@ -84,6 +84,7 @@ func goldenModel(t *testing.T) Model {
 		VLLMServerHost:  "127.0.0.1",
 		VLLMServerPort:  8000,
 		OllamaHost:      "127.0.0.1:11434",
+		OllamaPath:      "/usr/local/bin/ollama",
 		KoboldCppPort:   5001,
 	}
 	m.table.files = []models.ModelFile{
