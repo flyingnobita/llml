@@ -600,7 +600,7 @@ func (m Model) modalBlock() (string, bool) {
 		return m.quitConfirmModalBlock(), true
 	case m.collision.open:
 		return m.collisionModalBlock(), true
-	case m.import_.open:
+	case m.importView.open:
 		return m.importModalBlock(), true
 	case m.export.open:
 		return m.exportModalBlock(), true

@@ -30,25 +30,25 @@ func TestDiscoveryPathsEnterStartsEditByKeyCode(t *testing.T) {
 
 func TestImportPathTabSwitchesPickerByKeyCode(t *testing.T) {
 	m := newTestModel()
-	m.import_.open = true
-	m.import_.focus = importFocusPath
+	m.importView.open = true
+	m.importView.focus = importFocusPath
 
 	got, _ := m.updateImportKey(tea.KeyPressMsg{Code: tea.KeyTab})
 	m2 := got.(Model)
-	if m2.import_.focus != importFocusPicker {
-		t.Fatalf("expected tab key code to switch import focus to picker, got %v", m2.import_.focus)
+	if m2.importView.focus != importFocusPicker {
+		t.Fatalf("expected tab key code to switch import focus to picker, got %v", m2.importView.focus)
 	}
 }
 
 func TestImportPathEnterParsesByKeyCode(t *testing.T) {
 	m := newTestModel()
-	m.import_.open = true
-	m.import_.focus = importFocusPath
-	m.import_.filePath = ""
+	m.importView.open = true
+	m.importView.focus = importFocusPath
+	m.importView.filePath = ""
 
 	got, _ := m.updateImportKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m2 := got.(Model)
-	if m2.import_.parseError == "" {
+	if m2.importView.parseError == "" {
 		t.Fatal("expected enter key code to trigger import parse validation")
 	}
 }

@@ -103,13 +103,11 @@ func clampRenderedHeightKeepTopBottom(s string, maxH int) string {
 	return strings.Join(out, "\n")
 }
 
-// clampInt returns v limited to the inclusive range [lo, hi].
-func clampInt(v, lo, hi int) int {
-	if v < lo {
-		return lo
+// clampIndex returns v limited to the inclusive range [0, maxIdx]. A negative
+// maxIdx (an empty collection) yields 0.
+func clampIndex(v, maxIdx int) int {
+	if v < 0 || maxIdx < 0 {
+		return 0
 	}
-	if v > hi {
-		return hi
-	}
-	return v
+	return min(v, maxIdx)
 }

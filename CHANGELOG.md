@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
+- Sep-07, 2026 - 09:18 AM +0800 - [Lint: enable nolintlint, errorlint, revive, gocognit (30), funlen (120/60), unparam, and copyloopvar, and split the seven functions that exceeded the new thresholds into per-focus and per-message handlers; connection-refused and DNS errors are now matched with errors.Is/errors.As instead of substring checks on the message]
 - Sep-07, 2026 - 09:03 AM +0800 - [Cleanup: read LLML_DEBUG once instead of on every debug call, drop a duplicate branch in ModelParamsKey, convert the remaining sort.Slice/sort.Strings calls to the slices package, and use errors.New for messages with no format verbs]
 - Sep-07, 2026 - 09:01 AM +0800 - [TUI internals: move the last inline lipgloss styles (help panel, import box, alert body, pane titles, Notes textarea) into newStyles so a theme change restyles them, and enforce the rule with a forbidigo lint; alert lines now measure the tag by display width instead of byte length]
 - Sep-07, 2026 - 08:57 AM +0800 - [CLI: add `llml --help` with a usage listing of the subcommands, and make the entrypoint testable — os.Exit is now called once in main, subcommands return errors, and a bad flag no longer exits the process from inside flag parsing. cmd/llml test coverage rises from 29% to 73%]

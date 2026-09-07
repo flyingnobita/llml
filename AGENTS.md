@@ -172,6 +172,23 @@ file. Two constraints must hold when bumping any of them:
 
 Bump Go by editing `go.mod` and `mise.toml` together, then run `mise install`.
 
+### Lint thresholds
+
+`.golangci.yml` enables `nolintlint`, `errorlint`, `revive`, `gocognit`,
+`funlen`, `unparam`, `copyloopvar`, and `forbidigo` on top of the standard set
+plus `gosec`, `gocritic`, and `misspell`.
+
+- **Cognitive complexity** (`gocognit`) is capped at **30**, and function length
+  (`funlen`) at **120 lines / 60 statements**. When a key handler or renderer
+  crosses either, split it by the thing it is switching on: one function per
+  focus, per message group, or per row kind.
+- **Every `//nolint` must name its linter and give a reason** (`nolintlint`
+  enforces both). Do not add one to make a step green — fix the code, or stop
+  and ask.
+- Tests are exempt from `unparam`, `gocognit`, and `funlen`: a helper's
+  parameters are part of its shape, and table-driven tests are legitimately long.
+- Narrow, documented exceptions live in the `exclusions` block, not inline.
+
 ### Docs formatting
 
 Markdown, YAML, and JSON are formatted with **Prettier** and linted with

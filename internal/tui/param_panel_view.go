@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -337,6 +338,8 @@ func radioOptionLabel(v string) string {
 	return v
 }
 
+// renderMetadataSection renders the Profile Metadata block. Each field kind has
+// its own renderer below; this function only picks between them.
 func (m Model) renderMetadataSection(cw, maxSec int, secBox lipgloss.Style) string {
 	rows := []string{
 		lipgloss.JoinHorizontal(lipgloss.Top,
@@ -345,159 +348,160 @@ func (m Model) renderMetadataSection(cw, maxSec int, secBox lipgloss.Style) stri
 		),
 		"",
 	}
-	if len(m.params.editor.profiles) > 0 {
-		p := m.params.editor.ActiveProfile()
-		// Build []string slices for checkbox rows.
-		primaryStrs := make([]string, len(p.UseCase.Primary))
-		for i, v := range p.UseCase.Primary {
-			primaryStrs[i] = string(v)
-		}
-		canonicalPrimaryStrs := make([]string, len(profiles.CanonicalPrimaries))
-		for i, v := range profiles.CanonicalPrimaries {
-			canonicalPrimaryStrs[i] = string(v)
-		}
-		for field := paramMetadataField(0); field < paramMetadataFieldCount; field++ {
-			focused := m.params.focus == paramFocusMetadata && m.params.metadataCursor == int(field)
-			prefix := "  "
-			if focused {
-				prefix = "› "
-			}
-			switch field {
-			case paramMetadataBackend:
-				opts := m.paramBackendOptionsForModel()
-				optLabels := make([]string, len(opts))
-				for i, o := range opts {
-					optLabels[i] = radioOptionLabel(o)
-				}
-				selIdx := -1
-				for i, o := range opts {
-					if o == p.Backend {
-						selIdx = i
-						break
-					}
-				}
-				rows = append(rows, m.renderRadioRow(
-					"Backend", optLabels, selIdx,
-					m.params.backendCursor, focused, maxSec,
-				)...)
-			case paramMetadataHardwareClass:
-				hwLabels := make([]string, len(paramHardwareClassOptions))
-				for i, o := range paramHardwareClassOptions {
-					hwLabels[i] = radioOptionLabel(string(o))
-				}
-				selIdx := -1
-				for i, o := range paramHardwareClassOptions {
-					if o == p.Hardware.Class {
-						selIdx = i
-						break
-					}
-				}
-				rows = append(rows, m.renderRadioRow(
-					"Hardware Class", hwLabels, selIdx,
-					m.params.hardwareClassCursor, focused, maxSec,
-				)...)
-			case paramMetadataUseCasePrimary:
-				rows = append(rows, m.renderCheckboxRow(
-					"Use Case Primary", canonicalPrimaryStrs, primaryStrs,
-					m.params.primaryCursor, focused, maxSec,
-				)...)
-			case paramMetadataUseCaseTags:
-				rows = append(rows, m.renderCheckboxRow(
-					"Tags", profiles.CanonicalTags, p.UseCase.Tags,
-					m.params.tagCursor, focused, maxSec,
-				)...)
-			case paramMetadataHardwareNotes:
-				if focused && m.params.editKind == paramEditMetadataValue {
-					labelPart := m.renderLabelPart(prefix, paramMetadataFieldLabels[field])
-					labelPartW := lipgloss.Width(labelPart)
-					indent := strings.Repeat(" ", labelPartW)
-					// Split textarea view into lines; prepend label to first, indent the rest.
-					taLines := strings.Split(m.params.notesInput.View(), "\n")
-					for i, taLine := range taLines {
-						if taLine == "" && i == len(taLines)-1 {
-							break // skip trailing empty line from textarea View
-						}
-						if i == 0 {
-							rows = append(rows, labelPart+taLine)
-						} else {
-							rows = append(rows, indent+taLine)
-						}
-					}
-					continue
-				}
-				labelPart := m.renderLabelPart(prefix, paramMetadataFieldLabels[field])
-				labelPartW := lipgloss.Width(labelPart)
-				valueW := max(maxSec-labelPartW, 8)
-				value := m.metadataFieldValue(field)
 
-				var wrapped []string
-				if value == "" {
-					wrapped = []string{"unspecified"}
-				} else {
-					wrapped = wrapTextToLines(value, valueW)
-					if len(wrapped) == 0 {
-						wrapped = []string{"unspecified"}
-					}
-				}
-
-				displayLines := min(notesMaxLines, len(wrapped))
-				hasScroll := len(wrapped) > notesMaxLines
-				displayW := valueW
-				thumbLines := 0
-				if hasScroll {
-					displayW = max(valueW-2, 4)
-					thumbLines = max(1, notesMaxLines*notesMaxLines/len(wrapped))
-				}
-
-				for i := range displayLines {
-					line := truncateParamLine(wrapped[i], displayW)
-					var lineStr string
-					if hasScroll {
-						pad := displayW - lipgloss.Width(line)
-						padded := line
-						if pad > 0 {
-							padded = line + strings.Repeat(" ", pad)
-						}
-						scrollChar := "░"
-						if i < thumbLines {
-							scrollChar = "█"
-						}
-						lineStr = m.ui.styles.paramDetailContent.Render(padded) +
-							" " + m.ui.styles.scrollBarColumn.Render(scrollChar)
-					} else {
-						lineStr = m.ui.styles.paramDetailContent.Render(line)
-					}
-					if i == 0 {
-						rows = append(rows, labelPart+lineStr)
-					} else {
-						rows = append(rows, strings.Repeat(" ", labelPartW)+lineStr)
-					}
-				}
-			default:
-				if focused && m.params.editKind == paramEditMetadataValue {
-					labelPart := m.renderLabelPart(prefix, paramMetadataFieldLabels[field])
-					rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Top,
-						labelPart,
-						m.params.editInput.View(),
-					))
-					continue
-				}
-				// Split label (muted) and value (bright) with aligned column.
-				labelPart := m.renderLabelPart(prefix, paramMetadataFieldLabels[field])
-				labelPartW := lipgloss.Width(labelPart)
-				valueW := max(maxSec-labelPartW, 8)
-				value := m.metadataFieldValue(field)
-				if value == "" {
-					value = "unspecified"
-				}
-				valuePart := m.ui.styles.paramDetailContent.Render(truncateParamLine(value, valueW))
-				rows = append(rows, labelPart+valuePart)
-			}
-		}
-	} else {
+	if len(m.params.editor.profiles) == 0 {
 		rows = append(rows, m.ui.styles.paramDetailContent.Render("  unspecified"))
+		return secBox.Width(cw).Render(lipgloss.JoinVertical(lipgloss.Left, rows...))
+	}
+
+	p := m.params.editor.ActiveProfile()
+	for field := paramMetadataField(0); field < paramMetadataFieldCount; field++ {
+		focused := m.params.focus == paramFocusMetadata && m.params.metadataCursor == int(field)
+		rows = append(rows, m.renderMetadataField(field, p, focused, maxSec)...)
 	}
 	return secBox.Width(cw).Render(lipgloss.JoinVertical(lipgloss.Left, rows...))
+}
+
+// renderMetadataField renders the rows for one metadata field.
+func (m Model) renderMetadataField(field paramMetadataField, p profiles.Profile, focused bool, maxSec int) []string {
+	switch field {
+	case paramMetadataBackend:
+		return m.renderBackendRow(p, focused, maxSec)
+	case paramMetadataHardwareClass:
+		return m.renderHardwareClassRow(p, focused, maxSec)
+	case paramMetadataUseCasePrimary:
+		return m.renderPrimaryRow(p, focused, maxSec)
+	case paramMetadataUseCaseTags:
+		return m.renderCheckboxRow("Tags", profiles.CanonicalTags, p.UseCase.Tags,
+			m.params.tagCursor, focused, maxSec)
+	case paramMetadataHardwareNotes:
+		return m.renderNotesRow(field, focused, maxSec)
+	default:
+		return m.renderTextRow(field, focused, maxSec)
+	}
+}
+
+// metadataRowPrefix marks the focused row with a cursor.
+func metadataRowPrefix(focused bool) string {
+	if focused {
+		return "› "
+	}
+	return "  "
+}
+
+func (m Model) renderBackendRow(p profiles.Profile, focused bool, maxSec int) []string {
+	opts := m.paramBackendOptionsForModel()
+	labels := make([]string, len(opts))
+	for i, o := range opts {
+		labels[i] = radioOptionLabel(o)
+	}
+	return m.renderRadioRow("Backend", labels, slices.Index(opts, p.Backend),
+		m.params.backendCursor, focused, maxSec)
+}
+
+func (m Model) renderHardwareClassRow(p profiles.Profile, focused bool, maxSec int) []string {
+	labels := make([]string, len(paramHardwareClassOptions))
+	for i, o := range paramHardwareClassOptions {
+		labels[i] = radioOptionLabel(string(o))
+	}
+	return m.renderRadioRow("Hardware Class", labels,
+		slices.Index(paramHardwareClassOptions, p.Hardware.Class),
+		m.params.hardwareClassCursor, focused, maxSec)
+}
+
+func (m Model) renderPrimaryRow(p profiles.Profile, focused bool, maxSec int) []string {
+	selected := make([]string, len(p.UseCase.Primary))
+	for i, v := range p.UseCase.Primary {
+		selected[i] = string(v)
+	}
+	canonical := make([]string, len(profiles.CanonicalPrimaries))
+	for i, v := range profiles.CanonicalPrimaries {
+		canonical[i] = string(v)
+	}
+	return m.renderCheckboxRow("Use Case Primary", canonical, selected,
+		m.params.primaryCursor, focused, maxSec)
+}
+
+// renderNotesRow renders the multi-line Notes field: a textarea while editing,
+// otherwise up to notesMaxLines of wrapped text with a scrollbar.
+func (m Model) renderNotesRow(field paramMetadataField, focused bool, maxSec int) []string {
+	labelPart := m.renderLabelPart(metadataRowPrefix(focused), paramMetadataFieldLabels[field])
+	labelPartW := lipgloss.Width(labelPart)
+
+	if focused && m.params.editKind == paramEditMetadataValue {
+		indent := strings.Repeat(" ", labelPartW)
+		taLines := strings.Split(m.params.notesInput.View(), "\n")
+		var rows []string
+		for i, taLine := range taLines {
+			if taLine == "" && i == len(taLines)-1 {
+				break // the textarea view ends with an empty line
+			}
+			if i == 0 {
+				rows = append(rows, labelPart+taLine)
+				continue
+			}
+			rows = append(rows, indent+taLine)
+		}
+		return rows
+	}
+
+	valueW := max(maxSec-labelPartW, 8)
+	wrapped := wrapTextToLines(m.metadataFieldValue(field), valueW)
+	if len(wrapped) == 0 {
+		wrapped = []string{"unspecified"}
+	}
+
+	displayLines := min(notesMaxLines, len(wrapped))
+	hasScroll := len(wrapped) > notesMaxLines
+	displayW := valueW
+	thumbLines := 0
+	if hasScroll {
+		displayW = max(valueW-2, 4)
+		thumbLines = max(1, notesMaxLines*notesMaxLines/len(wrapped))
+	}
+
+	rows := make([]string, 0, displayLines)
+	for i := range displayLines {
+		lineStr := m.renderNotesLine(wrapped[i], displayW, i, thumbLines, hasScroll)
+		if i == 0 {
+			rows = append(rows, labelPart+lineStr)
+			continue
+		}
+		rows = append(rows, strings.Repeat(" ", labelPartW)+lineStr)
+	}
+	return rows
+}
+
+// renderNotesLine renders one wrapped Notes line, with a scrollbar cell when the
+// text is taller than the visible window.
+func (m Model) renderNotesLine(text string, displayW, i, thumbLines int, hasScroll bool) string {
+	line := truncateParamLine(text, displayW)
+	if !hasScroll {
+		return m.ui.styles.paramDetailContent.Render(line)
+	}
+	if pad := displayW - lipgloss.Width(line); pad > 0 {
+		line += strings.Repeat(" ", pad)
+	}
+	scrollChar := "░"
+	if i < thumbLines {
+		scrollChar = "█"
+	}
+	return m.ui.styles.paramDetailContent.Render(line) + " " + m.ui.styles.scrollBarColumn.Render(scrollChar)
+}
+
+// renderTextRow renders a single-line metadata field, as an input while editing.
+func (m Model) renderTextRow(field paramMetadataField, focused bool, maxSec int) []string {
+	labelPart := m.renderLabelPart(metadataRowPrefix(focused), paramMetadataFieldLabels[field])
+	if focused && m.params.editKind == paramEditMetadataValue {
+		return []string{lipgloss.JoinHorizontal(lipgloss.Top, labelPart, m.params.editInput.View())}
+	}
+	// Label muted, value bright, aligned at a common column.
+	valueW := max(maxSec-lipgloss.Width(labelPart), 8)
+	value := m.metadataFieldValue(field)
+	if value == "" {
+		value = "unspecified"
+	}
+	return []string{labelPart + m.ui.styles.paramDetailContent.Render(truncateParamLine(value, valueW))}
 }
 
 // renderDetailSections renders the env-vars and extra-args sections into the section box.

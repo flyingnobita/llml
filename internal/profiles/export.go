@@ -197,7 +197,7 @@ type ModelGroup struct {
 // AllToPortableGrouped reads model-params.json and returns profiles
 // organized by model key. Groups are sorted alphabetically by ModelHint.
 func AllToPortableGrouped() ([]ModelGroup, error) {
-	f, err := ReadFile()
+	f, err := readConfigFile()
 	if err != nil {
 		return nil, err
 	}
@@ -220,7 +220,7 @@ func AllToPortableGrouped() ([]ModelGroup, error) {
 
 // AllToPortable reads model-params.json and converts every profile.
 func AllToPortable() ([]PortableProfile, error) {
-	f, err := ReadFile()
+	f, err := readConfigFile()
 	if err != nil {
 		return nil, err
 	}

@@ -11,6 +11,13 @@ linters:
     - gocritic
     - misspell
     - forbidigo
+    - nolintlint
+    - errorlint
+    - revive
+    - gocognit
+    - funlen
+    - unparam
+    - copyloopvar
 
   settings:
     gocritic:
@@ -23,6 +30,39 @@ linters:
     govet:
       disable:
         - fieldalignment
+    nolintlint:
+      # A suppression must name its linter and say why, so the next reader can
+      # judge whether it still applies.
+      require-explanation: true
+      require-specific: true
+      allow-unused: false
+    revive:
+      rules:
+        - name: exported
+          arguments:
+            # config.ConfigPath and profiles.ConfigPath read better at their
+            # call sites than config.Path would; the package name alone does
+            # not say which path. Keep the missing-doc-comment check, which
+            # AGENTS.md requires anyway.
+            - disableStutteringCheck
+        - name: package-comments
+        - name: var-naming
+        - name: redefines-builtin-id
+        - name: unused-parameter
+        - name: indent-error-flow
+        - name: error-strings
+        - name: errorf
+        - name: context-as-argument
+        - name: range
+        - name: superfluous-else
+        - name: unreachable-code
+    gocognit:
+      # Cognitive complexity, not line count: nesting and branching are what
+      # make a function hard to hold in your head.
+      min-complexity: 30
+    funlen:
+      lines: 120
+      statements: 60
     forbidigo:
       # AGENTS.md: styles are built once in newStyles so a theme change
       # restyles everything. An inline style silently ignores the active theme.
@@ -47,6 +87,12 @@ linters:
         linters:
           - gosec
           - errcheck
+          # A test helper's parameters are part of its shape, and table-driven
+          # tests are legitimately long and branchy. These checks are about
+          # production code being hard to maintain.
+          - unparam
+          - gocognit
+          - funlen
       - path: scripts/sync_skill_test\.go
         linters:
           - gosec
@@ -55,6 +101,10 @@ linters:
       - path: internal/tui/styles\.go
         linters:
           - forbidigo
+          # newStyles is one flat, keyed literal with no branching (gocognit
+          # still applies and reports 0). Splitting a palette across functions
+          # would mean jumping between them to read one theme, which is worse.
+          - funlen
 
 formatters:
   enable:

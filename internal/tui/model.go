@@ -219,20 +219,20 @@ type mainPaneFocusSnap struct {
 
 // Model is the root Bubble Tea model.
 type Model struct {
-	layout    layoutState
-	ui        themeState
-	table     tableState
-	rc        runtimeConfigState
-	params    paramsState
-	server    serverPaneState
-	preview   launchPreviewState
-	alerts    alertsState
-	discovery discoveryPathsState
-	export    exportViewState
-	import_   importViewState
-	collision collisionState
-	quit      quitConfirmState
-	paneFocus mainPaneFocusSnap
+	layout     layoutState
+	ui         themeState
+	table      tableState
+	rc         runtimeConfigState
+	params     paramsState
+	server     serverPaneState
+	preview    launchPreviewState
+	alerts     alertsState
+	discovery  discoveryPathsState
+	export     exportViewState
+	importView importViewState
+	collision  collisionState
+	quit       quitConfirmState
+	paneFocus  mainPaneFocusSnap
 
 	keys KeyMap
 	// svc holds every dependency the TUI reaches outside its own state. See services.go.
@@ -329,19 +329,19 @@ func NewWithServices(svc services) Model {
 	st := newStyles(th)
 	t, hv := newTableViewport(st, homeDir)
 	return Model{
-		layout:    layoutState{homeDir: homeDir},
-		ui:        themeState{theme: th, themePick: pick, styles: st},
-		table:     tableState{sortCol: defaultSortCol, tbl: t, hscroll: hv, effectiveBackends: make(map[string]models.ModelBackend)},
-		server:    serverPaneState{viewport: newServerLogViewport(st)},
-		preview:   launchPreviewState{viewport: newLaunchPreviewViewport(st)},
-		alerts:    alertsState{viewport: newAlertViewport(st)},
-		rc:        runtimeConfigState{inputs: newRuntimeConfigInputs()},
-		params:    paramsState{editInput: newParamLineTextInput(), notesInput: newNotesTextarea(st)},
-		discovery: discoveryPathsState{editInput: newPathTextInput()},
-		export:    exportViewState{pathInput: newPathTextInput(), filterInput: newFilterTextInput()},
-		import_:   importViewState{pathInput: newPathTextInput(), picker: filepicker.New()},
-		keys:      DefaultKeyMap(),
-		svc:       svc,
+		layout:     layoutState{homeDir: homeDir},
+		ui:         themeState{theme: th, themePick: pick, styles: st},
+		table:      tableState{sortCol: defaultSortCol, tbl: t, hscroll: hv, effectiveBackends: make(map[string]models.ModelBackend)},
+		server:     serverPaneState{viewport: newServerLogViewport(st)},
+		preview:    launchPreviewState{viewport: newLaunchPreviewViewport(st)},
+		alerts:     alertsState{viewport: newAlertViewport(st)},
+		rc:         runtimeConfigState{inputs: newRuntimeConfigInputs()},
+		params:     paramsState{editInput: newParamLineTextInput(), notesInput: newNotesTextarea(st)},
+		discovery:  discoveryPathsState{editInput: newPathTextInput()},
+		export:     exportViewState{pathInput: newPathTextInput(), filterInput: newFilterTextInput()},
+		importView: importViewState{pathInput: newPathTextInput(), picker: filepicker.New()},
+		keys:       DefaultKeyMap(),
+		svc:        svc,
 		// Built-in defaults keep hosts and ports usable until the first scan
 		// message arrives with the fully resolved values.
 		settings: settings.Resolve(settings.Defaults()),
@@ -428,7 +428,7 @@ func (m Model) activeProfileBackendForSelected() models.ModelBackend {
 	if err != nil || len(ent.Profiles) == 0 {
 		return models.BackendLlama
 	}
-	idx := clampInt(ent.ActiveIndex, 0, len(ent.Profiles)-1)
+	idx := clampIndex(ent.ActiveIndex, len(ent.Profiles)-1)
 	b, _ := models.ParseBackend(ent.Profiles[idx].Backend)
 	return b
 }
@@ -458,7 +458,7 @@ func (m Model) loadEffectiveBackendForIdentity(identity string) Model {
 	key := profiles.ModelParamsKey(identity)
 	backend, keep := models.BackendLlama, false
 	if ent, err := profiles.LoadEntry(key); err == nil && len(ent.Profiles) > 0 {
-		idx := clampInt(ent.ActiveIndex, 0, len(ent.Profiles)-1)
+		idx := clampIndex(ent.ActiveIndex, len(ent.Profiles)-1)
 		b, _ := models.ParseBackend(ent.Profiles[idx].Backend)
 		backend, keep = b, b != models.BackendLlama
 	}
@@ -510,13 +510,11 @@ func (m Model) innerWidth() int {
 }
 
 func maxAnsiLineWidth(lines []string) int {
-	max := 0
+	widest := 0
 	for _, line := range lines {
-		if w := ansi.StringWidth(line); w > max {
-			max = w
-		}
+		widest = max(widest, ansi.StringWidth(line))
 	}
-	return max
+	return widest
 }
 
 // serverLogNeedsHorizontalScroll reports whether any log line is wider than the

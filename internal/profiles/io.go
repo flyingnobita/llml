@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/flyingnobita/llml/internal/fsutil"
@@ -85,19 +86,17 @@ func (ft Fetcher) FetchPortable(ctx context.Context, rawURL string) (*PortableFi
 		if errors.As(err, &netErr) && netErr.Timeout() {
 			return nil, fmt.Errorf("timed out fetching %s", rawURL)
 		}
-		var urlErr *url.Error
-		if errors.As(err, &urlErr) {
-			if urlErr.Err != nil && strings.Contains(urlErr.Err.Error(), "connection refused") {
-				return nil, fmt.Errorf("cannot reach %s: connection refused", u.Host)
-			}
-			if _, ok := urlErr.Err.(*net.DNSError); ok || strings.Contains(urlErr.Err.Error(), "no such host") {
-				return nil, fmt.Errorf("cannot reach %s: %v", u.Host, urlErr.Err)
-			}
+		if errors.Is(err, syscall.ECONNREFUSED) {
+			return nil, fmt.Errorf("cannot reach %s: connection refused", u.Host)
 		}
-		if ctx.Err() == context.DeadlineExceeded {
+		var dnsErr *net.DNSError
+		if errors.As(err, &dnsErr) {
+			return nil, fmt.Errorf("cannot reach %s: %w", u.Host, dnsErr)
+		}
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return nil, fmt.Errorf("timed out fetching %s", rawURL)
 		}
-		return nil, fmt.Errorf("cannot reach %s: %v", u.Host, err)
+		return nil, fmt.Errorf("cannot reach %s: %w", u.Host, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -144,8 +143,9 @@ func ConfigPath() (string, error) {
 	return userdata.ModelParamsPath()
 }
 
-// ReadFile reads the model-params.json root document.
-func ReadFile() (file, error) {
+// readConfigFile reads the model-params.json root document. It is unexported
+// because its return type is; export.go is the only caller.
+func readConfigFile() (file, error) {
 	path, err := ConfigPath()
 	if err != nil {
 		return file{}, err

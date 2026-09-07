@@ -279,7 +279,7 @@ func newProfileEditor(ent profiles.Entry) profileEditor {
 	} else {
 		e.profiles = profiles.CopyProfiles(ent.Profiles)
 	}
-	e.index = clampInt(ent.ActiveIndex, 0, len(e.profiles)-1)
+	e.index = clampIndex(ent.ActiveIndex, len(e.profiles)-1)
 	e.load()
 	return e
 }

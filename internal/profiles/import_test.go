@@ -527,8 +527,8 @@ func TestFetchAndImportIntegration(t *testing.T) {
 	writeParamsJSON(t, paramsPath, map[string]any{"version": 3, "models": map[string]any{}})
 
 	// Start a test TLS server serving a valid profile
-	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(singleProfileTOML("url-profile")))
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(singleProfileTOML("url-profile")))
 	}))
 	defer srv.Close()
 	ft := testFetcher(srv)
@@ -595,8 +595,8 @@ func TestFetchAndImportIntegration_Collision(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(singleProfileTOML("url-profile")))
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(singleProfileTOML("url-profile")))
 	}))
 	defer srv.Close()
 	ft := testFetcher(srv)
@@ -631,8 +631,8 @@ func TestFetchAndImportIntegration_Collision(t *testing.T) {
 
 // Case 27: multi-profile with --activate equivalent (check before import)
 func TestMultiProfileActivateCheck(t *testing.T) {
-	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(multiProfileTOML()))
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(multiProfileTOML()))
 	}))
 	defer srv.Close()
 	ft := testFetcher(srv)

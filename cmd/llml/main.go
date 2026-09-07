@@ -1,3 +1,8 @@
+// Command llml is a terminal UI for discovering local GGUF and safetensors
+// models (plus Ollama models via its API) and launching a server for one.
+//
+// It also provides the export and import subcommands for portable parameter
+// profiles; see docs/profile-format.md.
 package main
 
 import (

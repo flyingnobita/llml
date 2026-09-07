@@ -338,28 +338,26 @@ func (s serverSpec) unixSplitScript() string {
 // On Unix, wraps in sh -c with printf echo and read-pause so logs stay readable before the TUI redraws.
 // On Windows, runs the binary directly with merged env (no pause support).
 // G204: intentional subprocess launch — llml's purpose is launching model servers.
-func (s serverSpec) foregroundCmd() *exec.Cmd { //nolint:gosec
+func (s serverSpec) foregroundCmd() *exec.Cmd {
 	if runtime.GOOS == "windows" {
-		c := exec.Command(s.bin, s.directArgs()...) //nolint:gosec //nolint:gosec
+		c := exec.Command(s.bin, s.directArgs()...) //nolint:gosec // G204: the binary and args are the user's configured launch command.
 		c.Env = mergeEnv(os.Environ(), s.params.Env)
 		return c
 	}
-	return exec.Command("sh", "-c", s.unixForegroundScript()) //nolint:gosec
+	return exec.Command("sh", "-c", s.unixForegroundScript()) //nolint:gosec // G204: the script is built from the user's configured launch command.
 }
 
 // splitCmd returns an *exec.Cmd for split-pane log streaming.
 // Unix vLLM uses sh -c with 2>&1 (stderr merge) and also sets Env via mergeEnv — double propagation
 // is intentional and matches the original per-backend split paths.
 // All other cases run the binary directly with merged env.
-//
-//nolint:gosec // G204: intentional subprocess launch.
 func (s serverSpec) splitCmd() *exec.Cmd {
 	if s.backend == models.BackendVLLM && runtime.GOOS != "windows" {
-		c := exec.Command("sh", "-c", s.unixSplitScript()) //nolint:gosec
+		c := exec.Command("sh", "-c", s.unixSplitScript()) //nolint:gosec // G204: the script is built from the user's configured launch command.
 		c.Env = mergeEnv(os.Environ(), s.params.Env)
 		return c
 	}
-	c := exec.Command(s.bin, s.directArgs()...) //nolint:gosec
+	c := exec.Command(s.bin, s.directArgs()...) //nolint:gosec // G204: the binary and args are the user's configured launch command.
 	c.Env = mergeEnv(os.Environ(), s.params.Env)
 	return c
 }
@@ -500,7 +498,7 @@ func runSplitServerCmd(spec serverSpec) tea.Cmd {
 }
 
 func startOllamaDaemon(spec serverSpec) error {
-	cmd := exec.Command(spec.bin, "serve") //nolint:gosec
+	cmd := exec.Command(spec.bin, "serve") //nolint:gosec // G204: spec.bin is the ollama binary llml detected.
 	cmd.Env = mergeEnv(os.Environ(), spec.params.Env)
 	devNull, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
 	if err != nil {

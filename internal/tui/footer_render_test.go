@@ -37,7 +37,7 @@ func TestDarkThemeFooterColorsAreDistinct(t *testing.T) {
 
 func TestImportFooter_UsesSemanticHintRendering(t *testing.T) {
 	m := newTestModel()
-	m.import_.focus = importFocusPicker
+	m.importView.focus = importFocusPicker
 
 	got := m.importFooter()
 	plain := m.ui.styles.footer.Render("tab: path input · enter: select · " + FooterNavHint + " · esc: back")

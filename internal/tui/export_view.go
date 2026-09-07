@@ -193,53 +193,54 @@ func (m Model) rebuildExportFilter() Model {
 		return m
 	}
 
+	indices := filterExportIndices(m.export.items, filter)
+	m.export.filteredIndices = indices
+	m.export.cursor = clampIndex(m.export.cursor, len(indices)-1)
+	m.export.scrollOffset = 0
+	return m
+}
+
+// filterExportIndices returns the item indices the filter matches. A group's
+// header is kept whenever the header itself matches or any profile under it
+// does, so a matching profile is never shown without the model it belongs to.
+func filterExportIndices(items []exportProfileItem, filter string) []int {
 	indices := make([]int, 0)
-	i := 0
-	items := m.export.items
-	for i < len(items) {
-		if items[i].kind == exportItemHeader {
-			headerIdx := i
-			i++
-			groupStart := i
-			for i < len(items) && items[i].kind == exportItemProfile {
-				i++
-			}
-			groupEnd := i
-
-			headerMatches := matchesExportFilter(items[headerIdx], filter)
-			anyProfileMatch := false
-			for j := groupStart; j < groupEnd; j++ {
-				if matchesExportFilter(items[j], filter) {
-					anyProfileMatch = true
-					break
-				}
-			}
-
-			if headerMatches || anyProfileMatch {
-				indices = append(indices, headerIdx)
-				for j := groupStart; j < groupEnd; j++ {
-					if matchesExportFilter(items[j], filter) {
-						indices = append(indices, j)
-					}
-				}
-			}
-		} else {
-			// Orphan profiles (no header).
+	for i := 0; i < len(items); {
+		if items[i].kind != exportItemHeader {
+			// An orphan profile with no header stands alone.
 			if matchesExportFilter(items[i], filter) {
 				indices = append(indices, i)
 			}
 			i++
+			continue
+		}
+
+		headerIdx := i
+		i++
+		groupStart := i
+		for i < len(items) && items[i].kind == exportItemProfile {
+			i++
+		}
+
+		matched := matchingExportIndices(items[groupStart:i], groupStart, filter)
+		if len(matched) == 0 && !matchesExportFilter(items[headerIdx], filter) {
+			continue
+		}
+		indices = append(indices, headerIdx)
+		indices = append(indices, matched...)
+	}
+	return indices
+}
+
+// matchingExportIndices returns the indices in group that match, offset by base.
+func matchingExportIndices(group []exportProfileItem, base int, filter string) []int {
+	var out []int
+	for j, it := range group {
+		if matchesExportFilter(it, filter) {
+			out = append(out, base+j)
 		}
 	}
-
-	m.export.filteredIndices = indices
-	if len(indices) == 0 {
-		m.export.cursor = 0
-	} else if m.export.cursor >= len(indices) {
-		m.export.cursor = len(indices) - 1
-	}
-	m.export.scrollOffset = 0
-	return m
+	return out
 }
 
 // exportMaxVisibleItems returns how many profile rows can fit in the terminal.
@@ -318,128 +319,127 @@ func (m Model) toggleGroup(checked bool) Model {
 	return m.syncHeaderStates()
 }
 
+// updateExportKey routes a key press to the export panel section that has
+// focus. Each section has its own handler below.
 func (m Model) updateExportKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	if m.export.focus == exportFocusFilter {
-		if isEscapeKey(msg) {
-			m.export.filterInput.SetValue("")
-			m.export.filteredIndices = nil
-			m.export.cursor = 0
-			m.export.scrollOffset = 0
-			m.export.filterInput.Blur()
-			m.export.focus = exportFocusList
-			return m, nil
-		}
-		if isTabKey(msg) {
-			m.export.filterInput.Blur()
-			m.export.focus = exportFocusPath
-			m = m.setExportPathWidth()
-			m.export.pathInput.Focus()
-			m.export.pathInput.SetValue(m.export.outputPath)
-			m.export.pathInput.CursorEnd()
-			return m, nil
-		}
-		var cmd tea.Cmd
-		m.export.filterInput, cmd = m.export.filterInput.Update(msg)
-		m = m.rebuildExportFilter()
-		return m, cmd
+	switch m.export.focus {
+	case exportFocusFilter:
+		return m.updateExportFilterKey(msg)
+	case exportFocusPath:
+		return m.updateExportPathKey(msg)
+	default:
+		return m.updateExportListKey(msg)
 	}
+}
 
-	if m.export.focus == exportFocusPath {
-		if msg.String() == "/" {
-			m.export.focus = exportFocusFilter
-			m.export.pathInput.Blur()
-			m.export.filterInput.Focus()
-			m.export.filterInput.CursorEnd()
-			m = m.rebuildExportFilter()
-			return m, nil
-		}
-		if isEscapeKey(msg) {
-			m.export.focus = exportFocusList
-			return m, nil
-		}
-		if isTabKey(msg) {
-			m.export.focus = exportFocusList
-			return m, nil
-		}
-		if isEnterKey(msg) {
-			return m.doExportAttempt()
-		}
-		var cmd tea.Cmd
-		m.export.pathInput, cmd = m.export.pathInput.Update(msg)
-		m.export.outputPath = m.export.pathInput.Value()
-		return m, cmd
-	}
+// focusExportPath moves focus to the output-path input, sized and pre-filled.
+func (m Model) focusExportPath() Model {
+	m.export.focus = exportFocusPath
+	m = m.setExportPathWidth()
+	m.export.pathInput.Focus()
+	m.export.pathInput.SetValue(m.export.outputPath)
+	m.export.pathInput.CursorEnd()
+	return m
+}
 
-	// Focus on profile list.
-	if isEscapeKey(msg) {
-		m = m.closeExportView()
+// focusExportFilter moves focus to the filter input.
+func (m Model) focusExportFilter() Model {
+	m.export.focus = exportFocusFilter
+	m.export.pathInput.Blur()
+	m.export.filterInput.Focus()
+	m.export.filterInput.CursorEnd()
+	return m.rebuildExportFilter()
+}
+
+func (m Model) updateExportFilterKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case isEscapeKey(msg):
+		// Escape clears the filter and returns to the list.
+		m.export.filterInput.SetValue("")
+		m.export.filteredIndices = nil
+		m.export.cursor = 0
+		m.export.scrollOffset = 0
+		m.export.filterInput.Blur()
+		m.export.focus = exportFocusList
 		return m, nil
+	case isTabKey(msg):
+		m.export.filterInput.Blur()
+		return m.focusExportPath(), nil
 	}
-	if isTabKey(msg) {
-		m.export.focus = exportFocusPath
-		m = m.setExportPathWidth()
-		m.export.pathInput.Focus()
-		m.export.pathInput.SetValue(m.export.outputPath)
-		m.export.pathInput.CursorEnd()
+	var cmd tea.Cmd
+	m.export.filterInput, cmd = m.export.filterInput.Update(msg)
+	return m.rebuildExportFilter(), cmd
+}
+
+func (m Model) updateExportPathKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case msg.String() == "/":
+		return m.focusExportFilter(), nil
+	case isEscapeKey(msg), isTabKey(msg):
+		m.export.focus = exportFocusList
 		return m, nil
-	}
-	if isEnterKey(msg) {
+	case isEnterKey(msg):
 		return m.doExportAttempt()
 	}
+	var cmd tea.Cmd
+	m.export.pathInput, cmd = m.export.pathInput.Update(msg)
+	m.export.outputPath = m.export.pathInput.Value()
+	return m, cmd
+}
+
+// toggleExportItemAtCursor toggles the row under the cursor: a whole group when
+// it is a header, otherwise the single profile.
+func (m Model) toggleExportItemAtCursor() Model {
+	idx := m.exportRealCursorIndex()
+	if idx < 0 || idx >= len(m.export.items) {
+		return m
+	}
+	if m.export.items[idx].kind == exportItemHeader {
+		return m.toggleGroup(!m.export.items[idx].checked)
+	}
+	m = m.withExportItemsCloned()
+	m.export.items[idx].checked = !m.export.items[idx].checked
+	return m.syncHeaderStates()
+}
+
+// setVisibleExportChecked checks or unchecks every profile currently visible,
+// which is the filtered set when a filter is active and all of them otherwise.
+func (m Model) setVisibleExportChecked(checked bool) Model {
+	m = m.withExportItemsCloned()
+	indices := m.export.filteredIndices
+	if indices == nil {
+		indices = make([]int, len(m.export.items))
+		for i := range m.export.items {
+			indices[i] = i
+		}
+	}
+	for _, idx := range indices {
+		if m.export.items[idx].kind == exportItemProfile {
+			m.export.items[idx].checked = checked
+		}
+	}
+	return m.syncHeaderStates()
+}
+
+func (m Model) updateExportListKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case isEscapeKey(msg):
+		return m.closeExportView(), nil
+	case isTabKey(msg):
+		return m.focusExportPath(), nil
+	case isEnterKey(msg):
+		return m.doExportAttempt()
+	}
+
 	switch msg.String() {
 	case "/":
-		m.export.focus = exportFocusFilter
-		m.export.filterInput.Focus()
-		m.export.filterInput.CursorEnd()
-		m = m.rebuildExportFilter()
-		return m, nil
+		return m.focusExportFilter(), nil
 	case "space":
-		idx := m.exportRealCursorIndex()
-		if idx >= 0 && idx < len(m.export.items) {
-			switch m.export.items[idx].kind {
-			case exportItemHeader:
-				m = m.toggleGroup(!m.export.items[idx].checked)
-			case exportItemProfile:
-				m = m.withExportItemsCloned()
-				m.export.items[idx].checked = !m.export.items[idx].checked
-				m = m.syncHeaderStates()
-			}
-		}
-		return m, nil
+		return m.toggleExportItemAtCursor(), nil
 	case "a":
-		m = m.withExportItemsCloned()
-		if m.export.filteredIndices != nil {
-			for _, idx := range m.export.filteredIndices {
-				if m.export.items[idx].kind == exportItemProfile {
-					m.export.items[idx].checked = true
-				}
-			}
-		} else {
-			for i := range m.export.items {
-				if m.export.items[i].kind == exportItemProfile {
-					m.export.items[i].checked = true
-				}
-			}
-		}
-		m = m.syncHeaderStates()
-		return m, nil
+		return m.setVisibleExportChecked(true), nil
 	case "A":
-		m = m.withExportItemsCloned()
-		if m.export.filteredIndices != nil {
-			for _, idx := range m.export.filteredIndices {
-				if m.export.items[idx].kind == exportItemProfile {
-					m.export.items[idx].checked = false
-				}
-			}
-		} else {
-			for i := range m.export.items {
-				if m.export.items[i].kind == exportItemProfile {
-					m.export.items[i].checked = false
-				}
-			}
-		}
-		m = m.syncHeaderStates()
-		return m, nil
+		return m.setVisibleExportChecked(false), nil
 	case "up", "k":
 		if m.export.cursor > 0 {
 			m.export.cursor--

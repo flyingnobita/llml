@@ -24,10 +24,14 @@ type ModelParams struct {
 // UseCasePrimary is one constrained primary purpose value for a profile.
 type UseCasePrimary string
 
+// The primary use-case values a profile may declare. See docs/profile-format.md.
 const (
+	// UseCaseUnspecified is the zero value: the profile declares no primary use case.
 	UseCaseUnspecified UseCasePrimary = ""
-	UseCaseGeneral     UseCasePrimary = "general"
-	UseCaseEval        UseCasePrimary = "eval"
+	// UseCaseGeneral covers chat and general-purpose assistant work.
+	UseCaseGeneral UseCasePrimary = "general"
+	// UseCaseEval marks a profile tuned for benchmarking or evaluation runs.
+	UseCaseEval UseCasePrimary = "eval"
 )
 
 // UseCasePrimaries is a set of primary use-case values for a profile.
@@ -67,11 +71,16 @@ type UseCaseMetadata struct {
 // HardwareClass is the coarse machine class a profile expects.
 type HardwareClass string
 
+// The hardware classes a profile may declare it targets.
 const (
+	// HardwareClassUnspecified is the zero value: the profile declares no hardware class.
 	HardwareClassUnspecified HardwareClass = ""
-	HardwareClassCPU         HardwareClass = "cpu"
-	HardwareClassGPU         HardwareClass = "gpu"
-	HardwareClassMixed       HardwareClass = "mixed"
+	// HardwareClassCPU targets CPU-only inference.
+	HardwareClassCPU HardwareClass = "cpu"
+	// HardwareClassGPU targets full GPU offload.
+	HardwareClassGPU HardwareClass = "gpu"
+	// HardwareClassMixed targets a split between GPU and CPU.
+	HardwareClassMixed HardwareClass = "mixed"
 )
 
 var validHardwareClass = []HardwareClass{

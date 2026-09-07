@@ -63,7 +63,7 @@ func testFetcher(srv *httptest.Server) Fetcher {
 func TestFetchPortable(t *testing.T) {
 	// Case 1: Happy path — valid single-profile TOML
 	t.Run("happy path single profile", func(t *testing.T) {
-		srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.Write([]byte(singleProfileTOML("fast")))
 		}))
 		defer srv.Close()
@@ -86,7 +86,7 @@ func TestFetchPortable(t *testing.T) {
 
 	// Case 2: Multi-profile happy path
 	t.Run("happy path multi profile", func(t *testing.T) {
-		srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.Write([]byte(multiProfileTOML()))
 		}))
 		defer srv.Close()
@@ -114,7 +114,7 @@ func TestFetchPortable(t *testing.T) {
 
 	// Case 4: HTTP 404
 	t.Run("http 404", func(t *testing.T) {
-		srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(404)
 		}))
 		defer srv.Close()
@@ -131,7 +131,7 @@ func TestFetchPortable(t *testing.T) {
 
 	// Case 5: HTTP 500
 	t.Run("http 500", func(t *testing.T) {
-		srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(500)
 		}))
 		defer srv.Close()
@@ -148,7 +148,7 @@ func TestFetchPortable(t *testing.T) {
 
 	// Case 7: Connection refused (closed port)
 	t.Run("connection refused", func(t *testing.T) {
-		srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+		srv := httptest.NewTLSServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 		addr := srv.URL
 		srv.Close()
 
@@ -212,7 +212,7 @@ func TestFetchPortable(t *testing.T) {
 
 	// Case 12: Body > 256 KB
 	t.Run("body exceeds cap", func(t *testing.T) {
-		srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			body := strings.Repeat("x", 300*1024)
 			w.Write([]byte(body))
 		}))
@@ -230,7 +230,7 @@ func TestFetchPortable(t *testing.T) {
 
 	// Case 13: Non-TOML body (HTML)
 	t.Run("non toml body", func(t *testing.T) {
-		srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.Write([]byte("<html><body>404 Not Found</body></html>"))
 		}))
 		defer srv.Close()
@@ -247,7 +247,7 @@ func TestFetchPortable(t *testing.T) {
 
 	// Case 14: Valid TOML, missing schema_version
 	t.Run("missing schema version", func(t *testing.T) {
-		srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.Write([]byte(`[[profiles]]
 name = "test"
 backend = "llama"
@@ -267,7 +267,7 @@ backend = "llama"
 
 	// Case 15: schema_version = 1 (rejected)
 	t.Run("schema version 1 rejected", func(t *testing.T) {
-		srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.Write([]byte(`schema_version = 1
 
 [[profiles]]
@@ -289,7 +289,7 @@ backend = "llama"
 
 	// Case 16: Valid TOML, missing name
 	t.Run("missing name field", func(t *testing.T) {
-		srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.Write([]byte(`schema_version = 2
 
 [[profiles]]

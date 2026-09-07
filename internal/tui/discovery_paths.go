@@ -10,7 +10,7 @@ import (
 )
 
 // openDiscoveryPathsModal opens the model discovery paths modal.
-func (m Model) openDiscoveryPathsModal() (Model, tea.Cmd) {
+func (m Model) openDiscoveryPathsModal() Model {
 	m = m.saveMainPaneFocusForModal()
 	m.discovery.open = true
 	m.discovery.original = slices.Clone(m.discovery.paths)
@@ -20,7 +20,7 @@ func (m Model) openDiscoveryPathsModal() (Model, tea.Cmd) {
 	m.discovery.cursor = 0
 	m.discovery.editInput.Blur()
 	m.discovery.editInput.SetValue("")
-	return m, nil
+	return m
 }
 
 // closeDiscoveryPathsModal closes the modal.

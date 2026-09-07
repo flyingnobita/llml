@@ -278,7 +278,7 @@ func (m Model) moveParamCursor(delta int) (Model, tea.Cmd) {
 		m = m.moveProfile(delta)
 		return m.persistParamPanel()
 	case paramFocusMetadata:
-		next := clampInt(m.params.metadataCursor+delta, 0, int(paramMetadataFieldCount)-1)
+		next := clampIndex(m.params.metadataCursor+delta, int(paramMetadataFieldCount)-1)
 		if next != m.params.metadataCursor {
 			m.params.metadataCursor = next
 			// Reset horizontal cursors when entering their interactive rows.
@@ -307,7 +307,7 @@ func (m Model) moveParamCursor(delta int) (Model, tea.Cmd) {
 			m.params.editor.argsCursor = 0
 			break
 		}
-		m.params.editor.envCursor = clampInt(m.params.editor.envCursor+delta, 0, n-1)
+		m.params.editor.envCursor = clampIndex(m.params.editor.envCursor+delta, n-1)
 	case paramFocusArgs:
 		n := m.paramArgsLen()
 		if n == 0 {
@@ -322,7 +322,7 @@ func (m Model) moveParamCursor(delta int) (Model, tea.Cmd) {
 			m.params.editor.envCursor = m.paramEnvLen() - 1
 			break
 		}
-		m.params.editor.argsCursor = clampInt(m.params.editor.argsCursor+delta, 0, n-1)
+		m.params.editor.argsCursor = clampIndex(m.params.editor.argsCursor+delta, n-1)
 	}
 	return m, nil
 }
@@ -407,72 +407,11 @@ func (m Model) handleNavKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	case "down", "j":
 		return m.moveParamCursor(1)
 	case "left", "h":
-		if m.params.focus == paramFocusMetadata {
-			switch paramMetadataField(m.params.metadataCursor) {
-			case paramMetadataUseCasePrimary:
-				if m.params.primaryCursor > 0 {
-					m.params.primaryCursor--
-				}
-				return m, nil
-			case paramMetadataUseCaseTags:
-				if m.params.tagCursor > 0 {
-					m.params.tagCursor--
-				}
-				return m, nil
-			case paramMetadataBackend:
-				if m.params.backendCursor > 0 {
-					m.params.backendCursor--
-				}
-				return m, nil
-			case paramMetadataHardwareClass:
-				if m.params.hardwareClassCursor > 0 {
-					m.params.hardwareClassCursor--
-				}
-				return m, nil
-			}
-		}
-		return m, nil
+		return m.moveMetadataChip(-1), nil
 	case "right", "l":
-		if m.params.focus == paramFocusMetadata {
-			switch paramMetadataField(m.params.metadataCursor) {
-			case paramMetadataUseCasePrimary:
-				if m.params.primaryCursor < len(profiles.CanonicalPrimaries)-1 {
-					m.params.primaryCursor++
-				}
-				return m, nil
-			case paramMetadataUseCaseTags:
-				if m.params.tagCursor < len(profiles.CanonicalTags)-1 {
-					m.params.tagCursor++
-				}
-				return m, nil
-			case paramMetadataBackend:
-				opts := m.paramBackendOptionsForModel()
-				if m.params.backendCursor < len(opts)-1 {
-					m.params.backendCursor++
-				}
-				return m, nil
-			case paramMetadataHardwareClass:
-				if m.params.hardwareClassCursor < len(paramHardwareClassOptions)-1 {
-					m.params.hardwareClassCursor++
-				}
-				return m, nil
-			}
-		}
-		return m, nil
+		return m.moveMetadataChip(1), nil
 	case "space":
-		if m.params.focus == paramFocusMetadata {
-			switch paramMetadataField(m.params.metadataCursor) {
-			case paramMetadataUseCasePrimary:
-				return m.toggleCurrentPrimary()
-			case paramMetadataUseCaseTags:
-				return m.toggleCurrentTag()
-			case paramMetadataBackend:
-				return m.selectBackend()
-			case paramMetadataHardwareClass:
-				return m.selectHardwareClass()
-			}
-		}
-		return m, nil
+		return m.activateMetadataChip()
 	case "c":
 		if m.params.focus == paramFocusProfiles {
 			m = m.duplicateProfile()
@@ -480,39 +419,9 @@ func (m Model) handleNavKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		}
 		return m, nil
 	case "a":
-		if m.params.focus == paramFocusProfiles {
-			m = m.addProfile()
-			return m.persistParamPanel()
-		}
-		if m.params.focus == paramFocusEnv || m.params.focus == paramFocusArgs {
-			var cmd tea.Cmd
-			m, cmd = m.addParamRow()
-			m, pcmd := m.persistParamPanel()
-			return m, tea.Batch(cmd, pcmd)
-		}
-		return m, nil
+		return m.handleParamAddKey()
 	case "d":
-		switch m.params.focus {
-		case paramFocusProfiles:
-			if len(m.params.editor.profiles) <= 1 {
-				return m, nil
-			}
-			m.params.confirmDelete = paramConfirmProfile
-			return m, nil
-		case paramFocusEnv:
-			if m.paramEnvLen() == 0 {
-				return m, nil
-			}
-			m.params.confirmDelete = paramConfirmEnvRow
-			return m, nil
-		case paramFocusArgs:
-			if m.paramArgsLen() == 0 {
-				return m, nil
-			}
-			m.params.confirmDelete = paramConfirmArgRow
-			return m, nil
-		}
-		return m, nil
+		return m.handleParamDeleteKey()
 	case "r", "R":
 		if m.params.focus == paramFocusProfiles {
 			return m.startProfileNameEdit()
@@ -521,6 +430,79 @@ func (m Model) handleNavKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	default:
 		return m, nil
 	}
+}
+
+// moveMetadataChip moves the horizontal cursor within the focused chip row
+// (the checkbox and radio rows). It is a no-op on any other focus or field.
+func (m Model) moveMetadataChip(delta int) Model {
+	if m.params.focus != paramFocusMetadata {
+		return m
+	}
+	switch paramMetadataField(m.params.metadataCursor) {
+	case paramMetadataUseCasePrimary:
+		m.params.primaryCursor = clampIndex(m.params.primaryCursor+delta, len(profiles.CanonicalPrimaries)-1)
+	case paramMetadataUseCaseTags:
+		m.params.tagCursor = clampIndex(m.params.tagCursor+delta, len(profiles.CanonicalTags)-1)
+	case paramMetadataBackend:
+		m.params.backendCursor = clampIndex(m.params.backendCursor+delta, len(m.paramBackendOptionsForModel())-1)
+	case paramMetadataHardwareClass:
+		m.params.hardwareClassCursor = clampIndex(m.params.hardwareClassCursor+delta, len(paramHardwareClassOptions)-1)
+	}
+	return m
+}
+
+// activateMetadataChip applies space to the focused chip row: toggling a
+// checkbox, or selecting a radio option.
+func (m Model) activateMetadataChip() (Model, tea.Cmd) {
+	if m.params.focus != paramFocusMetadata {
+		return m, nil
+	}
+	switch paramMetadataField(m.params.metadataCursor) {
+	case paramMetadataUseCasePrimary:
+		return m.toggleCurrentPrimary()
+	case paramMetadataUseCaseTags:
+		return m.toggleCurrentTag()
+	case paramMetadataBackend:
+		return m.selectBackend()
+	case paramMetadataHardwareClass:
+		return m.selectHardwareClass()
+	}
+	return m, nil
+}
+
+// handleParamAddKey adds a profile, env row, or arg row, depending on focus.
+func (m Model) handleParamAddKey() (Model, tea.Cmd) {
+	switch m.params.focus {
+	case paramFocusProfiles:
+		m = m.addProfile()
+		return m.persistParamPanel()
+	case paramFocusEnv, paramFocusArgs:
+		m, cmd := m.addParamRow()
+		m, pcmd := m.persistParamPanel()
+		return m, tea.Batch(cmd, pcmd)
+	}
+	return m, nil
+}
+
+// handleParamDeleteKey opens the delete confirmation for the focused row, if
+// there is anything that may be deleted.
+func (m Model) handleParamDeleteKey() (Model, tea.Cmd) {
+	switch m.params.focus {
+	case paramFocusProfiles:
+		// The last profile cannot be removed; a model always has one.
+		if len(m.params.editor.profiles) > 1 {
+			m.params.confirmDelete = paramConfirmProfile
+		}
+	case paramFocusEnv:
+		if m.paramEnvLen() > 0 {
+			m.params.confirmDelete = paramConfirmEnvRow
+		}
+	case paramFocusArgs:
+		if m.paramArgsLen() > 0 {
+			m.params.confirmDelete = paramConfirmArgRow
+		}
+	}
+	return m, nil
 }
 
 // updateParamPanelKey handles keys while the parameters panel is open.

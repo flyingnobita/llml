@@ -12,16 +12,18 @@ import (
 // runCLI drives run with fake streams and returns the exit code plus what each
 // stream received. Because run never calls os.Exit, this covers the real
 // entrypoint rather than a stand-in for it.
-func runCLI(t *testing.T, stdin string, args ...string) (int, string, string) {
+func runCLI(t *testing.T, args ...string) (int, string, string) {
 	t.Helper()
 	var stdout, stderr bytes.Buffer
-	code := run(args, strings.NewReader(stdin), &stdout, &stderr)
+	// No command under test reads stdin; the ones that do are exercised
+	// directly through cli, which takes the reader.
+	code := run(args, strings.NewReader(""), &stdout, &stderr)
 	return code, stdout.String(), stderr.String()
 }
 
 func TestRun_version(t *testing.T) {
 	for _, flag := range []string{"--version", "-version", "-v"} {
-		code, out, _ := runCLI(t, "", flag)
+		code, out, _ := runCLI(t, flag)
 		if code != 0 {
 			t.Errorf("%s: exit %d, want 0", flag, code)
 		}
@@ -33,7 +35,7 @@ func TestRun_version(t *testing.T) {
 
 func TestRun_helpListsSubcommands(t *testing.T) {
 	for _, flag := range []string{"--help", "-h", "help"} {
-		code, out, _ := runCLI(t, "", flag)
+		code, out, _ := runCLI(t, flag)
 		if code != 0 {
 			t.Errorf("%s: exit %d, want 0", flag, code)
 		}
@@ -47,7 +49,7 @@ func TestRun_helpListsSubcommands(t *testing.T) {
 
 func TestRun_subcommandHelpExitsZero(t *testing.T) {
 	for _, sub := range []string{"export", "import"} {
-		code, _, errOut := runCLI(t, "", sub, "--help")
+		code, _, errOut := runCLI(t, sub, "--help")
 		if code != 0 {
 			t.Errorf("%s --help: exit %d, want 0", sub, code)
 		}
@@ -58,7 +60,7 @@ func TestRun_subcommandHelpExitsZero(t *testing.T) {
 }
 
 func TestRun_importWithoutSourceFailsWithUsage(t *testing.T) {
-	code, _, errOut := runCLI(t, "", "import")
+	code, _, errOut := runCLI(t, "import")
 	if code != 1 {
 		t.Errorf("exit %d, want 1", code)
 	}
@@ -68,7 +70,7 @@ func TestRun_importWithoutSourceFailsWithUsage(t *testing.T) {
 }
 
 func TestRun_importUnknownFlagFails(t *testing.T) {
-	code, _, errOut := runCLI(t, "", "import", "--nope", "x.toml")
+	code, _, errOut := runCLI(t, "import", "--nope", "x.toml")
 	if code != 1 {
 		t.Errorf("exit %d, want 1", code)
 	}
@@ -91,7 +93,7 @@ args = ["--ctx-size 4096"]
 		t.Fatal(err)
 	}
 
-	code, out, errOut := runCLI(t, "", "import", "--dry-run", src)
+	code, out, errOut := runCLI(t, "import", "--dry-run", src)
 	if code != 0 {
 		t.Fatalf("exit %d, want 0 (stderr: %s)", code, errOut)
 	}
@@ -106,7 +108,7 @@ args = ["--ctx-size 4096"]
 func TestRun_importMissingFileFails(t *testing.T) {
 	setupConfigDir(t)
 
-	code, _, errOut := runCLI(t, "", "import", "--target", "/m.gguf", "/nonexistent/p.toml")
+	code, _, errOut := runCLI(t, "import", "--target", "/m.gguf", "/nonexistent/p.toml")
 	if code != 1 {
 		t.Errorf("exit %d, want 1", code)
 	}
@@ -129,7 +131,7 @@ args = ["--ctx-size 4096"]
 		t.Fatal(err)
 	}
 
-	code, out, errOut := runCLI(t, "", "import", "--target", filepath.Join(dir, "a.gguf"), src)
+	code, out, errOut := runCLI(t, "import", "--target", filepath.Join(dir, "a.gguf"), src)
 	if code != 0 {
 		t.Fatalf("exit %d, want 0 (stderr: %s)", code, errOut)
 	}
@@ -155,12 +157,12 @@ args = ["--ctx-size 4096"]
 `), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if code, _, errOut := runCLI(t, "", "import", "--target", filepath.Join(dir, "a.gguf"), src); code != 0 {
+	if code, _, errOut := runCLI(t, "import", "--target", filepath.Join(dir, "a.gguf"), src); code != 0 {
 		t.Fatalf("seed import failed: %s", errOut)
 	}
 
 	dest := filepath.Join(dir, "out.toml")
-	code, out, errOut := runCLI(t, "", "export", "--output", dest)
+	code, out, errOut := runCLI(t, "export", "--output", dest)
 	if code != 0 {
 		t.Fatalf("exit %d, want 0 (stderr: %s)", code, errOut)
 	}
@@ -179,7 +181,7 @@ args = ["--ctx-size 4096"]
 func TestRun_exportWithNoProfilesSaysSo(t *testing.T) {
 	setupConfigDir(t)
 
-	code, out, errOut := runCLI(t, "", "export")
+	code, out, errOut := runCLI(t, "export")
 	if code != 0 {
 		t.Fatalf("exit %d, want 0 (stderr: %s)", code, errOut)
 	}

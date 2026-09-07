@@ -15,53 +15,53 @@ import (
 )
 
 func (m Model) openImportView() (Model, tea.Cmd) {
-	m.import_.open = true
-	m.import_.focus = importFocusPicker
-	m.import_.filePath = ""
-	m.import_.pathInput.SetValue("")
-	m.import_.pathInput.Blur()
-	m.import_.groups = nil
-	m.import_.cursor = 0
-	m.import_.scrollOffset = 0
-	m.import_.parseError = ""
-	m.import_.pathInput.SetWidth(PathTextInputWidth)
-	m.import_.picker = filepicker.New()
-	m.import_.picker.AllowedTypes = []string{".toml"}
-	m.import_.picker.DirAllowed = true
-	m.import_.picker.FileAllowed = true
-	m.import_.picker.AutoHeight = true
-	m.import_.picker.ShowHidden = false
+	m.importView.open = true
+	m.importView.focus = importFocusPicker
+	m.importView.filePath = ""
+	m.importView.pathInput.SetValue("")
+	m.importView.pathInput.Blur()
+	m.importView.groups = nil
+	m.importView.cursor = 0
+	m.importView.scrollOffset = 0
+	m.importView.parseError = ""
+	m.importView.pathInput.SetWidth(PathTextInputWidth)
+	m.importView.picker = filepicker.New()
+	m.importView.picker.AllowedTypes = []string{".toml"}
+	m.importView.picker.DirAllowed = true
+	m.importView.picker.FileAllowed = true
+	m.importView.picker.AutoHeight = true
+	m.importView.picker.ShowHidden = false
 	if m.layout.homeDir != "" {
-		m.import_.picker.CurrentDirectory = m.layout.homeDir
+		m.importView.picker.CurrentDirectory = m.layout.homeDir
 	}
-	m.import_.picker.SetHeight(m.importPickerBodyH())
+	m.importView.picker.SetHeight(m.importPickerBodyH())
 	m = m.clearCurrentStatus()
-	return m, m.import_.picker.Init()
+	return m, m.importView.picker.Init()
 }
 
 func (m Model) closeImportView() Model {
-	m.import_.open = false
-	m.import_.pathInput.Blur()
-	m.import_.groups = nil
-	m.import_.parseError = ""
+	m.importView.open = false
+	m.importView.pathInput.Blur()
+	m.importView.groups = nil
+	m.importView.parseError = ""
 	return m
 }
 
 func (m Model) parseImportFile() Model {
-	m.import_.parseError = ""
-	m.import_.groups = nil
-	m.import_.cursor = 0
-	m.import_.scrollOffset = 0
+	m.importView.parseError = ""
+	m.importView.groups = nil
+	m.importView.cursor = 0
+	m.importView.scrollOffset = 0
 
-	path := strings.TrimSpace(m.import_.filePath)
+	path := strings.TrimSpace(m.importView.filePath)
 	if path == "" {
-		m.import_.parseError = "Enter a file path."
+		m.importView.parseError = "Enter a file path."
 		return m
 	}
 
 	f, err := profiles.ReadPortable(path)
 	if err != nil {
-		m.import_.parseError = err.Error()
+		m.importView.parseError = err.Error()
 		return m
 	}
 
@@ -97,10 +97,10 @@ func (m Model) parseImportFile() Model {
 				g.matchedDisplay = matched.Name
 			}
 		}
-		m.import_.groups = append(m.import_.groups, g)
+		m.importView.groups = append(m.importView.groups, g)
 	}
 
-	m.import_.focus = importFocusList
+	m.importView.focus = importFocusList
 	return m
 }
 
@@ -129,99 +129,108 @@ func fuzzyMatchModelHint(hint string, files []models.ModelFile) (models.ModelFil
 	return models.ModelFile{}, false
 }
 
+// updateImportKey routes a key press to the import panel section that has focus.
 func (m Model) updateImportKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	switch m.import_.focus {
+	switch m.importView.focus {
 	case importFocusPath:
-		switch {
-		case isEscapeKey(msg):
-			return m.closeImportView(), nil
-		case isTabKey(msg):
-			m.import_.focus = importFocusPicker
-			m.import_.picker.Path = ""
-			m.import_.picker.SetHeight(m.importPickerBodyH())
-			return m, m.import_.picker.Init()
-		case isEnterKey(msg):
-			m = m.parseImportFile()
-			return m, nil
-		default:
-			var cmd tea.Cmd
-			m.import_.pathInput, cmd = m.import_.pathInput.Update(msg)
-			m.import_.filePath = m.import_.pathInput.Value()
-			return m, cmd
-		}
+		return m.updateImportPathKey(msg)
 	case importFocusPicker:
-		switch {
-		case isEscapeKey(msg):
-			return m.closeImportView(), nil
-		case isTabKey(msg):
-			m.import_.focus = importFocusPath
-			m.import_.pathInput.Focus()
-			return m, nil
-		default:
-			var cmd tea.Cmd
-			m.import_.picker, cmd = m.import_.picker.Update(msg)
-			if m.import_.picker.Path != "" && !isDir(m.import_.picker.Path) {
-				m.import_.filePath = m.import_.picker.Path
-				m.import_.pathInput.SetValue(m.import_.picker.Path)
-				m.import_.focus = importFocusPath
-				m.import_.pathInput.Focus()
-				return m.parseImportFile(), cmd
-			}
-			return m, cmd
-		}
+		return m.updateImportPickerKey(msg)
 	case importFocusList:
-		switch {
-		case isEscapeKey(msg):
-			m.import_.focus = importFocusPath
-			m.import_.pathInput.Focus()
-			m.import_.parseError = ""
-			return m, nil
-		case msg.String() == " ":
-			if len(m.import_.groups) > 0 && m.import_.cursor < len(m.import_.groups) {
-				m = m.withImportGroupsCloned()
-				m.import_.groups[m.import_.cursor].checked = !m.import_.groups[m.import_.cursor].checked
-			}
-			return m, nil
-		case isEnterKey(msg):
-			return m.doImportAttempt()
-		case msg.String() == "j", msg.String() == "down":
-			if m.import_.cursor < len(m.import_.groups)-1 {
-				m.import_.cursor++
-			}
-			return m, nil
-		case msg.String() == "k", msg.String() == "up":
-			if m.import_.cursor > 0 {
-				m.import_.cursor--
-			}
-			return m, nil
-		case msg.String() == "ctrl+u":
-			m.import_.cursor = max(m.import_.cursor-5, 0)
-			return m, nil
-		case msg.String() == "ctrl+d":
-			m.import_.cursor = min(m.import_.cursor+5, len(m.import_.groups)-1)
-			return m, nil
-		case msg.String() == "a":
-			m = m.withImportGroupsCloned()
-			for i := range m.import_.groups {
-				m.import_.groups[i].checked = true
-			}
-			return m, nil
-		case msg.String() == "A":
-			m = m.withImportGroupsCloned()
-			for i := range m.import_.groups {
-				m.import_.groups[i].checked = false
-			}
-			return m, nil
-		}
+		return m.updateImportListKey(msg)
 	}
 	return m, nil
+}
+
+func (m Model) updateImportPathKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case isEscapeKey(msg):
+		return m.closeImportView(), nil
+	case isTabKey(msg):
+		m.importView.focus = importFocusPicker
+		m.importView.picker.Path = ""
+		m.importView.picker.SetHeight(m.importPickerBodyH())
+		return m, m.importView.picker.Init()
+	case isEnterKey(msg):
+		return m.parseImportFile(), nil
+	}
+	var cmd tea.Cmd
+	m.importView.pathInput, cmd = m.importView.pathInput.Update(msg)
+	m.importView.filePath = m.importView.pathInput.Value()
+	return m, cmd
+}
+
+func (m Model) updateImportPickerKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case isEscapeKey(msg):
+		return m.closeImportView(), nil
+	case isTabKey(msg):
+		m.importView.focus = importFocusPath
+		m.importView.pathInput.Focus()
+		return m, nil
+	}
+	var cmd tea.Cmd
+	m.importView.picker, cmd = m.importView.picker.Update(msg)
+	// Picking a file (rather than descending into a directory) moves focus to
+	// the path field and parses immediately.
+	if m.importView.picker.Path != "" && !isDir(m.importView.picker.Path) {
+		m.importView.filePath = m.importView.picker.Path
+		m.importView.pathInput.SetValue(m.importView.picker.Path)
+		m.importView.focus = importFocusPath
+		m.importView.pathInput.Focus()
+		return m.parseImportFile(), cmd
+	}
+	return m, cmd
+}
+
+func (m Model) updateImportListKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case isEscapeKey(msg):
+		m.importView.focus = importFocusPath
+		m.importView.pathInput.Focus()
+		m.importView.parseError = ""
+		return m, nil
+	case isEnterKey(msg):
+		return m.doImportAttempt()
+	}
+
+	last := len(m.importView.groups) - 1
+	switch msg.String() {
+	case " ":
+		if m.importView.cursor >= 0 && m.importView.cursor <= last {
+			m = m.withImportGroupsCloned()
+			m.importView.groups[m.importView.cursor].checked = !m.importView.groups[m.importView.cursor].checked
+		}
+	case "j", "down":
+		m.importView.cursor = clampIndex(m.importView.cursor+1, last)
+	case "k", "up":
+		m.importView.cursor = clampIndex(m.importView.cursor-1, last)
+	case "ctrl+d":
+		m.importView.cursor = clampIndex(m.importView.cursor+5, last)
+	case "ctrl+u":
+		m.importView.cursor = clampIndex(m.importView.cursor-5, last)
+	case "a":
+		m = m.setAllImportGroupsChecked(true)
+	case "A":
+		m = m.setAllImportGroupsChecked(false)
+	}
+	return m, nil
+}
+
+// setAllImportGroupsChecked checks or unchecks every profile group at once.
+func (m Model) setAllImportGroupsChecked(checked bool) Model {
+	m = m.withImportGroupsCloned()
+	for i := range m.importView.groups {
+		m.importView.groups[i].checked = checked
+	}
+	return m
 }
 
 func (m Model) doImportAttempt() (tea.Model, tea.Cmd) {
 	totalAdded, totalReplaced, totalSkipped := 0, 0, 0
 	var importedModels []string
 
-	for _, g := range m.import_.groups {
+	for _, g := range m.importView.groups {
 		if !g.checked || g.matchedKey == "" {
 			if g.checked && g.matchedKey == "" {
 				totalSkipped += len(g.profiles)
@@ -271,7 +280,7 @@ func (m Model) doImportAttempt() (tea.Model, tea.Cmd) {
 func (m Model) importModalBlock() string {
 	st := m.ui.styles
 
-	if m.import_.focus == importFocusPicker {
+	if m.importView.focus == importFocusPicker {
 		return m.importPickerModalBlock()
 	}
 
@@ -330,9 +339,9 @@ func (m Model) importPickerModalBlock() string {
 	footer := m.importFooter()
 
 	bodyH := m.importPickerBodyH()
-	m.import_.picker.SetHeight(bodyH)
+	m.importView.picker.SetHeight(bodyH)
 
-	pickerView := m.import_.picker.View()
+	pickerView := m.importView.picker.View()
 
 	content := title + "\n" + pickerView + "\n" + footer
 
@@ -340,7 +349,7 @@ func (m Model) importPickerModalBlock() string {
 }
 
 func (m Model) importFooter() string {
-	switch m.import_.focus {
+	switch m.importView.focus {
 	case importFocusPath:
 		return m.renderFooterHints("tab: browse · enter: parse · esc: back")
 	case importFocusPicker:
@@ -354,23 +363,23 @@ func (m Model) importBodyView() string {
 	st := m.ui.styles
 	var b strings.Builder
 
-	if m.import_.focus == importFocusPicker {
-		b.WriteString(m.import_.picker.View())
+	if m.importView.focus == importFocusPicker {
+		b.WriteString(m.importView.picker.View())
 		return b.String()
 	}
 
 	// Path input
 	pathLabel := st.bodyBold.Render("File:")
-	pathVal := m.import_.pathInput.View()
+	pathVal := m.importView.pathInput.View()
 	b.WriteString(pathLabel + " " + pathVal + "\n")
 
 	// Parse error
-	if m.import_.parseError != "" {
-		b.WriteString(st.bodyDim.Render(m.import_.parseError) + "\n")
+	if m.importView.parseError != "" {
+		b.WriteString(st.bodyDim.Render(m.importView.parseError) + "\n")
 		return b.String()
 	}
 
-	if len(m.import_.groups) == 0 {
+	if len(m.importView.groups) == 0 {
 		b.WriteString(st.bodyDim.Render("No profiles to show.") + "\n")
 		return b.String()
 	}
@@ -378,11 +387,11 @@ func (m Model) importBodyView() string {
 	// Group list
 	b.WriteString("\n")
 	visibleStart, visibleEnd := m.importVisibleRange()
-	for i := range m.import_.groups {
+	for i := range m.importView.groups {
 		if i < visibleStart || i >= visibleEnd {
 			continue
 		}
-		g := m.import_.groups[i]
+		g := m.importView.groups[i]
 		b.WriteString(m.renderImportGroupRow(i, g))
 	}
 
@@ -392,7 +401,7 @@ func (m Model) importBodyView() string {
 func (m Model) renderImportGroupRow(i int, g importGroup) string {
 	st := m.ui.styles
 	cursor := "  "
-	if i == m.import_.cursor && m.import_.focus == importFocusList {
+	if i == m.importView.cursor && m.importView.focus == importFocusList {
 		cursor = st.bodyBold.Render("> ")
 	}
 
@@ -423,7 +432,7 @@ func (m Model) renderImportGroupRow(i int, g importGroup) string {
 }
 
 func (m Model) importVisibleRange() (start, end int) {
-	total := len(m.import_.groups)
+	total := len(m.importView.groups)
 	if total == 0 {
 		return 0, 0
 	}
@@ -432,19 +441,19 @@ func (m Model) importVisibleRange() (start, end int) {
 		return 0, total
 	}
 	// Keep cursor in view
-	if m.import_.cursor < m.import_.scrollOffset {
-		m.import_.scrollOffset = m.import_.cursor
+	if m.importView.cursor < m.importView.scrollOffset {
+		m.importView.scrollOffset = m.importView.cursor
 	}
-	if m.import_.cursor >= m.import_.scrollOffset+maxVis {
-		m.import_.scrollOffset = m.import_.cursor - maxVis + 1
+	if m.importView.cursor >= m.importView.scrollOffset+maxVis {
+		m.importView.scrollOffset = m.importView.cursor - maxVis + 1
 	}
-	if m.import_.scrollOffset < 0 {
-		m.import_.scrollOffset = 0
+	if m.importView.scrollOffset < 0 {
+		m.importView.scrollOffset = 0
 	}
-	if m.import_.scrollOffset > total-maxVis {
-		m.import_.scrollOffset = total - maxVis
+	if m.importView.scrollOffset > total-maxVis {
+		m.importView.scrollOffset = total - maxVis
 	}
-	return m.import_.scrollOffset, m.import_.scrollOffset + maxVis
+	return m.importView.scrollOffset, m.importView.scrollOffset + maxVis
 }
 
 // importMaxVisibleItems returns how many profile groups can fit in the terminal.
@@ -472,6 +481,6 @@ func isDir(path string) bool {
 // withImportGroupsCloned returns a Model whose import groups are safe to write
 // element-wise. See [Model.withExportItemsCloned] for why this is needed.
 func (m Model) withImportGroupsCloned() Model {
-	m.import_.groups = slices.Clone(m.import_.groups)
+	m.importView.groups = slices.Clone(m.importView.groups)
 	return m
 }

@@ -96,7 +96,7 @@ func TestCloseDiscoveryPathsModal_RestoresLaunchPreviewFocus(t *testing.T) {
 	m.preview.focused = true
 	m.table.tbl.Blur()
 
-	m, _ = m.openDiscoveryPathsModal()
+	m = m.openDiscoveryPathsModal()
 	if m.preview.focused {
 		t.Fatal("expected launch preview unfocused while discovery modal is open")
 	}
@@ -113,7 +113,7 @@ func TestCloseDiscoveryPathsModal_RestoresSplitLogFocus(t *testing.T) {
 	m.preview.focused = false
 	m.table.tbl.Blur()
 
-	m, _ = m.openDiscoveryPathsModal()
+	m = m.openDiscoveryPathsModal()
 	if !m.server.splitFocused {
 		t.Fatal("expected split log focus unchanged while modal open")
 	}

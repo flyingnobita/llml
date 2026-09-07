@@ -53,7 +53,7 @@ func TestDiscoveryPathsModal_opensAndLoadsPaths(t *testing.T) {
 
 	m.discovery.paths = []string{"/prev/path"}
 
-	m2, _ := m.openDiscoveryPathsModal()
+	m2 := m.openDiscoveryPathsModal()
 	if !m2.discovery.open {
 		t.Fatal("should open modal")
 	}
@@ -77,7 +77,7 @@ func TestDiscoveryPathsModal_opensAndLoadsPaths(t *testing.T) {
 func TestDiscoveryPathsModal_CancelDiscardsEdits(t *testing.T) {
 	m := New()
 	m.discovery.paths = []string{"/start"}
-	m, _ = m.openDiscoveryPathsModal()
+	m = m.openDiscoveryPathsModal()
 	m.discovery.cursor = 0
 
 	m, _ = m.startDiscoveryPathEdit(false)
@@ -96,7 +96,7 @@ func TestDiscoveryPathsModal_CancelDiscardsEdits(t *testing.T) {
 func TestDiscoveryPathsModal_EscapeClosesAndRestoresOriginalPaths(t *testing.T) {
 	m := New()
 	m.discovery.paths = []string{"/start", "/keep"}
-	m, _ = m.openDiscoveryPathsModal()
+	m = m.openDiscoveryPathsModal()
 	m.discovery.cursor = 0
 
 	m, _ = m.startDiscoveryPathEdit(false)
@@ -124,7 +124,7 @@ func TestDiscoveryPathsModal_EscapeClosesAndRestoresOriginalPaths(t *testing.T) 
 func TestDiscoveryPathsModal_EscapeWithDirtyStateOpensDiscardConfirm(t *testing.T) {
 	m := New()
 	m.discovery.paths = []string{"/start"}
-	m, _ = m.openDiscoveryPathsModal()
+	m = m.openDiscoveryPathsModal()
 	m.discovery.paths = []string{"/edited"}
 
 	got, _ := m.updateDiscoveryPathsKey(tea.KeyPressMsg{Code: tea.KeyEscape})
@@ -139,7 +139,7 @@ func TestDiscoveryPathsModal_EscapeWithDirtyStateOpensDiscardConfirm(t *testing.
 func TestDiscoveryPathsDiscardConfirm_YRestoresOriginalAndCloses(t *testing.T) {
 	m := New()
 	m.discovery.paths = []string{"/start"}
-	m, _ = m.openDiscoveryPathsModal()
+	m = m.openDiscoveryPathsModal()
 	m.discovery.paths = []string{"/edited"}
 	m.discovery.discardConfirm = true
 
@@ -155,7 +155,7 @@ func TestDiscoveryPathsDiscardConfirm_YRestoresOriginalAndCloses(t *testing.T) {
 func TestDiscoveryPathsDiscardConfirm_NStaysOpen(t *testing.T) {
 	m := New()
 	m.discovery.paths = []string{"/start"}
-	m, _ = m.openDiscoveryPathsModal()
+	m = m.openDiscoveryPathsModal()
 	m.discovery.paths = []string{"/edited"}
 	m.discovery.discardConfirm = true
 
@@ -173,7 +173,7 @@ func TestDiscoveryPathsDiscardConfirm_NStaysOpen(t *testing.T) {
 
 func TestDiscoveryPathsModal_AddCommitDelete(t *testing.T) {
 	m := New()
-	m, _ = m.openDiscoveryPathsModal()
+	m = m.openDiscoveryPathsModal()
 
 	m, _ = m.startDiscoveryPathEdit(true)
 	m.discovery.editInput.SetValue("/new/path")
@@ -199,7 +199,7 @@ func TestDiscoveryPathsModal_SaveTriggersRescanIfChanged(t *testing.T) {
 
 	m := New()
 	m.discovery.paths = []string{"/new"}
-	m, _ = m.openDiscoveryPathsModal()
+	m = m.openDiscoveryPathsModal()
 
 	m2, cmd := m.saveDiscoveryPaths()
 
@@ -234,7 +234,7 @@ func TestDiscoveryPathsModal_SaveSkipsRescanIfUnchanged(t *testing.T) {
 
 	m := New()
 	m.discovery.paths = []string{"/unchanged"}
-	m, _ = m.openDiscoveryPathsModal()
+	m = m.openDiscoveryPathsModal()
 
 	m2, cmd := m.saveDiscoveryPaths()
 
@@ -273,7 +273,7 @@ func TestDiscoveryPathsModal_E2EFlow(t *testing.T) {
 	m.loading = false
 
 	// 2. open model-paths modal
-	m, _ = m.openDiscoveryPathsModal()
+	m = m.openDiscoveryPathsModal()
 	if !m.discovery.open {
 		t.Fatal("modal did not open")
 	}

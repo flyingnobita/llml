@@ -89,10 +89,10 @@ func ggufParamsSummary(path string) string {
 }
 
 // truncateMeta limits long general.name strings.
-func truncateMeta(s string, max int) string {
+func truncateMeta(s string, limit int) string {
 	runes := []rune(s)
-	if len(runes) <= max {
+	if len(runes) <= limit {
 		return s
 	}
-	return string(runes[:max-1]) + "…"
+	return string(runes[:limit-1]) + "…"
 }

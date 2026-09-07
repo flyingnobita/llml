@@ -20,7 +20,7 @@ func activeProfileNameForPreview(m Model) string {
 	if err != nil || len(ent.Profiles) == 0 {
 		return ""
 	}
-	idx := clampInt(ent.ActiveIndex, 0, len(ent.Profiles)-1)
+	idx := clampIndex(ent.ActiveIndex, len(ent.Profiles)-1)
 	return ent.Profiles[idx].Name
 }
 

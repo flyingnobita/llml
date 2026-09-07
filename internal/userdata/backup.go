@@ -1,3 +1,6 @@
+// Package userdata manages the files llml keeps under {UserConfigDir}/llml:
+// timestamped backups before overwrites, and the version marker that triggers
+// an extra snapshot when the binary is upgraded.
 package userdata
 
 import (
