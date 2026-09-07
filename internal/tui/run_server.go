@@ -16,6 +16,7 @@ import (
 	"github.com/atotto/clipboard"
 
 	"github.com/flyingnobita/llml/internal/models"
+	"github.com/flyingnobita/llml/internal/settings"
 )
 
 // serverSpec holds the resolved parameters needed to build server commands for one launch.
@@ -173,6 +174,23 @@ func resolveMMProjForSpec(modelPath string, params ModelParams) (string, []strin
 	return "", nil, true
 }
 
+// hostOr returns rt's host, or def when the runtime has not been probed yet.
+func hostOr(host, def string) string {
+	if v := strings.TrimSpace(host); v != "" {
+		return v
+	}
+	return def
+}
+
+// portOr returns rt's port, or def when the runtime has not been probed yet
+// (a zero-value RuntimeInfo, which the non-strict preview path can produce).
+func portOr(port, def int) int {
+	if port > 0 {
+		return port
+	}
+	return def
+}
+
 // buildServerSpec resolves the binary, port, and venv for launching a server.
 // When strict is true it returns an error if the binary is missing; when false it substitutes
 // a placeholder name so display functions show a plausible command even before the runtime is configured.
@@ -180,10 +198,7 @@ func buildServerSpec(backend models.ModelBackend, modelPath string, params Model
 	switch backend {
 	case models.BackendOllama:
 		bin := models.ResolveOllamaPath(rt)
-		host := rt.OllamaHost
-		if strings.TrimSpace(host) == "" {
-			host = models.OllamaHost()
-		}
+		host := hostOr(rt.OllamaHost, settings.DefaultOllamaHost)
 		if strict && bin == "" && !rt.OllamaRunning {
 			return serverSpec{}, errors.New(MissingOllamaFooterNote)
 		}
@@ -199,11 +214,8 @@ func buildServerSpec(backend models.ModelBackend, modelPath string, params Model
 		}, nil
 	case models.BackendVLLM:
 		bin := models.ResolveVLLMPath(rt)
-		activate := models.ResolveVLLMActivateScript(bin)
-		host := rt.VLLMServerHost
-		if strings.TrimSpace(host) == "" {
-			host = models.VllmServerHost()
-		}
+		activate := models.ResolveVLLMActivateScript(bin, rt.VLLMVenv, rt.VLLMConfiguredPath)
+		host := hostOr(rt.VLLMServerHost, settings.DefaultVLLMServerHost)
 		if strict {
 			if bin == "" {
 				return serverSpec{}, errors.New(MissingVLLMFooterNote)
@@ -218,7 +230,7 @@ func buildServerSpec(backend models.ModelBackend, modelPath string, params Model
 			backend:        models.BackendVLLM,
 			bin:            bin,
 			host:           host,
-			port:           models.VLLMPort(),
+			port:           portOr(rt.VLLMServerPort, settings.DefaultVLLMServerPort),
 			modelPath:      modelPath,
 			params:         params,
 			activateScript: activate,
@@ -235,7 +247,7 @@ func buildServerSpec(backend models.ModelBackend, modelPath string, params Model
 		return serverSpec{
 			backend:          models.BackendKobold,
 			bin:              bin,
-			port:             models.KoboldCppPort(),
+			port:             portOr(rt.KoboldCppPort, settings.DefaultKoboldCppPort),
 			modelPath:        modelPath,
 			params:           params,
 			mmprojPath:       mmprojPath,
@@ -244,10 +256,7 @@ func buildServerSpec(backend models.ModelBackend, modelPath string, params Model
 		}, nil
 	default: // BackendLlama
 		bin := models.ResolveLlamaServerPath(rt)
-		host := rt.LlamaServerHost
-		if strings.TrimSpace(host) == "" {
-			host = models.LlamaServerHost()
-		}
+		host := hostOr(rt.LlamaServerHost, settings.DefaultLlamaServerHost)
 		if strict && bin == "" {
 			return serverSpec{}, errors.New(MissingLlamaServerFooterNote)
 		}
@@ -259,7 +268,7 @@ func buildServerSpec(backend models.ModelBackend, modelPath string, params Model
 			backend:          models.BackendLlama,
 			bin:              bin,
 			host:             host,
-			port:             models.ListenPort(),
+			port:             portOr(rt.LlamaServerPort, settings.DefaultLlamaServerPort),
 			modelPath:        modelPath,
 			params:           params,
 			mmprojPath:       mmprojPath,
@@ -510,15 +519,17 @@ var (
 	preloadOllamaFn     = models.PreloadOllamaModel
 )
 
-func waitForOllama() bool {
+// waitForOllama polls the daemon at host until it answers or the startup
+// timeout elapses.
+func waitForOllama(host string) bool {
 	deadline := time.Now().Add(OllamaStartupTimeout)
 	for time.Now().Before(deadline) {
-		if probeOllamaFn() {
+		if probeOllamaFn(host) {
 			return true
 		}
 		time.Sleep(OllamaPollInterval)
 	}
-	return probeOllamaFn()
+	return probeOllamaFn(host)
 }
 
 type ollamaReadyResult struct {
@@ -527,7 +538,7 @@ type ollamaReadyResult struct {
 
 func ensureOllamaReady(spec serverSpec) (ollamaReadyResult, error) {
 	debugf("ensureOllamaReady: probe start bin=%q host=%q", spec.bin, spec.host)
-	if probeOllamaFn() {
+	if probeOllamaFn(spec.host) {
 		debugf("ensureOllamaReady: Ollama already reachable")
 		return ollamaReadyResult{}, nil
 	}
@@ -535,7 +546,7 @@ func ensureOllamaReady(spec serverSpec) (ollamaReadyResult, error) {
 		debugf("ensureOllamaReady: start failed: %v", err)
 		return ollamaReadyResult{}, err
 	}
-	if !waitForOllamaFn() {
+	if !waitForOllamaFn(spec.host) {
 		debugf("ensureOllamaReady: waitForOllama timed out")
 		return ollamaReadyResult{}, fmt.Errorf("ollama did not become ready on %s", spec.host)
 	}
@@ -544,10 +555,7 @@ func ensureOllamaReady(spec serverSpec) (ollamaReadyResult, error) {
 }
 
 func discoveryOllamaSpec(rt models.RuntimeInfo) serverSpec {
-	host := rt.OllamaHost
-	if strings.TrimSpace(host) == "" {
-		host = models.OllamaHost()
-	}
+	host := hostOr(rt.OllamaHost, settings.DefaultOllamaHost)
 	return serverSpec{
 		backend: models.BackendOllama,
 		bin:     models.ResolveOllamaPath(rt),
@@ -564,7 +572,7 @@ func runOllamaLaunchCmd(spec serverSpec) tea.Cmd {
 			if err != nil {
 				return ollamaLaunchDoneMsg{err: err}
 			}
-			if err := preloadOllamaFn(spec.modelPath); err != nil {
+			if err := preloadOllamaFn(spec.host, spec.modelPath); err != nil {
 				return ollamaLaunchDoneMsg{err: err}
 			}
 			note := fmt.Sprintf("Loaded %s into Ollama on %s", spec.modelPath, spec.host)

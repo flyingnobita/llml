@@ -11,6 +11,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/flyingnobita/llml/internal/fsutil"
 	"github.com/flyingnobita/llml/internal/models"
 	profilepkg "github.com/flyingnobita/llml/internal/profiles"
 )
@@ -141,7 +142,7 @@ func parseEnvLine(s string) EnvVar {
 	}
 	key := strings.TrimSpace(s[:i])
 	val := strings.TrimSpace(s[i+1:])
-	val = models.ExpandTildePath(val)
+	val = fsutil.ExpandTildePath(val)
 	return EnvVar{Key: key, Value: val}
 }
 

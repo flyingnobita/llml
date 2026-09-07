@@ -9,7 +9,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/flyingnobita/llml/internal/config"
-	"github.com/flyingnobita/llml/internal/models"
 )
 
 // extractModelRescanDoneMsg walks nested tea.BatchMsg trees (e.g. rescanModelsCmd when
@@ -70,7 +69,7 @@ func TestDiscoveryPathsModal_opensAndLoadsPaths(t *testing.T) {
 	if !strings.Contains(view, "Defaults (Read-Only):") {
 		t.Fatalf("missing defaults header in view:\n%s", view)
 	}
-	roots := models.DefaultSearchRoots()
+	roots := m2.settings.DefaultSearchRoots()
 	if len(roots) > 0 && !strings.Contains(view, roots[0]) {
 		t.Fatalf("missing default path %q in view:\n%s", roots[0], view)
 	}

@@ -3,38 +3,8 @@ package models
 import (
 	"fmt"
 	"strings"
-)
 
-// Environment variables for locating llama.cpp binaries and probing a running server.
-const (
-	EnvLlamaCppPath    = "LLAMA_CPP_PATH"
-	EnvLlamaServerPort = "LLAMA_SERVER_PORT"
-	// EnvLlamaServerHost is the listen host for llama-server (default 127.0.0.1).
-	EnvLlamaServerHost = "LLAMA_SERVER_HOST"
-	// EnvVLLMServerPort is the TCP port for vllm serve (default 8000 when unset or invalid; matches vLLM's typical default).
-	EnvVLLMServerPort = "VLLM_SERVER_PORT"
-	// EnvVLLMServerHost is the listen host for vllm serve (default 127.0.0.1).
-	EnvVLLMServerHost = "VLLM_SERVER_HOST"
-	// EnvVLLMPath is an optional directory containing a `vllm` executable (checked before PATH).
-	EnvVLLMPath = "VLLM_PATH"
-	// EnvVLLMVenv is an optional Python venv root (directory containing bin/activate on Unix).
-	// When set (or when $VLLM_PATH/.venv or dirname(vllm)/.venv exists), R sources activate before vllm serve.
-	EnvVLLMVenv = "VLLM_VENV"
-	// EnvOllamaPath is an optional directory or absolute binary path for the ollama executable.
-	EnvOllamaPath = "OLLAMA_PATH"
-	// EnvOllamaHost is the Ollama API bind/listen host (host:port by default).
-	EnvOllamaHost = "OLLAMA_HOST"
-	// EnvKoboldCppPath is an optional directory or absolute binary path for the koboldcpp executable.
-	EnvKoboldCppPath = "KOBOLDCPP_PATH"
-	// EnvKoboldCppPort is the TCP port for KoboldCpp (default 5001 when unset or invalid).
-	EnvKoboldCppPort = "KOBOLDCPP_PORT"
-
-	// EnvModelPaths is the env var for extra model search roots (comma-separated).
-	EnvModelPaths = "LLML_MODEL_PATHS"
-	// EnvHFHubCache is the Hugging Face hub cache directory override (HUGGINGFACE_HUB_CACHE).
-	EnvHFHubCache = "HUGGINGFACE_HUB_CACHE"
-	// EnvHFHome is the HF_HOME override (hub cache defaults to $HF_HOME/hub).
-	EnvHFHome = "HF_HOME"
+	"github.com/flyingnobita/llml/internal/settings"
 )
 
 // RuntimeInfo describes detected llama-cli / llama-server binaries, optional vLLM CLI, and optional running server.
@@ -52,6 +22,17 @@ type RuntimeInfo struct {
 	ProbePort          int // port used when ServerRunning is true (0 if not probed)
 	KoboldCppRunning   bool
 	KoboldCppProbePort int // port used when KoboldCppRunning is true
+
+	// Resolved listen ports, carried here so launch and preview code reads them
+	// from the detected runtime instead of re-reading configuration.
+	LlamaServerPort int
+	VLLMServerPort  int
+	KoboldCppPort   int
+
+	// VLLMVenv and VLLMConfiguredPath are the configured (not detected) vLLM
+	// locations, carried so venv activation can be resolved from a RuntimeInfo alone.
+	VLLMVenv           string
+	VLLMConfiguredPath string
 }
 
 // Available is true if any backend binary was found, or a llama-server responded on the health probe.
@@ -79,7 +60,7 @@ func (r RuntimeInfo) Summary() string {
 	case r.ServerRunning:
 		base = fmt.Sprintf("llama.cpp: binaries not on PATH — server running :%d", r.ProbePort)
 	default:
-		base = "llama.cpp: not found — set " + EnvLlamaCppPath + " or install to PATH (Homebrew: ensure /opt/homebrew/bin is on PATH)"
+		base = "llama.cpp: not found — set " + settings.EnvLlamaCppPath + " or install to PATH (Homebrew: ensure /opt/homebrew/bin is on PATH)"
 	}
 	v := "vllm: —"
 	if r.VLLMPath != "" {
@@ -121,37 +102,40 @@ func (r RuntimeInfo) Summary() string {
 	return strings.Join(parts, " · ")
 }
 
-// DiscoverRuntime locates llama-cli and llama-server using LLAMA_CPP_PATH, common install
+// DiscoverRuntime locates llama-cli and llama-server using s.LlamaCppPath, common install
 // directories (including Homebrew on Apple Silicon), then PATH. If neither binary exists,
-// it probes http://127.0.0.1:{LLAMA_SERVER_PORT}/health (default port 8080) with a short timeout.
-func DiscoverRuntime() RuntimeInfo {
-	cli := findLlamaBinary("llama-cli")
-	srv := findLlamaBinary("llama-server")
-	port := ListenPort()
-	host := LlamaServerHost()
+// it probes http://{s.LlamaServerHost}:{s.LlamaServerPort}/health with a short timeout.
+func DiscoverRuntime(s settings.Settings) RuntimeInfo {
+	cli := findLlamaBinary("llama-cli", s.LlamaCppPath)
+	srv := findLlamaBinary("llama-server", s.LlamaCppPath)
 	info := RuntimeInfo{
 		LlamaCLIPath:    cli,
 		LlamaServerPath: srv,
-		LlamaServerHost: host,
-		VLLMPath:        findVLLMBinary(),
-		VLLMServerHost:  VllmServerHost(),
-		OllamaPath:      findOllamaBinary(),
-		OllamaHost:      OllamaHost(),
-		KoboldCppPath:   findKoboldCppBinary(),
-		ProbePort:       port,
+		LlamaServerHost: s.LlamaServerHost,
+		VLLMPath:        findVLLMBinary(s.VLLMPath, s.VLLMVenv),
+		VLLMServerHost:  s.VLLMServerHost,
+		OllamaPath:      findOllamaBinary(s.OllamaPath),
+		OllamaHost:      s.OllamaHost,
+		KoboldCppPath:   findKoboldCppBinary(s.KoboldCppPath),
+		ProbePort:       s.LlamaServerPort,
+		LlamaServerPort: s.LlamaServerPort,
+		VLLMServerPort:  s.VLLMServerPort,
+		KoboldCppPort:   s.KoboldCppPort,
+
+		VLLMVenv:           s.VLLMVenv,
+		VLLMConfiguredPath: s.VLLMPath,
 	}
 	if cli == "" && srv == "" {
-		if probeHealthEndpoint(host, port) {
+		if probeHealthEndpoint(s.LlamaServerHost, s.LlamaServerPort) {
 			info.ServerRunning = true
 		}
 	}
-	if ProbeOllama() {
+	if ProbeOllama(s.OllamaHost) {
 		info.OllamaRunning = true
 	}
-	kPort := KoboldCppPort()
-	if probeHealthEndpoint("127.0.0.1", kPort) {
+	if probeHealthEndpoint(defaultProbeHost, s.KoboldCppPort) {
 		info.KoboldCppRunning = true
-		info.KoboldCppProbePort = kPort
+		info.KoboldCppProbePort = s.KoboldCppPort
 	}
 	return info
 }

@@ -2,15 +2,15 @@ package tui
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/flyingnobita/llml/internal/fsutil"
 	"github.com/flyingnobita/llml/internal/models"
+	"github.com/flyingnobita/llml/internal/settings"
 )
 
 type runtimeField int
@@ -30,43 +30,26 @@ const (
 	runtimeFieldCount
 )
 
-// applyPortEnv sets an env var from user input (port number or empty to unset).
-func applyPortEnv(envKey string, raw string, defaultPort int) error {
+// parsePortField reads a port field. An empty field means "use defaultPort",
+// which is what makes clearing the field restore the built-in behavior.
+func parsePortField(raw string, defaultPort int) (int, error) {
 	v := strings.TrimSpace(raw)
 	if v == "" {
-		_ = os.Unsetenv(envKey)
-		return nil
+		return defaultPort, nil
 	}
 	p, err := strconv.Atoi(v)
 	if err != nil || p < 1 || p > 65535 {
-		return fmt.Errorf("port must be 1-65535 or empty for default %d", defaultPort)
+		return 0, fmt.Errorf("port must be 1-65535 or empty for default %d", defaultPort)
 	}
-	_ = os.Setenv(envKey, v)
-	return nil
+	return p, nil
 }
 
-// prefillPort shows the env value when set; otherwise the effective port (same as the footer / server commands).
-func prefillPort(envKey string, effective int) string {
-	if v := strings.TrimSpace(os.Getenv(envKey)); v != "" {
+// hostField returns the trimmed host, or defaultHost when the field is empty.
+func hostField(raw, defaultHost string) string {
+	if v := strings.TrimSpace(raw); v != "" {
 		return v
 	}
-	return strconv.Itoa(effective)
-}
-
-// applyPathEnv sets or unsets a path-style environment variable (trimmed; empty unsets).
-// A leading "~" or "~/" is expanded to the user's home directory ([models.ExpandTildePath]).
-func applyPathEnv(key, raw string) {
-	v := strings.TrimSpace(raw)
-	if v == "" {
-		_ = os.Unsetenv(key)
-		return
-	}
-	v = filepath.Clean(models.ExpandTildePath(v))
-	if v == "" || v == "." {
-		_ = os.Unsetenv(key)
-		return
-	}
-	_ = os.Setenv(key, v)
+	return defaultHost
 }
 
 func validatePortInput(s string) error {
@@ -113,40 +96,31 @@ func newPathTextInput() textinput.Model {
 	return ti
 }
 
-// runtimeConfigDirty reports whether any runtime config input differs from the current env.
+// runtimeFieldValues returns the value each input should show for s, indexed by
+// [runtimeField]. Prefill and dirty-checking share it so they cannot drift.
+func runtimeFieldValues(s settings.Settings) [runtimeFieldCount]string {
+	var v [runtimeFieldCount]string
+	v[runtimeFieldLlamaCppPath] = s.LlamaCppPath
+	v[runtimeFieldLlamaPort] = strconv.Itoa(s.LlamaServerPort)
+	v[runtimeFieldLlamaHost] = s.LlamaServerHost
+	v[runtimeFieldOllamaPath] = s.OllamaPath
+	v[runtimeFieldOllamaHost] = s.OllamaHost
+	v[runtimeFieldVLLMPath] = s.VLLMPath
+	v[runtimeFieldVLLMVenv] = s.VLLMVenv
+	v[runtimeFieldVLLMPort] = strconv.Itoa(s.VLLMServerPort)
+	v[runtimeFieldVLLMHost] = s.VLLMServerHost
+	v[runtimeFieldKoboldCppPath] = s.KoboldCppPath
+	v[runtimeFieldKoboldCppPort] = strconv.Itoa(s.KoboldCppPort)
+	return v
+}
+
+// runtimeConfigDirty reports whether any input differs from the resolved settings.
 func (m Model) runtimeConfigDirty() bool {
-	if m.rc.inputs[runtimeFieldLlamaCppPath].Value() != os.Getenv(models.EnvLlamaCppPath) {
-		return true
-	}
-	if m.rc.inputs[runtimeFieldLlamaPort].Value() != prefillPort(models.EnvLlamaServerPort, models.ListenPort()) {
-		return true
-	}
-	if m.rc.inputs[runtimeFieldLlamaHost].Value() != models.LlamaServerHost() {
-		return true
-	}
-	if m.rc.inputs[runtimeFieldOllamaPath].Value() != os.Getenv(models.EnvOllamaPath) {
-		return true
-	}
-	if m.rc.inputs[runtimeFieldOllamaHost].Value() != models.OllamaHost() {
-		return true
-	}
-	if m.rc.inputs[runtimeFieldVLLMPath].Value() != os.Getenv(models.EnvVLLMPath) {
-		return true
-	}
-	if m.rc.inputs[runtimeFieldVLLMVenv].Value() != os.Getenv(models.EnvVLLMVenv) {
-		return true
-	}
-	if m.rc.inputs[runtimeFieldVLLMPort].Value() != prefillPort(models.EnvVLLMServerPort, models.VLLMPort()) {
-		return true
-	}
-	if m.rc.inputs[runtimeFieldVLLMHost].Value() != models.VllmServerHost() {
-		return true
-	}
-	if m.rc.inputs[runtimeFieldKoboldCppPath].Value() != os.Getenv(models.EnvKoboldCppPath) {
-		return true
-	}
-	if m.rc.inputs[runtimeFieldKoboldCppPort].Value() != prefillPort(models.EnvKoboldCppPort, models.KoboldCppPort()) {
-		return true
+	want := runtimeFieldValues(m.settings)
+	for i := range want {
+		if m.rc.inputs[i].Value() != want[i] {
+			return true
+		}
 	}
 	return false
 }
@@ -181,17 +155,9 @@ func (m Model) openRuntimeConfigFocused(focus runtimeField) (Model, tea.Cmd) {
 	m.rc.open = true
 	m.rc.discardConfirm = false
 	m = m.withLastRunCleared()
-	m.rc.inputs[runtimeFieldLlamaCppPath].SetValue(os.Getenv(models.EnvLlamaCppPath))
-	m.rc.inputs[runtimeFieldLlamaPort].SetValue(prefillPort(models.EnvLlamaServerPort, models.ListenPort()))
-	m.rc.inputs[runtimeFieldLlamaHost].SetValue(models.LlamaServerHost())
-	m.rc.inputs[runtimeFieldVLLMPath].SetValue(os.Getenv(models.EnvVLLMPath))
-	m.rc.inputs[runtimeFieldVLLMVenv].SetValue(os.Getenv(models.EnvVLLMVenv))
-	m.rc.inputs[runtimeFieldVLLMPort].SetValue(prefillPort(models.EnvVLLMServerPort, models.VLLMPort()))
-	m.rc.inputs[runtimeFieldVLLMHost].SetValue(models.VllmServerHost())
-	m.rc.inputs[runtimeFieldOllamaPath].SetValue(os.Getenv(models.EnvOllamaPath))
-	m.rc.inputs[runtimeFieldOllamaHost].SetValue(models.OllamaHost())
-	m.rc.inputs[runtimeFieldKoboldCppPath].SetValue(os.Getenv(models.EnvKoboldCppPath))
-	m.rc.inputs[runtimeFieldKoboldCppPort].SetValue(prefillPort(models.EnvKoboldCppPort, models.KoboldCppPort()))
+	for i, v := range runtimeFieldValues(m.settings) {
+		m.rc.inputs[i].SetValue(v)
+	}
 	return m.focusRuntimeField(focus)
 }
 
@@ -270,53 +236,59 @@ func (m Model) focusRuntimeField(i runtimeField) (Model, tea.Cmd) {
 	return m, cmd
 }
 
+// settingsFromRuntimeInputs builds the settings the panel describes. Path fields
+// are normalized, an empty port or host field falls back to the built-in default,
+// and everything not editable in the panel (extra model roots, HF cache) is
+// carried over from the current settings unchanged.
+func (m Model) settingsFromRuntimeInputs() (settings.Settings, error) {
+	s := m.settings
+
+	llamaPort, err := parsePortField(m.rc.inputs[runtimeFieldLlamaPort].Value(), settings.DefaultLlamaServerPort)
+	if err != nil {
+		return s, fmt.Errorf("%s: %w", settings.EnvLlamaServerPort, err)
+	}
+	vllmPort, err := parsePortField(m.rc.inputs[runtimeFieldVLLMPort].Value(), settings.DefaultVLLMServerPort)
+	if err != nil {
+		return s, fmt.Errorf("%s: %w", settings.EnvVLLMServerPort, err)
+	}
+	koboldPort, err := parsePortField(m.rc.inputs[runtimeFieldKoboldCppPort].Value(), settings.DefaultKoboldCppPort)
+	if err != nil {
+		return s, fmt.Errorf("%s: %w", settings.EnvKoboldCppPort, err)
+	}
+
+	s.LlamaCppPath = fsutil.NormalizePath(m.rc.inputs[runtimeFieldLlamaCppPath].Value())
+	s.VLLMPath = fsutil.NormalizePath(m.rc.inputs[runtimeFieldVLLMPath].Value())
+	s.VLLMVenv = fsutil.NormalizePath(m.rc.inputs[runtimeFieldVLLMVenv].Value())
+	s.OllamaPath = fsutil.NormalizePath(m.rc.inputs[runtimeFieldOllamaPath].Value())
+	s.KoboldCppPath = fsutil.NormalizePath(m.rc.inputs[runtimeFieldKoboldCppPath].Value())
+
+	s.LlamaServerPort = llamaPort
+	s.VLLMServerPort = vllmPort
+	s.KoboldCppPort = koboldPort
+
+	s.LlamaServerHost = hostField(m.rc.inputs[runtimeFieldLlamaHost].Value(), settings.DefaultLlamaServerHost)
+	s.VLLMServerHost = hostField(m.rc.inputs[runtimeFieldVLLMHost].Value(), settings.DefaultVLLMServerHost)
+	s.OllamaHost = hostField(
+		settings.NormalizeOllamaHost(m.rc.inputs[runtimeFieldOllamaHost].Value()),
+		settings.DefaultOllamaHost,
+	)
+	return s, nil
+}
+
 func (m Model) commitRuntimeConfig() (Model, tea.Cmd) {
-	if err := validatePortCommit(m.rc.inputs[runtimeFieldLlamaPort].Value()); err != nil {
-		m = m.withLastRunError(fmt.Sprintf("%s: %v", models.EnvLlamaServerPort, err))
-		return m, clearLastRunNoteAfterCmd()
+	for _, f := range []runtimeField{runtimeFieldLlamaPort, runtimeFieldVLLMPort, runtimeFieldKoboldCppPort} {
+		if err := validatePortCommit(m.rc.inputs[f].Value()); err != nil {
+			m = m.withLastRunError(fmt.Sprintf("%s: %v", runtimePortEnvKey(f), err))
+			return m, clearLastRunNoteAfterCmd()
+		}
 	}
-	if err := validatePortCommit(m.rc.inputs[runtimeFieldVLLMPort].Value()); err != nil {
-		m = m.withLastRunError(fmt.Sprintf("%s: %v", models.EnvVLLMServerPort, err))
-		return m, clearLastRunNoteAfterCmd()
-	}
-	if err := validatePortCommit(m.rc.inputs[runtimeFieldKoboldCppPort].Value()); err != nil {
-		m = m.withLastRunError(fmt.Sprintf("%s: %v", models.EnvKoboldCppPort, err))
-		return m, clearLastRunNoteAfterCmd()
-	}
-	if err := applyPortEnv(models.EnvLlamaServerPort, m.rc.inputs[runtimeFieldLlamaPort].Value(), models.ListenPort()); err != nil {
+	next, err := m.settingsFromRuntimeInputs()
+	if err != nil {
 		m = m.withLastRunError(err.Error())
 		return m, clearLastRunNoteAfterCmd()
 	}
-	if err := applyPortEnv(models.EnvVLLMServerPort, m.rc.inputs[runtimeFieldVLLMPort].Value(), models.VLLMPort()); err != nil {
-		m = m.withLastRunError(err.Error())
-		return m, clearLastRunNoteAfterCmd()
-	}
-	if err := applyPortEnv(models.EnvKoboldCppPort, m.rc.inputs[runtimeFieldKoboldCppPort].Value(), models.KoboldCppPort()); err != nil {
-		m = m.withLastRunError(err.Error())
-		return m, clearLastRunNoteAfterCmd()
-	}
-	// Only apply path env vars after all port applications succeed.
-	applyPathEnv(models.EnvLlamaCppPath, m.rc.inputs[runtimeFieldLlamaCppPath].Value())
-	applyPathEnv(models.EnvVLLMPath, m.rc.inputs[runtimeFieldVLLMPath].Value())
-	applyPathEnv(models.EnvVLLMVenv, m.rc.inputs[runtimeFieldVLLMVenv].Value())
-	applyPathEnv(models.EnvOllamaPath, m.rc.inputs[runtimeFieldOllamaPath].Value())
-	applyPathEnv(models.EnvKoboldCppPath, m.rc.inputs[runtimeFieldKoboldCppPath].Value())
-	if host := strings.TrimSpace(m.rc.inputs[runtimeFieldLlamaHost].Value()); host == "" {
-		_ = os.Unsetenv(models.EnvLlamaServerHost)
-	} else {
-		_ = os.Setenv(models.EnvLlamaServerHost, host)
-	}
-	if host := strings.TrimSpace(m.rc.inputs[runtimeFieldVLLMHost].Value()); host == "" {
-		_ = os.Unsetenv(models.EnvVLLMServerHost)
-	} else {
-		_ = os.Setenv(models.EnvVLLMServerHost, host)
-	}
-	if host := strings.TrimSpace(m.rc.inputs[runtimeFieldOllamaHost].Value()); host == "" {
-		_ = os.Unsetenv(models.EnvOllamaHost)
-	} else {
-		_ = os.Setenv(models.EnvOllamaHost, host)
-	}
-	m.runtime = models.DiscoverRuntime()
+	m.settings = next
+	m.runtime = discoverRuntimeFn(m.settings)
 	var cmd tea.Cmd
 	if err := writeConfigFromModel(m); err != nil {
 		m = m.withLastRunError("Could not save config: " + err.Error())
@@ -328,6 +300,19 @@ func (m Model) commitRuntimeConfig() (Model, tea.Cmd) {
 	m = m.closeRuntimeConfig()
 	m = m.withLaunchPreviewSynced()
 	return m, cmd
+}
+
+// runtimePortEnvKey names the environment variable a port field corresponds to,
+// so validation errors point at something the user can also set from the shell.
+func runtimePortEnvKey(f runtimeField) string {
+	switch f {
+	case runtimeFieldVLLMPort:
+		return settings.EnvVLLMServerPort
+	case runtimeFieldKoboldCppPort:
+		return settings.EnvKoboldCppPort
+	default:
+		return settings.EnvLlamaServerPort
+	}
 }
 
 // updateRuntimeConfigKey handles keys while the runtime env editor is open.

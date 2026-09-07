@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -37,7 +36,6 @@ func TestCommitRuntimeConfig_refreshesLaunchPreview(t *testing.T) {
 	cfg := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", cfg)
 	t.Setenv("HOME", cfg)
-	t.Cleanup(func() { _ = os.Unsetenv(models.EnvLlamaServerPort) })
 
 	modelPath := filepath.Join(cfg, "probe.gguf")
 	m := baseModelForPreview(t, modelPath)

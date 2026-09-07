@@ -3,10 +3,8 @@
 package config
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -14,6 +12,7 @@ import (
 
 	"github.com/flyingnobita/llml/internal/fsutil"
 	"github.com/flyingnobita/llml/internal/models"
+	"github.com/flyingnobita/llml/internal/settings"
 	"github.com/flyingnobita/llml/internal/userdata"
 )
 
@@ -83,9 +82,6 @@ func ReadFile() (Config, error) {
 	}
 	b, err := os.ReadFile(path)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return Config{}, err
-		}
 		return Config{}, err
 	}
 	var c Config
@@ -106,139 +102,98 @@ func (c Config) ValidForCache() bool {
 	return true
 }
 
-// ApplyRuntimeFromConfig sets process environment from [runtime] only where the
-// corresponding env var is currently unset (env wins over TOML).
-func ApplyRuntimeFromConfig(r *RuntimeConfig) {
-	if r == nil {
-		return
+// Layer converts the persisted [runtime] table into a settings layer. Empty
+// strings and nil ports mean "this file says nothing about that value", so a
+// higher-precedence layer (the environment) or the built-in defaults supply it.
+//
+// This is the only direction configuration flows into the running process: the
+// file is read into a layer, never applied to the process environment.
+func (r RuntimeConfig) Layer() settings.Layer {
+	var l settings.Layer
+	setLayerPath(&l.LlamaCppPath, r.DefaultLlamaCppPath)
+	setLayerPath(&l.VLLMPath, r.DefaultVLLMPath)
+	setLayerPath(&l.VLLMVenv, r.DefaultVLLMVenv)
+	setLayerPath(&l.OllamaPath, r.DefaultOllamaPath)
+	setLayerPath(&l.KoboldCppPath, r.DefaultKoboldCppPath)
+	setLayerString(&l.LlamaServerHost, r.DefaultLlamaServerHost)
+	setLayerString(&l.VLLMServerHost, r.DefaultVLLMServerHost)
+	setLayerString(&l.OllamaHost, settings.NormalizeOllamaHost(r.DefaultOllamaHost))
+	setLayerPort(&l.LlamaServerPort, r.DefaultLlamaServerPort)
+	setLayerPort(&l.VLLMServerPort, r.DefaultVLLMServerPort)
+	setLayerPort(&l.KoboldCppPort, r.DefaultKoboldCppPort)
+	return l
+}
+
+// Layer converts the persisted [discovery] table into a settings layer.
+func (d DiscoveryConfig) Layer() settings.Layer {
+	return settings.Layer{ExtraModelPaths: d.ExtraModelPaths}
+}
+
+// Layer converts the whole document into one settings layer.
+func (c Config) Layer() settings.Layer {
+	l := c.Runtime.Layer()
+	l.ExtraModelPaths = c.Discovery.ExtraModelPaths
+	return l
+}
+
+// Resolve reads config.toml and resolves it against the environment and the
+// built-in defaults, in that order of precedence. A missing or unreadable file
+// is not an error: the result is then the environment over the defaults.
+func Resolve(getenv settings.Getenv) settings.Settings {
+	c, err := ReadFile()
+	if err != nil {
+		return settings.Resolve(settings.FromEnv(getenv), settings.Defaults())
 	}
-	applyPathIfUnset(models.EnvLlamaCppPath, r.DefaultLlamaCppPath)
-	applyPathIfUnset(models.EnvVLLMPath, r.DefaultVLLMPath)
-	applyPathIfUnset(models.EnvVLLMVenv, r.DefaultVLLMVenv)
-	applyPathIfUnset(models.EnvOllamaPath, r.DefaultOllamaPath)
-	applyPathIfUnset(models.EnvKoboldCppPath, r.DefaultKoboldCppPath)
-	if v := strings.TrimSpace(r.DefaultLlamaServerHost); v != "" && os.Getenv(models.EnvLlamaServerHost) == "" {
-		_ = os.Setenv(models.EnvLlamaServerHost, v)
-	}
-	if v := strings.TrimSpace(r.DefaultVLLMServerHost); v != "" && os.Getenv(models.EnvVLLMServerHost) == "" {
-		_ = os.Setenv(models.EnvVLLMServerHost, v)
-	}
-	if v := strings.TrimSpace(r.DefaultOllamaHost); v != "" && os.Getenv(models.EnvOllamaHost) == "" {
-		_ = os.Setenv(models.EnvOllamaHost, v)
-	}
-	if r.DefaultLlamaServerPort != nil && os.Getenv(models.EnvLlamaServerPort) == "" {
-		_ = os.Setenv(models.EnvLlamaServerPort, strconv.Itoa(*r.DefaultLlamaServerPort))
-	}
-	if r.DefaultVLLMServerPort != nil && os.Getenv(models.EnvVLLMServerPort) == "" {
-		_ = os.Setenv(models.EnvVLLMServerPort, strconv.Itoa(*r.DefaultVLLMServerPort))
-	}
-	if r.DefaultKoboldCppPort != nil && os.Getenv(models.EnvKoboldCppPort) == "" {
-		_ = os.Setenv(models.EnvKoboldCppPort, strconv.Itoa(*r.DefaultKoboldCppPort))
+	return settings.Resolve(settings.FromEnv(getenv), c.Layer(), settings.Defaults())
+}
+
+func setLayerPath(dst **string, value string) {
+	if v := fsutil.NormalizePath(value); v != "" {
+		*dst = &v
 	}
 }
 
-// normalizePath trims, expands tilde, and cleans a filesystem path string.
-// Returns "" for empty or whitespace-only inputs.
-func normalizePath(v string) string {
-	if v = strings.TrimSpace(v); v == "" {
-		return ""
+func setLayerString(dst **string, value string) {
+	if v := strings.TrimSpace(value); v != "" {
+		*dst = &v
 	}
-	return filepath.Clean(models.ExpandTildePath(v))
 }
 
-func applyPathIfUnset(key, value string) {
-	v := normalizePath(value)
-	if v == "" || v == "." || os.Getenv(key) != "" {
-		return
+func setLayerPort(dst **int, value *int) {
+	if value != nil && *value > 0 && *value <= 65535 {
+		v := *value
+		*dst = &v
 	}
-	_ = os.Setenv(key, v)
 }
 
-// RuntimeFromEnv builds a RuntimeConfig from the current process environment (for writing).
-func RuntimeFromEnv() RuntimeConfig {
-	var r RuntimeConfig
-	if v := normalizePath(os.Getenv(models.EnvLlamaCppPath)); v != "" {
-		r.DefaultLlamaCppPath = v
+// RuntimeConfigFromSettings projects resolved settings back into the [runtime]
+// table for writing. Every value is written, so the file always shows what the
+// process is actually using.
+func RuntimeConfigFromSettings(s settings.Settings) RuntimeConfig {
+	llamaPort := s.LlamaServerPort
+	vllmPort := s.VLLMServerPort
+	koboldPort := s.KoboldCppPort
+	return RuntimeConfig{
+		DefaultLlamaCppPath:    s.LlamaCppPath,
+		DefaultLlamaServerHost: s.LlamaServerHost,
+		DefaultVLLMPath:        s.VLLMPath,
+		DefaultVLLMServerHost:  s.VLLMServerHost,
+		DefaultVLLMVenv:        s.VLLMVenv,
+		DefaultOllamaPath:      s.OllamaPath,
+		DefaultOllamaHost:      s.OllamaHost,
+		DefaultKoboldCppPath:   s.KoboldCppPath,
+		DefaultLlamaServerPort: &llamaPort,
+		DefaultVLLMServerPort:  &vllmPort,
+		DefaultKoboldCppPort:   &koboldPort,
 	}
-	if v := normalizePath(os.Getenv(models.EnvVLLMPath)); v != "" {
-		r.DefaultVLLMPath = v
-	}
-	if v := normalizePath(os.Getenv(models.EnvVLLMVenv)); v != "" {
-		r.DefaultVLLMVenv = v
-	}
-	if v := normalizePath(os.Getenv(models.EnvOllamaPath)); v != "" {
-		r.DefaultOllamaPath = v
-	}
-	if v := normalizePath(os.Getenv(models.EnvKoboldCppPath)); v != "" {
-		r.DefaultKoboldCppPath = v
-	}
-	if v := strings.TrimSpace(os.Getenv(models.EnvLlamaServerHost)); v != "" {
-		r.DefaultLlamaServerHost = v
-	} else {
-		r.DefaultLlamaServerHost = models.LlamaServerHost()
-	}
-	if v := strings.TrimSpace(os.Getenv(models.EnvVLLMServerHost)); v != "" {
-		r.DefaultVLLMServerHost = v
-	} else {
-		r.DefaultVLLMServerHost = models.VllmServerHost()
-	}
-	if v := strings.TrimSpace(os.Getenv(models.EnvOllamaHost)); v != "" {
-		r.DefaultOllamaHost = v
-	} else {
-		r.DefaultOllamaHost = models.OllamaHost()
-	}
-	if v := strings.TrimSpace(os.Getenv(models.EnvLlamaServerPort)); v != "" {
-		if p, err := strconv.Atoi(v); err == nil && p > 0 && p <= 65535 {
-			r.DefaultLlamaServerPort = &p
-		}
-	} else {
-		p := models.ListenPort()
-		r.DefaultLlamaServerPort = &p
-	}
-	if v := strings.TrimSpace(os.Getenv(models.EnvVLLMServerPort)); v != "" {
-		if p, err := strconv.Atoi(v); err == nil && p > 0 && p <= 65535 {
-			r.DefaultVLLMServerPort = &p
-		}
-	} else {
-		p := models.VLLMPort()
-		r.DefaultVLLMServerPort = &p
-	}
-	if v := strings.TrimSpace(os.Getenv(models.EnvKoboldCppPort)); v != "" {
-		if p, err := strconv.Atoi(v); err == nil && p > 0 && p <= 65535 {
-			r.DefaultKoboldCppPort = &p
-		}
-	} else {
-		p := models.KoboldCppPort()
-		r.DefaultKoboldCppPort = &p
-	}
-	return r
 }
 
-// ExtraModelPathsFromEnv returns comma-separated LLML_MODEL_PATHS entries.
-func ExtraModelPathsFromEnv() []string {
-	v := strings.TrimSpace(os.Getenv(models.EnvModelPaths))
-	if v == "" {
-		return nil
-	}
-	var out []string
-	for part := range strings.SplitSeq(v, ",") {
-		part = strings.TrimSpace(part)
-		if part != "" {
-			out = append(out, part)
-		}
-	}
-	return out
-}
-
-// MergeExtraRoots combines discovery extra paths from config with env-only extras for Discover options.
-// Config file paths are merged with env in [models.MergeSearchRoots] via Options.ExtraRoots.
-func MergeExtraRoots(discoveryExtra, envExtra []string) []string {
-	ps := models.NewPathSet()
-	for _, p := range discoveryExtra {
-		ps.Add(p)
-	}
-	for _, p := range envExtra {
-		ps.Add(p)
+// MergeExtraRoots combines extra model roots from several sources into one
+// normalized, deduplicated list, preserving order.
+func MergeExtraRoots(lists ...[]string) []string {
+	var ps fsutil.PathSet
+	for _, l := range lists {
+		ps.Add(l...)
 	}
 	return ps.Slice()
 }
@@ -260,20 +215,20 @@ func BuildConfig(runtime RuntimeConfig, discovery DiscoveryConfig, files []model
 // It normalizes and deduplicates paths without merging environment variables.
 func DiscoveryConfigFromInputs(configPaths []string, lastScan time.Time) DiscoveryConfig {
 	return DiscoveryConfig{
-		ExtraModelPaths: MergeExtraRoots(configPaths, nil),
+		ExtraModelPaths: MergeExtraRoots(configPaths),
 		LastScan:        lastScan,
 	}
 }
 
-// DiscoveryConfigForWrite merges extra model paths from a previous on-disk config with
-// current LLML_MODEL_PATHS so hand-edited TOML entries are preserved across writes.
-func DiscoveryConfigForWrite(prev *Config, lastScan time.Time) DiscoveryConfig {
+// DiscoveryConfigForWrite merges extra model paths from a previous on-disk config
+// with the resolved extra roots, so hand-edited TOML entries survive a write.
+func DiscoveryConfigForWrite(prev *Config, s settings.Settings, lastScan time.Time) DiscoveryConfig {
 	var fromFile []string
 	if prev != nil {
 		fromFile = prev.Discovery.ExtraModelPaths
 	}
 	return DiscoveryConfig{
-		ExtraModelPaths: MergeExtraRoots(fromFile, ExtraModelPathsFromEnv()),
+		ExtraModelPaths: MergeExtraRoots(fromFile, s.ExtraModelPaths),
 		LastScan:        lastScan,
 	}
 }

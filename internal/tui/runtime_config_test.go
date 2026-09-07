@@ -1,87 +1,44 @@
 package tui
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/flyingnobita/llml/internal/models"
+	"github.com/flyingnobita/llml/internal/settings"
 )
 
-func TestApplyPortEnv(t *testing.T) {
-	t.Run("VLLM empty unsets", func(t *testing.T) {
-		t.Setenv(models.EnvVLLMServerPort, "9000")
-		if err := applyPortEnv(models.EnvVLLMServerPort, "", models.VLLMPort()); err != nil {
-			t.Fatal(err)
+func TestParsePortField(t *testing.T) {
+	t.Parallel()
+
+	// An empty field means "use the default", which is how clearing a port
+	// restores built-in behavior.
+	if p, err := parsePortField("", 8000); err != nil || p != 8000 {
+		t.Fatalf("empty: got (%d, %v), want (8000, nil)", p, err)
+	}
+	if p, err := parsePortField("  9090 ", 8000); err != nil || p != 9090 {
+		t.Fatalf("value: got (%d, %v), want (9090, nil)", p, err)
+	}
+	for _, bad := range []string{"0", "65536", "abc"} {
+		if _, err := parsePortField(bad, 8000); err == nil {
+			t.Errorf("parsePortField(%q) should fail", bad)
 		}
-		if os.Getenv(models.EnvVLLMServerPort) != "" {
-			t.Fatal("expected unset")
-		}
-	})
-	t.Run("VLLM valid sets", func(t *testing.T) {
-		t.Setenv(models.EnvVLLMServerPort, "")
-		if err := applyPortEnv(models.EnvVLLMServerPort, "8000", models.VLLMPort()); err != nil {
-			t.Fatal(err)
-		}
-		if os.Getenv(models.EnvVLLMServerPort) != "8000" {
-			t.Fatalf("got %q", os.Getenv(models.EnvVLLMServerPort))
-		}
-	})
-	t.Run("llama empty unsets", func(t *testing.T) {
-		t.Setenv(models.EnvLlamaServerPort, "9000")
-		if err := applyPortEnv(models.EnvLlamaServerPort, "", models.ListenPort()); err != nil {
-			t.Fatal(err)
-		}
-		if os.Getenv(models.EnvLlamaServerPort) != "" {
-			t.Fatal("expected unset")
-		}
-	})
-	t.Run("llama valid sets", func(t *testing.T) {
-		t.Setenv(models.EnvLlamaServerPort, "")
-		if err := applyPortEnv(models.EnvLlamaServerPort, "9090", models.ListenPort()); err != nil {
-			t.Fatal(err)
-		}
-		if os.Getenv(models.EnvLlamaServerPort) != "9090" {
-			t.Fatalf("got %q", os.Getenv(models.EnvLlamaServerPort))
-		}
-	})
-	t.Run("llama reject out of range", func(t *testing.T) {
-		if applyPortEnv(models.EnvLlamaServerPort, "0", models.ListenPort()) == nil {
-			t.Fatal("expected error")
-		}
-		if applyPortEnv(models.EnvLlamaServerPort, "65536", models.ListenPort()) == nil {
-			t.Fatal("expected error")
-		}
-	})
-	t.Run("kobold empty unsets", func(t *testing.T) {
-		t.Setenv(models.EnvKoboldCppPort, "6000")
-		if err := applyPortEnv(models.EnvKoboldCppPort, "", models.KoboldCppPort()); err != nil {
-			t.Fatal(err)
-		}
-		if os.Getenv(models.EnvKoboldCppPort) != "" {
-			t.Fatal("expected unset")
-		}
-	})
-	t.Run("kobold valid sets", func(t *testing.T) {
-		t.Setenv(models.EnvKoboldCppPort, "")
-		if err := applyPortEnv(models.EnvKoboldCppPort, "5001", models.KoboldCppPort()); err != nil {
-			t.Fatal(err)
-		}
-		if os.Getenv(models.EnvKoboldCppPort) != "5001" {
-			t.Fatalf("got %q", os.Getenv(models.EnvKoboldCppPort))
-		}
-	})
-	t.Run("kobold reject out of range", func(t *testing.T) {
-		if applyPortEnv(models.EnvKoboldCppPort, "0", models.KoboldCppPort()) == nil {
-			t.Fatal("expected error")
-		}
-		if applyPortEnv(models.EnvKoboldCppPort, "65536", models.KoboldCppPort()) == nil {
-			t.Fatal("expected error")
-		}
-	})
+	}
+}
+
+func TestHostField(t *testing.T) {
+	t.Parallel()
+
+	if g := hostField("  0.0.0.0 ", "127.0.0.1"); g != "0.0.0.0" {
+		t.Errorf("got %q", g)
+	}
+	if g := hostField("   ", "127.0.0.1"); g != "127.0.0.1" {
+		t.Errorf("empty should fall back to the default, got %q", g)
+	}
 }
 
 func TestValidatePortInput(t *testing.T) {
+	t.Parallel()
+
 	if err := validatePortInput("8080"); err != nil {
 		t.Fatal(err)
 	}
@@ -94,6 +51,8 @@ func TestValidatePortInput(t *testing.T) {
 }
 
 func TestValidatePortCommit(t *testing.T) {
+	t.Parallel()
+
 	if err := validatePortCommit(""); err != nil {
 		t.Fatal(err)
 	}
@@ -105,40 +64,93 @@ func TestValidatePortCommit(t *testing.T) {
 	}
 }
 
-func TestPrefillPort(t *testing.T) {
-	t.Run("set env returns env", func(t *testing.T) {
-		t.Setenv(models.EnvVLLMServerPort, "7777")
-		if g := prefillPort(models.EnvVLLMServerPort, 8000); g != "7777" {
-			t.Fatalf("got %q", g)
-		}
-	})
-	t.Run("unset env returns effective", func(t *testing.T) {
-		t.Setenv(models.EnvVLLMServerPort, "")
-		if g := prefillPort(models.EnvVLLMServerPort, 8000); g != "8000" {
-			t.Fatalf("got %q want 8000", g)
-		}
-	})
+// The panel must prefill from the resolved settings, and a freshly opened panel
+// must therefore not read as dirty.
+func TestRuntimeFieldValues_prefillIsNotDirty(t *testing.T) {
+	t.Parallel()
+
+	m := New()
+	m.settings = settings.Resolve(settings.Layer{
+		LlamaCppPath:    ptrTo("/opt/llama"),
+		LlamaServerPort: ptrTo(61111),
+		OllamaHost:      ptrTo("box:11434"),
+	}, settings.Defaults())
+
+	m, _ = m.openRuntimeConfig()
+
+	if m.rc.inputs[runtimeFieldLlamaCppPath].Value() != "/opt/llama" {
+		t.Errorf("llama path = %q", m.rc.inputs[runtimeFieldLlamaCppPath].Value())
+	}
+	if m.rc.inputs[runtimeFieldLlamaPort].Value() != "61111" {
+		t.Errorf("llama port = %q", m.rc.inputs[runtimeFieldLlamaPort].Value())
+	}
+	if m.rc.inputs[runtimeFieldOllamaHost].Value() != "box:11434" {
+		t.Errorf("ollama host = %q", m.rc.inputs[runtimeFieldOllamaHost].Value())
+	}
+	if m.runtimeConfigDirty() {
+		t.Error("a freshly prefilled panel should not be dirty")
+	}
+
+	m.rc.inputs[runtimeFieldVLLMPort].SetValue("7777")
+	if !m.runtimeConfigDirty() {
+		t.Error("an edited field should mark the panel dirty")
+	}
 }
 
-func TestApplyPathEnv(t *testing.T) {
-	t.Setenv(models.EnvLlamaCppPath, "/old")
-	applyPathEnv(models.EnvLlamaCppPath, "/new/path")
-	if os.Getenv(models.EnvLlamaCppPath) != "/new/path" {
-		t.Fatalf("got %q", os.Getenv(models.EnvLlamaCppPath))
-	}
-	applyPathEnv(models.EnvLlamaCppPath, "  ")
-	if os.Getenv(models.EnvLlamaCppPath) != "" {
-		t.Fatal("expected unset for whitespace-only")
-	}
-}
-
-func TestApplyPathEnv_tilde(t *testing.T) {
+// Not parallel: tilde expansion resolves the real home directory.
+func TestSettingsFromRuntimeInputs(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	t.Setenv(models.EnvVLLMPath, "")
-	applyPathEnv(models.EnvVLLMPath, "~/my-vllm")
-	want := filepath.Join(home, "my-vllm")
-	if got := os.Getenv(models.EnvVLLMPath); got != want {
-		t.Fatalf("got %q want %q", got, want)
+
+	m := New()
+	// Values the panel cannot edit must survive the round trip.
+	m.settings.ExtraModelPaths = []string{"/roots/a"}
+	m.settings.HFHubCache = "/hf/cache"
+	m, _ = m.openRuntimeConfig()
+
+	m.rc.inputs[runtimeFieldLlamaCppPath].SetValue("~/llama/bin")
+	m.rc.inputs[runtimeFieldLlamaPort].SetValue("61111")
+	m.rc.inputs[runtimeFieldVLLMPort].SetValue("") // empty means default
+	m.rc.inputs[runtimeFieldOllamaHost].SetValue("http://box:11434/")
+	m.rc.inputs[runtimeFieldVLLMHost].SetValue("  ") // blank means default
+
+	got, err := m.settingsFromRuntimeInputs()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join(home, "llama", "bin"); got.LlamaCppPath != want {
+		t.Errorf("LlamaCppPath = %q, want %q", got.LlamaCppPath, want)
+	}
+	if got.LlamaServerPort != 61111 {
+		t.Errorf("LlamaServerPort = %d", got.LlamaServerPort)
+	}
+	if got.VLLMServerPort != settings.DefaultVLLMServerPort {
+		t.Errorf("empty port should use the default, got %d", got.VLLMServerPort)
+	}
+	if got.OllamaHost != "box:11434" {
+		t.Errorf("OllamaHost = %q, want box:11434 (scheme stripped)", got.OllamaHost)
+	}
+	if got.VLLMServerHost != settings.DefaultVLLMServerHost {
+		t.Errorf("blank host should use the default, got %q", got.VLLMServerHost)
+	}
+	if len(got.ExtraModelPaths) != 1 || got.ExtraModelPaths[0] != "/roots/a" {
+		t.Errorf("ExtraModelPaths should be carried over, got %v", got.ExtraModelPaths)
+	}
+	if got.HFHubCache != "/hf/cache" {
+		t.Errorf("HFHubCache should be carried over, got %q", got.HFHubCache)
 	}
 }
+
+func TestSettingsFromRuntimeInputs_rejectsBadPort(t *testing.T) {
+	t.Parallel()
+
+	m := New()
+	m, _ = m.openRuntimeConfig()
+	m.rc.inputs[runtimeFieldKoboldCppPort].SetValue("70000")
+
+	if _, err := m.settingsFromRuntimeInputs(); err == nil {
+		t.Fatal("expected an error for an out-of-range port")
+	}
+}
+
+func ptrTo[T any](v T) *T { return &v }

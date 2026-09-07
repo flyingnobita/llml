@@ -37,21 +37,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case runtimeReadyMsg:
+		m.settings = msg.settings
 		m.runtime = msg.runtime
 		m.runtimeScanned = true
 		return m, nil
 
 	case startupCacheHitMsg:
+		m.settings = msg.settings
 		return m.applyScanResult(&msg.runtime, msg.files, msg.lastScan, msg.configPaths, msg.writeErr, true)
 
 	case startupNeedFullScanMsg:
 		return m, applyAndFullScanCmd()
 
 	case fullScanDoneMsg:
+		m.settings = msg.settings
 		m2, cmd := m.applyScanResult(&msg.runtime, msg.files, msg.lastScan, msg.configPaths, msg.writeErr, true)
 		return applyOllamaDiscoveryResult(m2, cmd, msg.ollamaNote, msg.ollamaWarn)
 
 	case modelRescanDoneMsg:
+		m.settings = msg.settings
 		m2, cmd := m.applyScanResult(nil, msg.files, msg.lastScan, msg.configPaths, msg.writeErr, false)
 		return applyOllamaDiscoveryResult(m2, cmd, msg.ollamaNote, msg.ollamaWarn)
 

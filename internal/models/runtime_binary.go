@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strconv"
+	"slices"
 	"strings"
 	"time"
 )
@@ -42,8 +42,10 @@ func findBinaryInEnvAndCommonDirs(name, envDir string, commonDirs []string) stri
 	return ""
 }
 
-func findVLLMBinary() string {
-	if dir := os.Getenv(EnvVLLMPath); dir != "" {
+// findVLLMBinary resolves the vllm executable from vllmPath, then venvRoot, then
+// common install directories, then PATH. Both parameters may be empty.
+func findVLLMBinary(vllmPath, venvRoot string) string {
+	if dir := vllmPath; dir != "" {
 		clean := filepath.Clean(dir)
 		if isRegularFile(clean) && filepath.Base(clean) == "vllm" {
 			return clean
@@ -57,12 +59,12 @@ func findVLLMBinary() string {
 			return p
 		}
 	}
-	if d := strings.TrimSpace(os.Getenv(EnvVLLMVenv)); d != "" {
+	if d := strings.TrimSpace(venvRoot); d != "" {
 		if p := vllmBinaryInVenvRoot(d); p != "" {
 			return p
 		}
 	}
-	common := commonBinaryDirs
+	common := slices.Clone(commonBinaryDirs)
 	if home, err := os.UserHomeDir(); err == nil {
 		common = append(common, filepath.Join(home, ".local", "bin"))
 		if runtime.GOOS == "darwin" {
@@ -73,12 +75,14 @@ func findVLLMBinary() string {
 	return findBinaryInEnvAndCommonDirs("vllm", "", common)
 }
 
-func findLlamaBinary(name string) string {
+// findLlamaBinary resolves name from llamaCppPath, then common install
+// directories, then PATH. llamaCppPath may be empty.
+func findLlamaBinary(name, llamaCppPath string) string {
 	var envDir string
-	if d := os.Getenv(EnvLlamaCppPath); d != "" {
+	if d := llamaCppPath; d != "" {
 		envDir = filepath.Clean(d)
 	}
-	common := append([]string{}, commonBinaryDirs...)
+	common := slices.Clone(commonBinaryDirs)
 	common = append(common, "/opt/llama.cpp/build/bin")
 	if home, err := os.UserHomeDir(); err == nil {
 		common = append(common, filepath.Join(home, ".local", "bin"))
@@ -86,12 +90,14 @@ func findLlamaBinary(name string) string {
 	return findBinaryInEnvAndCommonDirs(name, envDir, common)
 }
 
-func findOllamaBinary() string {
+// findOllamaBinary resolves the ollama executable from ollamaPath, then common
+// install directories, then PATH. ollamaPath may be empty.
+func findOllamaBinary(ollamaPath string) string {
 	var envDir string
-	if d := os.Getenv(EnvOllamaPath); d != "" {
+	if d := ollamaPath; d != "" {
 		envDir = filepath.Clean(d)
 	}
-	common := commonBinaryDirs
+	common := slices.Clone(commonBinaryDirs)
 	if home, err := os.UserHomeDir(); err == nil {
 		common = append(common, filepath.Join(home, ".local", "bin"))
 	}
@@ -155,9 +161,12 @@ func isExecutableFile(path string) bool {
 	return fi.Mode().Perm()&0o111 != 0
 }
 
-func findKoboldCppBinary() string {
+// findKoboldCppBinary resolves a koboldcpp executable from koboldCppPath (a
+// directory or a direct file path), then common install directories, then PATH.
+// koboldCppPath may be empty.
+func findKoboldCppBinary(koboldCppPath string) string {
 	var envDir string
-	if d := os.Getenv(EnvKoboldCppPath); d != "" {
+	if d := koboldCppPath; d != "" {
 		envDir = filepath.Clean(d)
 	}
 	// 1) $KOBOLDCPP_PATH points directly to a file — use it only when the
@@ -175,7 +184,7 @@ func findKoboldCppBinary() string {
 		}
 	}
 	// 3) Common directories.
-	common := commonBinaryDirs
+	common := slices.Clone(commonBinaryDirs)
 	if home, err := os.UserHomeDir(); err == nil {
 		common = append(common, filepath.Join(home, ".local", "bin"))
 	}
@@ -189,22 +198,6 @@ func findKoboldCppBinary() string {
 		return p
 	}
 	return ""
-}
-
-// LlamaServerHost returns the listen host from LLAMA_SERVER_HOST, or "127.0.0.1" if unset.
-func LlamaServerHost() string {
-	if v := strings.TrimSpace(os.Getenv(EnvLlamaServerHost)); v != "" {
-		return v
-	}
-	return defaultLlamaServerHost
-}
-
-// VllmServerHost returns the listen host from VLLM_SERVER_HOST, or "127.0.0.1" if unset.
-func VllmServerHost() string {
-	if v := strings.TrimSpace(os.Getenv(EnvVLLMServerHost)); v != "" {
-		return v
-	}
-	return defaultVLLMServerHost
 }
 
 // probeHealthEndpoint GETs /health on host:port. Used by both llama-server and KoboldCpp.
@@ -223,30 +216,9 @@ func probeHealthEndpoint(host string, port int) bool {
 	return resp.StatusCode == http.StatusOK
 }
 
-const defaultLlamaServerPort = 8080
-const defaultLlamaServerHost = "127.0.0.1"
-const defaultVLLMServerPort = 8000
-const defaultVLLMServerHost = "127.0.0.1"
-const defaultKoboldCppPort = 5001
-
-// portFromEnv reads a port number from the named env var, returning def if unset or invalid.
-func portFromEnv(key string, def int) int {
-	if v := os.Getenv(key); v != "" {
-		if p, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && p > 0 && p <= 65535 {
-			return p
-		}
-	}
-	return def
-}
-
-// ListenPort returns the TCP port from LLAMA_SERVER_PORT, or 8080 if unset or invalid.
-func ListenPort() int { return portFromEnv(EnvLlamaServerPort, defaultLlamaServerPort) }
-
-// VLLMPort returns the TCP port from VLLM_SERVER_PORT, or 8000 if unset or invalid.
-func VLLMPort() int { return portFromEnv(EnvVLLMServerPort, defaultVLLMServerPort) }
-
-// KoboldCppPort returns the TCP port from KOBOLDCPP_PORT, or 5001 if unset or invalid.
-func KoboldCppPort() int { return portFromEnv(EnvKoboldCppPort, defaultKoboldCppPort) }
+// defaultProbeHost is the loopback address used for health probes that have no
+// configurable host of their own (KoboldCpp).
+const defaultProbeHost = "127.0.0.1"
 
 // resolvePath returns existing if non-empty, otherwise the first match for cmdName on PATH.
 func resolvePath(existing, cmdName string) string {

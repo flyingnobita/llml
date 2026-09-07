@@ -11,6 +11,7 @@ import (
 
 	"github.com/flyingnobita/llml/internal/config"
 	"github.com/flyingnobita/llml/internal/models"
+	"github.com/flyingnobita/llml/internal/settings"
 )
 
 func collectCmdMsgs(t *testing.T, cmd tea.Cmd) []tea.Msg {
@@ -35,15 +36,16 @@ func collectCmdMsgs(t *testing.T, cmd tea.Cmd) []tea.Msg {
 	return []tea.Msg{msg}
 }
 
+// restoreDiscoveryTestSeams snapshots the package-level seams, including the
+// environment reader, so a test never has to mutate the real environment.
 func restoreDiscoveryTestSeams() func() {
+	getenvFn = func(string) string { return "" }
 	oldReadConfig := readConfigFileFn
 	oldWriteConfig := writeConfigFileFn
-	oldApplyRuntime := applyRuntimeFromConfigFn
-	oldExtraPaths := extraModelPathsFromEnvFn
-	oldMergeRoots := mergeExtraRootsFn
+	oldGetenv := getenvFn
 	oldDiscInputs := discoveryConfigInputsFn
 	oldBuildConfig := buildConfigFn
-	oldRuntimeFromEnv := runtimeFromEnvFn
+	oldRuntimeConfig := runtimeConfigFn
 	oldModelFiles := modelFilesFromEntriesFn
 	oldFilterExisting := filterExistingPathsFn
 	oldDiscoverRuntime := discoverRuntimeFn
@@ -56,12 +58,10 @@ func restoreDiscoveryTestSeams() func() {
 	return func() {
 		readConfigFileFn = oldReadConfig
 		writeConfigFileFn = oldWriteConfig
-		applyRuntimeFromConfigFn = oldApplyRuntime
-		extraModelPathsFromEnvFn = oldExtraPaths
-		mergeExtraRootsFn = oldMergeRoots
+		getenvFn = oldGetenv
 		discoveryConfigInputsFn = oldDiscInputs
 		buildConfigFn = oldBuildConfig
-		runtimeFromEnvFn = oldRuntimeFromEnv
+		runtimeConfigFn = oldRuntimeConfig
 		modelFilesFromEntriesFn = oldModelFiles
 		filterExistingPathsFn = oldFilterExisting
 		discoverRuntimeFn = oldDiscoverRuntime
@@ -98,17 +98,13 @@ func TestApplyAndFullScanCmd_StartsOllamaForDiscovery(t *testing.T) {
 		}, nil
 	}
 	writeConfigFileFn = func(config.Config) error { return nil }
-	applyRuntimeFromConfigFn = func(*config.RuntimeConfig) {}
-	extraModelPathsFromEnvFn = func() []string { return nil }
-	mergeExtraRootsFn = func(a, b []string) []string { return nil }
 	discoveryConfigInputsFn = func(configPaths []string, lastScan time.Time) config.DiscoveryConfig {
 		return config.DiscoveryConfig{ExtraModelPaths: configPaths, LastScan: lastScan}
 	}
 	buildConfigFn = config.BuildConfig
-	runtimeFromEnvFn = config.RuntimeFromEnv
 
 	runtimeCalls := 0
-	discoverRuntimeFn = func() models.RuntimeInfo {
+	discoverRuntimeFn = func(settings.Settings) models.RuntimeInfo {
 		runtimeCalls++
 		if runtimeCalls >= 2 {
 			return models.RuntimeInfo{OllamaPath: "/bin/ollama", OllamaHost: "127.0.0.1:11434", OllamaRunning: true}
@@ -121,8 +117,8 @@ func TestApplyAndFullScanCmd_StartsOllamaForDiscovery(t *testing.T) {
 		}
 		return nil
 	}
-	waitForOllamaFn = func() bool { return true }
-	probeOllamaFn = func() bool { return false }
+	waitForOllamaFn = func(string) bool { return true }
+	probeOllamaFn = func(string) bool { return false }
 	discoverModelsFn = func(models.Options) ([]models.ModelFile, error) {
 		return []models.ModelFile{testOllamaRow("live:latest")}, nil
 	}
@@ -156,24 +152,19 @@ func TestApplyAndFullScanCmd_StartsOllamaForDiscovery(t *testing.T) {
 	}
 }
 
-// TestStartupCmd_InvalidCacheStillAppliesRuntime ensures that when the config
-// reads successfully but the cache is unusable (wrong schema version), the
-// runtime env vars are still applied before the early return. Without this,
-// runtimeFromEnvFn() could be called in the subsequent full-scan write with
-// no env vars set, blanking the on-disk runtime config.
-func TestStartupCmd_InvalidCacheStillAppliesRuntime(t *testing.T) {
+// TestStartupCmd_InvalidCacheStillResolvesRuntimeFromFile guards the invariant
+// that used to need an eager os.Setenv: when the config file reads but its cache
+// is unusable, the runtime values in that file must still reach the settings the
+// subsequent write path uses, or the on-disk [runtime] table would be blanked.
+func TestStartupCmd_InvalidCacheStillResolvesRuntimeFromFile(t *testing.T) {
 	t.Cleanup(restoreDiscoveryTestSeams())
 
 	wantPath := "/test/llama.cpp"
-	var appliedRuntime *config.RuntimeConfig
-
-	readConfigFileFn = func() (config.Config, error) {
-		return config.Config{
-			SchemaVersion: config.SchemaVersion - 1, // invalid cache
-			Runtime:       config.RuntimeConfig{DefaultLlamaCppPath: wantPath},
-		}, nil
+	cfg := config.Config{
+		SchemaVersion: config.SchemaVersion - 1, // invalid cache
+		Runtime:       config.RuntimeConfig{DefaultLlamaCppPath: wantPath},
 	}
-	applyRuntimeFromConfigFn = func(r *config.RuntimeConfig) { appliedRuntime = r }
+	readConfigFileFn = func() (config.Config, error) { return cfg, nil }
 
 	msgs := collectCmdMsgs(t, startupCmd())
 	if len(msgs) != 1 {
@@ -182,11 +173,13 @@ func TestStartupCmd_InvalidCacheStillAppliesRuntime(t *testing.T) {
 	if _, ok := msgs[0].(startupNeedFullScanMsg); !ok {
 		t.Fatalf("msg[0] %T, want startupNeedFullScanMsg", msgs[0])
 	}
-	if appliedRuntime == nil {
-		t.Fatal("applyRuntimeFromConfigFn was not called before early return")
+
+	got := resolveSettings(cfg, true, nil)
+	if got.LlamaCppPath != wantPath {
+		t.Fatalf("resolved LlamaCppPath = %q, want %q", got.LlamaCppPath, wantPath)
 	}
-	if appliedRuntime.DefaultLlamaCppPath != wantPath {
-		t.Fatalf("applied runtime path %q, want %q", appliedRuntime.DefaultLlamaCppPath, wantPath)
+	if rc := config.RuntimeConfigFromSettings(got); rc.DefaultLlamaCppPath != wantPath {
+		t.Fatalf("write path would blank the runtime table: %q", rc.DefaultLlamaCppPath)
 	}
 }
 
@@ -201,8 +194,7 @@ func TestStartupCmd_CacheHitWithStoppedOllamaFallsBackToFullScan(t *testing.T) {
 			},
 		}, nil
 	}
-	applyRuntimeFromConfigFn = func(*config.RuntimeConfig) {}
-	discoverRuntimeFn = func() models.RuntimeInfo {
+	discoverRuntimeFn = func(settings.Settings) models.RuntimeInfo {
 		return models.RuntimeInfo{OllamaPath: "/bin/ollama", OllamaHost: "127.0.0.1:11434"}
 	}
 	filterExistingPathsFn = func(files []models.ModelFile) []models.ModelFile {
@@ -239,21 +231,19 @@ func TestStartupCmd_CacheHitWithRunningOllamaRefreshesLiveOllamaRows(t *testing.
 			Discovery: config.DiscoveryConfig{LastScan: time.Unix(2, 0)},
 		}, nil
 	}
-	applyRuntimeFromConfigFn = func(*config.RuntimeConfig) {}
 	writeConfigFileFn = func(c config.Config) error {
 		wrote = c
 		return nil
 	}
 	buildConfigFn = config.BuildConfig
-	runtimeFromEnvFn = config.RuntimeFromEnv
-	discoverRuntimeFn = func() models.RuntimeInfo {
+	discoverRuntimeFn = func(settings.Settings) models.RuntimeInfo {
 		return models.RuntimeInfo{OllamaPath: "/bin/ollama", OllamaHost: "127.0.0.1:11434", OllamaRunning: true}
 	}
 	filterExistingPathsFn = func(files []models.ModelFile) []models.ModelFile {
 		return files
 	}
 	modelFilesFromEntriesFn = config.ModelFilesFromEntries
-	discoverOllamaModelsFn = func() ([]models.ModelFile, error) {
+	discoverOllamaModelsFn = func(string) ([]models.ModelFile, error) {
 		return []models.ModelFile{testOllamaRow("live:latest")}, nil
 	}
 
@@ -295,21 +285,17 @@ func TestApplyAndFullScanCmd_FailedStartupMergesCachedOllamaRows(t *testing.T) {
 		}, nil
 	}
 	writeConfigFileFn = func(config.Config) error { return nil }
-	applyRuntimeFromConfigFn = func(*config.RuntimeConfig) {}
-	extraModelPathsFromEnvFn = func() []string { return nil }
-	mergeExtraRootsFn = func(a, b []string) []string { return nil }
 	discoveryConfigInputsFn = func(configPaths []string, lastScan time.Time) config.DiscoveryConfig {
 		return config.DiscoveryConfig{ExtraModelPaths: configPaths, LastScan: lastScan}
 	}
 	buildConfigFn = config.BuildConfig
-	runtimeFromEnvFn = config.RuntimeFromEnv
 
-	discoverRuntimeFn = func() models.RuntimeInfo {
+	discoverRuntimeFn = func(settings.Settings) models.RuntimeInfo {
 		return models.RuntimeInfo{OllamaPath: "/bin/ollama", OllamaHost: "127.0.0.1:11434"}
 	}
 	startOllamaDaemonFn = func(serverSpec) error { return errors.New("boom") }
-	waitForOllamaFn = func() bool { return false }
-	probeOllamaFn = func() bool { return false }
+	waitForOllamaFn = func(string) bool { return false }
+	probeOllamaFn = func(string) bool { return false }
 	discoverModelsFn = func(models.Options) ([]models.ModelFile, error) {
 		return []models.ModelFile{
 			{Backend: models.BackendLlama, Path: "/m.gguf", Name: "m.gguf", Size: 1, ModTime: time.Unix(1, 0)},
@@ -339,21 +325,17 @@ func TestApplyAndFullScanCmd_FailedStartupWithoutCacheKeepsNonOllamaRows(t *test
 		return config.Config{}, os.ErrNotExist
 	}
 	writeConfigFileFn = func(config.Config) error { return nil }
-	applyRuntimeFromConfigFn = func(*config.RuntimeConfig) {}
-	extraModelPathsFromEnvFn = func() []string { return nil }
-	mergeExtraRootsFn = func(a, b []string) []string { return nil }
 	discoveryConfigInputsFn = func(configPaths []string, lastScan time.Time) config.DiscoveryConfig {
 		return config.DiscoveryConfig{ExtraModelPaths: configPaths, LastScan: lastScan}
 	}
 	buildConfigFn = config.BuildConfig
-	runtimeFromEnvFn = config.RuntimeFromEnv
 
-	discoverRuntimeFn = func() models.RuntimeInfo {
+	discoverRuntimeFn = func(settings.Settings) models.RuntimeInfo {
 		return models.RuntimeInfo{OllamaPath: "/bin/ollama", OllamaHost: "127.0.0.1:11434"}
 	}
 	startOllamaDaemonFn = func(serverSpec) error { return errors.New("boom") }
-	waitForOllamaFn = func() bool { return false }
-	probeOllamaFn = func() bool { return false }
+	waitForOllamaFn = func(string) bool { return false }
+	probeOllamaFn = func(string) bool { return false }
 	discoverModelsFn = func(models.Options) ([]models.ModelFile, error) {
 		return []models.ModelFile{
 			{Backend: models.BackendLlama, Path: "/m.gguf", Name: "m.gguf", Size: 1, ModTime: time.Unix(1, 0)},
@@ -377,17 +359,13 @@ func TestRescanModelsCmd_StartsOllamaAndReturnsDiscoveryNote(t *testing.T) {
 		return config.Config{SchemaVersion: config.SchemaVersion}, nil
 	}
 	writeConfigFileFn = func(config.Config) error { return nil }
-	applyRuntimeFromConfigFn = func(*config.RuntimeConfig) {}
-	extraModelPathsFromEnvFn = func() []string { return nil }
-	mergeExtraRootsFn = func(a, b []string) []string { return nil }
 	discoveryConfigInputsFn = func(configPaths []string, lastScan time.Time) config.DiscoveryConfig {
 		return config.DiscoveryConfig{ExtraModelPaths: configPaths, LastScan: lastScan}
 	}
 	buildConfigFn = config.BuildConfig
-	runtimeFromEnvFn = config.RuntimeFromEnv
 
 	runtimeCalls := 0
-	discoverRuntimeFn = func() models.RuntimeInfo {
+	discoverRuntimeFn = func(settings.Settings) models.RuntimeInfo {
 		runtimeCalls++
 		if runtimeCalls >= 2 {
 			return models.RuntimeInfo{OllamaPath: "/bin/ollama", OllamaHost: "127.0.0.1:11434", OllamaRunning: true}
@@ -395,8 +373,8 @@ func TestRescanModelsCmd_StartsOllamaAndReturnsDiscoveryNote(t *testing.T) {
 		return models.RuntimeInfo{OllamaPath: "/bin/ollama", OllamaHost: "127.0.0.1:11434"}
 	}
 	startOllamaDaemonFn = func(serverSpec) error { return nil }
-	waitForOllamaFn = func() bool { return true }
-	probeOllamaFn = func() bool { return false }
+	waitForOllamaFn = func(string) bool { return true }
+	probeOllamaFn = func(string) bool { return false }
 	discoverModelsFn = func(models.Options) ([]models.ModelFile, error) {
 		return []models.ModelFile{testOllamaRow("live:latest")}, nil
 	}

@@ -62,12 +62,13 @@ func activateAdjacentToVLLM(vllmBin string) string {
 }
 
 // ResolveVLLMActivateScript returns an activate script path to source before `vllm serve`, or ""
-// when no venv should be activated. Resolution order:
+// when no venv should be activated. venvRoot and vllmPath come from the resolved
+// settings and may both be empty. Resolution order:
 //  1. activate next to vllm in the same bin/ directory (e.g. .venv/bin/activate + .venv/bin/vllm)
-//  2. VLLM_VENV (venv root)
-//  3. $VLLM_PATH/.venv (when VLLM_PATH is set)
+//  2. venvRoot
+//  3. vllmPath/.venv
 //  4. dirname(vllmBin)/.venv (project-local venv when vllm is a top-level script)
-func ResolveVLLMActivateScript(vllmBin string) string {
+func ResolveVLLMActivateScript(vllmBin, venvRoot, vllmPath string) string {
 	if s := activateAdjacentToVLLM(vllmBin); s != "" {
 		return s
 	}
@@ -78,12 +79,12 @@ func ResolveVLLMActivateScript(vllmBin string) string {
 		}
 		return ""
 	}
-	if d := strings.TrimSpace(os.Getenv(EnvVLLMVenv)); d != "" {
+	if d := strings.TrimSpace(venvRoot); d != "" {
 		if s := try(d); s != "" {
 			return s
 		}
 	}
-	if d := strings.TrimSpace(os.Getenv(EnvVLLMPath)); d != "" {
+	if d := strings.TrimSpace(vllmPath); d != "" {
 		if s := try(filepath.Join(filepath.Clean(d), ".venv")); s != "" {
 			return s
 		}

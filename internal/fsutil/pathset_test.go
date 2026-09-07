@@ -1,4 +1,4 @@
-package models
+package fsutil
 
 import (
 	"path/filepath"
@@ -54,13 +54,24 @@ func TestPathSetTildeExpansion(t *testing.T) {
 	}
 }
 
+// The zero value must be usable, so callers can declare a PathSet without
+// NewPathSet and still get deduplication on the first Add.
+func TestPathSetZeroValueDeduplicates(t *testing.T) {
+	var ps PathSet
+	ps.Add("/a", "/b", "/a")
+	if got, want := len(ps.Slice()), 2; got != want {
+		t.Errorf("len = %d, want %d (%v)", got, want, ps.Slice())
+	}
+}
+
 func TestNewPathSet(t *testing.T) {
 	ps := NewPathSet()
 	if ps == nil {
 		t.Fatal("NewPathSet returned nil")
 	}
-	if ps.seen == nil {
-		t.Error("seen map is nil")
+	ps.Add("/a", "/a")
+	if got, want := len(ps.Slice()), 1; got != want {
+		t.Errorf("len = %d, want %d", got, want)
 	}
 }
 

@@ -15,8 +15,10 @@ import (
 	"charm.land/lipgloss/v2/compat"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/flyingnobita/llml/internal/fsutil"
 	"github.com/flyingnobita/llml/internal/models"
 	"github.com/flyingnobita/llml/internal/profiles"
+	"github.com/flyingnobita/llml/internal/settings"
 )
 
 // layoutState holds terminal geometry and derived table dimensions.
@@ -225,7 +227,11 @@ type Model struct {
 	quit      quitConfirmState
 	paneFocus mainPaneFocusSnap
 
-	keys               KeyMap
+	keys KeyMap
+	// settings holds every resolved runtime value. It is set from the message a
+	// scan or reload produces, and from the c panel on save; nothing in the TUI
+	// reads the process environment for these values.
+	settings           settings.Settings
 	runtime            models.RuntimeInfo
 	runtimeScanned     bool
 	lastRunNote        string
@@ -298,7 +304,7 @@ func newRuntimeConfigInputs() [runtimeFieldCount]textinput.Model {
 
 // New returns a model with default key bindings and an empty table; Init triggers discovery.
 func New() Model {
-	homeDir := models.HomeDir()
+	homeDir := fsutil.HomeDir()
 	pick := initialThemePick()
 	th := resolveTheme()
 	st := newStyles(th)
@@ -316,7 +322,10 @@ func New() Model {
 		export:    exportViewState{pathInput: newPathTextInput(), filterInput: newFilterTextInput()},
 		import_:   importViewState{pathInput: newPathTextInput(), picker: filepicker.New()},
 		keys:      DefaultKeyMap(),
-		loading:   true,
+		// Built-in defaults keep hosts and ports usable until the first scan
+		// message arrives with the fully resolved values.
+		settings: settings.Resolve(settings.Defaults()),
+		loading:  true,
 	}
 }
 

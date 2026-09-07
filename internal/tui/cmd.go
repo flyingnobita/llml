@@ -10,25 +10,45 @@ import (
 
 	"github.com/flyingnobita/llml/internal/config"
 	"github.com/flyingnobita/llml/internal/models"
+	"github.com/flyingnobita/llml/internal/settings"
 )
 
 const themeToastVisibleDuration = 2 * time.Second
 
 var (
-	readConfigFileFn         = config.ReadFile
-	writeConfigFileFn        = config.WriteFile
-	applyRuntimeFromConfigFn = config.ApplyRuntimeFromConfig
-	extraModelPathsFromEnvFn = config.ExtraModelPathsFromEnv
-	mergeExtraRootsFn        = config.MergeExtraRoots
-	discoveryConfigInputsFn  = config.DiscoveryConfigFromInputs
-	buildConfigFn            = config.BuildConfig
-	runtimeFromEnvFn         = config.RuntimeFromEnv
-	modelFilesFromEntriesFn  = config.ModelFilesFromEntries
-	filterExistingPathsFn    = config.FilterExistingPaths
-	discoverRuntimeFn        = models.DiscoverRuntime
-	discoverModelsFn         = models.Discover
-	discoverOllamaModelsFn   = models.DiscoverOllamaModels
+	readConfigFileFn        = config.ReadFile
+	writeConfigFileFn       = config.WriteFile
+	discoveryConfigInputsFn = config.DiscoveryConfigFromInputs
+	buildConfigFn           = config.BuildConfig
+	runtimeConfigFn         = config.RuntimeConfigFromSettings
+	modelFilesFromEntriesFn = config.ModelFilesFromEntries
+	filterExistingPathsFn   = config.FilterExistingPaths
+	discoverRuntimeFn       = models.DiscoverRuntime
+	discoverModelsFn        = models.Discover
+	discoverOllamaModelsFn  = models.DiscoverOllamaModels
+
+	// getenvFn is the process environment as seen by settings resolution. Tests
+	// replace it instead of mutating the real environment.
+	getenvFn settings.Getenv = settings.OSGetenv
 )
+
+// resolveSettings folds the environment, an optional config file, and the
+// built-in defaults into one value, in that order of precedence. explicitPaths,
+// when non-empty, replaces the extra model roots the config file carries;
+// roots from the environment still apply.
+func resolveSettings(cfg config.Config, haveCfg bool, explicitPaths []string) settings.Settings {
+	layers := []settings.Layer{settings.FromEnv(getenvFn)}
+	if haveCfg {
+		layer := cfg.Layer()
+		if len(explicitPaths) > 0 {
+			layer.ExtraModelPaths = explicitPaths
+		}
+		layers = append(layers, layer)
+	} else if len(explicitPaths) > 0 {
+		layers = append(layers, settings.Layer{ExtraModelPaths: explicitPaths})
+	}
+	return settings.Resolve(append(layers, settings.Defaults())...)
+}
 
 func mergeCachedOllamaRows(cfg config.Config, files []models.ModelFile, rt models.RuntimeInfo) []models.ModelFile {
 	if rt.OllamaRunning {
@@ -69,29 +89,29 @@ type discoveryScanPlan struct {
 	cfg      config.Config
 	haveCfg  bool
 	fromFile []string
+	settings settings.Settings
 	opts     models.Options
 	runtime  models.RuntimeInfo
 }
 
 func prepareDiscoveryScan(explicitPaths []string) discoveryScanPlan {
 	cfg, err := readConfigFileFn()
-	opts := models.Options{}
-	var fromFile []string
-	if err == nil {
-		applyRuntimeFromConfigFn(&cfg.Runtime)
+	haveCfg := err == nil
+	s := resolveSettings(cfg, haveCfg, explicitPaths)
+
+	fromFile := explicitPaths
+	if len(fromFile) == 0 && haveCfg {
 		fromFile = cfg.Discovery.ExtraModelPaths
 	}
-	if len(explicitPaths) > 0 {
-		fromFile = explicitPaths
-	}
-	opts.ExtraRoots = mergeExtraRootsFn(fromFile, extraModelPathsFromEnvFn())
-	debugf("prepareDiscoveryScan: haveCfg=%t explicitPaths=%v fromFile=%v extraRoots=%v", err == nil, explicitPaths, fromFile, opts.ExtraRoots)
-	rt := discoverRuntimeFn()
+	opts := models.Options{Settings: s, IncludeOllama: true}
+	debugf("prepareDiscoveryScan: haveCfg=%t explicitPaths=%v fromFile=%v extraRoots=%v", haveCfg, explicitPaths, fromFile, s.ExtraModelPaths)
+	rt := discoverRuntimeFn(s)
 	debugf("prepareDiscoveryScan: runtime ollamaPath=%q ollamaHost=%q ollamaRunning=%t", rt.OllamaPath, rt.OllamaHost, rt.OllamaRunning)
 	return discoveryScanPlan{
 		cfg:      cfg,
-		haveCfg:  err == nil,
+		haveCfg:  haveCfg,
 		fromFile: fromFile,
+		settings: s,
 		opts:     opts,
 		runtime:  rt,
 	}
@@ -115,7 +135,7 @@ func runDiscoveryScan(plan discoveryScanPlan) (models.RuntimeInfo, []models.Mode
 			ollamaWarn = err.Error()
 			debugf("runDiscoveryScan: ensureOllamaReady failed: %v", err)
 		} else if ready.Started {
-			rt = discoverRuntimeFn()
+			rt = discoverRuntimeFn(plan.settings)
 			ollamaNote = fmt.Sprintf("Started Ollama for model discovery on %s", spec.host)
 			debugf("runDiscoveryScan: Ollama started successfully, refreshed runtime running=%t", rt.OllamaRunning)
 		}
@@ -132,7 +152,7 @@ func runDiscoveryScan(plan discoveryScanPlan) (models.RuntimeInfo, []models.Mode
 	}
 	now := time.Now()
 	disc := discoveryConfigInputsFn(plan.fromFile, now)
-	werr := writeConfigFileFn(buildConfigFn(runtimeFromEnvFn(), disc, files))
+	werr := writeConfigFileFn(buildConfigFn(runtimeConfigFn(plan.settings), disc, files))
 	if werr != nil {
 		debugf("runDiscoveryScan: writeConfig failed: %v", werr)
 	}
@@ -151,6 +171,7 @@ func applyAndFullScanCmd(explicitPaths ...string) tea.Cmd {
 		}
 		return fullScanDoneMsg{
 			runtime:     rt,
+			settings:    plan.settings,
 			files:       files,
 			writeErr:    werr,
 			lastScan:    now,
@@ -180,6 +201,7 @@ func rescanModelsCmd(explicitPaths ...string) tea.Cmd {
 			return modelsErrMsg{err: derr}
 		}
 		return modelRescanDoneMsg{
+			settings:    plan.settings,
 			files:       files,
 			writeErr:    werr,
 			lastScan:    now,
@@ -209,8 +231,8 @@ func reloadRuntimeCmd() tea.Cmd {
 			}
 			return runtimeReloadErrMsg{err: err}
 		}
-		applyRuntimeFromConfigFn(&cfg.Runtime)
-		return runtimeReadyMsg{runtime: discoverRuntimeFn()}
+		s := resolveSettings(cfg, true, nil)
+		return runtimeReadyMsg{runtime: discoverRuntimeFn(s), settings: s}
 	}
 }
 
@@ -218,16 +240,12 @@ func reloadRuntimeCmd() tea.Cmd {
 func startupCmd() tea.Cmd {
 	return func() tea.Msg {
 		cfg, err := readConfigFileFn()
-		if err == nil {
-			// Apply runtime env vars eagerly so they are set before any write path
-			// (including the full-scan fallback) calls runtimeFromEnvFn().
-			applyRuntimeFromConfigFn(&cfg.Runtime)
-		}
+		s := resolveSettings(cfg, err == nil, nil)
 		if err != nil || !cfg.ValidForCache() {
 			debugf("startupCmd: no valid cache, falling back to full scan err=%v valid=%t", err, err == nil && cfg.ValidForCache())
 			return startupNeedFullScanMsg{}
 		}
-		rt := discoverRuntimeFn()
+		rt := discoverRuntimeFn(s)
 		debugf("startupCmd: cache valid, runtime ollamaPath=%q ollamaRunning=%t cachedModels=%d", rt.OllamaPath, rt.OllamaRunning, len(cfg.Models))
 		if rt.OllamaPath != "" && !rt.OllamaRunning {
 			debugf("startupCmd: Ollama installed but stopped, forcing full scan")
@@ -240,13 +258,13 @@ func startupCmd() tea.Cmd {
 		}
 		var writeErr error
 		if rt.OllamaRunning {
-			liveOllama, err := discoverOllamaModelsFn()
+			liveOllama, err := discoverOllamaModelsFn(s.OllamaHost)
 			if err != nil {
 				debugf("startupCmd: live Ollama refresh failed, keeping cache: %v", err)
 			} else {
 				files = mergeLiveOllamaRows(files, liveOllama)
 				debugf("startupCmd: merged %d live Ollama rows into cache hit", len(liveOllama))
-				writeErr = writeConfigFileFn(buildConfigFn(runtimeFromEnvFn(), cfg.Discovery, files))
+				writeErr = writeConfigFileFn(buildConfigFn(runtimeConfigFn(s), cfg.Discovery, files))
 				if writeErr != nil {
 					debugf("startupCmd: writeConfig after live Ollama refresh failed: %v", writeErr)
 				}
@@ -255,6 +273,7 @@ func startupCmd() tea.Cmd {
 		debugf("startupCmd: using cache hit with %d files", len(files))
 		return startupCacheHitMsg{
 			runtime:     rt,
+			settings:    s,
 			files:       files,
 			lastScan:    cfg.Discovery.LastScan,
 			configPaths: cfg.Discovery.ExtraModelPaths,

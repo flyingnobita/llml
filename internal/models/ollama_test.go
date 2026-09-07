@@ -9,6 +9,8 @@ import (
 )
 
 func TestDiscoverOllamaModels(t *testing.T) {
+	t.Parallel()
+
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/tags" {
 			t.Fatalf("path %q", r.URL.Path)
@@ -30,9 +32,7 @@ func TestDiscoverOllamaModels(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	t.Setenv(EnvOllamaHost, strings.TrimPrefix(srv.URL, "http://"))
-
-	got, err := DiscoverOllamaModels()
+	got, err := DiscoverOllamaModels(strings.TrimPrefix(srv.URL, "http://"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,6 +54,8 @@ func TestDiscoverOllamaModels(t *testing.T) {
 }
 
 func TestPreloadOllamaModel(t *testing.T) {
+	t.Parallel()
+
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/generate" {
 			t.Fatalf("path %q", r.URL.Path)
@@ -69,8 +71,7 @@ func TestPreloadOllamaModel(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	t.Setenv(EnvOllamaHost, strings.TrimPrefix(srv.URL, "http://"))
-	if err := PreloadOllamaModel("qwen3.5:latest"); err != nil {
+	if err := PreloadOllamaModel(strings.TrimPrefix(srv.URL, "http://"), "qwen3.5:latest"); err != nil {
 		t.Fatal(err)
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/flyingnobita/llml/internal/config"
 	"github.com/flyingnobita/llml/internal/models"
 	"github.com/flyingnobita/llml/internal/profiles"
+	"github.com/flyingnobita/llml/internal/settings"
 )
 
 func TestUniqueBackendsFromPortable(t *testing.T) {
@@ -189,7 +190,7 @@ func TestPickTargetModel_NoCompatibleBackend(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(modelsDir, "test.gguf"), []byte("fake"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv(models.EnvModelPaths, modelsDir)
+	t.Setenv(settings.EnvModelPaths, modelsDir)
 
 	// Profile requests vllm backend, but only llama models are on disk.
 	pp := []profiles.PortableProfile{{Backend: "vllm"}}
@@ -250,7 +251,7 @@ func TestPickTargetModel_StaleCache(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(modelsDir, "test.gguf"), []byte("fake"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv(models.EnvModelPaths, modelsDir)
+	t.Setenv(settings.EnvModelPaths, modelsDir)
 
 	// Write a stale cache.
 	c := config.Config{
@@ -290,7 +291,7 @@ func TestPickTargetModel_Rescan(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(modelsDir, "test.gguf"), []byte("fake"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv(models.EnvModelPaths, modelsDir)
+	t.Setenv(settings.EnvModelPaths, modelsDir)
 
 	pp := []profiles.PortableProfile{{Backend: "llama"}}
 	_, err := pickTargetModel(pp, true) // --rescan
@@ -436,7 +437,7 @@ func TestValidateTargetBackend_Rescan(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(modelsDir, "test.gguf"), []byte("fake"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv(models.EnvModelPaths, modelsDir)
+	t.Setenv(settings.EnvModelPaths, modelsDir)
 
 	pp := []profiles.PortableProfile{{Backend: "vllm"}}
 	// Rescan finds llama models, but profile wants vllm → incompatible.

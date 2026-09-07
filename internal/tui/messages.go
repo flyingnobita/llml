@@ -7,10 +7,13 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/flyingnobita/llml/internal/models"
+	"github.com/flyingnobita/llml/internal/settings"
 )
 
 type runtimeReadyMsg struct {
-	runtime models.RuntimeInfo
+	// settings are the values this scan resolved and wrote; the model adopts them.
+	settings settings.Settings
+	runtime  models.RuntimeInfo
 }
 
 // modelsLoadedMsg is used in tests to simulate a completed filesystem scan.
@@ -23,6 +26,8 @@ type startupNeedFullScanMsg struct{}
 
 // startupCacheHitMsg loads models from config.toml cache (no filesystem walk).
 type startupCacheHitMsg struct {
+	// settings are the values this scan resolved and wrote; the model adopts them.
+	settings    settings.Settings
 	runtime     models.RuntimeInfo
 	files       []models.ModelFile
 	lastScan    time.Time
@@ -32,6 +37,8 @@ type startupCacheHitMsg struct {
 
 // fullScanDoneMsg completes a full discovery pass (startup or refresh-all path).
 type fullScanDoneMsg struct {
+	// settings are the values this scan resolved and wrote; the model adopts them.
+	settings    settings.Settings
 	runtime     models.RuntimeInfo
 	files       []models.ModelFile
 	writeErr    error
@@ -43,6 +50,8 @@ type fullScanDoneMsg struct {
 
 // modelRescanDoneMsg completes an S-key model-only re-scan.
 type modelRescanDoneMsg struct {
+	// settings are the values this scan resolved and wrote; the model adopts them.
+	settings    settings.Settings
 	files       []models.ModelFile
 	writeErr    error
 	lastScan    time.Time

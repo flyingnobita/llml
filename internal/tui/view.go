@@ -8,8 +8,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-
-	"github.com/flyingnobita/llml/internal/models"
 )
 
 // mainPaneCaptionLine renders a full-width pane caption (lipgloss v2 has no border Title API).
@@ -687,7 +685,7 @@ func (m Model) discoveryPathsModalBlock() string {
 		rows = append(rows, m.ui.styles.bodyDim.Render("  (No extra paths configured)"))
 	}
 	rows = append(rows, "", m.ui.styles.body.Render("Defaults (Read-Only):"))
-	for _, p := range models.DefaultSearchRoots() {
+	for _, p := range m.settings.DefaultSearchRoots() {
 		rows = append(rows, m.ui.styles.bodyDim.Render("  "+p))
 	}
 	rows = append(rows, "", m.renderFooterHints(FooterDiscoveryPathsHints))

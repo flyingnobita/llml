@@ -6,15 +6,18 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/flyingnobita/llml/internal/settings"
 )
 
-func TestMergeSearchRoots_dedupes(t *testing.T) {
-	t.Setenv(EnvModelPaths, "/foo/bar,/foo/bar,/baz")
+func TestSearchRoots_dedupes(t *testing.T) {
+	t.Parallel()
 	home, err := os.UserHomeDir()
 	if err != nil {
 		t.Fatal(err)
 	}
-	got := MergeSearchRoots([]string{filepath.Join(home, "models")}, false)
+	s := settings.Settings{ExtraModelPaths: []string{"/foo/bar", "/foo/bar", "/baz"}}
+	got := s.SearchRoots([]string{filepath.Join(home, "models")}, false)
 	seen := make(map[string]int)
 	for _, p := range got {
 		seen[p]++
@@ -39,7 +42,7 @@ func TestDiscover_findsSafetensorsModelDir(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := Discover(Options{ExtraRoots: []string{tmp}, MaxDepth: 8, SkipDefaultRoots: true, DisableAPISources: true})
+	got, err := Discover(Options{ExtraRoots: []string{tmp}, MaxDepth: 8, SkipDefaultRoots: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +77,7 @@ func TestDiscover_vllmNameUsesHFRepoID(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := Discover(Options{ExtraRoots: []string{tmp}, MaxDepth: 12, SkipDefaultRoots: true, DisableAPISources: true})
+	got, err := Discover(Options{ExtraRoots: []string{tmp}, MaxDepth: 12, SkipDefaultRoots: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +101,7 @@ func TestDiscover_findsGGUF(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := Discover(Options{ExtraRoots: []string{tmp}, MaxDepth: 8, SkipDefaultRoots: true, DisableAPISources: true})
+	got, err := Discover(Options{ExtraRoots: []string{tmp}, MaxDepth: 8, SkipDefaultRoots: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,7 +131,7 @@ func TestDiscover_symlinkGGUF_reportsTargetSize(t *testing.T) {
 		t.Skip("symlink not supported:", err)
 	}
 
-	got, err := Discover(Options{ExtraRoots: []string{tmp}, MaxDepth: 8, SkipDefaultRoots: true, DisableAPISources: true})
+	got, err := Discover(Options{ExtraRoots: []string{tmp}, MaxDepth: 8, SkipDefaultRoots: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +163,7 @@ func TestDiscover_followsSymlinkedRepoDir(t *testing.T) {
 		t.Skip("symlink not supported:", err)
 	}
 
-	got, err := Discover(Options{ExtraRoots: []string{hub}, MaxDepth: 12, SkipDefaultRoots: true, DisableAPISources: true})
+	got, err := Discover(Options{ExtraRoots: []string{hub}, MaxDepth: 12, SkipDefaultRoots: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -213,7 +216,7 @@ func TestDiscover_findsGGUFAndSafetensorsUnderSameRoot(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := Discover(Options{ExtraRoots: []string{tmp}, MaxDepth: 4, SkipDefaultRoots: true, DisableAPISources: true})
+	got, err := Discover(Options{ExtraRoots: []string{tmp}, MaxDepth: 4, SkipDefaultRoots: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -257,7 +260,7 @@ func TestDiscover_filtersAuxiliaryVLLMModel(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := Discover(Options{ExtraRoots: []string{tmp}, MaxDepth: 4, SkipDefaultRoots: true, DisableAPISources: true})
+	got, err := Discover(Options{ExtraRoots: []string{tmp}, MaxDepth: 4, SkipDefaultRoots: true})
 	if err != nil {
 		t.Fatal(err)
 	}

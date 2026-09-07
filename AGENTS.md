@@ -41,7 +41,8 @@ archives it to `BOARD.md`.
 ```text
 cmd/llml/            # Binary entrypoint (main.go)
 internal/
-  config/            # TOML persistence ({UserConfigDir}/llml/config.toml): runtime, discovery cache, [[models]]
+  settings/          # Resolved runtime configuration: Settings, Layer, Resolve, FromEnv, Defaults. Owns the env var names and built-in defaults; imports nothing from config/models/tui
+  config/            # TOML persistence ({UserConfigDir}/llml/config.toml): runtime, discovery cache, [[models]]. Converts to and from settings via RuntimeConfig.Layer / RuntimeConfigFromSettings
   models/            # GGUF + safetensors discovery, metadata, runtime detection, formatting; also Ollama API discovery and HF-hub support. Filesystem discovery uses the `modelSource` interface (`ggufSource`, `safetensorsSource`) and Ollama rows are merged from the daemon API.
   profiles/          # Profile import/export: parse/write portable TOML files (schema v2), merge profiles into model-params.json, strip model-location params
   tui/               # Bubble Tea model, update, view, styles, keymaps
@@ -60,6 +61,13 @@ scripts/             # gofmt-check.sh, precommit-docs-fix.sh
 - All exported types and functions must have doc comments.
 - Use `go fmt` / `gofmt` for formatting; CI enforces via `scripts/gofmt-check.sh`.
 - Run `go vet ./...` before committing.
+- **Never call `os.Setenv` / `os.Unsetenv` in production code, and do not read
+  `os.Getenv` outside `internal/settings/env.go`** (the two exceptions are
+  `internal/tui/debug.go` and `internal/tui/theme.go`). Runtime values are
+  resolved once into a `settings.Settings` and passed explicitly; see the ADR
+  `dev-docs/llml/adr/20260907-resolved-settings-instead-of-env.md`. Tests pass
+  a fake `settings.Getenv` rather than mutating the process environment, which
+  is what lets them use `t.Parallel`.
 - Tests live alongside source (`_test.go`) and run with `go test -race ./...`.
 
 ### Bubble Tea pattern
@@ -92,10 +100,10 @@ scripts/             # gofmt-check.sh, precommit-docs-fix.sh
 
 - **Updates vs user data:** Release packaging (Homebrew cask, archives) ships **only the `llml` binary** — not the config tree. User data stays under **`{UserConfigDir}/llml/`**. **`backups/`** holds timestamped copies before overwrites (pruned to 10 per logical file); **`.last-run-version`** triggers an extra snapshot of `config.toml` and `model-params.json` when the embedded version changes (skipped for `dev` / empty version). See `internal/userdata`, `internal/fsutil.WriteFileAtomic`.
 
-- **Precedence:** **environment variables override** values from `config.toml`; unset env vars fall back to TOML `default_` keys, then built-in defaults.
+- **Precedence:** **environment variables override** values from `config.toml`; unset env vars fall back to TOML `default_` keys, then built-in defaults. This is resolved **once, at startup**, by `settings.Resolve(settings.FromEnv(getenv), cfg.Layer(), settings.Defaults())` — the first layer that sets a field wins. Changing an environment variable after llml starts has no effect.
 - **Startup:** if the cache is valid (`schema_version` matches, at least one cached model path still exists on disk), the UI loads without a full filesystem walk. Otherwise a full scan runs and the file is rewritten.
 - **`r`** reloads **`[runtime]`** from `config.toml` and re-runs runtime detection (does not rescan models). **`S`** runs a full model discovery and refreshes **`[[models]]`**.
-- Saving the runtime panel (**`c`**) updates the process environment and **best-effort** writes **`[runtime]`** to `config.toml` (failure is non-fatal).
+- Saving the runtime panel (**`c`**) builds a new `settings.Settings` from the inputs, assigns it to the model, re-runs runtime detection, and **best-effort** writes **`[runtime]`** to `config.toml` (failure is non-fatal). An empty port or host field means "use the built-in default".
 
 **Runtime** env vars (same keys as **`[runtime]`** in TOML):
 
@@ -176,8 +184,11 @@ The pre-commit hook handles staged files automatically.
 
 ## Testing
 
-- Unit tests for `internal/config` cover TOML round-trip, env precedence over
-  TOML, cache validation, and stale path filtering.
+- Unit tests for `internal/settings` cover the precedence rule (env over TOML
+  over defaults), value normalization, and invalid-value fallthrough, using a
+  map-backed `Getenv`.
+- Unit tests for `internal/config` cover TOML round-trip, the settings layer
+  mapping and its round trip, cache validation, and stale path filtering.
 - Unit tests for `internal/models` cover discovery, formatting, paths, and
   runtime detection.
 - Unit tests for `internal/tui` cover model initialization, parameter-profile

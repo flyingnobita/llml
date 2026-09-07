@@ -15,10 +15,9 @@ func TestFindLlamaBinary_LLamaCppPathWins(t *testing.T) {
 	dir := t.TempDir()
 	name := "llama-cli"
 	bin := makeFakeExecutable(t, dir, name)
-	t.Setenv(EnvLlamaCppPath, dir)
 	t.Setenv("PATH", "/nonexistent")
 
-	got := findLlamaBinary(name)
+	got := findLlamaBinary(name, dir)
 	if got != bin {
 		t.Fatalf("got %q want %q", got, bin)
 	}
@@ -29,10 +28,9 @@ func TestFindLlamaBinary_ExecutablePathWins(t *testing.T) {
 	name := "llama-server"
 	bin := makeFakeExecutable(t, dir, name)
 	// Set the environment variable to the exact binary path instead of the directory
-	t.Setenv(EnvLlamaCppPath, bin)
 	t.Setenv("PATH", "/nonexistent")
 
-	got := findLlamaBinary(name)
+	got := findLlamaBinary(name, bin)
 	if got != bin {
 		t.Fatalf("got %q want %q", got, bin)
 	}
@@ -43,10 +41,9 @@ func TestFindVLLMBinary_ExecutablePathWins(t *testing.T) {
 	name := "vllm"
 	bin := makeFakeExecutable(t, dir, name)
 	// Set the environment variable to the exact binary path instead of the directory
-	t.Setenv(EnvVLLMPath, bin)
 	t.Setenv("PATH", "/nonexistent")
 
-	got := findVLLMBinary()
+	got := findVLLMBinary(bin, "")
 	if got != bin {
 		t.Fatalf("got %q want %q", got, bin)
 	}
@@ -55,10 +52,9 @@ func TestFindVLLMBinary_ExecutablePathWins(t *testing.T) {
 func TestFindKoboldCppBinary_envPathWins(t *testing.T) {
 	dir := t.TempDir()
 	bin := makeFakeExecutable(t, dir, "koboldcpp")
-	t.Setenv(EnvKoboldCppPath, dir)
 	t.Setenv("PATH", "/nonexistent")
 
-	got := findKoboldCppBinary()
+	got := findKoboldCppBinary(dir)
 	if got != bin {
 		t.Fatalf("got %q want %q", got, bin)
 	}
@@ -67,10 +63,9 @@ func TestFindKoboldCppBinary_envPathWins(t *testing.T) {
 func TestFindKoboldCppBinary_executablePathWins(t *testing.T) {
 	dir := t.TempDir()
 	bin := makeFakeExecutable(t, dir, "koboldcpp")
-	t.Setenv(EnvKoboldCppPath, bin)
 	t.Setenv("PATH", "/nonexistent")
 
-	got := findKoboldCppBinary()
+	got := findKoboldCppBinary(bin)
 	if got != bin {
 		t.Fatalf("got %q want %q", got, bin)
 	}
@@ -79,10 +74,9 @@ func TestFindKoboldCppBinary_executablePathWins(t *testing.T) {
 func TestFindKoboldCppBinary_platformSpecificName(t *testing.T) {
 	dir := t.TempDir()
 	bin := makeFakeExecutable(t, dir, "koboldcpp-linux-x64")
-	t.Setenv(EnvKoboldCppPath, dir)
 	t.Setenv("PATH", "/nonexistent")
 
-	got := findKoboldCppBinary()
+	got := findKoboldCppBinary(dir)
 	if got != bin {
 		t.Fatalf("got %q want %q", got, bin)
 	}
@@ -91,10 +85,9 @@ func TestFindKoboldCppBinary_platformSpecificName(t *testing.T) {
 func TestFindKoboldCppBinary_platformSpecificFullPath(t *testing.T) {
 	dir := t.TempDir()
 	bin := makeFakeExecutable(t, dir, "koboldcpp-linux-x64")
-	t.Setenv(EnvKoboldCppPath, bin)
 	t.Setenv("PATH", "/nonexistent")
 
-	got := findKoboldCppBinary()
+	got := findKoboldCppBinary(bin)
 	if got != bin {
 		t.Fatalf("got %q want %q", got, bin)
 	}
@@ -105,10 +98,9 @@ func TestFindKoboldCppBinary_prefersPrimaryVariant(t *testing.T) {
 	primary := makeFakeExecutable(t, dir, "koboldcpp-linux-x64")
 	makeFakeExecutable(t, dir, "koboldcpp-linux-x64-nocuda")
 	makeFakeExecutable(t, dir, "koboldcpp-linux-x64-oldpc")
-	t.Setenv(EnvKoboldCppPath, dir)
 	t.Setenv("PATH", "/nonexistent")
 
-	got := findKoboldCppBinary()
+	got := findKoboldCppBinary(dir)
 	if got != primary {
 		t.Fatalf("got %q want primary %q", got, primary)
 	}
@@ -117,10 +109,9 @@ func TestFindKoboldCppBinary_prefersPrimaryVariant(t *testing.T) {
 func TestFindKoboldCppBinary_pathFallback(t *testing.T) {
 	dir := t.TempDir()
 	bin := makeFakeExecutable(t, dir, "koboldcpp")
-	t.Setenv(EnvKoboldCppPath, "")
 	t.Setenv("PATH", dir)
 
-	got := findKoboldCppBinary()
+	got := findKoboldCppBinary("")
 	if got != bin {
 		t.Fatalf("got %q want %q", got, bin)
 	}
@@ -161,10 +152,8 @@ func TestFindVLLMBinary_VLLMPath_dotVenv(t *testing.T) {
 	if err := os.WriteFile(vllm, []byte{}, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv(EnvVLLMPath, proj)
-	t.Setenv(EnvVLLMVenv, "")
 	t.Setenv("PATH", "/nonexistent")
-	if got := findVLLMBinary(); got != vllm {
+	if got := findVLLMBinary(proj, ""); got != vllm {
 		t.Fatalf("got %q want %q", got, vllm)
 	}
 }
@@ -175,8 +164,6 @@ func TestFindVLLMBinary_DarwinVenvVllmMetal(t *testing.T) {
 	}
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	t.Setenv(EnvVLLMPath, "")
-	t.Setenv(EnvVLLMVenv, "")
 	t.Setenv("PATH", "/nonexistent")
 
 	binDir := filepath.Join(home, ".venv-vllm-metal", "bin")
@@ -188,7 +175,7 @@ func TestFindVLLMBinary_DarwinVenvVllmMetal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got := findVLLMBinary()
+	got := findVLLMBinary("", "")
 	if got != vllm {
 		t.Fatalf("got %q want %q", got, vllm)
 	}
@@ -196,7 +183,7 @@ func TestFindVLLMBinary_DarwinVenvVllmMetal(t *testing.T) {
 	if err := os.WriteFile(wantActivate, []byte{}, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if act := ResolveVLLMActivateScript(got); act != wantActivate {
+	if act := ResolveVLLMActivateScript(got, "", ""); act != wantActivate {
 		t.Fatalf("ResolveVLLMActivateScript(%q) = %q want %q", got, act, wantActivate)
 	}
 }

@@ -6,6 +6,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/flyingnobita/llml/internal/fsutil"
 	"github.com/flyingnobita/llml/internal/models"
 	"github.com/flyingnobita/llml/internal/profiles"
 )
@@ -68,7 +69,7 @@ func (m Model) commitParamLineEdit() Model {
 	case paramEditEnvLine:
 		m.params.editor.SetEnvRow(m.params.editor.envCursor, parseEnvLine(line))
 	case paramEditArgLine:
-		m.params.editor.SetArgRow(m.params.editor.argsCursor, models.ExpandTildePath(strings.TrimSpace(line)))
+		m.params.editor.SetArgRow(m.params.editor.argsCursor, fsutil.ExpandTildePath(strings.TrimSpace(line)))
 	case paramEditMetadataValue:
 		m.params.editor.SetHardwareField(paramMetadataField(m.params.metadataCursor), line)
 	}

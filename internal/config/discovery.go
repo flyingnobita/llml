@@ -2,27 +2,23 @@ package config
 
 import (
 	"fmt"
-	"sort"
+	"slices"
 	"time"
 
 	"github.com/flyingnobita/llml/internal/models"
+	"github.com/flyingnobita/llml/internal/settings"
 )
 
 // cacheMaxAge is the maximum age of a discovery cache before it's considered stale.
 const cacheMaxAge = 24 * time.Hour
 
-// RunDiscovery runs a full model scan (filesystem + Ollama API), writes the
-// results to config.toml, and returns the discovered models. Callers that only
-// need the cached models should use CachedModels instead.
-func RunDiscovery() ([]models.ModelFile, error) {
-	opts := models.Options{
-		ExtraRoots: MergeExtraRoots(nil, ExtraModelPathsFromEnv()),
-	}
-
-	// Also read existing config for extra paths the user may have set via TUI.
-	if cfg, err := ReadFile(); err == nil {
-		opts.ExtraRoots = MergeExtraRoots(cfg.Discovery.ExtraModelPaths, ExtraModelPathsFromEnv())
-	}
+// RunDiscovery runs a full model scan (filesystem plus the Ollama API), writes
+// the results to config.toml, and returns the discovered models. The extra
+// search roots already carry both the environment and config.toml entries,
+// because s was resolved from both. Callers that only need the cached models
+// should use CachedModels instead.
+func RunDiscovery(s settings.Settings) ([]models.ModelFile, error) {
+	opts := models.Options{Settings: s, IncludeOllama: true}
 
 	files, err := models.Discover(opts)
 	if err != nil {
@@ -30,8 +26,8 @@ func RunDiscovery() ([]models.ModelFile, error) {
 	}
 
 	now := time.Now()
-	disc := DiscoveryConfigFromInputs(opts.ExtraRoots, now)
-	cfg := BuildConfig(RuntimeFromEnv(), disc, files)
+	disc := DiscoveryConfigFromInputs(s.ExtraModelPaths, now)
+	cfg := BuildConfig(RuntimeConfigFromSettings(s), disc, files)
 	if err := WriteFile(cfg); err != nil {
 		return files, fmt.Errorf("writing config after discovery: %w", err)
 	}
@@ -107,6 +103,6 @@ func ModelBackends(files []models.ModelFile) []string {
 	for b := range seen {
 		out = append(out, b)
 	}
-	sort.Strings(out)
+	slices.Sort(out)
 	return out
 }

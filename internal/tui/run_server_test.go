@@ -12,6 +12,7 @@ import (
 
 	"github.com/flyingnobita/llml/internal/models"
 	"github.com/flyingnobita/llml/internal/profiles"
+	"github.com/flyingnobita/llml/internal/settings"
 )
 
 func TestShellSingleQuoted(t *testing.T) {
@@ -110,7 +111,6 @@ func TestSplitServerInvocationEcho_matchesLlamaSplitLogLine(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", dir)
 	t.Setenv("HOME", dir)
 	t.Setenv("AppData", dir)
-	t.Setenv(models.EnvLlamaServerPort, "9090")
 	modelPath := filepath.Join(dir, "a.gguf")
 	m := New()
 	m.loading = false
@@ -118,7 +118,7 @@ func TestSplitServerInvocationEcho_matchesLlamaSplitLogLine(t *testing.T) {
 	m.table.files = []models.ModelFile{
 		{Backend: models.BackendLlama, Path: modelPath, Name: "a", Size: 1},
 	}
-	m.runtime = models.RuntimeInfo{LlamaServerPath: "/bin/llama-server"}
+	m.runtime = models.RuntimeInfo{LlamaServerPath: "/bin/llama-server", LlamaServerPort: 9090}
 	m.table.tbl.SetRows([]btable.Row{{"a", "a", "llama.cpp", "1 B", "", modelPath}})
 	m.table.tbl.SetCursor(0)
 
@@ -153,7 +153,6 @@ func TestLaunchPreviewCommandLine_vllmOmitsActivateWrapper(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", dir)
 	t.Setenv("HOME", dir)
 	t.Setenv("AppData", dir)
-	t.Setenv(models.EnvVLLMServerPort, "8000")
 	modelPath := filepath.Join(dir, "hf-model")
 	m := New()
 	m.loading = false
@@ -161,7 +160,7 @@ func TestLaunchPreviewCommandLine_vllmOmitsActivateWrapper(t *testing.T) {
 	m.table.files = []models.ModelFile{
 		{Backend: models.BackendVLLM, Path: modelPath, Name: "m", Size: 1},
 	}
-	m.runtime = models.RuntimeInfo{VLLMPath: "/proj/.venv/bin/vllm"}
+	m.runtime = models.RuntimeInfo{VLLMPath: "/proj/.venv/bin/vllm", VLLMServerPort: 8000}
 	m.table.tbl.SetRows([]btable.Row{{"m", "hf-model", "vllm", "1 B", "", modelPath}})
 	m.table.tbl.SetCursor(0)
 
@@ -284,7 +283,10 @@ func TestBuildServerSpec_koboldCppStrictMissing(t *testing.T) {
 	}
 }
 
+// A zero-value RuntimeInfo is what the non-strict preview path sees before the
+// first probe; it must still yield the built-in default port, not 0.
 func TestBuildServerSpec_koboldCppNonStrict(t *testing.T) {
+	t.Parallel()
 	rt := models.RuntimeInfo{}
 	spec, err := buildServerSpec(models.BackendKobold, "/m/a.gguf", ModelParams{}, rt, false)
 	if err != nil {
@@ -293,7 +295,7 @@ func TestBuildServerSpec_koboldCppNonStrict(t *testing.T) {
 	if spec.bin != "koboldcpp" {
 		t.Fatalf("expected placeholder bin, got %q", spec.bin)
 	}
-	if spec.port != models.KoboldCppPort() {
+	if spec.port != settings.DefaultKoboldCppPort {
 		t.Fatalf("expected default koboldcpp port, got %d", spec.port)
 	}
 }
@@ -303,7 +305,6 @@ func TestSplitServerInvocationEcho_koboldCppProfile(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", dir)
 	t.Setenv("HOME", dir)
 	t.Setenv("AppData", dir)
-	t.Setenv(models.EnvKoboldCppPort, "5001")
 	modelPath := filepath.Join(dir, "a.gguf")
 	m := New()
 	m.loading = false
@@ -311,7 +312,7 @@ func TestSplitServerInvocationEcho_koboldCppProfile(t *testing.T) {
 	m.table.files = []models.ModelFile{
 		{Backend: models.BackendLlama, Path: modelPath, Name: "a", Size: 1},
 	}
-	m.runtime = models.RuntimeInfo{KoboldCppPath: "/bin/koboldcpp"}
+	m.runtime = models.RuntimeInfo{KoboldCppPath: "/bin/koboldcpp", KoboldCppPort: 5001}
 	m.table.tbl.SetRows([]btable.Row{{"a", "a", "llama.cpp", "1 B", "", modelPath}})
 	m.table.tbl.SetCursor(0)
 
@@ -343,7 +344,6 @@ func TestLaunchPreviewCommandLine_koboldCppProfile(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", dir)
 	t.Setenv("HOME", dir)
 	t.Setenv("AppData", dir)
-	t.Setenv(models.EnvKoboldCppPort, "5001")
 	modelPath := filepath.Join(dir, "a.gguf")
 	m := New()
 	m.loading = false
@@ -351,7 +351,7 @@ func TestLaunchPreviewCommandLine_koboldCppProfile(t *testing.T) {
 	m.table.files = []models.ModelFile{
 		{Backend: models.BackendLlama, Path: modelPath, Name: "a", Size: 1},
 	}
-	m.runtime = models.RuntimeInfo{KoboldCppPath: "/bin/koboldcpp"}
+	m.runtime = models.RuntimeInfo{KoboldCppPath: "/bin/koboldcpp", KoboldCppPort: 5001}
 	m.table.tbl.SetRows([]btable.Row{{"a", "a", "llama.cpp", "1 B", "", modelPath}})
 	m.table.tbl.SetCursor(0)
 

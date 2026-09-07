@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/flyingnobita/llml/internal/models"
+	"github.com/flyingnobita/llml/internal/settings"
 )
 
 func TestFilterByBackend_SingleMatch(t *testing.T) {
@@ -258,9 +259,8 @@ func TestRunDiscovery_WritesConfig(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", dir)
 	t.Setenv("HOME", dir)
 
-	t.Setenv(models.EnvModelPaths, modelsDir)
-
-	models, err := RunDiscovery()
+	s := settings.Resolve(settings.Layer{ExtraModelPaths: []string{modelsDir}}, settings.Defaults())
+	models, err := RunDiscovery(s)
 	if err != nil {
 		t.Fatal(err)
 	}

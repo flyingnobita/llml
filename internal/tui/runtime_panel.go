@@ -2,11 +2,11 @@ package tui
 
 import (
 	"fmt"
-	"os"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 
+	"github.com/flyingnobita/llml/internal/fsutil"
 	"github.com/flyingnobita/llml/internal/models"
 )
 
@@ -28,22 +28,28 @@ const (
 // runtimePanelEnvLabelWidth is the width of the left column (labels) in RuntimePanelLines.
 const runtimePanelEnvLabelWidth = len(runtimePanelLabelLlamaServerPath) // 17; longest label
 
-// portEnvDisplay returns the env value when set, otherwise the effective TCP port as decimal.
-func portEnvDisplay(envKey string, effective int) string {
-	if v := strings.TrimSpace(os.Getenv(envKey)); v != "" {
-		return v
-	}
-	return strconv.Itoa(effective)
-}
-
-// pathEnvDisplay returns a display value for a path env var, or "—" when unset.
-func pathEnvDisplay(envKey string) string {
-	v := strings.TrimSpace(os.Getenv(envKey))
-	if v == "" {
+// portDisplay renders a resolved TCP port, or "—" when the runtime has not been probed.
+func portDisplay(port int) string {
+	if port <= 0 {
 		return "—"
 	}
-	home := models.HomeDir()
-	return FormatPathDisplay(v, home)
+	return strconv.Itoa(port)
+}
+
+// pathDisplay renders a configured path relative to the home directory, or "—" when unset.
+func pathDisplay(v string) string {
+	if v = strings.TrimSpace(v); v == "" {
+		return "—"
+	}
+	return FormatPathDisplay(v, fsutil.HomeDir())
+}
+
+// valueOrDash renders a resolved string value, or "—" when it is empty.
+func valueOrDash(v string) string {
+	if v = strings.TrimSpace(v); v == "" {
+		return "—"
+	}
+	return v
 }
 
 // llamaServerPathPanelDisplay returns the resolved llama-server binary path for the runtime
@@ -52,13 +58,12 @@ func pathEnvDisplay(envKey string) string {
 func llamaServerPathPanelDisplay(r models.RuntimeInfo) string {
 	p := models.ResolveLlamaServerPath(r)
 	if p != "" {
-		home := models.HomeDir()
-		return FormatPathDisplay(p, home)
+		return FormatPathDisplay(p, fsutil.HomeDir())
 	}
 	if r.ServerRunning {
 		port := r.ProbePort
 		if port <= 0 {
-			port = models.ListenPort()
+			port = r.LlamaServerPort
 		}
 		return fmt.Sprintf("(server at :%d)", port)
 	}
@@ -71,22 +76,21 @@ func vllmPathPanelDisplay(r models.RuntimeInfo) string {
 	if p == "" {
 		return "—"
 	}
-	home := models.HomeDir()
-	return FormatPathDisplay(p, home)
+	return FormatPathDisplay(p, fsutil.HomeDir())
 }
 
-// vllmVenvPanelDisplay returns the value shown for vLLM venv in the runtime panel: the env var
-// when set, otherwise the venv root inferred from the same rules as vLLM activation (adjacent
-// bin layout, $VLLM_PATH/.venv, dirname(vllm)/.venv), or "—" when none applies.
+// vllmVenvPanelDisplay returns the value shown for vLLM venv in the runtime panel:
+// the configured venv root when set, otherwise the root inferred from the same
+// rules as vLLM activation (adjacent bin layout, $VLLM_PATH/.venv,
+// dirname(vllm)/.venv), or "—" when none applies.
 func vllmVenvPanelDisplay(r models.RuntimeInfo) string {
-	if strings.TrimSpace(os.Getenv(models.EnvVLLMVenv)) != "" {
-		return pathEnvDisplay(models.EnvVLLMVenv)
+	if strings.TrimSpace(r.VLLMVenv) != "" {
+		return pathDisplay(r.VLLMVenv)
 	}
 	vllmBin := models.ResolveVLLMPath(r)
-	act := models.ResolveVLLMActivateScript(vllmBin)
+	act := models.ResolveVLLMActivateScript(vllmBin, r.VLLMVenv, r.VLLMConfiguredPath)
 	if root := models.VenvRootFromActivateScript(act); root != "" {
-		home := models.HomeDir()
-		return FormatPathDisplay(root, home)
+		return FormatPathDisplay(root, fsutil.HomeDir())
 	}
 	return "—"
 }
@@ -96,8 +100,7 @@ func koboldCppPathPanelDisplay(r models.RuntimeInfo) string {
 	if p == "" {
 		return "—"
 	}
-	home := models.HomeDir()
-	return FormatPathDisplay(p, home)
+	return FormatPathDisplay(p, fsutil.HomeDir())
 }
 
 func ollamaPathPanelDisplay(r models.RuntimeInfo) string {
@@ -105,14 +108,13 @@ func ollamaPathPanelDisplay(r models.RuntimeInfo) string {
 	if p == "" {
 		return "—"
 	}
-	home := models.HomeDir()
-	return FormatPathDisplay(p, home)
+	return FormatPathDisplay(p, fsutil.HomeDir())
 }
 
 // RuntimePanelLines returns lines for the TUI footer: each row is a label (left) and its current
 // value (right), sorted alphabetically by label. Binary paths use [models.ResolveLlamaServerPath]
-// and [models.ResolveVLLMPath]; port rows use the env when set, otherwise the effective default
-// ([models.ListenPort] / [models.VLLMPort]). The venv row shows VLLM_VENV when set, otherwise
+// and [models.ResolveVLLMPath]; host and port rows come from the resolved settings
+// carried on r. The venv row shows the configured venv root when set, otherwise
 // the inferred venv root when activation would run. Lines are truncated to maxWidth display width.
 func RuntimePanelLines(maxWidth int, r models.RuntimeInfo) []string {
 	if maxWidth < MinModalInnerWidth {
@@ -132,18 +134,20 @@ func RuntimePanelLines(maxWidth int, r models.RuntimeInfo) []string {
 		value string
 	}{
 		{runtimePanelLabelKoboldCppPath, koboldCppPathPanelDisplay(r)},
-		{runtimePanelLabelKoboldCppPort, portEnvDisplay(models.EnvKoboldCppPort, models.KoboldCppPort())},
+		{runtimePanelLabelKoboldCppPort, portDisplay(r.KoboldCppPort)},
 		{runtimePanelLabelLlamaServerPath, llamaServerPathPanelDisplay(r)},
-		{runtimePanelLabelLlamaServerHost, r.LlamaServerHost},
-		{runtimePanelLabelLlamaServerPort, portEnvDisplay(models.EnvLlamaServerPort, models.ListenPort())},
-		{runtimePanelLabelOllamaHost, models.OllamaHost()},
+		{runtimePanelLabelLlamaServerHost, valueOrDash(r.LlamaServerHost)},
+		{runtimePanelLabelLlamaServerPort, portDisplay(r.LlamaServerPort)},
+		{runtimePanelLabelOllamaHost, valueOrDash(r.OllamaHost)},
 		{runtimePanelLabelOllamaPath, ollamaPathPanelDisplay(r)},
 		{runtimePanelLabelVLLMPath, vllmPathPanelDisplay(r)},
-		{runtimePanelLabelVLLMPort, portEnvDisplay(models.EnvVLLMServerPort, models.VLLMPort())},
-		{runtimePanelLabelVLLMHost, r.VLLMServerHost},
+		{runtimePanelLabelVLLMPort, portDisplay(r.VLLMServerPort)},
+		{runtimePanelLabelVLLMHost, valueOrDash(r.VLLMServerHost)},
 		{runtimePanelLabelVLLMVenv, vllmVenvPanelDisplay(r)},
 	}
-	sort.Slice(rows, func(i, j int) bool { return rows[i].key < rows[j].key })
+	slices.SortFunc(rows, func(a, b struct{ key, value string }) int {
+		return strings.Compare(a.key, b.key)
+	})
 	out := make([]string, len(rows))
 	for i := range rows {
 		out[i] = line(rows[i].key, rows[i].value)

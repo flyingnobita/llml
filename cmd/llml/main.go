@@ -15,6 +15,7 @@ import (
 	"github.com/flyingnobita/llml/internal/config"
 	"github.com/flyingnobita/llml/internal/models"
 	"github.com/flyingnobita/llml/internal/profiles"
+	"github.com/flyingnobita/llml/internal/settings"
 	"github.com/flyingnobita/llml/internal/tui"
 	"github.com/flyingnobita/llml/internal/userdata"
 )
@@ -293,22 +294,26 @@ func validateTargetBackend(target string, portables []profiles.PortableProfile, 
 }
 
 // resolveModels returns cached or freshly-scanned models based on the rescan flag
-// and cache freshness.
+// and cache freshness. A scan resolves settings from the environment, config.toml,
+// and the built-in defaults, in that order of precedence.
 func resolveModels(rescan bool) ([]models.ModelFile, error) {
+	scan := func() ([]models.ModelFile, error) {
+		return config.RunDiscovery(config.Resolve(settings.OSGetenv))
+	}
 	if rescan {
 		fmt.Fprintln(os.Stderr, "Scanning local models...")
-		return config.RunDiscovery()
+		return scan()
 	}
 	modelFiles, err := config.CachedModels()
 	var stale *config.CacheStaleError
 	if errors.As(err, &stale) {
 		fmt.Fprintf(os.Stderr, "Discovery cache is stale (last scan: %s). Scanning local models...\n",
 			stale.LastScan.Format("2006-01-02 15:04:05"))
-		return config.RunDiscovery()
+		return scan()
 	}
 	if err == nil && len(modelFiles) == 0 {
 		fmt.Fprintln(os.Stderr, "Scanning local models...")
-		return config.RunDiscovery()
+		return scan()
 	}
 	return modelFiles, err
 }

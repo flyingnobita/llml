@@ -3,10 +3,12 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
 	"github.com/flyingnobita/llml/internal/models"
+	"github.com/flyingnobita/llml/internal/settings"
 )
 
 func TestConfigRoundTrip(t *testing.T) {
@@ -70,30 +72,6 @@ func TestValidForCache(t *testing.T) {
 	}
 }
 
-func TestApplyRuntimeFromConfig_envWins(t *testing.T) {
-	t.Setenv(models.EnvLlamaCppPath, "/from-env")
-	t.Cleanup(func() { _ = os.Unsetenv(models.EnvLlamaCppPath) })
-
-	ApplyRuntimeFromConfig(&RuntimeConfig{DefaultLlamaCppPath: "/from-toml"})
-	if os.Getenv(models.EnvLlamaCppPath) != "/from-env" {
-		t.Fatalf("env should win, got %q", os.Getenv(models.EnvLlamaCppPath))
-	}
-}
-
-func TestApplyRuntimeFromConfig_tomlFallback(t *testing.T) {
-	_ = os.Unsetenv(models.EnvLlamaCppPath)
-	t.Cleanup(func() { _ = os.Unsetenv(models.EnvLlamaCppPath) })
-
-	ApplyRuntimeFromConfig(&RuntimeConfig{DefaultLlamaCppPath: "/from-toml"})
-	got := os.Getenv(models.EnvLlamaCppPath)
-	if got == "" {
-		t.Fatal("expected TOML path applied")
-	}
-	if !filepath.IsAbs(got) {
-		t.Fatalf("want absolute path, got %q", got)
-	}
-}
-
 func TestFilterExistingPaths(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -137,15 +115,15 @@ func TestModelEntryToModelFile_Ollama(t *testing.T) {
 }
 
 func TestDiscoveryConfigForWrite_merge(t *testing.T) {
+	t.Parallel()
 	prev := &Config{
 		Discovery: DiscoveryConfig{
 			ExtraModelPaths: []string{"/a"},
 			LastScan:        time.Unix(100, 0).UTC(),
 		},
 	}
-	t.Setenv(models.EnvModelPaths, "/b")
-	t.Cleanup(func() { _ = os.Unsetenv(models.EnvModelPaths) })
-	d := DiscoveryConfigForWrite(prev, time.Unix(200, 0).UTC())
+	s := settings.Settings{ExtraModelPaths: []string{"/b"}}
+	d := DiscoveryConfigForWrite(prev, s, time.Unix(200, 0).UTC())
 	if len(d.ExtraModelPaths) != 2 {
 		t.Fatalf("paths %v", d.ExtraModelPaths)
 	}
@@ -202,37 +180,8 @@ func TestConfigRoundTrip_koboldCpp(t *testing.T) {
 	}
 }
 
-func TestApplyRuntimeFromConfig_koboldCppEnvWins(t *testing.T) {
-	t.Setenv(models.EnvKoboldCppPath, "/from-env")
-
-	ApplyRuntimeFromConfig(&RuntimeConfig{DefaultKoboldCppPath: "/from-toml"})
-	if os.Getenv(models.EnvKoboldCppPath) != "/from-env" {
-		t.Fatalf("env should win, got %q", os.Getenv(models.EnvKoboldCppPath))
-	}
-}
-
-func TestApplyRuntimeFromConfig_koboldCppTomlFallback(t *testing.T) {
-	t.Setenv(models.EnvKoboldCppPath, "")
-
-	ApplyRuntimeFromConfig(&RuntimeConfig{DefaultKoboldCppPath: "/from-toml"})
-	got := os.Getenv(models.EnvKoboldCppPath)
-	if !filepath.IsAbs(got) {
-		t.Fatalf("want absolute path, got %q", got)
-	}
-}
-
-func TestApplyRuntimeFromConfig_koboldCppPort(t *testing.T) {
-	t.Setenv(models.EnvKoboldCppPort, "")
-	p := 6000
-	ApplyRuntimeFromConfig(&RuntimeConfig{DefaultKoboldCppPort: &p})
-	if os.Getenv(models.EnvKoboldCppPort) != "6000" {
-		t.Fatalf("got %q", os.Getenv(models.EnvKoboldCppPort))
-	}
-}
-
 func TestDiscoveryConfigFromInputs(t *testing.T) {
-	t.Setenv(models.EnvModelPaths, "/env/ignored") // should not be used
-	t.Cleanup(func() { _ = os.Unsetenv(models.EnvModelPaths) })
+	t.Parallel()
 
 	paths := []string{" /a ", "  ", ".", "/b/../c", "/a"}
 	lastScan := time.Unix(300, 0).UTC()
@@ -249,5 +198,89 @@ func TestDiscoveryConfigFromInputs(t *testing.T) {
 	}
 	if !d.LastScan.Equal(lastScan) {
 		t.Fatalf("last scan %v", d.LastScan)
+	}
+}
+
+// fakeEnv backs settings resolution with a map, so precedence can be exercised
+// without mutating the process environment.
+func fakeEnv(m map[string]string) settings.Getenv {
+	return func(k string) string { return m[k] }
+}
+
+func TestRuntimeConfigLayer_envWinsOverFile(t *testing.T) {
+	t.Parallel()
+
+	rc := RuntimeConfig{DefaultLlamaCppPath: "/from-toml", DefaultKoboldCppPath: "/from-toml-kobold"}
+	s := settings.Resolve(
+		settings.FromEnv(fakeEnv(map[string]string{settings.EnvLlamaCppPath: "/from-env"})),
+		rc.Layer(),
+		settings.Defaults(),
+	)
+	if s.LlamaCppPath != "/from-env" {
+		t.Errorf("env should win: got %q", s.LlamaCppPath)
+	}
+	if s.KoboldCppPath != "/from-toml-kobold" {
+		t.Errorf("file should supply what the env does not: got %q", s.KoboldCppPath)
+	}
+}
+
+func TestRuntimeConfigLayer_fileWinsOverDefault(t *testing.T) {
+	t.Parallel()
+
+	port := 6000
+	rc := RuntimeConfig{
+		DefaultKoboldCppPort:   &port,
+		DefaultLlamaServerHost: "0.0.0.0",
+		DefaultOllamaHost:      "http://box:11434/",
+	}
+	s := settings.Resolve(settings.FromEnv(fakeEnv(nil)), rc.Layer(), settings.Defaults())
+
+	if s.KoboldCppPort != 6000 {
+		t.Errorf("KoboldCppPort = %d, want 6000", s.KoboldCppPort)
+	}
+	if s.LlamaServerHost != "0.0.0.0" {
+		t.Errorf("LlamaServerHost = %q", s.LlamaServerHost)
+	}
+	// A host written with a scheme is normalized on the way in.
+	if s.OllamaHost != "box:11434" {
+		t.Errorf("OllamaHost = %q, want box:11434", s.OllamaHost)
+	}
+	if s.VLLMServerPort != settings.DefaultVLLMServerPort {
+		t.Errorf("VLLMServerPort should fall back to the default, got %d", s.VLLMServerPort)
+	}
+}
+
+func TestRuntimeConfigLayer_expandsAndCleansPaths(t *testing.T) {
+	t.Parallel()
+
+	rc := RuntimeConfig{DefaultVLLMPath: "  /opt/vllm/bin/..  ", DefaultOllamaPath: "   "}
+	s := settings.Resolve(settings.FromEnv(fakeEnv(nil)), rc.Layer(), settings.Defaults())
+
+	if s.VLLMPath != "/opt/vllm" {
+		t.Errorf("VLLMPath = %q, want /opt/vllm", s.VLLMPath)
+	}
+	if s.OllamaPath != "" {
+		t.Errorf("a whitespace-only path should stay unset, got %q", s.OllamaPath)
+	}
+}
+
+// RuntimeConfigFromSettings must round-trip through Layer unchanged, so writing
+// the file and reading it back does not shift the resolved values.
+func TestRuntimeConfigFromSettings_roundTrips(t *testing.T) {
+	t.Parallel()
+
+	want := settings.Resolve(settings.FromEnv(fakeEnv(map[string]string{
+		settings.EnvLlamaCppPath:   "/opt/llama",
+		settings.EnvKoboldCppPort:  "6000",
+		settings.EnvOllamaHost:     "box:11434",
+		settings.EnvVLLMServerHost: "0.0.0.0",
+	})), settings.Defaults())
+
+	rc := RuntimeConfigFromSettings(want)
+	got := settings.Resolve(settings.FromEnv(fakeEnv(nil)), rc.Layer(), settings.Defaults())
+
+	got.ExtraModelPaths = want.ExtraModelPaths // not part of the [runtime] table
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("round trip changed settings:\n got %+v\nwant %+v", got, want)
 	}
 }

@@ -10,22 +10,21 @@ import (
 	"github.com/flyingnobita/llml/internal/models"
 )
 
+// The panel renders purely from RuntimeInfo, which carries the resolved hosts
+// and ports, so this test needs no environment at all.
 func TestRuntimePanelLines(t *testing.T) {
-	t.Setenv(models.EnvLlamaServerPort, "")
-	t.Setenv(models.EnvVLLMServerPort, "")
-	t.Setenv(models.EnvVLLMVenv, "")
-	t.Setenv(models.EnvLlamaCppPath, "")
-	t.Setenv(models.EnvVLLMPath, "")
-	t.Setenv(models.EnvOllamaHost, "")
-	t.Setenv(models.EnvOllamaPath, "")
+	t.Parallel()
 
 	r := models.RuntimeInfo{
 		LlamaServerPath: "/home/u/llama.cpp/bin/llama-server",
 		LlamaServerHost: "127.0.0.1",
+		LlamaServerPort: 8080,
 		VLLMPath:        "/home/u/.local/bin/vllm",
 		VLLMServerHost:  "127.0.0.1",
+		VLLMServerPort:  8000,
 		OllamaPath:      "/home/u/.local/bin/ollama",
 		OllamaHost:      "127.0.0.1:11434",
+		KoboldCppPort:   5001,
 		ServerRunning:   false,
 		ProbePort:       8080,
 	}
@@ -70,7 +69,6 @@ func TestRuntimePanelLines(t *testing.T) {
 }
 
 func TestRuntimePanelLines_ServerRunningNoBinary(t *testing.T) {
-	t.Setenv(models.EnvLlamaServerPort, "")
 	t.Setenv("PATH", t.TempDir()) // ResolveLlamaServerPath must not find llama-server via LookPath
 	r := models.RuntimeInfo{
 		LlamaServerPath: "",
@@ -108,14 +106,9 @@ func TestRuntimePanelLines_VLLMVenvInferred(t *testing.T) {
 	if err := os.WriteFile(vllm, []byte{}, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv(models.EnvLlamaCppPath, "")
-	t.Setenv(models.EnvVLLMPath, "")
-	t.Setenv(models.EnvVLLMVenv, "")
-	t.Setenv(models.EnvLlamaServerPort, "")
-	t.Setenv(models.EnvVLLMServerPort, "")
 	t.Setenv("PATH", binDir)
 
-	// Avoid host-specific DiscoverRuntime() (e.g. ~/.venv-vllm-metal before PATH).
+	// Avoid host-specific DiscoverRuntime (e.g. ~/.venv-vllm-metal before PATH).
 	info := models.RuntimeInfo{VLLMPath: vllm}
 	home, err := os.UserHomeDir()
 	if err != nil {

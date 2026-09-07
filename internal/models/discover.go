@@ -5,9 +5,11 @@ package models
 import (
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"time"
+
+	"github.com/flyingnobita/llml/internal/settings"
 )
 
 // DefaultMaxDepth limits recursion depth below each search root.
@@ -77,10 +79,17 @@ func (f ModelFile) LaunchTarget() string {
 
 // Options configures discovery.
 type Options struct {
-	ExtraRoots        []string
-	MaxDepth          int
-	SkipDefaultRoots  bool
-	DisableAPISources bool
+	// Settings supplies the resolved extra model roots and Hugging Face cache
+	// location used to build the search roots.
+	Settings settings.Settings
+	// ExtraRoots are additional caller-supplied roots, merged with the ones in Settings.
+	ExtraRoots []string
+	MaxDepth   int
+	// SkipDefaultRoots omits the home-directory defaults, which isolated scans and tests rely on.
+	SkipDefaultRoots bool
+	// IncludeOllama merges rows from the Ollama daemon at Settings.OllamaHost
+	// into the result. The filesystem walk itself never reaches the network.
+	IncludeOllama bool
 }
 
 // candidate is an internal (source-index, path) pair used during filesystem scan.
@@ -140,7 +149,7 @@ func Discover(opts Options) ([]ModelFile, error) {
 	if maxD <= 0 {
 		maxD = DefaultMaxDepth
 	}
-	roots := MergeSearchRoots(opts.ExtraRoots, opts.SkipDefaultRoots)
+	roots := opts.Settings.SearchRoots(opts.ExtraRoots, opts.SkipDefaultRoots)
 	sources := []modelSource{ggufSource{}, safetensorsSource{}}
 
 	candidates, err := collectCandidates(roots, sources, maxD)
@@ -149,24 +158,21 @@ func Discover(opts Options) ([]ModelFile, error) {
 	}
 
 	out := buildModelFiles(candidates, sources)
-	if !opts.DisableAPISources {
-		if ollamaRows, err := DiscoverOllamaModels(); err == nil {
+	if opts.IncludeOllama {
+		if ollamaRows, err := DiscoverOllamaModels(opts.Settings.OllamaHost); err == nil {
 			out = append(out, ollamaRows...)
 		}
 	}
-	sort.Slice(out, func(i, j int) bool {
-		return compareForDefaultOrder(out[i], out[j])
-	})
+	slices.SortFunc(out, compareForDefaultOrder)
 	return out, nil
 }
 
-func compareForDefaultOrder(a, b ModelFile) bool {
-	al := a.DisplayLocation()
-	bl := b.DisplayLocation()
-	if al != bl {
-		return al < bl
+// compareForDefaultOrder orders rows by display location, then by identity.
+func compareForDefaultOrder(a, b ModelFile) int {
+	if c := strings.Compare(a.DisplayLocation(), b.DisplayLocation()); c != 0 {
+		return c
 	}
-	return a.Identity() < b.Identity()
+	return strings.Compare(a.Identity(), b.Identity())
 }
 
 // isAuxiliaryModel drops non-LLM weight files (e.g. CLIP/mmproj sidecars in multimodal repos).

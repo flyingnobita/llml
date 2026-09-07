@@ -8,6 +8,8 @@ import (
 )
 
 func TestResolveVLLMActivateScript(t *testing.T) {
+	t.Parallel()
+
 	proj := t.TempDir()
 	var activate string
 	if runtime.GOOS == "windows" {
@@ -31,33 +33,30 @@ func TestResolveVLLMActivateScript(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	t.Run("VLLM_PATH_dot_venv", func(t *testing.T) {
-		t.Setenv(EnvVLLMVenv, "")
-		t.Setenv(EnvVLLMPath, proj)
-		got := ResolveVLLMActivateScript(vllmBin)
-		if got != activate {
-			t.Fatalf("got %q want %q", got, activate)
-		}
-	})
-	t.Run("VLLM_VENV_explicit", func(t *testing.T) {
-		t.Setenv(EnvVLLMPath, "")
-		t.Setenv(EnvVLLMVenv, filepath.Join(proj, ".venv"))
-		got := ResolveVLLMActivateScript("/other/vllm")
-		if got != activate {
-			t.Fatalf("got %q want %q", got, activate)
-		}
-	})
-	t.Run("dirname_vllm_dot_venv", func(t *testing.T) {
-		t.Setenv(EnvVLLMVenv, "")
-		t.Setenv(EnvVLLMPath, "")
-		got := ResolveVLLMActivateScript(vllmBin)
-		if got != activate {
-			t.Fatalf("got %q want %q", got, activate)
-		}
-	})
+	tests := []struct {
+		name     string
+		vllmBin  string
+		venvRoot string
+		vllmPath string
+	}{
+		{name: "vllm_path_dot_venv", vllmBin: vllmBin, vllmPath: proj},
+		{name: "venv_root_explicit", vllmBin: "/other/vllm", venvRoot: filepath.Join(proj, ".venv")},
+		{name: "dirname_vllm_dot_venv", vllmBin: vllmBin},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := ResolveVLLMActivateScript(tc.vllmBin, tc.venvRoot, tc.vllmPath)
+			if got != activate {
+				t.Fatalf("got %q want %q", got, activate)
+			}
+		})
+	}
 }
 
 func TestResolveVLLMActivateScript_adjacentBinLayout(t *testing.T) {
+	t.Parallel()
+
 	if runtime.GOOS == "windows" {
 		t.Skip("parallel test layout uses Unix venv paths")
 	}
@@ -74,9 +73,8 @@ func TestResolveVLLMActivateScript_adjacentBinLayout(t *testing.T) {
 	if err := os.WriteFile(vllm, []byte{}, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv(EnvVLLMPath, "")
-	t.Setenv(EnvVLLMVenv, "")
-	if g := ResolveVLLMActivateScript(vllm); g != act {
+	// An activate script adjacent to the binary wins even with no configured venv.
+	if g := ResolveVLLMActivateScript(vllm, "", ""); g != act {
 		t.Fatalf("got %q want %q", g, act)
 	}
 }

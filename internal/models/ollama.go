@@ -5,12 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
 	"time"
-)
 
-const defaultOllamaHost = "127.0.0.1:11434"
+	"github.com/flyingnobita/llml/internal/settings"
+)
 
 const (
 	ollamaProbeTimeout   = 3 * time.Second
@@ -47,32 +46,21 @@ type ollamaPreloadRequest struct {
 	Stream    bool   `json:"stream"`
 }
 
-// OllamaHost returns the configured host:port for the Ollama API.
-func OllamaHost() string {
-	return normalizeOllamaHost(strings.TrimSpace(os.Getenv(EnvOllamaHost)))
-}
-
-// OllamaBaseURL returns the API base URL for the configured host.
-func OllamaBaseURL() string {
-	return "http://" + OllamaHost() + "/api"
-}
-
-func normalizeOllamaHost(raw string) string {
-	v := strings.TrimSpace(raw)
-	v = strings.TrimPrefix(v, "http://")
-	v = strings.TrimPrefix(v, "https://")
-	v = strings.TrimSuffix(v, "/")
-	if v == "" {
-		return defaultOllamaHost
+// ollamaBaseURL returns the API base URL for host, falling back to the built-in
+// default when the caller passes an empty host.
+func ollamaBaseURL(host string) string {
+	host = settings.NormalizeOllamaHost(host)
+	if host == "" {
+		host = settings.DefaultOllamaHost
 	}
-	return v
+	return "http://" + host + "/api"
 }
 
 func ollamaHTTPClient(timeout time.Duration) *http.Client {
 	return &http.Client{Timeout: timeout}
 }
 
-func doOllamaJSON(method, path string, reqBody any, out any, timeout time.Duration) error {
+func doOllamaJSON(host, method, path string, reqBody any, out any, timeout time.Duration) error {
 	var body *bytes.Reader
 	if reqBody == nil {
 		body = bytes.NewReader(nil)
@@ -83,7 +71,7 @@ func doOllamaJSON(method, path string, reqBody any, out any, timeout time.Durati
 		}
 		body = bytes.NewReader(b)
 	}
-	req, err := http.NewRequest(method, OllamaBaseURL()+path, body)
+	req, err := http.NewRequest(method, ollamaBaseURL(host)+path, body)
 	if err != nil {
 		return err
 	}
@@ -104,16 +92,16 @@ func doOllamaJSON(method, path string, reqBody any, out any, timeout time.Durati
 	return json.NewDecoder(resp.Body).Decode(out)
 }
 
-// ProbeOllama reports whether the configured Ollama daemon is reachable.
-func ProbeOllama() bool {
+// ProbeOllama reports whether the Ollama daemon at host is reachable.
+func ProbeOllama(host string) bool {
 	var resp ollamaTagsResponse
-	return doOllamaJSON(http.MethodGet, "/tags", nil, &resp, ollamaProbeTimeout) == nil
+	return doOllamaJSON(host, http.MethodGet, "/tags", nil, &resp, ollamaProbeTimeout) == nil
 }
 
-// DiscoverOllamaModels lists installed Ollama models via the supported API.
-func DiscoverOllamaModels() ([]ModelFile, error) {
+// DiscoverOllamaModels lists the models installed on the Ollama daemon at host.
+func DiscoverOllamaModels(host string) ([]ModelFile, error) {
 	var resp ollamaTagsResponse
-	if err := doOllamaJSON(http.MethodGet, "/tags", nil, &resp, ollamaProbeTimeout); err != nil {
+	if err := doOllamaJSON(host, http.MethodGet, "/tags", nil, &resp, ollamaProbeTimeout); err != nil {
 		return nil, err
 	}
 	out := make([]ModelFile, 0, len(resp.Models))
@@ -152,19 +140,20 @@ func formatOllamaParams(d ollamaDetails) string {
 	return strings.Join(parts, " · ")
 }
 
-// PreloadOllamaModel keeps the selected model loaded in memory indefinitely.
-func PreloadOllamaModel(modelID string) error {
-	return doOllamaJSON(http.MethodPost, "/generate", ollamaPreloadRequest{
+// PreloadOllamaModel keeps the selected model loaded in memory indefinitely on
+// the daemon at host.
+func PreloadOllamaModel(host, modelID string) error {
+	return doOllamaJSON(host, http.MethodPost, "/generate", ollamaPreloadRequest{
 		Model:     modelID,
 		KeepAlive: -1,
 		Stream:    false,
 	}, nil, ollamaPreloadTimeout)
 }
 
-// ListRunningOllamaModels returns the currently loaded Ollama model IDs.
-func ListRunningOllamaModels() ([]string, error) {
+// ListRunningOllamaModels returns the model IDs currently loaded on the daemon at host.
+func ListRunningOllamaModels(host string) ([]string, error) {
 	var resp ollamaPSResponse
-	if err := doOllamaJSON(http.MethodGet, "/ps", nil, &resp, ollamaProbeTimeout); err != nil {
+	if err := doOllamaJSON(host, http.MethodGet, "/ps", nil, &resp, ollamaProbeTimeout); err != nil {
 		return nil, err
 	}
 	out := make([]string, 0, len(resp.Models))
