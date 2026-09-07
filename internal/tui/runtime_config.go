@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -56,11 +57,11 @@ func hostField(raw, defaultHost string) string {
 func validatePortInput(s string) error {
 	for _, r := range s {
 		if r < '0' || r > '9' {
-			return fmt.Errorf("digits only")
+			return errors.New("digits only")
 		}
 	}
 	if len(s) > 5 {
-		return fmt.Errorf("max 5 digits")
+		return errors.New("max 5 digits")
 	}
 	return nil
 }
@@ -73,7 +74,7 @@ func validatePortCommit(raw string) error {
 	}
 	p, err := strconv.Atoi(v)
 	if err != nil || p < 1 || p > 65535 {
-		return fmt.Errorf("port must be 1-65535 or empty to use the default")
+		return errors.New("port must be 1-65535 or empty to use the default")
 	}
 	return nil
 }

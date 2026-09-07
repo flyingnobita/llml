@@ -6,7 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 )
@@ -94,15 +94,15 @@ func PruneOldBackups(backupDir, base string, keep int) error {
 		return nil
 	}
 
-	sort.Slice(matches, func(i, j int) bool {
-		pi := filepath.Join(backupDir, matches[i])
-		pj := filepath.Join(backupDir, matches[j])
-		si, err1 := os.Stat(pi)
-		sj, err2 := os.Stat(pj)
+	// Newest first, so matches[keep:] is the oldest surplus. Names carry a
+	// timestamp, so reverse-lexical is a sound fallback when stat fails.
+	slices.SortFunc(matches, func(a, b string) int {
+		si, err1 := os.Stat(filepath.Join(backupDir, a))
+		sj, err2 := os.Stat(filepath.Join(backupDir, b))
 		if err1 != nil || err2 != nil {
-			return matches[i] > matches[j]
+			return strings.Compare(b, a)
 		}
-		return si.ModTime().After(sj.ModTime())
+		return sj.ModTime().Compare(si.ModTime())
 	})
 
 	for _, name := range matches[keep:] {

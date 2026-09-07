@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/abrander/gguf"
@@ -34,7 +34,7 @@ func writeGGUFReport(w io.Writer, r *gguf.Reader, opts DumpGGUFOptions) error {
 	for k := range r.Metadata {
 		keys = append(keys, k)
 	}
-	sort.Strings(keys)
+	slices.Sort(keys)
 
 	_, _ = fmt.Fprintln(w, "metadata:")
 	for _, k := range keys {

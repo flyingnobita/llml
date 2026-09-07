@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
-	"sort"
 	"strings"
 
 	"charm.land/bubbles/v2/textinput"
@@ -34,13 +33,12 @@ func (m Model) openExportView() Model {
 		modelDisplay := profiles.ModelHint(g.ModelKey)
 
 		// Sort profiles within group by (backend, name).
-		sorted := make([]profiles.PortableProfile, len(g.Profiles))
-		copy(sorted, g.Profiles)
-		sort.Slice(sorted, func(i, j int) bool {
-			if sorted[i].Backend != sorted[j].Backend {
-				return sorted[i].Backend < sorted[j].Backend
+		sorted := slices.Clone(g.Profiles)
+		slices.SortFunc(sorted, func(a, b profiles.PortableProfile) int {
+			if c := strings.Compare(a.Backend, b.Backend); c != 0 {
+				return c
 			}
-			return sorted[i].Name < sorted[j].Name
+			return strings.Compare(a.Name, b.Name)
 		})
 
 		items = append(items, exportProfileItem{

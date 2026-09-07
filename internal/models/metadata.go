@@ -1,6 +1,7 @@
 package models
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -38,7 +39,7 @@ func GGUFGeneralName(path string) (string, error) {
 		}
 		s = strings.TrimSpace(s)
 		if s == "" {
-			return fmt.Errorf("general.name empty or missing")
+			return errors.New("general.name empty or missing")
 		}
 		name = s
 		return nil

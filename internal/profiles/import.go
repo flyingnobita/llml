@@ -1,6 +1,7 @@
 package profiles
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -106,7 +107,7 @@ type ImportResult struct {
 // true, existing profiles with the same name are replaced in-place.
 func ImportProfiles(targetKey string, profiles []Profile, force bool) (*ImportResult, error) {
 	if targetKey == "" {
-		return nil, fmt.Errorf("target model key is required")
+		return nil, errors.New("target model key is required")
 	}
 	ent, err := LoadEntry(targetKey)
 	if err != nil {

@@ -1,11 +1,12 @@
 package profiles
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -211,8 +212,8 @@ func AllToPortableGrouped() ([]ModelGroup, error) {
 			out = append(out, ModelGroup{ModelKey: key, Profiles: pps})
 		}
 	}
-	sort.Slice(out, func(i, j int) bool {
-		return ModelHint(out[i].ModelKey) < ModelHint(out[j].ModelKey)
+	slices.SortFunc(out, func(a, b ModelGroup) int {
+		return strings.Compare(ModelHint(a.ModelKey), ModelHint(b.ModelKey))
 	})
 	return out, nil
 }
@@ -254,7 +255,7 @@ func NextAvailablePath(dest string) (path string, existed bool, err error) {
 			return cand, true, nil
 		}
 	}
-	return "", true, fmt.Errorf("too many existing files matching pattern; clean up or choose a different name")
+	return "", true, errors.New("too many existing files matching pattern; clean up or choose a different name")
 }
 
 // WritePortable writes profiles to a portable TOML file at dest.

@@ -371,7 +371,7 @@ func (c cli) pickTargetModel(portableProfiles []profiles.PortableProfile, rescan
 	}
 
 	if len(modelFiles) == 0 {
-		return "", fmt.Errorf("no local model files found: download a model first, then retry")
+		return "", errors.New("no local model files found: download a model first, then retry")
 	}
 
 	compatible := config.FilterByBackend(modelFiles, backends)

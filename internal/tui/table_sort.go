@@ -1,7 +1,7 @@
 package tui
 
 import (
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/flyingnobita/llml/internal/models"
@@ -29,15 +29,12 @@ func sortModelFiles(files []models.ModelFile, col tableSortCol, desc bool) {
 		return
 	}
 	col = clampSortCol(col)
-	sort.SliceStable(files, func(i, j int) bool {
-		c := compareModelFilesCol(files[i], files[j], col)
-		if c != 0 {
-			if desc {
-				return c > 0
-			}
-			return c < 0
+	slices.SortStableFunc(files, func(a, b models.ModelFile) int {
+		c := compareModelFilesCol(a, b, col)
+		if desc {
+			return -c
 		}
-		return false
+		return c
 	})
 }
 

@@ -42,7 +42,7 @@ func newHTTPClient() *http.Client {
 				return fmt.Errorf("too many redirects (max %d)", maxRedirects)
 			}
 			if req.URL.Scheme != "https" {
-				return fmt.Errorf("refusing redirect from https to non-https")
+				return errors.New("refusing redirect from https to non-https")
 			}
 			return nil
 		},
@@ -71,7 +71,7 @@ func (ft Fetcher) FetchPortable(ctx context.Context, rawURL string) (*PortableFi
 		return nil, fmt.Errorf("cannot parse URL %q: %w", rawURL, err)
 	}
 	if u.Scheme != "https" {
-		return nil, fmt.Errorf("only https:// URLs are supported")
+		return nil, errors.New("only https:// URLs are supported")
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
@@ -113,7 +113,7 @@ func (ft Fetcher) FetchPortable(ctx context.Context, rawURL string) (*PortableFi
 		return nil, fmt.Errorf("error reading response from %s: %w", rawURL, err)
 	}
 	if len(body) > maxProfileBody {
-		return nil, fmt.Errorf("profile body exceeds 256KB cap")
+		return nil, errors.New("profile body exceeds 256KB cap")
 	}
 
 	f, err := parsePortable(body)
@@ -286,9 +286,7 @@ func ModelParamsKey(modelPath string) string {
 	if key == "" {
 		return ""
 	}
-	if strings.HasPrefix(key, "ollama://") {
-		return key
-	}
+	// Scheme-bearing identities (ollama://, hf://, …) are already canonical.
 	if strings.Contains(key, "://") {
 		return key
 	}
@@ -299,7 +297,7 @@ func ModelParamsKey(modelPath string) string {
 // targetKey. Returns an error if no profile with that name is found.
 func SetActiveProfile(targetKey, profileName string) error {
 	if targetKey == "" {
-		return fmt.Errorf("target model key is required")
+		return errors.New("target model key is required")
 	}
 	ent, err := LoadEntry(targetKey)
 	if err != nil {
