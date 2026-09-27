@@ -451,7 +451,7 @@ func (m Model) modalTitleRow(innerW int, titleStyle lipgloss.Style, plain string
 // use -1 to size the viewport to the natural height of tbl.View(). Returns the rendered body
 // and the hscroll height applied (for absorbing leftover terminal rows inside the table chrome).
 func (m Model) mainAppModelListBody(iw int, minTableScrollH int) (body string, appliedScrollH int) {
-	tview := m.table.tbl.View()
+	tview := m.tableView()
 	th := strings.Count(tview, "\n") + 1
 	if th < 1 {
 		th = 1

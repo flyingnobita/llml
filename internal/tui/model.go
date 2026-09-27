@@ -269,7 +269,7 @@ type Model struct {
 
 func newTableViewport(st styles, homeDir string) (btable.Model, viewport.Model) {
 	t := btable.New(
-		btable.WithColumns(tableColumns(100, nil, homeDir, defaultSortCol, false)),
+		btable.WithColumns(tableColumns(100, nil, homeDir, defaultSortCol, false, runtimeColW)),
 		btable.WithRows(nil),
 		btable.WithFocused(true),
 		btable.WithStyles(st.table),
@@ -495,15 +495,6 @@ func (m Model) loadEffectiveBackendForIdentity(identity string) Model {
 	return m
 }
 
-// refreshTableRows rebuilds the table rows from m.table.files and the effective
-// backend cache. It recalculates columns from current files and cache. It does not relayout body heights — use layoutTable
-// for a full relayout (e.g. after terminal resize or sort change).
-func (m Model) refreshTableRows() Model {
-	cols := tableColumns(m.innerWidth(), m.table.files, m.layout.homeDir, m.table.sortCol, m.table.sortDesc)
-	m.table.tbl.SetRows(buildTableRows(m.table.files, cols, m.layout.homeDir, m.table.effectiveBackends))
-	return m
-}
-
 // SelectedPath returns the stable identity of the highlighted row, or empty if none.
 func (m Model) SelectedPath() string {
 	f, ok := m.SelectedModelFile()
@@ -578,7 +569,7 @@ func tableRowAreaHeight(contentAreaH int) int {
 // layoutTableAtInnerW builds columns, body height, and hscroll for a given inner body width.
 func (m Model) layoutTableAtInnerW(innerW int) Model {
 	m.layout.bodyInnerW = innerW
-	cols := tableColumns(innerW, m.table.files, m.layout.homeDir, m.table.sortCol, m.table.sortDesc)
+	cols := m.tableColumnsAt(innerW)
 	m.table.tbl.SetColumns(cols)
 	m.table.tbl.SetStyles(m.ui.styles.table)
 	minW := tableContentMinWidth(cols)
@@ -592,7 +583,7 @@ func (m Model) layoutTableAtInnerW(innerW int) Model {
 	h := m.computeBodyHeight(needsLogHBar)
 	m = m.applyTableAndLogHeights(h, innerW, previewH)
 
-	m.table.tbl.SetRows(buildTableRows(m.table.files, cols, m.layout.homeDir, m.table.effectiveBackends))
+	m.table.tbl.SetRows(m.tableRows(cols))
 	tview := m.table.tbl.View()
 	m.layout.tableBodyH = max(1, strings.Count(tview, "\n")+1)
 	lines := strings.Split(tview, "\n")

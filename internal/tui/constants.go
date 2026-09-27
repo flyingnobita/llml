@@ -155,6 +155,7 @@ const (
 	defaultIDColW       = 28
 	maxIDColW           = 56
 	runtimeColW         = 11 // "llama.cpp", "vllm"
+	runtimeColOffW      = 16 // "koboldcpp (off)", when any row is dimmed
 	sizeColW            = 9
 	modTimeColW         = 17
 	maxFileNameColW     = 72

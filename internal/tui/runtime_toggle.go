@@ -4,10 +4,12 @@ import (
 	"github.com/flyingnobita/llml/internal/models"
 )
 
-// adoptRuntimeStates makes r the model's stored on/off state. A failed read
-// leaves every Runtime on and is reported in the alert history.
+// adoptRuntimeStates makes r the model's stored on/off state and redraws the
+// rows, which dim by it. A failed read leaves every Runtime on and is reported
+// in the alert history.
 func (m Model) adoptRuntimeStates(r runtimeStatesRead) Model {
 	m.runtimeStates = r.states
+	m = m.layoutTable()
 	if r.err != nil {
 		m = m.addAlert(alertSeverityWarn, "Runtimes", "Could not read runtimes.toml, treating every Runtime as on: "+r.err.Error())
 	}
@@ -53,6 +55,7 @@ func (m Model) saveRuntimeToggles() Model {
 		return m
 	}
 	m.runtimeStates = m.rc.toggles
+	m = m.layoutTable()
 	if err := m.svc.writeRuntimeStates(m.runtimeStates); err != nil {
 		m = m.addAlert(alertSeverityWarn, "Runtimes", "Could not save runtimes.toml: "+err.Error())
 	}
