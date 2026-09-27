@@ -14,6 +14,8 @@ type runtimeReadyMsg struct {
 	// settings are the values this scan resolved and wrote; the model adopts them.
 	settings settings.Settings
 	runtime  models.RuntimeInfo
+	// states is the runtime state store detection ran with.
+	states runtimeStatesRead
 }
 
 // modelsLoadedMsg is used in tests to simulate a completed filesystem scan.
@@ -36,6 +38,7 @@ type startupCacheHitMsg struct {
 	// settings are the values this scan resolved and wrote; the model adopts them.
 	settings    settings.Settings
 	runtime     models.RuntimeInfo
+	states      runtimeStatesRead
 	files       []models.ModelFile
 	lastScan    time.Time
 	configPaths []string

@@ -7,22 +7,22 @@
   ││                                                                                            │
   ││  Runtime Environment                                                                       │
   ││                                                                                            │
-  ││  GGUF                    Llama.cpp · found                                                 │
-  ││   › [✓] Llama.cpp ○                                                                        │
-  ││     [✓] KoboldCpp ✗        Path  > /opt/llama/bin                                          │
-  ││  Safetensors               in use: /opt/llama/bin/llama-server (config)                    │
+  ││  GGUF                    KoboldCpp · Off                                                   │
+  ││     [✓] Llama.cpp ○                                                                        │
+  ││   › [ ] KoboldCpp off      Path  > koboldcpp binary or its dir                             │
+  ││  Safetensors               in use: not found (default)                                     │
   ││     [✓] vLLM      ○                                                                        │
-  ││  NInfer (.ninfer)          Port  > 8080                                                    │
-  ││     [✓] NInfer    ○        in use: 8081 (LLAMA_SERVER_PORT)                                │
+  ││  NInfer (.ninfer)          Port  > 5001                                                    │
+  ││     [✓] NInfer    ○        in use: 5001 (default)                                          │
   ││  Ollama library                                                                            │
-  ││     [✓] Ollama    ○        Host  > 127.0.0.1                                               │
-  ╰│                            in use: 127.0.0.1 (default)                                     │
-   │                                                                                            │
+  ││     [✓] Ollama    ○                                                                        │
+  ╰│                                                                                            │
    │  ● running  ○ found  ✗ not found                                                           │
-  L│  Saved to config.toml. Environment variables win over saved values.                        │
-  ╭│  ↑/↓: runtime · space: on/off · tab/→: fields · enter: save · esc: back                    │
-  ││                                                                                            │
+   │  Saved to config.toml. Environment variables win over saved values.                        │
+  L│  ↑/↓: runtime · space: on/off · tab/→: fields · enter: save · esc: back                    │
+  ╭│                                                                                            │
   │╰────────────────────────────────────────────────────────────────────────────────────────────╯
+  │   --model '/home/u/models/qwen3-8b-q4.gguf' \                                              │░
   │   --alias 'qwen3-8b-q4.gguf' \                                                             │░
   │   --host 127.0.0.1 \                                                                       │░
   ╰────────────────────────────────────────────────────────────────────────────────────────────╯░

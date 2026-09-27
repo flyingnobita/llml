@@ -184,8 +184,11 @@ func (m Model) savedRuntimeSettings() settings.Settings {
 }
 
 // runtimeConfigDirty reports whether any input differs from what it held when
-// the panel opened.
+// the panel opened, or any Runtime was toggled.
 func (m Model) runtimeConfigDirty() bool {
+	if m.runtimeTogglesDirty() {
+		return true
+	}
 	for i := range m.rc.prefill {
 		if m.rc.inputs[i].Value() != m.rc.prefill[i] {
 			return true
@@ -220,6 +223,7 @@ func (m Model) openRuntimeConfig() (Model, tea.Cmd) {
 	m.rc.discardConfirm = false
 	m = m.withLastRunCleared()
 	m.rc.prefill = m.runtimePanelPrefill()
+	m.rc.toggles = m.runtimeStates
 	for i, v := range m.rc.prefill {
 		m.rc.inputs[i].SetValue(v)
 	}
@@ -229,62 +233,38 @@ func (m Model) openRuntimeConfig() (Model, tea.Cmd) {
 	return m.focusRuntimeField(runtimeFieldNone)
 }
 
-// maybeSetMissingRuntimeFooterNote sets [Model.lastRunNote] when the scan found models that need a
-// backend binary, but [models.ResolveLlamaServerPath] or [models.ResolveVLLMPath] is empty.
-// GGUF rows require llama-server; vLLM rows require vllm. Clears the footer line when neither applies.
+// missingRuntimeNotes pairs each Runtime with the footer note shown when a
+// row needs it and its program cannot be found, in display order.
+var missingRuntimeNotes = []struct {
+	backend models.ModelBackend
+	note    string
+}{
+	{models.BackendLlama, MissingLlamaServerFooterNote},
+	{models.BackendVLLM, MissingVLLMFooterNote},
+	{models.BackendOllama, MissingOllamaFooterNote},
+	{models.BackendKobold, MissingKoboldCppFooterNote},
+	{models.BackendNInfer, MissingNInferFooterNote},
+	{models.BackendOMLX, MissingOMLXFooterNote},
+	{models.BackendSplash, MissingSplashFooterNote},
+}
+
+// maybeSetMissingRuntimeFooterNote sets [Model.lastRunNote] when the scan found
+// models whose Runtime's program cannot be found, and clears it otherwise. A
+// GGUF row needs KoboldCpp too when its active profile launches with it. A
+// Disabled Runtime is never reported: the user turned it off.
 func (m Model) maybeSetMissingRuntimeFooterNote() (Model, tea.Cmd) {
-	var wantLlama, wantVLLM, wantOllama, wantKobold, wantNInfer, wantOMLX, wantSplash bool
+	want := map[models.ModelBackend]bool{}
 	for _, f := range m.table.files {
-		switch f.Backend {
-		case models.BackendLlama:
-			wantLlama = true
-			if m.table.effectiveBackends[f.Identity()] == models.BackendKobold {
-				wantKobold = true
-			}
-		case models.BackendVLLM:
-			wantVLLM = true
-		case models.BackendOllama:
-			wantOllama = true
-		case models.BackendNInfer:
-			wantNInfer = true
-		case models.BackendOMLX:
-			wantOMLX = true
-		case models.BackendSplash:
-			wantSplash = true
+		want[f.Backend] = true
+		if f.Backend == models.BackendLlama && m.table.effectiveBackends[f.Identity()] == models.BackendKobold {
+			want[models.BackendKobold] = true
 		}
 	}
-	found := func(b models.ModelBackend) bool { return runtimeFor(b).status(m.runtime).found }
-	haveLlama := found(models.BackendLlama)
-	haveVLLM := found(models.BackendVLLM)
-	// Ollama models launch through a running daemon, so the program is optional.
-	ollama := runtimeFor(models.BackendOllama).status(m.runtime)
-	haveOllama := ollama.found || ollama.running
-	haveKobold := found(models.BackendKobold)
-	haveNInfer := found(models.BackendNInfer)
-	haveOMLX := found(models.BackendOMLX)
-	haveSplash := found(models.BackendSplash)
-
 	var msgs []string
-	if wantLlama && !haveLlama {
-		msgs = append(msgs, MissingLlamaServerFooterNote)
-	}
-	if wantVLLM && !haveVLLM {
-		msgs = append(msgs, MissingVLLMFooterNote)
-	}
-	if wantOllama && !haveOllama {
-		msgs = append(msgs, MissingOllamaFooterNote)
-	}
-	if wantKobold && !haveKobold {
-		msgs = append(msgs, MissingKoboldCppFooterNote)
-	}
-	if wantNInfer && !haveNInfer {
-		msgs = append(msgs, MissingNInferFooterNote)
-	}
-	if wantOMLX && !haveOMLX {
-		msgs = append(msgs, MissingOMLXFooterNote)
-	}
-	if wantSplash && !haveSplash {
-		msgs = append(msgs, MissingSplashFooterNote)
+	for _, r := range missingRuntimeNotes {
+		if want[r.backend] && m.runtimeEnabled(r.backend) && !m.runtimeAvailable(r.backend) {
+			msgs = append(msgs, r.note)
+		}
 	}
 	if len(msgs) > 0 {
 		m = m.withLastRunError(strings.Join(msgs, "\n"))
@@ -292,6 +272,17 @@ func (m Model) maybeSetMissingRuntimeFooterNote() (Model, tea.Cmd) {
 		m = m.withLastRunCleared()
 	}
 	return m, nil
+}
+
+// runtimeAvailable reports whether Runtime b can be used: its program was
+// found. Ollama models launch through a running daemon, so for Ollama a
+// daemon that answers is enough.
+func (m Model) runtimeAvailable(b models.ModelBackend) bool {
+	st := runtimeFor(b).status(m.runtime)
+	if b == models.BackendOllama {
+		return st.found || st.running
+	}
+	return st.found
 }
 
 // maybeSetMissingRuntimeFooterNoteBatch is like maybeSetMissingRuntimeFooterNote but batches with another command.
@@ -380,12 +371,13 @@ func (m Model) commitRuntimeConfig() (Model, tea.Cmd) {
 		return m, clearLastRunNoteAfterCmd()
 	}
 	m.settings = m.resolveSavedSettings(next)
+	m = m.saveRuntimeToggles()
 	// Re-probing is synchronous here because the panel must show the result of
 	// the save immediately; the timeout keeps an unreachable backend from
-	// freezing the UI.
+	// freezing the UI. Toggling a Runtime needs only this, never a rescan.
 	ctx, cancel := context.WithTimeout(context.Background(), runtimeProbeTimeout)
 	defer cancel()
-	m.runtime = m.svc.discoverRuntime(ctx, m.settings)
+	m.runtime = m.svc.discoverRuntime(ctx, m.settings, m.runtimeStates.Disabled())
 	var cmd tea.Cmd
 	// config.toml gets the panel's values, not the settings in use, so a field
 	// the environment overrides still saves what the panel holds.
@@ -432,9 +424,12 @@ func (m Model) updateRuntimeConfigKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 }
 
 // updateRuntimeListKey handles keys while the runtime list has focus: move the
-// highlight, or step right into the highlighted Runtime's first field.
+// highlight, toggle the highlighted Runtime, or step right into its first
+// field. Only here does space toggle, so a space typed in a field never does.
 func (m Model) updateRuntimeListKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch msg.String() {
+	case "space":
+		return m.toggleSelectedRuntime(), nil
 	case "up", "k":
 		return m.moveRuntimeCursor(-1), nil
 	case "down", "j":

@@ -17,6 +17,7 @@ import (
 	"charm.land/lipgloss/v2/compat"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/flyingnobita/llml/internal/config"
 	"github.com/flyingnobita/llml/internal/fsutil"
 	"github.com/flyingnobita/llml/internal/models"
 	"github.com/flyingnobita/llml/internal/profiles"
@@ -71,6 +72,9 @@ type runtimeConfigState struct {
 	// prefill is what each input held when the panel opened; the panel is
 	// dirty once any input differs from it.
 	prefill [runtimeFieldCount]string
+	// toggles is the on/off state the list shows: the stored state plus the
+	// user's unsaved space presses. enter stores it; esc drops it.
+	toggles config.RuntimeStates
 }
 
 // paramsState holds the parameter-profiles panel's state.
@@ -250,9 +254,12 @@ type Model struct {
 	// settings holds every resolved runtime value. It is set from the message a
 	// scan or reload produces, and from the c panel on save; nothing in the TUI
 	// reads the process environment for these values.
-	settings           settings.Settings
-	runtime            models.RuntimeInfo
-	runtimeScanned     bool
+	settings       settings.Settings
+	runtime        models.RuntimeInfo
+	runtimeScanned bool
+	// runtimeStates is the stored on/off state of each Runtime, as the last
+	// detection read it or the runtime panel saved it.
+	runtimeStates      config.RuntimeStates
 	lastRunNote        string
 	lastRunNoteSuccess bool // true: lastRunNote is non-error feedback (e.g. copy confirmation)
 	loading            bool

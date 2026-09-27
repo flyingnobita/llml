@@ -279,7 +279,7 @@ func newPanelFakes(getenv settings.Getenv) *panelFakes {
 		f.written = append(f.written, c)
 		return nil
 	}
-	svc.discoverRuntime = func(_ context.Context, s settings.Settings) models.RuntimeInfo {
+	svc.discoverRuntime = func(_ context.Context, s settings.Settings, _ models.BackendSet) models.RuntimeInfo {
 		f.probed = append(f.probed, s)
 		return panelRuntime(linuxPlatform)
 	}
@@ -406,7 +406,7 @@ func TestRuntimePanel_fitsEightyByTwentyFour(t *testing.T) {
 				"Runtime Environment",
 				"● running  ○ found  ✗ not found",
 				runtimeConfigModalSubtitle,
-				"↑/↓: runtime · tab/→: fields · enter: save · esc: back",
+				FooterRuntimeConfigHints,
 			} {
 				if !strings.Contains(view, want) {
 					t.Errorf("%s/%s: clipped, missing %q:\n%s", p.GOOS, rt.name, want, view)
