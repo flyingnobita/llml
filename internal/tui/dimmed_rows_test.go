@@ -30,7 +30,7 @@ type launchFakes struct {
 func newLaunchFakes() *launchFakes {
 	f := &launchFakes{}
 	svc := testServices()
-	svc.launchServer = func(spec serverSpec, _ runServerMode) tea.Cmd {
+	svc.launchServer = func(_ services, spec serverSpec, _ runServerMode) tea.Cmd {
 		f.launches = append(f.launches, spec.backend)
 		return nil
 	}

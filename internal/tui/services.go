@@ -48,9 +48,11 @@ type services struct {
 	probeOllama       func(ctx context.Context, host string) bool
 	preloadOllama     func(ctx context.Context, host, modelID string) error
 
-	// launchServer returns the command that starts spec's server in mode. Nil
-	// means the real launch; see [services.startServer].
-	launchServer func(spec serverSpec, mode runServerMode) tea.Cmd
+	// launchServer returns the command that starts spec's server in mode. It
+	// takes the services value it runs under, because the real launch
+	// ([services.launch]) starts Ollama through the daemon functions above, and
+	// a test that fakes those must see its fakes used.
+	launchServer func(svc services, spec serverSpec, mode runServerMode) tea.Cmd
 
 	// Environment and clipboard.
 	getenv         settings.Getenv
@@ -87,6 +89,8 @@ func defaultServices() services {
 			return models.NewOllamaClient(host).Preload(ctx, modelID)
 		},
 
+		launchServer: services.launch,
+
 		getenv:         settings.OSGetenv,
 		clipboardWrite: clipboard.WriteAll,
 	}
@@ -113,14 +117,15 @@ func (s services) waitForOllamaOrDefault(ctx context.Context, host string) bool 
 	}
 }
 
-// startServer returns the command that starts spec's server: an Ollama preload
-// on the shared daemon, or a server process in the split pane or fullscreen.
-// The real launch is the fallback here, rather than in defaultServices, because
-// the Ollama launch needs the daemon functions from the same services value.
+// startServer returns the command that starts spec's server in mode, through
+// the injected [services.launchServer].
 func (s services) startServer(spec serverSpec, mode runServerMode) tea.Cmd {
-	if s.launchServer != nil {
-		return s.launchServer(spec, mode)
-	}
+	return s.launchServer(s, spec, mode)
+}
+
+// launch is the real server launch: an Ollama preload on the shared daemon,
+// or a server process in the split pane or fullscreen.
+func (s services) launch(spec serverSpec, mode runServerMode) tea.Cmd {
 	switch {
 	case spec.backend == models.BackendOllama:
 		return s.runOllamaLaunchCmd(spec)
