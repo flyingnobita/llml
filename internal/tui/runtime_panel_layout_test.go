@@ -488,6 +488,9 @@ func TestRuntimePanel_envSourcedFieldStartsFromSavedValue(t *testing.T) {
 		t.Errorf("the environment's port should be in use:\n%s", view)
 	}
 
+	// Edit another field, so the save writes config.toml.
+	m = press(t, m, keyTab, keyCtrlU) // Llama.cpp Host
+	m = typeText(t, m, "127.0.0.2")
 	press(t, m, keyEnter)
 	if len(f.written) != 1 {
 		t.Fatalf("want one config write, got %d", len(f.written))

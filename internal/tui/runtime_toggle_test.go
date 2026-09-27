@@ -321,3 +321,50 @@ func TestRuntimeToggles_unreadableStateFileAlerts(t *testing.T) {
 type errTest string
 
 func (e errTest) Error() string { return string(e) }
+
+// countConfigWrites counts writes to config.toml through f's services.
+func (f *stateFakes) countConfigWrites() *int {
+	n := new(int)
+	f.services.writeConfig = func(config.Config) error {
+		*n++
+		return nil
+	}
+	return n
+}
+
+// A save that only toggles Runtimes writes the state file and leaves
+// config.toml alone, so a hand-edited file keeps its comments.
+func TestRuntimePanel_toggleOnlySaveLeavesConfigAlone(t *testing.T) {
+	t.Parallel()
+
+	f := newStateFakes()
+	configWrites := f.countConfigWrites()
+	m := openPanel(t, f.services, linuxPlatform, defaultSettings(), 100, 30)
+	press(t, m, keyDown, keySpace, keyEnter) // KoboldCpp off
+
+	if f.writes != 1 {
+		t.Errorf("the toggle should be written to the state file, got %d writes", f.writes)
+	}
+	if *configWrites != 0 {
+		t.Errorf("no field changed, so config.toml should not be written, got %d writes", *configWrites)
+	}
+}
+
+// A save that edits a field writes config.toml, alongside any toggles.
+func TestRuntimePanel_fieldEditSaveWritesConfig(t *testing.T) {
+	t.Parallel()
+
+	f := newStateFakes()
+	configWrites := f.countConfigWrites()
+	m := openPanel(t, f.services, linuxPlatform, defaultSettings(), 100, 30)
+	m = press(t, m, keyRight, keyCtrlU) // Llama.cpp Path
+	m = typeText(t, m, "/opt/llama")
+	press(t, m, keyEnter)
+
+	if *configWrites != 1 {
+		t.Errorf("an edited field should be written to config.toml once, got %d writes", *configWrites)
+	}
+	if f.writes != 0 {
+		t.Errorf("no toggle changed, so the state file should not be written, got %d writes", f.writes)
+	}
+}
