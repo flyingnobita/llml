@@ -298,3 +298,15 @@ const (
 	FooterImportHintsPath = FooterHintImport + FooterHintSep + "enter: parse · esc: back"
 	FooterImportHintsList = FooterHintImport + FooterHintSep + "space: toggle · enter: import · esc: back"
 )
+
+// modelFormat is the on-disk form of a model, which decides the Runtimes that
+// can run it. The runtime panel groups Runtimes under it.
+type modelFormat int
+
+const (
+	formatGGUF modelFormat = iota
+	formatSafetensors
+	formatNInfer
+	formatSplash
+	formatOllama
+)

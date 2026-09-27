@@ -42,8 +42,7 @@ const (
 
 // runtimeFieldVisible reports whether field f is shown on this platform.
 func (m Model) runtimeFieldVisible(f runtimeField) bool {
-	rt, _ := runtimeFieldDefFor(f)
-	return rt.supported(m.runtime.Platform)
+	return runtimeForField(f).supported(m.runtime.Platform)
 }
 
 // stepRuntimeField returns the next visible field after from in direction
@@ -212,7 +211,8 @@ func (m Model) maybeSetMissingRuntimeFooterNote() (Model, tea.Cmd) {
 	haveLlama := found(models.BackendLlama)
 	haveVLLM := found(models.BackendVLLM)
 	// Ollama models launch through a running daemon, so the program is optional.
-	haveOllama := found(models.BackendOllama) || runtimeFor(models.BackendOllama).status(m.runtime).running
+	ollama := runtimeFor(models.BackendOllama).status(m.runtime)
+	haveOllama := ollama.found || ollama.running
 	haveKobold := found(models.BackendKobold)
 	haveNInfer := found(models.BackendNInfer)
 	haveOMLX := found(models.BackendOMLX)
