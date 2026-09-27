@@ -138,11 +138,18 @@ type Settings struct {
 	// when both are set; see [Settings.HuggingFaceHubCache].
 	HFHubCache string
 	HFHome     string
+
+	// sources records which layer supplied each runtime field; see [Settings.Source].
+	sources [fieldCount]Source
 }
 
 // Layer is a partial [Settings]: a nil field means "this source says nothing
 // about that value", which is what lets a lower-precedence layer supply it.
 type Layer struct {
+	// Origin is the kind of source this layer reads, reported by
+	// [Settings.Source] for each runtime field the layer supplies.
+	Origin Origin
+
 	LlamaCppPath    *string
 	LlamaServerHost *string
 	LlamaServerPort *int
@@ -183,6 +190,8 @@ type Layer struct {
 // meaningful default, so [Resolve] always produces usable hosts and ports.
 func Defaults() Layer {
 	return Layer{
+		Origin: OriginDefault,
+
 		LlamaServerHost: ptr(DefaultLlamaServerHost),
 		LlamaServerPort: ptr(DefaultLlamaServerPort),
 		VLLMServerHost:  ptr(DefaultVLLMServerHost),
@@ -211,51 +220,57 @@ func Resolve(layers ...Layer) Settings {
 	var s Settings
 	var roots fsutil.PathSet
 	for _, l := range layers {
-		takeString(&s.LlamaCppPath, l.LlamaCppPath)
-		takeString(&s.LlamaServerHost, l.LlamaServerHost)
-		takeInt(&s.LlamaServerPort, l.LlamaServerPort)
-		takeString(&s.VLLMPath, l.VLLMPath)
-		takeString(&s.VLLMVenv, l.VLLMVenv)
-		takeString(&s.VLLMServerHost, l.VLLMServerHost)
-		takeInt(&s.VLLMServerPort, l.VLLMServerPort)
-		takeString(&s.OllamaPath, l.OllamaPath)
-		takeString(&s.OllamaHost, l.OllamaHost)
-		takeString(&s.KoboldCppPath, l.KoboldCppPath)
-		takeInt(&s.KoboldCppPort, l.KoboldCppPort)
-		takeString(&s.NInferPath, l.NInferPath)
-		takeString(&s.NInferServerHost, l.NInferServerHost)
-		takeInt(&s.NInferServerPort, l.NInferServerPort)
-		takeString(&s.OMLXPath, l.OMLXPath)
-		takeString(&s.OMLXHost, l.OMLXHost)
-		takeInt(&s.OMLXPort, l.OMLXPort)
+		take(&s, l.Origin, FieldLlamaCppPath, &s.LlamaCppPath, l.LlamaCppPath)
+		take(&s, l.Origin, FieldLlamaServerHost, &s.LlamaServerHost, l.LlamaServerHost)
+		take(&s, l.Origin, FieldLlamaServerPort, &s.LlamaServerPort, l.LlamaServerPort)
+		take(&s, l.Origin, FieldVLLMPath, &s.VLLMPath, l.VLLMPath)
+		take(&s, l.Origin, FieldVLLMVenv, &s.VLLMVenv, l.VLLMVenv)
+		take(&s, l.Origin, FieldVLLMServerHost, &s.VLLMServerHost, l.VLLMServerHost)
+		take(&s, l.Origin, FieldVLLMServerPort, &s.VLLMServerPort, l.VLLMServerPort)
+		take(&s, l.Origin, FieldOllamaPath, &s.OllamaPath, l.OllamaPath)
+		take(&s, l.Origin, FieldOllamaHost, &s.OllamaHost, l.OllamaHost)
+		take(&s, l.Origin, FieldKoboldCppPath, &s.KoboldCppPath, l.KoboldCppPath)
+		take(&s, l.Origin, FieldKoboldCppPort, &s.KoboldCppPort, l.KoboldCppPort)
+		take(&s, l.Origin, FieldNInferPath, &s.NInferPath, l.NInferPath)
+		take(&s, l.Origin, FieldNInferServerHost, &s.NInferServerHost, l.NInferServerHost)
+		take(&s, l.Origin, FieldNInferServerPort, &s.NInferServerPort, l.NInferServerPort)
+		take(&s, l.Origin, FieldOMLXPath, &s.OMLXPath, l.OMLXPath)
+		take(&s, l.Origin, FieldOMLXHost, &s.OMLXHost, l.OMLXHost)
+		take(&s, l.Origin, FieldOMLXPort, &s.OMLXPort, l.OMLXPort)
 		if len(s.OMLXModelDirs) == 0 && len(l.OMLXModelDirs) > 0 {
 			var dirs fsutil.PathSet
 			dirs.Add(l.OMLXModelDirs...)
 			s.OMLXModelDirs = dirs.Slice()
 		}
-		takeString(&s.SplashPath, l.SplashPath)
-		takeString(&s.SplashHost, l.SplashHost)
-		takeInt(&s.SplashPort, l.SplashPort)
-		takeString(&s.HFHubCache, l.HFHubCache)
-		takeString(&s.HFHome, l.HFHome)
+		take(&s, l.Origin, FieldSplashPath, &s.SplashPath, l.SplashPath)
+		take(&s, l.Origin, FieldSplashHost, &s.SplashHost, l.SplashHost)
+		take(&s, l.Origin, FieldSplashPort, &s.SplashPort, l.SplashPort)
+		claim(&s.HFHubCache, l.HFHubCache)
+		claim(&s.HFHome, l.HFHome)
 		roots.Add(l.ExtraModelPaths...)
 	}
 	s.ExtraModelPaths = roots.Slice()
 	return s
 }
 
-// takeString assigns v to dst only if v is set and dst has not been claimed by
-// a higher-precedence layer.
-func takeString(dst *string, v *string) {
-	if v != nil && *dst == "" {
-		*dst = *v
+// take claims dst for v, as [claim] does, and records origin as the source of
+// f when it does.
+func take[T comparable](s *Settings, origin Origin, f Field, dst, v *T) {
+	if claim(dst, v) {
+		s.sources[f] = origin.source(f)
 	}
 }
 
-func takeInt(dst *int, v *int) {
-	if v != nil && *dst == 0 {
-		*dst = *v
+// claim assigns v to dst only if v is set and dst has not been claimed by a
+// higher-precedence layer. A zero v claims nothing, so it cannot record a source
+// for a value it did not supply.
+func claim[T comparable](dst, v *T) bool {
+	var zero T
+	if v == nil || *v == zero || *dst != zero {
+		return false
 	}
+	*dst = *v
+	return true
 }
 
 func ptr[T any](v T) *T { return &v }

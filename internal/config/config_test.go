@@ -231,6 +231,39 @@ func TestRuntimeConfigLayer_expandsAndCleansPaths(t *testing.T) {
 	}
 }
 
+func TestRuntimeConfigLayer_reportsConfigAsSource(t *testing.T) {
+	t.Parallel()
+
+	port := 6000
+	rc := RuntimeConfig{
+		DefaultLlamaCppPath:  "/from-toml",
+		DefaultKoboldCppPort: &port,
+		DefaultOllamaHost:    "http://box:11434/",
+		DefaultVLLMPath:      "/from-toml-vllm",
+	}
+	s := settings.Resolve(
+		settings.FromEnv(fakeEnv(map[string]string{settings.EnvVLLMPath: "/from-env"})),
+		rc.Layer(),
+		settings.Defaults(),
+	)
+
+	tests := []struct {
+		field settings.Field
+		want  string
+	}{
+		{settings.FieldLlamaCppPath, "config"},
+		{settings.FieldKoboldCppPort, "config"},
+		{settings.FieldOllamaHost, "config"},
+		{settings.FieldVLLMPath, settings.EnvVLLMPath},
+		{settings.FieldLlamaServerPort, "default"},
+	}
+	for _, tt := range tests {
+		if got := s.Source(tt.field).String(); got != tt.want {
+			t.Errorf("Source(%s) = %q, want %q", tt.field.EnvVar(), got, tt.want)
+		}
+	}
+}
+
 // RuntimeConfigFromSettings must round-trip through Layer unchanged, so writing
 // the file and reading it back does not shift the resolved values.
 func TestRuntimeConfigFromSettings_roundTrips(t *testing.T) {
@@ -254,9 +287,25 @@ func TestRuntimeConfigFromSettings_roundTrips(t *testing.T) {
 	got := settings.Resolve(settings.FromEnv(fakeEnv(nil)), rc.Layer(), settings.Defaults())
 
 	got.ExtraModelPaths = want.ExtraModelPaths // not part of the [runtime] table
-	if !reflect.DeepEqual(got, want) {
+	if !sameValues(got, want) {
 		t.Errorf("round trip changed settings:\n got %+v\nwant %+v", got, want)
 	}
+}
+
+// sameValues reports whether a and b resolved to the same values. It ignores
+// where each value came from: a round trip through the file turns environment
+// sources into config sources by design.
+func sameValues(a, b settings.Settings) bool {
+	va, vb := reflect.ValueOf(a), reflect.ValueOf(b)
+	for i := range va.NumField() {
+		if !va.Type().Field(i).IsExported() {
+			continue
+		}
+		if !reflect.DeepEqual(va.Field(i).Interface(), vb.Field(i).Interface()) {
+			return false
+		}
+	}
+	return true
 }
 
 func TestOMLXAppLayer(t *testing.T) {

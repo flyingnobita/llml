@@ -162,7 +162,7 @@ func migrateToCurrentSchema(c Config) (Config, error) {
 // This is the only direction configuration flows into the running process: the
 // file is read into a layer, never applied to the process environment.
 func (r RuntimeConfig) Layer() settings.Layer {
-	var l settings.Layer
+	l := settings.Layer{Origin: settings.OriginConfig}
 	setLayerPath(&l.LlamaCppPath, r.DefaultLlamaCppPath)
 	setLayerPath(&l.VLLMPath, r.DefaultVLLMPath)
 	setLayerPath(&l.VLLMVenv, r.DefaultVLLMVenv)
@@ -188,7 +188,7 @@ func (r RuntimeConfig) Layer() settings.Layer {
 
 // Layer converts the persisted [discovery] table into a settings layer.
 func (d DiscoveryConfig) Layer() settings.Layer {
-	return settings.Layer{ExtraModelPaths: d.ExtraModelPaths}
+	return settings.Layer{Origin: settings.OriginConfig, ExtraModelPaths: d.ExtraModelPaths}
 }
 
 // Layer converts the whole document into one settings layer.
