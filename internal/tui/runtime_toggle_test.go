@@ -10,6 +10,7 @@ import (
 
 	"github.com/flyingnobita/llml/internal/config"
 	"github.com/flyingnobita/llml/internal/models"
+	"github.com/flyingnobita/llml/internal/profiles"
 	"github.com/flyingnobita/llml/internal/settings"
 )
 
@@ -364,5 +365,29 @@ func TestRuntimePanel_fieldEditSaveWritesConfig(t *testing.T) {
 	}
 	if f.writes != 0 {
 		t.Errorf("no toggle changed, so the state file should not be written, got %d writes", f.writes)
+	}
+}
+
+// The missing-runtime note follows a GGUF row's Active Profile the same way
+// dimming and launch do: through the parameter-profile key, which cleans the
+// row's identity. A row whose identity is not already clean still finds the
+// KoboldCpp choice stored for it.
+func TestMissingNote_followsActiveProfileByParamsKey(t *testing.T) {
+	t.Parallel()
+
+	m := NewWithServices(testServices())
+	m.runtime = models.RuntimeInfo{Platform: linuxPlatform, LlamaServerPath: "/bin/llama-server"}
+	row := models.ModelFile{Backend: models.BackendLlama, ID: "/m/./a.gguf", Path: "/m/a.gguf", Name: "a.gguf"}
+	m.table.files = []models.ModelFile{row}
+	m.table.effectiveBackends = map[string]models.ModelBackend{
+		profiles.ModelParamsKey(row.Identity()): models.BackendKobold,
+	}
+	if row.Identity() == profiles.ModelParamsKey(row.Identity()) {
+		t.Fatal("fixture: the identity should differ from its params key")
+	}
+
+	m, _ = m.maybeSetMissingRuntimeFooterNote()
+	if !strings.Contains(m.lastRunNote, MissingKoboldCppFooterNote) {
+		t.Errorf("the row launches on the missing KoboldCpp, note %q", m.lastRunNote)
 	}
 }

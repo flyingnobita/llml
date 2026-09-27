@@ -259,9 +259,7 @@ func (m Model) maybeSetMissingRuntimeFooterNote() (Model, tea.Cmd) {
 	want := map[models.ModelBackend]bool{}
 	for _, f := range m.table.files {
 		want[f.Backend] = true
-		if f.Backend == models.BackendLlama && m.table.effectiveBackends[f.Identity()] == models.BackendKobold {
-			want[models.BackendKobold] = true
-		}
+		want[rowRuntime(f, m.table.effectiveBackends)] = true
 	}
 	var msgs []string
 	for _, r := range missingRuntimeNotes {
