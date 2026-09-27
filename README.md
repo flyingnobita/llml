@@ -341,6 +341,10 @@ their `p` panel, but **R** / **ctrl+R** will not launch them; an alert names the
 in `c`. A GGUF model follows its active profile: it is dimmed only when that profile's runtime
 (llama.cpp or KoboldCpp) is off, so switching profiles can make it launchable again.
 
+When Ollama is off, llml does not contact the Ollama daemon at all: startup and **S** neither start
+`ollama serve` nor call its API. The Ollama models from the last scan stay in the table, dimmed, and
+may be out of date until you turn Ollama back on and scan again.
+
 | Feature             | Environment Variable | `config.toml` key (under `[runtime]`) | Default           |
 | :------------------ | :------------------- | :------------------------------------ | :---------------- |
 | **llama.cpp path**  | `LLAMA_CPP_PATH`     | `default_llama_cpp_path`              | _(auto)_          |

@@ -34,6 +34,18 @@ func (svc services) resolveSettings(cfg config.Config, haveCfg bool, explicitPat
 	return settings.Resolve(append(layers, settings.Defaults())...)
 }
 
+// ollamaOff reports whether detection skipped Ollama because it is a Disabled
+// Runtime. llml then leaves the daemon alone: no start, no probe, no API call.
+func ollamaOff(rt models.RuntimeInfo) bool {
+	return rt.Skipped.Has(models.BackendOllama)
+}
+
+// ollamaNeedsStart reports whether discovery should start the Ollama daemon
+// first: Ollama is on and installed, but its server did not answer.
+func ollamaNeedsStart(rt models.RuntimeInfo) bool {
+	return !ollamaOff(rt) && rt.OllamaPath != "" && !rt.OllamaRunning
+}
+
 func mergeCachedOllamaRows(cached config.CacheFile, files []models.ModelFile, rt models.RuntimeInfo) []models.ModelFile {
 	if rt.OllamaRunning {
 		return files
@@ -145,7 +157,7 @@ func (svc services) runDiscoveryScan(ctx context.Context, plan discoveryScanPlan
 	}
 	debugf("runDiscoveryScan: start haveCfg=%t ollamaPath=%q ollamaRunning=%t", plan.haveCfg, res.runtime.OllamaPath, res.runtime.OllamaRunning)
 
-	if res.runtime.OllamaPath != "" && !res.runtime.OllamaRunning {
+	if ollamaNeedsStart(res.runtime) {
 		spec := discoveryOllamaSpec(res.runtime)
 		debugf("runDiscoveryScan: ensuring Ollama ready via bin=%q host=%q", spec.bin, spec.host)
 		ready, err := svc.ensureOllamaReady(ctx, spec)
@@ -168,8 +180,11 @@ func (svc services) runDiscoveryScan(ctx context.Context, plan discoveryScanPlan
 	debugf("runDiscoveryScan: discoverModels returned %d files", len(files))
 
 	// Ollama rows are fetched separately from the filesystem walk; a daemon
-	// that is down must not fail the scan.
-	if rows, oerr := svc.discoverOllama(ctx, plan.settings.OllamaHost); oerr == nil {
+	// that is down must not fail the scan. With Ollama off the API is not
+	// called at all, and the cached rows below stand in for it.
+	if ollamaOff(res.runtime) {
+		debugf("runDiscoveryScan: Ollama is off, keeping cached rows")
+	} else if rows, oerr := svc.discoverOllama(ctx, plan.settings.OllamaHost); oerr == nil {
 		files = append(files, rows...)
 	} else {
 		debugf("runDiscoveryScan: ollama discovery failed, continuing: %v", oerr)
@@ -202,7 +217,7 @@ func (svc services) discoveryScanCmd(ctx context.Context, mode scanMode, explici
 		return scanDoneMsg{mode: mode, result: res}
 	}
 	// Starting the daemon takes a moment, so tell the user before blocking.
-	if plan.runtime.OllamaPath != "" && !plan.runtime.OllamaRunning {
+	if ollamaNeedsStart(plan.runtime) {
 		debugf("discoveryScanCmd: Ollama installed but stopped, sending startup note then scan")
 		return tea.Batch(
 			func() tea.Msg { return ollamaDiscoveryStartedMsg{note: discoveryStartNote(plan.runtime)} },
@@ -247,7 +262,7 @@ func (svc services) startupCmd() tea.Cmd {
 		}
 		rt, states := svc.detectRuntime(ctx, s)
 		debugf("startupCmd: cache valid, runtime ollamaPath=%q ollamaRunning=%t cachedModels=%d", rt.OllamaPath, rt.OllamaRunning, len(cached.Models))
-		if rt.OllamaPath != "" && !rt.OllamaRunning {
+		if ollamaNeedsStart(rt) {
 			debugf("startupCmd: Ollama installed but stopped, forcing full scan")
 			return startupNeedFullScanMsg{}
 		}
@@ -257,7 +272,7 @@ func (svc services) startupCmd() tea.Cmd {
 			return startupNeedFullScanMsg{}
 		}
 		var writeErr error
-		if rt.OllamaRunning {
+		if rt.OllamaRunning && !ollamaOff(rt) {
 			liveOllama, err := svc.discoverOllama(ctx, s.OllamaHost)
 			if err != nil {
 				debugf("startupCmd: live Ollama refresh failed, keeping cache: %v", err)
