@@ -185,7 +185,7 @@ llml
 | `S`         | Full model filesystem rescan; refresh the discovery cache (`cache/models.toml`)                                                                       |
 | `R`         | Run server (split view: table + log pane)                                                                                                             |
 | `ctrl`+`R`  | Run server full-screen                                                                                                                                |
-| `c`         | Edit runtime environment (paths, ports)                                                                                                               |
+| `c`         | Edit runtime environment (paths, ports) and turn runtimes on or off                                                                                   |
 | `p`         | Edit parameter profiles for the selected model                                                                                                        |
 | `m`         | Edit extra model search paths (saved in `config.toml`)                                                                                                |
 | `,` / `.`   | Change sort column / reverse sort direction                                                                                                           |
@@ -309,6 +309,7 @@ User data and settings are stored in a dedicated folder. Routine app upgrades **
 - **`cache/models.toml`**: The model discovery cache. Machine-owned and safe to delete; llml
   rebuilds it on the next scan.
 - **`model-params.json`**: Stores your [named parameter profiles](#parameter-profiles-p) (args/env) for each model.
+- **`runtimes.toml`**: Which runtimes are on, as set with the checkboxes in the `c` panel.
 - **`backups/`**: Automatic timestamped snapshots created before the app overwrites configuration.
 
 ---
@@ -321,6 +322,13 @@ found, or not found. **↑**/**↓** pick a runtime, **tab** or **→** move int
 saves, and **esc** discards. Under each field, an `in use` line shows the value llml runs with and
 where it came from: the environment variable's name, `config`, `default`, or `detected` (a program
 found with no path configured). An environment variable wins over the saved value until it is unset.
+
+Each runtime has a checkbox. **space** (in the list only, never in a field) turns the highlighted
+runtime on or off, and **enter** saves it with your field edits. A runtime you turn off shows `off`
+in the list and "Off" in its detail pane: llml stops probing it and leaves it out of the runtime
+status line, and its fields stay editable. Saving re-detects runtimes without rescanning models.
+The on/off choices are stored in `runtimes.toml`, not `config.toml`, and no environment variable
+overrides them. A runtime with no stored choice is on.
 
 | Feature             | Environment Variable | `config.toml` key (under `[runtime]`) | Default           |
 | :------------------ | :------------------- | :------------------------------------ | :---------------- |
@@ -406,7 +414,7 @@ To protect your settings and cache, `llml` maintains a history of your configura
 
 - **Atomic Writes**: Files are written to a temporary location before being moved, preventing corruption.
 - **Automatic Backups**: The newest **10** versions of each file are kept in the `backups/` directory.
-- **Upgrade Snapshots**: When the `llml` version changes, a snapshot of both `config.toml` and `model-params.json` is created automatically so you can roll back if needed. The file **`.last-run-version`** in the same directory records the last run version for that behavior.
+- **Upgrade Snapshots**: When the `llml` version changes, a snapshot of `config.toml`, `model-params.json`, and `runtimes.toml` is created automatically so you can roll back if needed. The file **`.last-run-version`** in the same directory records the last run version for that behavior.
 
 ## 💻 Development
 
