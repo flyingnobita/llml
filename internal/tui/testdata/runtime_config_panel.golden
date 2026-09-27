@@ -12,7 +12,7 @@
   ││     ✗ KoboldCpp            Path  > /opt/llama/bin                                          │
   ││  Safetensors               in use: /opt/llama/bin/llama-server (config)                    │
   ││     ○ vLLM                                                                                 │
-  ││  NInfer (.ninfer)          Port  > 8081                                                    │
+  ││  NInfer (.ninfer)          Port  > 8080                                                    │
   ││     ○ NInfer               in use: 8081 (LLAMA_SERVER_PORT)                                │
   ││  Ollama library                                                                            │
   ││     ○ Ollama               Host  > 127.0.0.1                                               │

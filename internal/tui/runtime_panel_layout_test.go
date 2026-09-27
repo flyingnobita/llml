@@ -379,8 +379,23 @@ func TestRuntimePanel_escDiscardsAfterConfirmation(t *testing.T) {
 func TestRuntimePanel_fitsEightyByTwentyFour(t *testing.T) {
 	t.Parallel()
 
+	// Every path comes from the environment and is long, so the in-use lines
+	// carry the longest values and source tags the panel can show.
+	long := "/very/long/directory/name/that/does/not/fit/in/eighty/columns"
+	env := map[string]string{}
+	for _, rt := range runtimeTable {
+		for _, d := range rt.fields {
+			if d.isPath {
+				env[d.env()] = long
+			}
+		}
+	}
+	s := settings.Resolve(settings.FromEnv(func(k string) string { return env[k] }), settings.Defaults())
+
 	for _, p := range []models.Platform{linuxPlatform, macPlatform} {
-		m := openPanel(t, testServices(), p, defaultSettings(), 80, 24)
+		m := openPanel(t, testServices(), p, s, 80, 24)
+		m.runtime.LlamaServerPath = long + "/llama-server"
+		m.runtime.OllamaPath = long + "/ollama"
 		for _, rt := range m.panelRuntimes() {
 			view := plainView(m)
 			lines := strings.Split(view, "\n")
@@ -399,6 +414,13 @@ func TestRuntimePanel_fitsEightyByTwentyFour(t *testing.T) {
 			}
 			if got := strings.Count(view, "in use: "); got != len(rt.fields) {
 				t.Errorf("%s/%s: %d in-use lines, want %d:\n%s", p.GOOS, rt.name, got, len(rt.fields), view)
+			}
+			for _, d := range rt.fields {
+				// Which label a field gets is tested elsewhere; here it only
+				// has to survive the truncation of a long value.
+				if _, src := m.runtimeFieldInUse(d); !strings.Contains(view, "("+src.label+")") {
+					t.Errorf("%s/%s: source tag %q clipped:\n%s", p.GOOS, rt.name, src.label, view)
+				}
 			}
 			// The overlay cuts a block larger than the terminal, so a block
 			// that fits is drawn whole, bottom border included.
@@ -441,5 +463,70 @@ func TestRuntimePanel_restylesWithTheme(t *testing.T) {
 	}
 	if view := m.View().Content; !strings.Contains(view, light) || strings.Contains(view, dark) {
 		t.Error("the environment tag should follow the theme change")
+	}
+}
+
+// A field the environment sets starts from the saved value, not the
+// environment's, so saving the panel never copies the variable into
+// config.toml. The in-use line still shows the environment's value.
+func TestRuntimePanel_envSourcedFieldStartsFromSavedValue(t *testing.T) {
+	t.Parallel()
+
+	env := map[string]string{settings.EnvLlamaServerPort: "8081"}
+	getenv := func(k string) string { return env[k] }
+	f := newPanelFakes(getenv)
+	saved := config.Config{Runtime: config.RuntimeConfig{DefaultLlamaServerPort: ptrTo(9000)}}
+	f.services.readConfig = func() (config.Config, error) { return saved, nil }
+	s := settings.Resolve(settings.FromEnv(getenv), saved.Layer(), settings.Defaults())
+
+	m := openPanel(t, f.services, linuxPlatform, s, 100, 30)
+	m = press(t, m, keyTab, keyTab) // Llama.cpp Port
+	if l := focusLine(t, m); !strings.Contains(l, "9000") {
+		t.Errorf("the Port input should hold the saved 9000, focus line %q", l)
+	}
+	if view := plainView(m); !strings.Contains(view, "in use: 8081 (LLAMA_SERVER_PORT)") {
+		t.Errorf("the environment's port should be in use:\n%s", view)
+	}
+
+	press(t, m, keyEnter)
+	if len(f.written) != 1 {
+		t.Fatalf("want one config write, got %d", len(f.written))
+	}
+	if p := f.written[0].Runtime.DefaultLlamaServerPort; p == nil || *p != 9000 {
+		t.Errorf("saving should keep the saved port 9000, wrote %v", p)
+	}
+}
+
+// A path's source is "detected" whenever the program in use was not found at
+// the configured path, and a program found nowhere reads "not found".
+func TestRuntimePanel_pathSourceFollowsWhereTheProgramWasFound(t *testing.T) {
+	t.Parallel()
+
+	s := settings.Resolve(
+		settings.Layer{Origin: settings.OriginConfig, LlamaCppPath: ptrTo("/opt/llama/bin"), VLLMPath: ptrTo("/opt/vllm/bin")},
+		settings.Defaults(),
+	)
+	m := openPanel(t, testServices(), linuxPlatform, s, 100, 30)
+	m.runtime.LlamaServerPath = "/usr/local/bin/llama-server" // not under /opt/llama/bin
+	if view := plainView(m); !strings.Contains(view, "in use: /usr/local/bin/llama-server (detected)") {
+		t.Errorf("a program found outside the configured path is detected:\n%s", view)
+	}
+
+	m = press(t, m, keyDown, keyDown) // vLLM, found under its configured path
+	if view := plainView(m); !strings.Contains(view, "in use: /opt/vllm/bin/vllm (config)") {
+		t.Errorf("a program under the configured path comes from config:\n%s", view)
+	}
+}
+
+// Not parallel: program lookups fall back to PATH, which the test empties so
+// nothing is found on the host.
+func TestRuntimePanel_missingProgramReadsNotFound(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+
+	m := openPanel(t, testServices(), linuxPlatform, defaultSettings(), 100, 30)
+	m.runtime.LlamaServerPath = ""
+	m.runtime.ServerRunning = true // a server answering does not make the program found
+	if view := plainView(m); !strings.Contains(view, "in use: not found (default)") {
+		t.Errorf("a program found nowhere reads not found:\n%s", view)
 	}
 }

@@ -83,8 +83,10 @@ type styles struct {
 	runtimeMarkMissing  lipgloss.Style
 	runtimeLegend       lipgloss.Style
 	runtimeFieldLabel   lipgloss.Style
-	runtimeInUse        lipgloss.Style
-	runtimeEnvSource    lipgloss.Style
+	// runtimeFieldLabelFocused is the label of the field holding keyboard focus.
+	runtimeFieldLabelFocused lipgloss.Style
+	runtimeInUse             lipgloss.Style
+	runtimeEnvSource         lipgloss.Style
 	// notesTextarea is the Notes field's textarea styling, with the distracting
 	// bubbles defaults (cursor-line highlight, base padding) cleared.
 	notesTextarea textarea.Styles
@@ -245,17 +247,18 @@ func newStyles(theme Theme) styles {
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(theme.Border).
 			Padding(0, 2),
-		runtimeGroupLabel:   lipgloss.NewStyle().Bold(true).Foreground(theme.ParamSectionHeading),
-		runtimeListPane:     lipgloss.NewStyle(),
-		runtimeListSelected: lipgloss.NewStyle().Bold(true).Foreground(theme.ParamProfileName),
-		runtimeMarkRunning:  lipgloss.NewStyle().Foreground(theme.Info),
-		runtimeMarkFound:    lipgloss.NewStyle().Foreground(theme.Body),
-		runtimeMarkMissing:  lipgloss.NewStyle().Foreground(theme.Subtitle),
-		runtimeLegend:       lipgloss.NewStyle().Foreground(theme.Footer),
-		runtimeFieldLabel:   lipgloss.NewStyle().Foreground(theme.ParamMetadataLabel),
-		runtimeInUse:        lipgloss.NewStyle().Foreground(theme.RuntimePanel),
-		runtimeEnvSource:    lipgloss.NewStyle().Foreground(theme.Warn),
-		notesTextarea:       newNotesTextareaStyles(),
+		runtimeGroupLabel:        lipgloss.NewStyle().Bold(true).Foreground(theme.ParamSectionHeading),
+		runtimeListPane:          lipgloss.NewStyle(),
+		runtimeListSelected:      lipgloss.NewStyle().Bold(true).Foreground(theme.ParamProfileName),
+		runtimeMarkRunning:       lipgloss.NewStyle().Foreground(theme.Info),
+		runtimeMarkFound:         lipgloss.NewStyle().Foreground(theme.Body),
+		runtimeMarkMissing:       lipgloss.NewStyle().Foreground(theme.Subtitle),
+		runtimeLegend:            lipgloss.NewStyle().Foreground(theme.Footer),
+		runtimeFieldLabel:        lipgloss.NewStyle().Foreground(theme.ParamMetadataLabel),
+		runtimeFieldLabelFocused: lipgloss.NewStyle().Bold(true).Foreground(theme.Body),
+		runtimeInUse:             lipgloss.NewStyle().Foreground(theme.RuntimePanel),
+		runtimeEnvSource:         lipgloss.NewStyle().Foreground(theme.Warn),
+		notesTextarea:            newNotesTextareaStyles(),
 	}
 }
 

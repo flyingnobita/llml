@@ -1,9 +1,11 @@
 package tui
 
 import (
+	"path/filepath"
 	"strings"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/flyingnobita/llml/internal/models"
 	"github.com/flyingnobita/llml/internal/settings"
@@ -68,10 +70,9 @@ func (m Model) runtimeConfigModalBlock() string {
 // one runs. A format no supported Runtime runs gets no label.
 func (m Model) runtimeListPane() string {
 	var lines []string
-	var group modelFormat = -1
-	for _, rt := range m.panelRuntimes() {
-		if rt.format != group {
-			group = rt.format
+	rts := m.panelRuntimes()
+	for i, rt := range rts {
+		if i == 0 || rt.format != rts[i-1].format {
 			lines = append(lines, m.ui.styles.runtimeGroupLabel.Render(rt.format.String()))
 		}
 		lines = append(lines, m.runtimeListRow(rt))
@@ -79,43 +80,46 @@ func (m Model) runtimeListPane() string {
 	return m.ui.styles.runtimeListPane.Width(runtimeListPaneWidth).Render(strings.Join(lines, "\n"))
 }
 
+// focusMarker is the "›" that marks the one line holding keyboard focus, or
+// blank space of the same width.
+func focusMarker(focused bool) string {
+	if focused {
+		return "› "
+	}
+	return "  "
+}
+
 // runtimeListRow renders one Runtime's list line: a focus marker when the list
 // has keyboard focus, its status mark, and its name, emphasized when it is the
 // highlighted Runtime.
 func (m Model) runtimeListRow(rt runtimeDef) string {
-	prefix := "  "
 	highlighted := rt.backend == m.rc.selected
-	if highlighted && m.rc.focus == runtimeFieldNone {
-		prefix = "› "
-	}
 	name := m.ui.styles.body.Render(rt.name)
 	if highlighted {
 		name = m.ui.styles.runtimeListSelected.Render(rt.name)
 	}
-	return " " + prefix + m.runtimeStatusMark(rt.status(m.runtime)) + " " + name
+	sv := m.runtimeStatusView(rt.status(m.runtime))
+	return runtimeListRowIndent + focusMarker(highlighted && m.rc.focus == runtimeFieldNone) +
+		sv.style.Render(sv.mark) + " " + name
 }
 
-// runtimeStatusMark renders the mark for what detection learned.
-func (m Model) runtimeStatusMark(st runtimeStatus) string {
-	switch {
-	case st.running:
-		return m.ui.styles.runtimeMarkRunning.Render(runtimeMarkRunning)
-	case st.found:
-		return m.ui.styles.runtimeMarkFound.Render(runtimeMarkFound)
-	default:
-		return m.ui.styles.runtimeMarkMissing.Render(runtimeMarkMissing)
-	}
+// runtimeStatusView is how the panel shows one detection status: the list's
+// mark, the word the legend and detail header use, and the mark's style.
+type runtimeStatusView struct {
+	mark  string
+	word  string
+	style lipgloss.Style
 }
 
-// runtimeStatusWord names a status in the detail pane header.
-func runtimeStatusWord(st runtimeStatus) string {
+// runtimeStatusView returns how the panel shows st.
+func (m Model) runtimeStatusView(st runtimeStatus) runtimeStatusView {
 	switch {
 	case st.running:
-		return "running"
+		return runtimeStatusView{runtimeMarkRunning, "running", m.ui.styles.runtimeMarkRunning}
 	case st.found:
-		return "found"
+		return runtimeStatusView{runtimeMarkFound, "found", m.ui.styles.runtimeMarkFound}
 	default:
-		return "not found"
+		return runtimeStatusView{runtimeMarkMissing, "not found", m.ui.styles.runtimeMarkMissing}
 	}
 }
 
@@ -124,10 +128,12 @@ func (m Model) runtimeLegend() string {
 	if !m.runtimeScanned && m.loading {
 		return m.ui.styles.runtimeLegend.Render("Detecting runtimes…")
 	}
-	st := m.ui.styles
-	return st.runtimeMarkRunning.Render(runtimeMarkRunning) + st.runtimeLegend.Render(" running  ") +
-		st.runtimeMarkFound.Render(runtimeMarkFound) + st.runtimeLegend.Render(" found  ") +
-		st.runtimeMarkMissing.Render(runtimeMarkMissing) + st.runtimeLegend.Render(" not found")
+	var parts []string
+	for _, st := range []runtimeStatus{{running: true}, {found: true}, {}} {
+		sv := m.runtimeStatusView(st)
+		parts = append(parts, sv.style.Render(sv.mark)+m.ui.styles.runtimeLegend.Render(" "+sv.word))
+	}
+	return strings.Join(parts, m.ui.styles.runtimeLegend.Render("  "))
 }
 
 // runtimeDetailPane renders the highlighted Runtime's header and fields in
@@ -135,7 +141,7 @@ func (m Model) runtimeLegend() string {
 func (m Model) runtimeDetailPane(width int) string {
 	rt := runtimeFor(m.rc.selected)
 	header := m.ui.styles.bodyBold.Render(rt.name) +
-		m.ui.styles.runtimeInUse.Render(" · "+runtimeStatusWord(rt.status(m.runtime)))
+		m.ui.styles.runtimeInUse.Render(" · "+m.runtimeStatusView(rt.status(m.runtime)).word)
 	lines := []string{header}
 	for _, d := range rt.fields {
 		lines = append(lines, "", m.runtimeFieldInputLine(d, width), m.runtimeFieldInUseLine(d, width))
@@ -146,18 +152,18 @@ func (m Model) runtimeDetailPane(width int) string {
 // runtimeFieldInputLine renders a field's focus marker, label, and input.
 func (m Model) runtimeFieldInputLine(d runtimeFieldDef, width int) string {
 	focused := m.rc.focus == d.field
-	prefix := "  "
-	label := m.ui.styles.runtimeFieldLabel.Render(padRight(d.label, runtimeFieldLabelWidth))
+	prefix := focusMarker(focused)
+	labelStyle := m.ui.styles.runtimeFieldLabel
 	if focused {
-		prefix = "› "
-		label = m.ui.styles.bodyBold.Render(padRight(d.label, runtimeFieldLabelWidth))
+		labelStyle = m.ui.styles.runtimeFieldLabelFocused
 	}
 	in := m.rc.inputs[d.field]
 	if d.port == nil {
 		// textinput.View adds the prompt and one cell for the cursor.
-		in.SetWidth(max(width-len(prefix)-runtimeFieldLabelWidth-lipgloss.Width(in.Prompt)-1, 1))
+		const cursorCell = 1
+		in.SetWidth(max(width-lipgloss.Width(prefix)-runtimeFieldLabelWidth-lipgloss.Width(in.Prompt)-cursorCell, 1))
 	}
-	return m.ui.styles.body.Render(prefix) + label + in.View()
+	return m.ui.styles.body.Render(prefix) + labelStyle.Width(runtimeFieldLabelWidth).Render(d.label) + in.View()
 }
 
 // runtimeFieldInUseLine renders "in use: <value> (<source>)" for a field. The
@@ -170,7 +176,7 @@ func (m Model) runtimeFieldInUseLine(d runtimeFieldDef, width int) string {
 	tag := " (" + src.label + ")"
 	lead := "in use: "
 	room := width - runtimeInUseIndent - len(lead) - lipgloss.Width(tag)
-	value = truncateLeft(value, room)
+	value = truncateLeft(value, max(room, 0))
 	tagStyle := m.ui.styles.runtimeInUse
 	if src.env {
 		tagStyle = m.ui.styles.runtimeEnvSource
@@ -185,7 +191,7 @@ type fieldSource struct {
 }
 
 // runtimeFieldInUse returns the value llml runs with for d and where it came
-// from. A path found by detection with nothing configured reads "detected".
+// from. A program found anywhere but the configured path reads "detected".
 func (m Model) runtimeFieldInUse(d runtimeFieldDef) (string, fieldSource) {
 	src := m.settings.Source(d.setting)
 	out := fieldSource{label: src.String(), env: src.Origin == settings.OriginEnv}
@@ -194,34 +200,29 @@ func (m Model) runtimeFieldInUse(d runtimeFieldDef) (string, fieldSource) {
 	}
 	p := d.inUse(m.runtime)
 	if p == "" {
-		return "—", out
+		return "not found", out
 	}
-	if src.Origin == settings.OriginDefault {
+	if !pathWithin(p, *d.str(&m.settings)) {
 		out.label = "detected"
 	}
 	return FormatPathDisplay(p, m.layout.homeDir), out
 }
 
-// padRight pads s with spaces to w display columns.
-func padRight(s string, w int) string {
-	if n := lipgloss.Width(s); n < w {
-		return s + strings.Repeat(" ", w-n)
+// pathWithin reports whether p is root or lies under it. An empty root
+// contains nothing.
+func pathWithin(p, root string) bool {
+	if root == "" {
+		return false
 	}
-	return s
+	return p == root || strings.HasPrefix(p, strings.TrimSuffix(root, string(filepath.Separator))+string(filepath.Separator))
 }
 
 // truncateLeft shortens s to w display columns by dropping its start, so a
 // long path keeps the program name at its end.
 func truncateLeft(s string, w int) string {
-	if lipgloss.Width(s) <= w {
+	over := lipgloss.Width(s) - w
+	if over <= 0 {
 		return s
 	}
-	if w < 2 {
-		return ""
-	}
-	r := []rune(s)
-	for len(r) > 0 && lipgloss.Width(string(r))+1 > w {
-		r = r[1:]
-	}
-	return "…" + string(r)
+	return ansi.TruncateLeft(s, over+1, "…")
 }

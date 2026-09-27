@@ -68,6 +68,9 @@ type runtimeConfigState struct {
 	focus          runtimeField
 	discardConfirm bool
 	inputs         [runtimeFieldCount]textinput.Model
+	// prefill is what each input held when the panel opened; the panel is
+	// dirty once any input differs from it.
+	prefill [runtimeFieldCount]string
 }
 
 // paramsState holds the parameter-profiles panel's state.

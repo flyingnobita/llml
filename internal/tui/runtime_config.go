@@ -151,11 +151,43 @@ func runtimeFieldValues(s settings.Settings) [runtimeFieldCount]string {
 	return v
 }
 
-// runtimeConfigDirty reports whether any input differs from the resolved settings.
+// runtimePanelPrefill returns what each input starts with: the value in use,
+// except for a field the environment sets, which starts from the value
+// config.toml (or the default) would give. Saving the panel then never copies
+// an environment variable into config.toml.
+func (m Model) runtimePanelPrefill() [runtimeFieldCount]string {
+	v := runtimeFieldValues(m.settings)
+	var saved *[runtimeFieldCount]string
+	for _, rt := range runtimeTable {
+		for _, d := range rt.fields {
+			if m.settings.Source(d.setting).Origin != settings.OriginEnv {
+				continue
+			}
+			if saved == nil {
+				sv := runtimeFieldValues(m.savedRuntimeSettings())
+				saved = &sv
+			}
+			v[d.field] = saved[d.field]
+		}
+	}
+	return v
+}
+
+// savedRuntimeSettings resolves config.toml over the defaults, without the
+// environment: the values llml would use if no variable were set.
+func (m Model) savedRuntimeSettings() settings.Settings {
+	cfg, err := m.svc.readConfig()
+	if err != nil {
+		return settings.Resolve(settings.Defaults())
+	}
+	return settings.Resolve(cfg.Layer(), settings.Defaults())
+}
+
+// runtimeConfigDirty reports whether any input differs from what it held when
+// the panel opened.
 func (m Model) runtimeConfigDirty() bool {
-	want := runtimeFieldValues(m.settings)
-	for i := range want {
-		if m.rc.inputs[i].Value() != want[i] {
+	for i := range m.rc.prefill {
+		if m.rc.inputs[i].Value() != m.rc.prefill[i] {
 			return true
 		}
 	}
@@ -187,7 +219,8 @@ func (m Model) openRuntimeConfig() (Model, tea.Cmd) {
 	m.rc.open = true
 	m.rc.discardConfirm = false
 	m = m.withLastRunCleared()
-	for i, v := range runtimeFieldValues(m.settings) {
+	m.rc.prefill = m.runtimePanelPrefill()
+	for i, v := range m.rc.prefill {
 		m.rc.inputs[i].SetValue(v)
 	}
 	if rts := m.panelRuntimes(); len(rts) > 0 {
@@ -329,14 +362,6 @@ func (m Model) resolveSavedSettings(saved settings.Settings) settings.Settings {
 	)
 }
 
-// writeRuntimeConfig writes saved, the panel's values, to config.toml. It
-// writes these rather than the settings in use, so a field the environment
-// overrides still saves what the user typed.
-func (m Model) writeRuntimeConfig(saved settings.Settings) error {
-	m.settings = saved
-	return writeConfigFromModel(m)
-}
-
 func (m Model) commitRuntimeConfig() (Model, tea.Cmd) {
 	for _, rt := range runtimeTable {
 		for _, d := range rt.fields {
@@ -362,7 +387,9 @@ func (m Model) commitRuntimeConfig() (Model, tea.Cmd) {
 	defer cancel()
 	m.runtime = m.svc.discoverRuntime(ctx, m.settings)
 	var cmd tea.Cmd
-	if err := m.writeRuntimeConfig(next); err != nil {
+	// config.toml gets the panel's values, not the settings in use, so a field
+	// the environment overrides still saves what the panel holds.
+	if err := m.svc.writeSettings(next); err != nil {
 		m = m.withLastRunError("Could not save config: " + err.Error())
 		m = m.addAlert(alertSeverityWarn, "Config", "Could not save config: "+err.Error())
 		cmd = clearLastRunNoteAfterCmd()

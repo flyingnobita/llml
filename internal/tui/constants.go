@@ -94,6 +94,8 @@ const (
 	runtimePanelPaneGap    = 2
 	runtimeFieldLabelWidth = 6 // "Path", "Venv", "Port", "Host" plus a space
 	runtimeInUseIndent     = 2 // under the field label, past the focus marker
+	// runtimeListRowIndent sets Runtime rows one column in from their group label.
+	runtimeListRowIndent = " "
 
 	// FilterInputCharLimit is the max characters for the export filter text input.
 	FilterInputCharLimit = 128
