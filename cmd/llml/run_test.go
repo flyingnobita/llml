@@ -100,7 +100,7 @@ args = ["--ctx-size 4096"]
 	if !strings.Contains(out, "cuda-fast") {
 		t.Errorf("preview should name the profile:\n%s", out)
 	}
-	if _, err := os.Stat(filepath.Join(dir, "llml", "model-params.json")); err == nil {
+	if _, err := os.Stat(modelParamsPath(t)); err == nil {
 		t.Error("--dry-run must not write model-params.json")
 	}
 }
@@ -138,7 +138,7 @@ args = ["--ctx-size 4096"]
 	if !strings.Contains(out, "1 added") {
 		t.Errorf("stdout should report the import:\n%s", out)
 	}
-	if _, err := os.Stat(filepath.Join(dir, "llml", "model-params.json")); err != nil {
+	if _, err := os.Stat(modelParamsPath(t)); err != nil {
 		t.Errorf("model-params.json should exist: %v", err)
 	}
 }
@@ -213,4 +213,16 @@ func TestConfirmImport_accepts(t *testing.T) {
 			t.Errorf("%q should be accepted, got %v", in, err)
 		}
 	}
+}
+
+// modelParamsPath resolves model-params.json the way llml does. setupConfigDir
+// points HOME and XDG_CONFIG_HOME at a temp dir, but the config directory
+// under it is platform-specific (Library/Application Support on macOS).
+func modelParamsPath(t *testing.T) string {
+	t.Helper()
+	cfg, err := os.UserConfigDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return filepath.Join(cfg, "llml", "model-params.json")
 }
