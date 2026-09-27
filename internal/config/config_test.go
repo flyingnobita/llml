@@ -290,4 +290,20 @@ func TestOMLXAppLayer(t *testing.T) {
 	if got := OMLXAppLayer(home).OMLXModelDirs; got != nil {
 		t.Errorf("unreadable settings should give an empty layer, got %v", got)
 	}
+
+	// A base path moved in the app is recorded in its bootstrap file.
+	moved := t.TempDir()
+	if err := os.WriteFile(filepath.Join(moved, "settings.json"), []byte(`{"model":{"model_dirs":["/moved"]}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	bootstrap := filepath.Join(home, "Library", "Application Support", "oMLX")
+	if err := os.MkdirAll(bootstrap, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(bootstrap, "base-path"), []byte(moved+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := OMLXAppLayer(home).OMLXModelDirs; !reflect.DeepEqual(got, []string{"/moved"}) {
+		t.Errorf("bootstrap base path = %v", got)
+	}
 }

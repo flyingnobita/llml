@@ -883,8 +883,10 @@ func TestBuildServerSpec_ninfer(t *testing.T) {
 	}
 }
 
+// These launch tests clear PATH because the resolvers fall back to it, and
+// on a Mac with oMLX and Splash installed they would find the real CLIs.
 func TestOMLXLaunchArgs(t *testing.T) {
-	t.Parallel()
+	t.Setenv("PATH", t.TempDir())
 	rt := models.RuntimeInfo{
 		OMLXPath:      "/Users/u/.omlx/bin/omlx",
 		OMLXHost:      "127.0.0.1",
@@ -917,7 +919,7 @@ func TestOMLXLaunchArgs(t *testing.T) {
 }
 
 func TestSplashLaunchArgs(t *testing.T) {
-	t.Parallel()
+	t.Setenv("PATH", t.TempDir())
 	rt := models.RuntimeInfo{SplashPath: "/opt/homebrew/bin/splash", SplashHost: "127.0.0.1", SplashPort: 8000}
 	dir := "/Users/u/.cache/huggingface/hub/models--incoai--Qwen3.8-27B-Splash/snapshots/abc"
 	spec, err := buildServerSpec(models.BackendSplash, dir, profiles.ModelParams{Args: []string{"--max-context", "128K"}}, rt, true)

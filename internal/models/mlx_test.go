@@ -154,9 +154,6 @@ func TestFindOMLXBinary(t *testing.T) {
 	t.Setenv("HOME", home)
 	t.Setenv("PATH", t.TempDir())
 
-	if got := findOMLXBinary(""); got != "" {
-		t.Fatalf("nothing installed, got %q", got)
-	}
 	binDir := filepath.Join(home, ".omlx", "bin")
 	if err := os.MkdirAll(binDir, 0o750); err != nil {
 		t.Fatal(err)
@@ -164,7 +161,8 @@ func TestFindOMLXBinary(t *testing.T) {
 	shim := makeFakeExecutable(t, binDir, "omlx")
 
 	// The app's shim is found with no configuration, and from each form
-	// OMLX_PATH may take.
+	// OMLX_PATH may take. It wins over the common directories, where Homebrew
+	// may hold a symlink to it.
 	for _, configured := range []string{"", filepath.Join(home, ".omlx"), binDir, shim} {
 		if got := findOMLXBinary(configured); got != shim {
 			t.Errorf("findOMLXBinary(%q) = %q, want %q", configured, got, shim)
