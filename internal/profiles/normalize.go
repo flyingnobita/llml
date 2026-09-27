@@ -233,6 +233,10 @@ func normalizeBackend(v string) string {
 		return "koboldcpp"
 	case "ninfer":
 		return "ninfer"
+	case "omlx":
+		return "omlx"
+	case "splash":
+		return "splash"
 	default:
 		return ""
 	}

@@ -123,6 +123,27 @@ var ninferRules = locationRules{
 	},
 }
 
+// omlxRules covers oMLX. llml passes the --model-dir that holds the selected
+// model; per-model settings live in the oMLX app, keyed by that directory.
+var omlxRules = locationRules{
+	argTokens: map[string]bool{
+		"--model-dir": true,
+	},
+}
+
+// splashRules covers Splash, which names the model and its speculative draft
+// by Hugging Face repo id or local directory.
+var splashRules = locationRules{
+	envKeys: map[string]bool{
+		"HF_HOME":               true,
+		"HF_TOKEN":              true,
+		"HUGGINGFACE_HUB_CACHE": true,
+	},
+	argTokens: map[string]bool{
+		"--model": true, "--revision": true, "--draft-model": true,
+	},
+}
+
 // rulesByBackend maps a backend name to its rules. llama and koboldcpp share
 // ggufRules by value, so they cannot drift apart.
 var rulesByBackend = map[string]locationRules{
@@ -130,6 +151,8 @@ var rulesByBackend = map[string]locationRules{
 	"koboldcpp": ggufRules,
 	"vllm":      vllmRules,
 	"ninfer":    ninferRules,
+	"omlx":      omlxRules,
+	"splash":    splashRules,
 }
 
 // isAnyBackendLocationEnv reports whether key is a model-location variable for
