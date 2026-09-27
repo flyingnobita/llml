@@ -272,7 +272,8 @@ func (svc services) startupCmd() tea.Cmd {
 			return startupNeedFullScanMsg{}
 		}
 		var writeErr error
-		if rt.OllamaRunning && !ollamaOff(rt) {
+		// A Disabled Ollama is never probed, so it is never running here.
+		if rt.OllamaRunning {
 			liveOllama, err := svc.discoverOllama(ctx, s.OllamaHost)
 			if err != nil {
 				debugf("startupCmd: live Ollama refresh failed, keeping cache: %v", err)
