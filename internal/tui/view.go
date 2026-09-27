@@ -8,6 +8,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+
+	"github.com/flyingnobita/llml/internal/models"
 )
 
 // mainPaneCaptionLine renders a full-width pane caption (lipgloss v2 has no border Title API).
@@ -743,24 +745,19 @@ func (m Model) runtimeFieldRow(fieldID runtimeField, label string) []string {
 	}
 }
 
-// runtimeFieldLabel pairs a runtime config field with its label.
-type runtimeFieldLabel struct {
-	field runtimeField
-	label string
-}
-
-// runtimeConfigSection renders one backend's heading and fields, or "" when
-// the platform cannot run that backend (all of a section's fields share one).
-func (m Model) runtimeConfigSection(title string, fields ...runtimeFieldLabel) string {
-	if len(fields) == 0 || !m.runtimeFieldVisible(fields[0].field) {
+// runtimeConfigSection renders one Runtime's heading and fields, or "" when
+// the platform cannot run it.
+func (m Model) runtimeConfigSection(b models.ModelBackend) string {
+	rt := runtimeFor(b)
+	if !rt.supported(m.runtime.Platform) {
 		return ""
 	}
-	rows := []string{m.ui.styles.bodyBold.Render(title), ""}
-	for i, f := range fields {
+	rows := []string{m.ui.styles.bodyBold.Render(rt.name), ""}
+	for i, d := range rt.fields {
 		if i > 0 {
 			rows = append(rows, "")
 		}
-		rows = append(rows, m.runtimeFieldRow(f.field, f.label)...)
+		rows = append(rows, m.runtimeFieldRow(d.field, d.label)...)
 	}
 	return lipgloss.JoinVertical(lipgloss.Left, rows...)
 }
@@ -790,36 +787,18 @@ func (m Model) runtimeConfigModalBlock() string {
 	cw := m.paramPanelContentWidth()
 	section := m.runtimeConfigSection
 
+	// The column split is layout only; each section's contents come from the
+	// runtime table.
 	left := []string{
-		section(runtimeConfigHeaderLlama,
-			runtimeFieldLabel{runtimeFieldLlamaCppPath, runtimeConfigLabelLlamaCppPath},
-			runtimeFieldLabel{runtimeFieldLlamaPort, runtimeConfigLabelLlamaPort},
-			runtimeFieldLabel{runtimeFieldLlamaHost, runtimeConfigLabelLlamaHost}),
-		section(runtimeConfigHeaderOllama,
-			runtimeFieldLabel{runtimeFieldOllamaPath, runtimeConfigLabelOllamaPath},
-			runtimeFieldLabel{runtimeFieldOllamaHost, runtimeConfigLabelOllamaHost}),
-		section(runtimeConfigHeaderNInfer,
-			runtimeFieldLabel{runtimeFieldNInferPath, runtimeConfigLabelNInferPath},
-			runtimeFieldLabel{runtimeFieldNInferPort, runtimeConfigLabelNInferPort},
-			runtimeFieldLabel{runtimeFieldNInferHost, runtimeConfigLabelNInferHost}),
-		section(runtimeConfigHeaderSplash,
-			runtimeFieldLabel{runtimeFieldSplashPath, runtimeConfigLabelSplashPath},
-			runtimeFieldLabel{runtimeFieldSplashPort, runtimeConfigLabelPort},
-			runtimeFieldLabel{runtimeFieldSplashHost, runtimeConfigLabelHost}),
+		section(models.BackendLlama),
+		section(models.BackendOllama),
+		section(models.BackendNInfer),
+		section(models.BackendSplash),
 	}
 	right := []string{
-		section(runtimeConfigHeaderVLLM,
-			runtimeFieldLabel{runtimeFieldVLLMPath, runtimeConfigLabelVLLMPath},
-			runtimeFieldLabel{runtimeFieldVLLMVenv, runtimeConfigLabelVLLMVenv},
-			runtimeFieldLabel{runtimeFieldVLLMPort, runtimeConfigLabelVLLMPort},
-			runtimeFieldLabel{runtimeFieldVLLMHost, runtimeConfigLabelVLLMHost}),
-		section(runtimeConfigHeaderKoboldCpp,
-			runtimeFieldLabel{runtimeFieldKoboldCppPath, runtimeConfigLabelKoboldCppPath},
-			runtimeFieldLabel{runtimeFieldKoboldCppPort, runtimeConfigLabelKoboldCppPort}),
-		section(runtimeConfigHeaderOMLX,
-			runtimeFieldLabel{runtimeFieldOMLXPath, runtimeConfigLabelOMLXPath},
-			runtimeFieldLabel{runtimeFieldOMLXPort, runtimeConfigLabelPort},
-			runtimeFieldLabel{runtimeFieldOMLXHost, runtimeConfigLabelHost}),
+		section(models.BackendVLLM),
+		section(models.BackendKobold),
+		section(models.BackendOMLX),
 	}
 
 	var inputBlock string

@@ -299,28 +299,17 @@ func newAlertViewport(st styles) viewport.Model {
 }
 
 func newRuntimeConfigInputs() [runtimeFieldCount]textinput.Model {
-	return [runtimeFieldCount]textinput.Model{
-		runtimeFieldLlamaCppPath:  newPathTextInput(),
-		runtimeFieldLlamaPort:     newPortTextInput(),
-		runtimeFieldLlamaHost:     newPathTextInput(),
-		runtimeFieldOllamaPath:    newPathTextInput(),
-		runtimeFieldOllamaHost:    newPathTextInput(),
-		runtimeFieldNInferPath:    newPathTextInput(),
-		runtimeFieldNInferPort:    newPortTextInput(),
-		runtimeFieldNInferHost:    newPathTextInput(),
-		runtimeFieldSplashPath:    newPathTextInput(),
-		runtimeFieldSplashPort:    newPortTextInput(),
-		runtimeFieldSplashHost:    newPathTextInput(),
-		runtimeFieldVLLMPath:      newPathTextInput(),
-		runtimeFieldVLLMVenv:      newPathTextInput(),
-		runtimeFieldVLLMPort:      newPortTextInput(),
-		runtimeFieldVLLMHost:      newPathTextInput(),
-		runtimeFieldKoboldCppPath: newPathTextInput(),
-		runtimeFieldKoboldCppPort: newPortTextInput(),
-		runtimeFieldOMLXPath:      newPathTextInput(),
-		runtimeFieldOMLXPort:      newPortTextInput(),
-		runtimeFieldOMLXHost:      newPathTextInput(),
+	var inputs [runtimeFieldCount]textinput.Model
+	for _, rt := range runtimeTable {
+		for _, d := range rt.fields {
+			if d.port != nil {
+				inputs[d.field] = newPortTextInput()
+			} else {
+				inputs[d.field] = newPathTextInput()
+			}
+		}
 	}
+	return inputs
 }
 
 // New returns a model with default key bindings and an empty table; Init triggers discovery.

@@ -260,32 +260,7 @@ const (
 	FooterRuntimeConfigHints     = "tab: fields · enter: save · esc: back"
 	FooterRuntimeConfigDiscardYN = "y: discard changes · n/esc: stay"
 	// runtimeConfigModalSubtitle appears below the modal title (values here override startup discovery).
-	runtimeConfigModalSubtitle      = "Overrides saved to config.toml. Shell environment variables take precedence."
-	runtimeConfigHeaderLlama        = "Llama.cpp"
-	runtimeConfigHeaderVLLM         = "vLLM"
-	runtimeConfigHeaderOllama       = "Ollama"
-	runtimeConfigHeaderKoboldCpp    = "KoboldCpp"
-	runtimeConfigHeaderNInfer       = "NInfer"
-	runtimeConfigHeaderOMLX         = "oMLX"
-	runtimeConfigHeaderSplash       = "Splash"
-	runtimeConfigLabelLlamaCppPath  = "Path (llama-cli / llama-server)"
-	runtimeConfigLabelLlamaPort     = "Port"
-	runtimeConfigLabelLlamaHost     = "Host"
-	runtimeConfigLabelVLLMPath      = "Path (vllm binary)"
-	runtimeConfigLabelVLLMVenv      = "Venv Root (Optional)"
-	runtimeConfigLabelVLLMPort      = "Port"
-	runtimeConfigLabelVLLMHost      = "Host"
-	runtimeConfigLabelOllamaPath    = "Path (ollama binary)"
-	runtimeConfigLabelOllamaHost    = "Host"
-	runtimeConfigLabelKoboldCppPath = "Path (koboldcpp binary)"
-	runtimeConfigLabelKoboldCppPort = "Port"
-	runtimeConfigLabelNInferPath    = "Path (checkout or ninfer-serve)"
-	runtimeConfigLabelNInferPort    = "Port"
-	runtimeConfigLabelNInferHost    = "Host"
-	runtimeConfigLabelOMLXPath      = "Path (omlx CLI or ~/.omlx)"
-	runtimeConfigLabelSplashPath    = "Path (splash binary)"
-	runtimeConfigLabelPort          = "Port"
-	runtimeConfigLabelHost          = "Host"
+	runtimeConfigModalSubtitle = "Overrides saved to config.toml. Shell environment variables take precedence."
 
 	// FooterHintTabSections is the shared "tab: sections" fragment used by split-pane
 	// and parameter modal footers.
@@ -322,4 +297,16 @@ const (
 	// Import modal.
 	FooterImportHintsPath = FooterHintImport + FooterHintSep + "enter: parse · esc: back"
 	FooterImportHintsList = FooterHintImport + FooterHintSep + "space: toggle · enter: import · esc: back"
+)
+
+// modelFormat is the on-disk form of a model, which decides the Runtimes that
+// can run it. The runtime panel groups Runtimes under it.
+type modelFormat int
+
+const (
+	formatGGUF modelFormat = iota
+	formatSafetensors
+	formatNInfer
+	formatSplash
+	formatOllama
 )
