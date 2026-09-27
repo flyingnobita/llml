@@ -269,12 +269,10 @@ func TestRuntimeToggles_reloadAndFullScanSkipDisabled(t *testing.T) {
 }
 
 // A Disabled Runtime is left out of the main screen's runtime status: rows
-// that need it do not produce a "not found" note for it.
-//
-// Not parallel: program lookups fall back to PATH, which the test empties so
-// nothing is found on the host.
+// that need it do not produce a "not found" note for it. Availability reads
+// only the detection result, so the host's PATH does not matter.
 func TestRuntimeToggles_disabledRuntimeLeftOutOfMissingNote(t *testing.T) {
-	t.Setenv("PATH", t.TempDir())
+	t.Parallel()
 
 	m := NewWithServices(testServices())
 	m.runtime = models.RuntimeInfo{Platform: linuxPlatform}
