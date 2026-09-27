@@ -2,8 +2,12 @@ package models
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/flyingnobita/llml/internal/settings"
@@ -207,5 +211,35 @@ func TestPlatformSupports(t *testing.T) {
 		if got := tt.p.Supports(tt.b); got != tt.want {
 			t.Errorf("%+v.Supports(%s) = %v, want %v", tt.p, tt.b, got, tt.want)
 		}
+	}
+}
+
+// oMLX and Splash share port 8000 and both answer /health, so the probe tells
+// them apart by the owner each reports in /v1/models.
+func TestProbeModelsOwner(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/models" {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write([]byte(`{"object":"list","data":[{"id":"incoai/Qwen3.8-27B-Splash","owned_by":"splash"}]}`))
+	}))
+	defer srv.Close()
+	u, err := url.Parse(srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	port, err := strconv.Atoi(u.Port())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := context.Background()
+	if !probeModelsOwner(ctx, u.Hostname(), port, "splash") {
+		t.Error("splash server not recognized")
+	}
+	if probeModelsOwner(ctx, u.Hostname(), port, "omlx") {
+		t.Error("splash server reported as oMLX")
 	}
 }

@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -273,16 +274,10 @@ func findSplashBinary(splashPath string) string {
 }
 
 // probeHealthEndpoint GETs /health on host:port, bounded by ctx. Used by
-// llama-server, KoboldCpp, ninfer-serve, and oMLX.
+// llama-server, KoboldCpp, and ninfer-serve. It shares the package HTTP client
+// so repeated probes reuse connections.
 func probeHealthEndpoint(ctx context.Context, host string, port int) bool {
-	return probeHTTP(ctx, host, port, "/health")
-}
-
-// probeHTTP GETs path on host:port and reports whether it answered 200 OK,
-// bounded by ctx. It shares the package HTTP client so repeated probes reuse
-// connections.
-func probeHTTP(ctx context.Context, host string, port int, path string) bool {
-	url := fmt.Sprintf("http://%s:%d%s", host, port, path)
+	url := fmt.Sprintf("http://%s:%d/health", host, port)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return false
@@ -295,6 +290,41 @@ func probeHTTP(ctx context.Context, host string, port int, path string) bool {
 	// Drain so the connection returns to the pool.
 	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4<<10))
 	return resp.StatusCode == http.StatusOK
+}
+
+// probeModelsOwner reports whether the OpenAI-compatible server on host:port
+// lists a model owned by owner. oMLX and Splash both answer /health and both
+// default to port 8000, so a health check alone cannot tell which one is up;
+// each reports itself as the owner in /v1/models.
+func probeModelsOwner(ctx context.Context, host string, port int, owner string) bool {
+	url := fmt.Sprintf("http://%s:%d/v1/models", host, port)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return false
+	}
+	resp, err := sharedHTTPClient.Do(req)
+	if err != nil {
+		return false
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4<<10))
+		return false
+	}
+	var list struct {
+		Data []struct {
+			OwnedBy string `json:"owned_by"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&list); err != nil {
+		return false
+	}
+	for _, m := range list.Data {
+		if m.OwnedBy == owner {
+			return true
+		}
+	}
+	return false
 }
 
 // defaultProbeHost is the loopback address used for health probes that have no

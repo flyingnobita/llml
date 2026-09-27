@@ -30,10 +30,10 @@ type RuntimeInfo struct {
 	NInferRunning      bool // ninfer-serve answered /health on NInferServerPort
 	OMLXPath           string
 	OMLXHost           string
-	OMLXRunning        bool // an oMLX server answered /health on OMLXPort
+	OMLXRunning        bool // an oMLX server is listing models on OMLXPort
 	SplashPath         string
 	SplashHost         string
-	SplashRunning      bool // a Splash server answered /status on SplashPort
+	SplashRunning      bool // a Splash server is listing models on SplashPort
 
 	// OMLXModelDirs are the directories oMLX serves models from; launch
 	// passes the one holding the selected model as --model-dir.
@@ -221,12 +221,12 @@ func DiscoverRuntime(ctx context.Context, s settings.Settings) RuntimeInfo {
 	}
 	if info.Platform.Supports(BackendOMLX) {
 		probe(&info.OMLXRunning, func() bool {
-			return probeHealthEndpoint(ctx, probeHost(s.OMLXHost), s.OMLXPort)
+			return probeModelsOwner(ctx, probeHost(s.OMLXHost), s.OMLXPort, "omlx")
 		})
 	}
 	if info.Platform.Supports(BackendSplash) {
 		probe(&info.SplashRunning, func() bool {
-			return probeHTTP(ctx, probeHost(s.SplashHost), s.SplashPort, "/status")
+			return probeModelsOwner(ctx, probeHost(s.SplashHost), s.SplashPort, "splash")
 		})
 	}
 	wg.Wait()

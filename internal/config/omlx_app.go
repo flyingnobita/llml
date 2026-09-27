@@ -26,7 +26,7 @@ func OMLXAppLayer(home string) settings.Layer {
 	if home == "" {
 		return settings.Layer{}
 	}
-	data, err := os.ReadFile(filepath.Join(omlxBasePath(home), "settings.json")) //nolint:gosec // G304: oMLX's own settings file under the user's home.
+	data, err := os.ReadFile(filepath.Join(omlxBasePath(home), "settings.json"))
 	if err != nil {
 		return settings.Layer{}
 	}
