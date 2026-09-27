@@ -43,6 +43,11 @@ type RuntimeInfo struct {
 	// the platform cannot run; see [Platform.Supports].
 	Platform Platform
 
+	// Skipped are the Runtimes detection was told to skip: the Disabled
+	// Runtimes. They got no network probe, so their Running flags are false
+	// whether or not a server is up. Their programs are still looked up.
+	Skipped BackendSet
+
 	// Resolved listen ports, carried here so launch and preview code reads them
 	// from the detected runtime instead of re-reading configuration.
 	LlamaServerPort int
@@ -86,87 +91,78 @@ func formatBinLabel(abs string) string {
 	return "✓"
 }
 
-// Summary is a single-line status for the TUI (no trailing newline).
-func (r RuntimeInfo) Summary() string {
-	var base string
+// llamaSummary is the llama.cpp part of [RuntimeInfo.Summary].
+func (r RuntimeInfo) llamaSummary() string {
 	switch {
 	case r.LlamaCLIPath != "" && r.LlamaServerPath != "":
-		base = fmt.Sprintf("llama.cpp: cli %s · server %s", formatBinLabel(r.LlamaCLIPath), formatBinLabel(r.LlamaServerPath))
+		return fmt.Sprintf("llama.cpp: cli %s · server %s", formatBinLabel(r.LlamaCLIPath), formatBinLabel(r.LlamaServerPath))
 	case r.LlamaCLIPath != "":
-		base = fmt.Sprintf("llama.cpp: cli %s · server —", formatBinLabel(r.LlamaCLIPath))
+		return fmt.Sprintf("llama.cpp: cli %s · server —", formatBinLabel(r.LlamaCLIPath))
 	case r.LlamaServerPath != "":
-		base = fmt.Sprintf("llama.cpp: cli — · server %s", formatBinLabel(r.LlamaServerPath))
+		return fmt.Sprintf("llama.cpp: cli — · server %s", formatBinLabel(r.LlamaServerPath))
 	case r.ServerRunning:
-		base = fmt.Sprintf("llama.cpp: binaries not on PATH — server running :%d", r.ProbePort)
+		return fmt.Sprintf("llama.cpp: binaries not on PATH — server running :%d", r.ProbePort)
 	default:
-		base = "llama.cpp: not found — set " + settings.EnvLlamaCppPath + " or install to PATH (Homebrew: ensure /opt/homebrew/bin is on PATH)"
+		return "llama.cpp: not found — set " + settings.EnvLlamaCppPath + " or install to PATH (Homebrew: ensure /opt/homebrew/bin is on PATH)"
 	}
-	v := "vllm: —"
-	if r.VLLMPath != "" {
-		v = "vllm: ✓"
-	}
-	k := "koboldcpp: —"
-	if r.KoboldCppPath != "" {
-		k = "koboldcpp: ✓"
-	}
-	showKobold := r.KoboldCppPath != "" || r.KoboldCppRunning
-	if showKobold {
-		switch {
-		case r.KoboldCppPath != "" && r.KoboldCppRunning:
-			k = "koboldcpp: ✓ running"
-		case r.KoboldCppPath != "":
-			k = "koboldcpp: ✓ stopped"
-		case r.KoboldCppRunning:
-			k = "koboldcpp: running"
-		}
-	}
-	o := "ollama: —"
-	showOllama := r.OllamaPath != "" || r.OllamaRunning
-	switch {
-	case r.OllamaPath != "" && r.OllamaRunning:
-		o = "ollama: ✓ running"
-	case r.OllamaPath != "":
-		o = "ollama: ✓ stopped"
-	case r.OllamaRunning:
-		o = "ollama: running"
-	}
+}
+
+// Summary is a single-line status for the TUI (no trailing newline). The
+// Runtimes detection skipped (the Disabled Runtimes) are left out.
+func (r RuntimeInfo) Summary() string {
 	var parts []string
-	parts = append(parts, base, v)
-	if showKobold {
-		parts = append(parts, k)
+	if !r.Skipped.Has(BackendLlama) {
+		parts = append(parts, r.llamaSummary())
+	}
+	if !r.Skipped.Has(BackendVLLM) {
+		v := "vllm: —"
+		if r.VLLMPath != "" {
+			v = "vllm: ✓"
+		}
+		parts = append(parts, v)
 	}
 	for _, b := range []struct {
+		backend ModelBackend
 		name    string
 		path    string
 		running bool
 	}{
-		{"ninfer", r.NInferPath, r.NInferRunning},
-		{"omlx", r.OMLXPath, r.OMLXRunning},
-		{"splash", r.SplashPath, r.SplashRunning},
+		{BackendKobold, "koboldcpp", r.KoboldCppPath, r.KoboldCppRunning},
+		{BackendNInfer, "ninfer", r.NInferPath, r.NInferRunning},
+		{BackendOMLX, "omlx", r.OMLXPath, r.OMLXRunning},
+		{BackendSplash, "splash", r.SplashPath, r.SplashRunning},
+		{BackendOllama, "ollama", r.OllamaPath, r.OllamaRunning},
 	} {
+		if r.Skipped.Has(b.backend) {
+			continue
+		}
 		if s, ok := binaryStatus(b.name, b.path, b.running); ok {
 			parts = append(parts, s)
 		}
 	}
-	if showOllama {
-		parts = append(parts, o)
-	}
 	return strings.Join(parts, " · ")
 }
 
-// DiscoverRuntime locates llama-cli and llama-server using s.LlamaCppPath, common install
-// directories (including Homebrew on Apple Silicon), then PATH. If neither binary exists,
-// it probes http://{s.LlamaServerHost}:{s.LlamaServerPort}/health.
+// DiscoverRuntime locates each Runtime's program and probes its server.
 //
-// The network probes run concurrently, so an unreachable backend costs one
-// timeout rather than one per backend in sequence, and all of them observe ctx: a cancelled
-// or expired context returns whatever the filesystem lookups found.
-func DiscoverRuntime(ctx context.Context, s settings.Settings) RuntimeInfo {
-	cli := findLlamaBinary("llama-cli", s.LlamaCppPath)
-	srv := findLlamaBinary("llama-server", s.LlamaCppPath)
-	info := RuntimeInfo{
-		LlamaCLIPath:     cli,
-		LlamaServerPath:  srv,
+// llama-cli and llama-server are looked up in s.LlamaCppPath, common install
+// directories (including Homebrew on Apple Silicon), then PATH; the other
+// programs follow the same pattern. Program lookups are cheap and run for every
+// Runtime. The network probes skip every Runtime in skip, the Disabled
+// Runtimes, so a host the user does not use costs nothing; see [probeRuntimes].
+func DiscoverRuntime(ctx context.Context, s settings.Settings, skip BackendSet) RuntimeInfo {
+	info := locateRuntimes(s)
+	info.Skipped = skip
+	probeRuntimes(ctx, s, &info, skip)
+	return info
+}
+
+// locateRuntimes fills in every Runtime's program path and resolved address,
+// without touching the network.
+func locateRuntimes(s settings.Settings) RuntimeInfo {
+	return RuntimeInfo{
+		LlamaCLIPath:     findLlamaBinary("llama-cli", s.LlamaCppPath),
+		LlamaServerPath:  findLlamaBinary("llama-server", s.LlamaCppPath),
 		LlamaServerHost:  s.LlamaServerHost,
 		VLLMPath:         findVLLMBinary(s.VLLMPath, s.VLLMVenv),
 		VLLMServerHost:   s.VLLMServerHost,
@@ -192,9 +188,24 @@ func DiscoverRuntime(ctx context.Context, s settings.Settings) RuntimeInfo {
 		VLLMVenv:           s.VLLMVenv,
 		VLLMConfiguredPath: s.VLLMPath,
 	}
+}
 
+// probeRuntimes asks each Runtime's server whether it is up and records the
+// answers on info. A Runtime in skip, or one info.Platform cannot run, gets no
+// request. vLLM has no probe.
+//
+// The probes run concurrently, so an unreachable host costs one timeout rather
+// than one per Runtime in sequence, and all of them observe ctx: a cancelled or
+// expired context leaves the Running flags false.
+func probeRuntimes(ctx context.Context, s settings.Settings, info *RuntimeInfo, skip BackendSet) {
 	var wg sync.WaitGroup
-	probe := func(dst *bool, fn func() bool) {
+	probe := func(b ModelBackend, dst *bool, fn func() bool) {
+		// Platform-specific Runtimes are probed only where they can run: oMLX
+		// and Splash share port 8000 with vLLM by default, so a probe on Linux
+		// would only ever find something else.
+		if skip.Has(b) || !info.Platform.Supports(b) {
+			return
+		}
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -203,37 +214,27 @@ func DiscoverRuntime(ctx context.Context, s settings.Settings) RuntimeInfo {
 	}
 
 	// Probing llama-server is only informative when neither binary was found.
-	if cli == "" && srv == "" {
-		probe(&info.ServerRunning, func() bool {
+	if info.LlamaCLIPath == "" && info.LlamaServerPath == "" {
+		probe(BackendLlama, &info.ServerRunning, func() bool {
 			return probeHealthEndpoint(ctx, s.LlamaServerHost, s.LlamaServerPort)
 		})
 	}
-	probe(&info.OllamaRunning, func() bool { return NewOllamaClient(s.OllamaHost).Probe(ctx) })
+	probe(BackendOllama, &info.OllamaRunning, func() bool { return NewOllamaClient(s.OllamaHost).Probe(ctx) })
 	var koboldRunning bool
-	probe(&koboldRunning, func() bool { return probeHealthEndpoint(ctx, defaultProbeHost, s.KoboldCppPort) })
-	// Platform-specific backends are probed only where they can run: oMLX and
-	// Splash share port 8000 with vLLM by default, so a probe on Linux would
-	// only ever find something else.
-	if info.Platform.Supports(BackendNInfer) {
-		probe(&info.NInferRunning, func() bool {
-			return probeHealthEndpoint(ctx, probeHost(s.NInferServerHost), s.NInferServerPort)
-		})
-	}
-	if info.Platform.Supports(BackendOMLX) {
-		probe(&info.OMLXRunning, func() bool {
-			return probeModelsOwner(ctx, probeHost(s.OMLXHost), s.OMLXPort, "omlx")
-		})
-	}
-	if info.Platform.Supports(BackendSplash) {
-		probe(&info.SplashRunning, func() bool {
-			return probeModelsOwner(ctx, probeHost(s.SplashHost), s.SplashPort, "splash")
-		})
-	}
+	probe(BackendKobold, &koboldRunning, func() bool { return probeHealthEndpoint(ctx, defaultProbeHost, s.KoboldCppPort) })
+	probe(BackendNInfer, &info.NInferRunning, func() bool {
+		return probeHealthEndpoint(ctx, probeHost(s.NInferServerHost), s.NInferServerPort)
+	})
+	probe(BackendOMLX, &info.OMLXRunning, func() bool {
+		return probeModelsOwner(ctx, probeHost(s.OMLXHost), s.OMLXPort, "omlx")
+	})
+	probe(BackendSplash, &info.SplashRunning, func() bool {
+		return probeModelsOwner(ctx, probeHost(s.SplashHost), s.SplashPort, "splash")
+	})
 	wg.Wait()
 
 	if koboldRunning {
 		info.KoboldCppRunning = true
 		info.KoboldCppProbePort = s.KoboldCppPort
 	}
-	return info
 }

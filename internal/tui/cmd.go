@@ -76,6 +76,7 @@ type discoveryScanPlan struct {
 	settings settings.Settings
 	opts     models.Options
 	runtime  models.RuntimeInfo
+	states   runtimeStatesRead
 }
 
 func (svc services) prepareDiscoveryScan(ctx context.Context, explicitPaths []string) discoveryScanPlan {
@@ -90,7 +91,7 @@ func (svc services) prepareDiscoveryScan(ctx context.Context, explicitPaths []st
 	}
 	opts := models.Options{Settings: s}
 	debugf("prepareDiscoveryScan: haveCfg=%t explicitPaths=%v fromFile=%v extraRoots=%v", haveCfg, explicitPaths, fromFile, s.ExtraModelPaths)
-	rt := svc.discoverRuntime(ctx, s)
+	rt, states := svc.detectRuntime(ctx, s)
 	debugf("prepareDiscoveryScan: runtime ollamaPath=%q ollamaHost=%q ollamaRunning=%t", rt.OllamaPath, rt.OllamaHost, rt.OllamaRunning)
 	return discoveryScanPlan{
 		cfg:      cfg,
@@ -100,6 +101,7 @@ func (svc services) prepareDiscoveryScan(ctx context.Context, explicitPaths []st
 		settings: s,
 		opts:     opts,
 		runtime:  rt,
+		states:   states,
 	}
 }
 
@@ -113,6 +115,8 @@ func discoveryStartNote(rt models.RuntimeInfo) string {
 // carry a //nolint directive because callers unpacked it by position.
 type scanResult struct {
 	runtime models.RuntimeInfo
+	// states is the runtime state store detection ran with.
+	states runtimeStatesRead
 	// settings are the values this pass resolved; the model adopts them.
 	settings settings.Settings
 	files    []models.ModelFile
@@ -135,6 +139,7 @@ type scanResult struct {
 func (svc services) runDiscoveryScan(ctx context.Context, plan discoveryScanPlan) (scanResult, error) {
 	res := scanResult{
 		runtime:     plan.runtime,
+		states:      plan.states,
 		settings:    plan.settings,
 		configPaths: plan.fromFile,
 	}
@@ -149,7 +154,7 @@ func (svc services) runDiscoveryScan(ctx context.Context, plan discoveryScanPlan
 			res.ollamaWarn = err.Error()
 			debugf("runDiscoveryScan: ensureOllamaReady failed: %v", err)
 		case ready.Started:
-			res.runtime = svc.discoverRuntime(ctx, plan.settings)
+			res.runtime = svc.discoverRuntime(ctx, plan.settings, plan.runtime.Skipped)
 			res.ollamaNote = fmt.Sprintf("Started Ollama for model discovery on %s", spec.host)
 			debugf("runDiscoveryScan: Ollama started successfully, refreshed runtime running=%t", res.runtime.OllamaRunning)
 		}
@@ -221,7 +226,8 @@ func (svc services) reloadRuntimeCmd() tea.Cmd {
 		ctx, cancel := context.WithTimeout(context.Background(), runtimeProbeTimeout)
 		defer cancel()
 		s := svc.resolveSettings(cfg, true, nil)
-		return runtimeReadyMsg{runtime: svc.discoverRuntime(ctx, s), settings: s}
+		rt, states := svc.detectRuntime(ctx, s)
+		return runtimeReadyMsg{runtime: rt, settings: s, states: states}
 	}
 }
 
@@ -239,7 +245,7 @@ func (svc services) startupCmd() tea.Cmd {
 			debugf("startupCmd: no valid cache, falling back to full scan err=%v valid=%t", err, err == nil && cached.ValidForCache())
 			return startupNeedFullScanMsg{}
 		}
-		rt := svc.discoverRuntime(ctx, s)
+		rt, states := svc.detectRuntime(ctx, s)
 		debugf("startupCmd: cache valid, runtime ollamaPath=%q ollamaRunning=%t cachedModels=%d", rt.OllamaPath, rt.OllamaRunning, len(cached.Models))
 		if rt.OllamaPath != "" && !rt.OllamaRunning {
 			debugf("startupCmd: Ollama installed but stopped, forcing full scan")
@@ -267,6 +273,7 @@ func (svc services) startupCmd() tea.Cmd {
 		debugf("startupCmd: using cache hit with %d files", len(files))
 		return startupCacheHitMsg{
 			runtime:     rt,
+			states:      states,
 			settings:    s,
 			files:       files,
 			lastScan:    cached.LastScan,

@@ -12,6 +12,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/flyingnobita/llml/internal/config"
 	"github.com/flyingnobita/llml/internal/models"
 	"github.com/flyingnobita/llml/internal/settings"
 )
@@ -167,6 +168,17 @@ func TestGolden_runtimeConfigPanelMacOS(t *testing.T) {
 		m, _ = m.updateRuntimeConfigKey(tea.KeyPressMsg{Code: tea.KeyDown})
 	}
 	assertGolden(t, "runtime_config_panel_macos", m.View().Content)
+}
+
+// A Disabled Runtime shows an empty checkbox and "off" in the list, and its
+// detail pane says "Off" while its fields stay in place for editing.
+func TestGolden_runtimeConfigPanelDisabled(t *testing.T) {
+	m := goldenModel(t)
+	m.settings = goldenPanelSettings()
+	m.runtimeStates = config.RuntimeStates{}.With(models.BackendKobold, false)
+	m, _ = m.openRuntimeConfig()
+	m, _ = m.updateRuntimeConfigKey(tea.KeyPressMsg{Code: tea.KeyDown})
+	assertGolden(t, "runtime_config_panel_disabled", m.View().Content)
 }
 
 func TestGolden_helpPanel(t *testing.T) {

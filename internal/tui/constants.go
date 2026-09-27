@@ -266,7 +266,7 @@ const (
 	splitServerStoppedWithHint = "Server stopped. Press Enter to close..."
 
 	// Runtime config modal.
-	FooterRuntimeConfigHints     = "↑/↓: runtime · tab/→: fields · enter: save · esc: back"
+	FooterRuntimeConfigHints     = "↑/↓: runtime · space: on/off · tab/→: fields · enter: save · esc: back"
 	FooterRuntimeConfigDiscardYN = "y: discard changes · n/esc: stay"
 	// runtimeConfigModalSubtitle sits above the runtime panel's key hints.
 	runtimeConfigModalSubtitle = "Saved to config.toml. Environment variables win over saved values."

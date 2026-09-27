@@ -30,9 +30,14 @@ type services struct {
 	modelFilesFromCfg func([]config.ModelEntry) []models.ModelFile
 	filterExisting    func([]models.ModelFile) []models.ModelFile
 
+	// Runtime state store (runtimes.toml): which Runtimes are on.
+	readRuntimeStates  func() (config.RuntimeStates, error)
+	writeRuntimeStates func(config.RuntimeStates) error
+
 	// Discovery. Every call that can block on I/O takes a context so an
-	// abandoned scan stops instead of running to a fixed timeout.
-	discoverRuntime func(context.Context, settings.Settings) models.RuntimeInfo
+	// abandoned scan stops instead of running to a fixed timeout. Runtime
+	// detection sends no probe to a Runtime in its skip set.
+	discoverRuntime func(ctx context.Context, s settings.Settings, skip models.BackendSet) models.RuntimeInfo
 	discoverModels  func(context.Context, models.Options) ([]models.ModelFile, error)
 	discoverOllama  func(ctx context.Context, host string) ([]models.ModelFile, error)
 
@@ -59,6 +64,9 @@ func defaultServices() services {
 		runtimeConfig:     config.RuntimeConfigFromSettings,
 		modelFilesFromCfg: config.ModelFilesFromEntries,
 		filterExisting:    config.FilterExistingPaths,
+
+		readRuntimeStates:  config.ReadRuntimeStates,
+		writeRuntimeStates: config.WriteRuntimeStates,
 
 		discoverRuntime: models.DiscoverRuntime,
 		discoverModels:  models.Discover,
@@ -98,4 +106,23 @@ func (s services) waitForOllamaOrDefault(ctx context.Context, host string) bool 
 		case <-time.After(OllamaPollInterval):
 		}
 	}
+}
+
+// runtimeStatesRead is the runtime state store as one command read it. It
+// travels back to the model with the detection it steered, so the model adopts
+// the same on/off state detection used.
+type runtimeStatesRead struct {
+	states config.RuntimeStates
+	// err is a failed read. The states are then empty: every Runtime is on.
+	err error
+}
+
+// detectRuntime reads the runtime state store and runs detection, skipping the
+// Disabled Runtimes.
+func (s services) detectRuntime(ctx context.Context, set settings.Settings) (models.RuntimeInfo, runtimeStatesRead) {
+	states, err := s.readRuntimeStates()
+	if err != nil {
+		states = config.RuntimeStates{}
+	}
+	return s.discoverRuntime(ctx, set, states.Disabled()), runtimeStatesRead{states: states, err: err}
 }

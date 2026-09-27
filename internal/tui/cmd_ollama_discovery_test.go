@@ -46,13 +46,17 @@ func testServices() services {
 	svc.writeConfig = func(config.Config) error { return nil }
 	svc.readCache = func() (config.CacheFile, error) { return config.CacheFile{}, os.ErrNotExist }
 	svc.writeCache = func(config.CacheFile) error { return nil }
-	svc.discoverRuntime = func(context.Context, settings.Settings) models.RuntimeInfo { return models.RuntimeInfo{} }
+	svc.discoverRuntime = func(context.Context, settings.Settings, models.BackendSet) models.RuntimeInfo {
+		return models.RuntimeInfo{}
+	}
 	svc.discoverModels = func(context.Context, models.Options) ([]models.ModelFile, error) { return nil, nil }
 	svc.discoverOllama = func(context.Context, string) ([]models.ModelFile, error) { return nil, nil }
 	svc.startOllamaDaemon = func(serverSpec) error { return nil }
 	svc.waitForOllama = func(context.Context, string) bool { return true }
 	svc.probeOllama = func(context.Context, string) bool { return false }
 	svc.preloadOllama = func(context.Context, string, string) error { return nil }
+	svc.readRuntimeStates = func() (config.RuntimeStates, error) { return config.RuntimeStates{}, nil }
+	svc.writeRuntimeStates = func(config.RuntimeStates) error { return nil }
 	svc.getenv = func(string) string { return "" }
 	svc.clipboardWrite = func(string) error { return nil }
 	return svc
@@ -90,7 +94,7 @@ func TestApplyAndFullScanCmd_StartsOllamaForDiscovery(t *testing.T) {
 	svc.buildConfig = config.BuildConfig
 
 	runtimeCalls := 0
-	svc.discoverRuntime = func(context.Context, settings.Settings) models.RuntimeInfo {
+	svc.discoverRuntime = func(context.Context, settings.Settings, models.BackendSet) models.RuntimeInfo {
 		runtimeCalls++
 		if runtimeCalls >= 2 {
 			return models.RuntimeInfo{OllamaPath: "/bin/ollama", OllamaHost: "127.0.0.1:11434", OllamaRunning: true}
@@ -192,7 +196,7 @@ func TestStartupCmd_CacheHitWithStoppedOllamaFallsBackToFullScan(t *testing.T) {
 			},
 		}, nil
 	}
-	svc.discoverRuntime = func(context.Context, settings.Settings) models.RuntimeInfo {
+	svc.discoverRuntime = func(context.Context, settings.Settings, models.BackendSet) models.RuntimeInfo {
 		return models.RuntimeInfo{OllamaPath: "/bin/ollama", OllamaHost: "127.0.0.1:11434"}
 	}
 	svc.filterExisting = func(files []models.ModelFile) []models.ModelFile {
@@ -239,7 +243,7 @@ func TestStartupCmd_CacheHitWithRunningOllamaRefreshesLiveOllamaRows(t *testing.
 		return nil
 	}
 	svc.buildConfig = config.BuildConfig
-	svc.discoverRuntime = func(context.Context, settings.Settings) models.RuntimeInfo {
+	svc.discoverRuntime = func(context.Context, settings.Settings, models.BackendSet) models.RuntimeInfo {
 		return models.RuntimeInfo{OllamaPath: "/bin/ollama", OllamaHost: "127.0.0.1:11434", OllamaRunning: true}
 	}
 	svc.filterExisting = func(files []models.ModelFile) []models.ModelFile {
@@ -295,7 +299,7 @@ func TestApplyAndFullScanCmd_FailedStartupMergesCachedOllamaRows(t *testing.T) {
 	svc.writeConfig = func(config.Config) error { return nil }
 	svc.buildConfig = config.BuildConfig
 
-	svc.discoverRuntime = func(context.Context, settings.Settings) models.RuntimeInfo {
+	svc.discoverRuntime = func(context.Context, settings.Settings, models.BackendSet) models.RuntimeInfo {
 		return models.RuntimeInfo{OllamaPath: "/bin/ollama", OllamaHost: "127.0.0.1:11434"}
 	}
 	svc.startOllamaDaemon = func(serverSpec) error { return errors.New("boom") }
@@ -334,7 +338,7 @@ func TestApplyAndFullScanCmd_FailedStartupWithoutCacheKeepsNonOllamaRows(t *test
 	svc.writeConfig = func(config.Config) error { return nil }
 	svc.buildConfig = config.BuildConfig
 
-	svc.discoverRuntime = func(context.Context, settings.Settings) models.RuntimeInfo {
+	svc.discoverRuntime = func(context.Context, settings.Settings, models.BackendSet) models.RuntimeInfo {
 		return models.RuntimeInfo{OllamaPath: "/bin/ollama", OllamaHost: "127.0.0.1:11434"}
 	}
 	svc.startOllamaDaemon = func(serverSpec) error { return errors.New("boom") }
@@ -368,7 +372,7 @@ func TestRescanModelsCmd_StartsOllamaAndReturnsDiscoveryNote(t *testing.T) {
 	svc.buildConfig = config.BuildConfig
 
 	runtimeCalls := 0
-	svc.discoverRuntime = func(context.Context, settings.Settings) models.RuntimeInfo {
+	svc.discoverRuntime = func(context.Context, settings.Settings, models.BackendSet) models.RuntimeInfo {
 		runtimeCalls++
 		if runtimeCalls >= 2 {
 			return models.RuntimeInfo{OllamaPath: "/bin/ollama", OllamaHost: "127.0.0.1:11434", OllamaRunning: true}
