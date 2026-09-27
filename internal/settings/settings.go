@@ -245,32 +245,32 @@ func Resolve(layers ...Layer) Settings {
 		take(&s, l.Origin, FieldSplashPath, &s.SplashPath, l.SplashPath)
 		take(&s, l.Origin, FieldSplashHost, &s.SplashHost, l.SplashHost)
 		take(&s, l.Origin, FieldSplashPort, &s.SplashPort, l.SplashPort)
-		takeString(&s.HFHubCache, l.HFHubCache)
-		takeString(&s.HFHome, l.HFHome)
+		claim(&s.HFHubCache, l.HFHubCache)
+		claim(&s.HFHome, l.HFHome)
 		roots.Add(l.ExtraModelPaths...)
 	}
 	s.ExtraModelPaths = roots.Slice()
 	return s
 }
 
-// take assigns v to dst, and records origin as the source of f, only if v is
-// set and dst has not been claimed by a higher-precedence layer. A zero v claims
-// nothing, so it cannot record a source for a value it did not supply.
+// take claims dst for v, as [claim] does, and records origin as the source of
+// f when it does.
 func take[T comparable](s *Settings, origin Origin, f Field, dst, v *T) {
-	var zero T
-	if v == nil || *v == zero || *dst != zero {
-		return
+	if claim(dst, v) {
+		s.sources[f] = origin.source(f)
 	}
-	*dst = *v
-	s.sources[f] = origin.source(f)
 }
 
-// takeString assigns v to dst only if v is set and dst has not been claimed by
-// a higher-precedence layer.
-func takeString(dst *string, v *string) {
-	if v != nil && *dst == "" {
-		*dst = *v
+// claim assigns v to dst only if v is set and dst has not been claimed by a
+// higher-precedence layer. A zero v claims nothing, so it cannot record a source
+// for a value it did not supply.
+func claim[T comparable](dst, v *T) bool {
+	var zero T
+	if v == nil || *v == zero || *dst != zero {
+		return false
 	}
+	*dst = *v
+	return true
 }
 
 func ptr[T any](v T) *T { return &v }
