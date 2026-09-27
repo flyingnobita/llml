@@ -313,7 +313,8 @@ func (m Model) routeModalKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 }
 
 // handleRunServerKey launches the selected model, in the split pane or
-// fullscreen according to mode.
+// fullscreen according to mode. A dimmed row, one on a Disabled Runtime, is
+// not launched.
 func (m Model) handleRunServerKey(mode runServerMode) (tea.Model, tea.Cmd) {
 	if m.loading {
 		return m.flashError("Wait for the model scan to finish.")
@@ -324,22 +325,17 @@ func (m Model) handleRunServerKey(mode runServerMode) (tea.Model, tea.Cmd) {
 	}
 	m = m.withLastRunCleared()
 
-	params, _ := profiles.LoadParamsForRun(p)
 	be := m.resolveEffectiveBackend()
+	if !m.runtimeEnabled(be) {
+		return m.blockLaunchOnDisabledRuntime(be)
+	}
+	params, _ := profiles.LoadParamsForRun(p)
 	spec, err := buildServerSpec(be, p, params, m.runtime, true)
 	if err != nil {
 		return m.flashError(err.Error())
 	}
 	m = m.warnAboutMMProj(spec, p)
-
-	switch {
-	case be == models.BackendOllama:
-		return m, m.svc.runOllamaLaunchCmd(spec)
-	case mode == runServerModeFullscreen:
-		return m, runForegroundServerCmd(spec)
-	default:
-		return m, runSplitServerCmd(spec)
-	}
+	return m, m.svc.startServer(spec, mode)
 }
 
 // warnAboutMMProj records an alert when mmproj injection was requested but could

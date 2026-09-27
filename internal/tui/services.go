@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/atotto/clipboard"
 
 	"github.com/flyingnobita/llml/internal/config"
@@ -46,6 +47,10 @@ type services struct {
 	waitForOllama     func(ctx context.Context, host string) bool
 	probeOllama       func(ctx context.Context, host string) bool
 	preloadOllama     func(ctx context.Context, host, modelID string) error
+
+	// launchServer returns the command that starts spec's server in mode. Nil
+	// means the real launch; see [services.startServer].
+	launchServer func(spec serverSpec, mode runServerMode) tea.Cmd
 
 	// Environment and clipboard.
 	getenv         settings.Getenv
@@ -105,6 +110,24 @@ func (s services) waitForOllamaOrDefault(ctx context.Context, host string) bool 
 			return false
 		case <-time.After(OllamaPollInterval):
 		}
+	}
+}
+
+// startServer returns the command that starts spec's server: an Ollama preload
+// on the shared daemon, or a server process in the split pane or fullscreen.
+// The real launch is the fallback here, rather than in defaultServices, because
+// the Ollama launch needs the daemon functions from the same services value.
+func (s services) startServer(spec serverSpec, mode runServerMode) tea.Cmd {
+	if s.launchServer != nil {
+		return s.launchServer(spec, mode)
+	}
+	switch {
+	case spec.backend == models.BackendOllama:
+		return s.runOllamaLaunchCmd(spec)
+	case mode == runServerModeFullscreen:
+		return runForegroundServerCmd(spec)
+	default:
+		return runSplitServerCmd(spec)
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 
+	"github.com/flyingnobita/llml/internal/models"
 	"github.com/flyingnobita/llml/internal/profiles"
 )
 
@@ -394,6 +395,12 @@ func (m Model) renderBackendRow(p profiles.Profile, focused bool, maxSec int) []
 	labels := make([]string, len(opts))
 	for i, o := range opts {
 		labels[i] = radioOptionLabel(o)
+		// A Disabled Runtime stays selectable, so a profile set up for it
+		// keeps its choice; the label says it is off. No override means
+		// llama.cpp.
+		if b, err := models.ParseBackend(o); err == nil && !m.runtimeEnabled(b) {
+			labels[i] += runtimeOffSuffix
+		}
 	}
 	return m.renderRadioRow("Backend", labels, slices.Index(opts, p.Backend),
 		m.params.backendCursor, focused, maxSec)

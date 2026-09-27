@@ -7,15 +7,20 @@ import (
 )
 
 // adoptRuntimeStates makes r the model's stored on/off state, then decides
-// every Runtime rt shows for the first time (see [Model.decideFirstSeen]). A
-// failed read leaves every Runtime on, is reported in the alert history, and
-// decides nothing, so the unreadable file is not overwritten.
+// every Runtime rt shows for the first time (see [Model.decideFirstSeen]), and
+// redraws the rows, which dim by the result. A failed read leaves every
+// Runtime on, is reported in the alert history, and decides nothing, so the
+// unreadable file is not overwritten.
 func (m Model) adoptRuntimeStates(r runtimeStatesRead, rt models.RuntimeInfo) Model {
 	m.runtimeStates = r.states
 	if r.err != nil {
-		return m.addAlert(alertSeverityWarn, "Runtimes", "Could not read runtimes.toml, treating every Runtime as on: "+r.err.Error())
+		m = m.addAlert(alertSeverityWarn, "Runtimes", "Could not read runtimes.toml, treating every Runtime as on: "+r.err.Error())
+	} else {
+		m = m.decideFirstSeen(rt)
 	}
-	return m.decideFirstSeen(rt)
+	// After decideFirstSeen, which may change runtimeStates, so first-seen
+	// Runtimes that start off dim their rows at once.
+	return m.layoutTable()
 }
 
 // decideFirstSeen gives each Runtime rt's platform supports, and that has no
@@ -98,6 +103,7 @@ func (m Model) saveRuntimeToggles() Model {
 		return m
 	}
 	m.runtimeStates = m.rc.toggles
+	m = m.layoutTable()
 	if err := m.svc.writeRuntimeStates(m.runtimeStates); err != nil {
 		m = m.addAlert(alertSeverityWarn, "Runtimes", "Could not save runtimes.toml: "+err.Error())
 	}
