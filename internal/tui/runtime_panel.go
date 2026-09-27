@@ -29,7 +29,7 @@ func vllmVenvInUse(r models.RuntimeInfo) string {
 	if v := strings.TrimSpace(r.VLLMVenv); v != "" {
 		return v
 	}
-	vllmBin := models.ResolveVLLMPath(r)
+	vllmBin := r.Status(models.BackendVLLM).Path
 	act := models.ResolveVLLMActivateScript(vllmBin, r.VLLMVenv, r.VLLMConfiguredPath)
 	return models.VenvRootFromActivateScript(act)
 }

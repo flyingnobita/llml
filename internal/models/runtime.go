@@ -71,13 +71,13 @@ func (r RuntimeInfo) Available() bool {
 // binaryStatus renders "name: ✓ running" / "name: ✓ stopped" / "name: running"
 // for a backend that was found or answered its probe, and reports false when
 // neither happened so the caller can leave it out of the summary.
-func binaryStatus(name, path string, running bool) (string, bool) {
+func binaryStatus(name string, st RuntimeStatus) (string, bool) {
 	switch {
-	case path != "" && running:
+	case st.Found() && st.Running:
 		return name + ": ✓ running", true
-	case path != "":
+	case st.Found():
 		return name + ": ✓ stopped", true
-	case running:
+	case st.Running:
 		return name + ": running", true
 	default:
 		return "", false
@@ -116,7 +116,7 @@ func (r RuntimeInfo) Summary() string {
 	}
 	if !r.Skipped.Has(BackendVLLM) {
 		v := "vllm: —"
-		if r.VLLMPath != "" {
+		if r.Status(BackendVLLM).Found() {
 			v = "vllm: ✓"
 		}
 		parts = append(parts, v)
@@ -124,19 +124,17 @@ func (r RuntimeInfo) Summary() string {
 	for _, b := range []struct {
 		backend ModelBackend
 		name    string
-		path    string
-		running bool
 	}{
-		{BackendKobold, "koboldcpp", r.KoboldCppPath, r.KoboldCppRunning},
-		{BackendNInfer, "ninfer", r.NInferPath, r.NInferRunning},
-		{BackendOMLX, "omlx", r.OMLXPath, r.OMLXRunning},
-		{BackendSplash, "splash", r.SplashPath, r.SplashRunning},
-		{BackendOllama, "ollama", r.OllamaPath, r.OllamaRunning},
+		{BackendKobold, "koboldcpp"},
+		{BackendNInfer, "ninfer"},
+		{BackendOMLX, "omlx"},
+		{BackendSplash, "splash"},
+		{BackendOllama, "ollama"},
 	} {
 		if r.Skipped.Has(b.backend) {
 			continue
 		}
-		if s, ok := binaryStatus(b.name, b.path, b.running); ok {
+		if s, ok := binaryStatus(b.name, r.Status(b.backend)); ok {
 			parts = append(parts, s)
 		}
 	}

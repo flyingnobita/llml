@@ -2,6 +2,7 @@ package tui
 
 import (
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/flyingnobita/llml/internal/models"
@@ -65,9 +66,10 @@ func TestRuntimeTableFields(t *testing.T) {
 }
 
 // Detection status reads "found" from the program lookup and "running" from
-// the server probe, per Runtime.
+// the server probe, per Runtime. It reads only what detection recorded, so the
+// PATH of the machine running the test does not matter.
 func TestRuntimeTableStatus(t *testing.T) {
-	t.Setenv("PATH", t.TempDir()) // no program is found through PATH lookup
+	t.Parallel()
 
 	r := models.RuntimeInfo{
 		LlamaServerPath:  "/opt/llama/bin/llama-server",
@@ -90,6 +92,31 @@ func TestRuntimeTableStatus(t *testing.T) {
 	for _, rt := range runtimeTable {
 		if got := rt.status(r); got != want[rt.backend] {
 			t.Errorf("%s status = %+v, want %+v", rt.name, got, want[rt.backend])
+		}
+	}
+}
+
+// The panel's status mark agrees with what the first-seen check decides from:
+// a Runtime detection did not find is shown not found, even when its program
+// is on the PATH of the machine running the test. Before, the panel looked the
+// program up on PATH again while rendering, so first-seen could turn a Runtime
+// off that the panel showed as found.
+func TestRuntimePanel_statusMatchesDetected(t *testing.T) {
+	t.Parallel()
+
+	for _, p := range []models.Platform{linuxPlatform, macPlatform} {
+		for name, rt := range map[string]models.RuntimeInfo{
+			"nothing detected": {Platform: p},
+			"all detected":     panelRuntime(p),
+		} {
+			m := openPanel(t, testServices(), p, defaultSettings(), 100, 30)
+			m.runtime = rt
+			for _, def := range m.panelRuntimes() {
+				missing := strings.Contains(listRow(t, m, def.name), runtimeMarkMissing)
+				if detected := rt.Detected(def.backend); missing == detected {
+					t.Errorf("%s/%s: %s shows missing=%t but Detected=%t", p.GOOS, name, def.name, missing, detected)
+				}
+			}
 		}
 	}
 }
