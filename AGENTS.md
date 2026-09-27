@@ -8,9 +8,9 @@ This instruction lives in `AGENTS.md`. Update it here, not in `CLAUDE.md`.
 
 ## Project Overview
 
-**LLM Launcher** (`llml`) is a terminal UI (TUI) for discovering GGUF and Hugging Face-style
-safetensors models on the local filesystem, plus Ollama models via the Ollama API,
-and launching `llama-server`, `koboldcpp`, `vllm serve`, or Ollama preload flows for a selected row.
+**LLM Launcher** (`llml`) is a terminal UI (TUI) for discovering GGUF, Hugging Face-style
+safetensors, and NInfer (`.ninfer`) models on the local filesystem, plus Ollama models via the Ollama API,
+and launching `llama-server`, `koboldcpp`, `vllm serve`, `ninfer-serve`, or Ollama preload flows for a selected row.
 
 - Language: **Go 1.26+**
 - UI framework: **Bubble Tea v2** (`charm.land/bubbletea/v2`) + **Lip Gloss v2** (`charm.land/lipgloss/v2`) + **Bubbles v2** (`charm.land/bubbles/v2`)
@@ -44,7 +44,7 @@ cmd/gguf-dump/       # Developer-only tool: dumps a GGUF file's metadata (mise r
 internal/
   settings/          # Resolved runtime configuration: Settings, Layer, Resolve, FromEnv, Defaults. Owns the env var names and built-in defaults; imports nothing from config/models/tui
   config/            # TOML persistence ({UserConfigDir}/llml/config.toml): runtime, discovery cache, [[models]]. Converts to and from settings via RuntimeConfig.Layer / RuntimeConfigFromSettings
-  models/            # GGUF + safetensors discovery, metadata, runtime detection, formatting; also Ollama API discovery and HF-hub support. Filesystem discovery uses the `modelSource` interface (`ggufSource`, `safetensorsSource`) and Ollama rows are merged from the daemon API.
+  models/            # GGUF + safetensors + NInfer discovery, metadata, runtime detection, formatting; also Ollama API discovery and HF-hub support. Filesystem discovery uses the `modelSource` interface (`ggufSource`, `safetensorsSource`, `ninferSource`) and Ollama rows are merged from the daemon API.
   profiles/          # Parameter profiles end to end: model-params.json persistence (Entry, Profile, ModelParams), portable TOML parse/write (portable_parse.go), and the single model-location rule table (model_location.go). internal/tui uses these types directly — do not reintroduce alias wrappers
   tui/               # Bubble Tea model, update, view, styles, keymaps
 .agents/skills/     # Canonical repo-managed agent skills; llml-import lives here
@@ -116,20 +116,23 @@ scripts/             # gofmt-check.sh, precommit-docs-fix.sh
 
 **Runtime** env vars (same keys as **`[runtime]`** in TOML):
 
-| Variable                            | Purpose                                                                                                                       |
-| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `LLAMA_CPP_PATH`                    | Directory containing `llama-cli`/`llama-server`                                                                               |
-| `VLLM_PATH`                         | Directory containing the `vllm` executable                                                                                    |
-| `VLLM_VENV`                         | Optional Python venv root; `R` sources `bin/activate` before `vllm` (Unix)                                                    |
-| `LLAMA_SERVER_PORT`                 | TCP port for `llama-server` and `/health` probe (default 8080)                                                                |
-| `VLLM_SERVER_PORT`                  | TCP port for `vllm serve` (default 8000)                                                                                      |
-| `OLLAMA_PATH`                       | Directory containing the `ollama` executable, or the absolute executable path                                                 |
-| `OLLAMA_HOST`                       | Ollama API host (default `127.0.0.1:11434`); `R` / `ctrl+R` ensure the daemon is running there and preload the selected model |
-| `KOBOLDCPP_PATH`                    | Directory containing the `koboldcpp` executable, or the absolute executable path                                              |
-| `KOBOLDCPP_PORT`                    | TCP port for KoboldCpp and `/api/extra/generate/check` health probe (default 5001)                                            |
-| `LLML_MODEL_PATHS`                  | Extra model search roots (comma-separated); merged with `discovery.extra_model_paths` in TOML for scans                       |
-| `HUGGINGFACE_HUB_CACHE` / `HF_HOME` | Hugging Face hub cache location                                                                                               |
-| `LLML_THEME`                        | Initial TUI palette (`dark` / `light` / `auto`); **`t`** cycles while running (not in runtime `c` text fields)                |
+| Variable                            | Purpose                                                                                                                        |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `LLAMA_CPP_PATH`                    | Directory containing `llama-cli`/`llama-server`                                                                                |
+| `VLLM_PATH`                         | Directory containing the `vllm` executable                                                                                     |
+| `VLLM_VENV`                         | Optional Python venv root; `R` sources `bin/activate` before `vllm` (Unix)                                                     |
+| `LLAMA_SERVER_PORT`                 | TCP port for `llama-server` and `/health` probe (default 8080)                                                                 |
+| `VLLM_SERVER_PORT`                  | TCP port for `vllm serve` (default 8000)                                                                                       |
+| `OLLAMA_PATH`                       | Directory containing the `ollama` executable, or the absolute executable path                                                  |
+| `OLLAMA_HOST`                       | Ollama API host (default `127.0.0.1:11434`); `R` / `ctrl+R` ensure the daemon is running there and preload the selected model  |
+| `KOBOLDCPP_PATH`                    | Directory containing the `koboldcpp` executable, or the absolute executable path                                               |
+| `KOBOLDCPP_PORT`                    | TCP port for KoboldCpp and `/api/extra/generate/check` health probe (default 5001)                                             |
+| `NINFER_PATH`                       | NInfer checkout root (ninfer-serve at `build/apps/`), its build dir, or the `ninfer-serve` path; adds `<root>/models` to scans |
+| `NINFER_SERVER_PORT`                | TCP port for `ninfer-serve` and its `/health` probe (default 18080, off ninfer-serve's 8080 to avoid llama-server)             |
+| `NINFER_SERVER_HOST`                | Listen host for `ninfer-serve` (default `127.0.0.1`)                                                                           |
+| `LLML_MODEL_PATHS`                  | Extra model search roots (comma-separated); merged with `discovery.extra_model_paths` in TOML for scans                        |
+| `HUGGINGFACE_HUB_CACHE` / `HF_HOME` | Hugging Face hub cache location                                                                                                |
+| `LLML_THEME`                        | Initial TUI palette (`dark` / `light` / `auto`); **`t`** cycles while running (not in runtime `c` text fields)                 |
 
 **Parameter profiles** (per-model extra env + argv for `llama-server`, `koboldcpp`, `vllm`, and backend-specific launch helpers, edited with **`p`**) are **not** in `config.toml`: they are stored in **`{UserConfigDir}/llml/model-params.json`** (see `internal/profiles`). Keys are stable model identities: cleaned filesystem paths for local rows, model IDs for Ollama rows. Each entry has named profiles and `activeIndex` for which profile **`R`** uses. In the `p` modal, **`c`** duplicates the highlighted profile (clone env + args). The Profile Metadata section has two checkbox rows: **Use Case Primary** (multi-select from `chat`, `tool-calling`, `eval` — left/right moves the chip cursor, space toggles) and **Tags** (same interaction, from a canonical tag list). **Backend** and **Hardware Class** are rendered as single-select radio rows (`( )`/`(•)` chips) — left/right moves the cursor, space/enter selects the highlighted option. All text fields (GPU Count, Min/Max VRAM GB, **Notes** — formerly "Hardware Notes") open a text-input edit on enter. Labels and values use distinct colors; all value columns align at the same horizontal offset regardless of label width.
 

@@ -8,17 +8,19 @@
 **LLM Launcher** (`llml`) is a TUI for people who already have models on disk and are
 tired of reconstructing launch commands from shell history.
 
-It scans your local filesystem for **GGUF** and **Hugging Face-style safetensors** models,
-detects installed runtimes (**[llama.cpp](https://github.com/ggerganov/llama.cpp)**,
+It scans your local filesystem for **GGUF**, **Hugging Face-style safetensors**, and
+**NInfer** (`.ninfer`) models, detects installed runtimes
+(**[llama.cpp](https://github.com/ggerganov/llama.cpp)**,
 **[vLLM](https://github.com/vllm-project/vllm)**,
-**[Ollama](https://ollama.com/)**, and
-**[KoboldCpp](https://github.com/LostRuins/koboldcpp)**),
+**[Ollama](https://ollama.com/)**,
+**[KoboldCpp](https://github.com/LostRuins/koboldcpp)**, and
+**[NInfer](https://github.com/Neroued/ninfer)**),
 and lets you save named parameter profiles per model — so the command that worked
 last time is always one keystroke away.
 
 Browse local models. Detect the right runtime. Launch with one key.
 
-Works alongside llama.cpp, vLLM, Ollama, and KoboldCpp — not a replacement for them.
+Works alongside llama.cpp, vLLM, Ollama, KoboldCpp, and NInfer — not a replacement for them.
 llml is the profile manager for whatever backend you already run.
 
 > [!NOTE]
@@ -28,11 +30,12 @@ llml is the profile manager for whatever backend you already run.
 
 ## ✨ Features
 
-- **Model discovery** — auto-scans common paths for GGUF files and safetensors model
-  directories; add extra roots via `LLML_MODEL_PATHS` and/or `config.toml`. Results are
+- **Model discovery** — auto-scans common paths for GGUF files, safetensors model
+  directories, and NInfer artifacts (including the `models/` directory of a configured
+  NInfer checkout); add extra roots via `LLML_MODEL_PATHS` and/or `config.toml`. Results are
   cached under **`{UserConfigDir}/llml/cache/models.toml`** so the next launch can skip the
   filesystem walk when the cache is still valid.
-- **Runtime detection** — finds installed `llama-server`, `vllm`, and `koboldcpp` binaries and maps
+- **Runtime detection** — finds installed `llama-server`, `vllm`, `koboldcpp`, and `ninfer-serve` binaries and maps
   installed `ollama` plus the configured Ollama host, then maps each model to its
   compatible runtime. GGUF models can use llama.cpp or KoboldCpp via profile selection.
 - **Named parameter profiles** — save multiple profiles per model (e.g. `fast-laptop`,
@@ -61,8 +64,8 @@ llml is the profile manager for whatever backend you already run.
 ### Runtime Requirements
 
 - **Runtime engine (at least one)**: **llama.cpp** (`llama-server`) or **KoboldCpp** (`koboldcpp`) for GGUF models,
-  **vLLM** (`vllm`) for safetensors models, and/or **Ollama** (`ollama`) for Ollama
-  models are installed (see [Runtime Engines](#runtime-engines)).
+  **vLLM** (`vllm`) for safetensors models, **NInfer** (`ninfer-serve`) for `.ninfer`
+  artifacts, and/or **Ollama** (`ollama`) for Ollama models are installed (see [Runtime Engines](#runtime-engines)).
 - **Models** in default scan locations, or configure custom roots with `LLML_MODEL_PATHS` (see [Model Discovery](#model-discovery)).
 
 ### Install
@@ -321,6 +324,9 @@ Configure how `llml` finds and launches servers. You can edit these interactivel
 | **Ollama host**    | `OLLAMA_HOST`        | `default_ollama_host`                 | `127.0.0.1:11434` |
 | **KoboldCpp path** | `KOBOLDCPP_PATH`     | `default_koboldcpp_path`              | _(auto)_          |
 | **KoboldCpp port** | `KOBOLDCPP_PORT`     | `default_koboldcpp_port`              | `5001`            |
+| **NInfer path**    | `NINFER_PATH`        | `default_ninfer_path`                 | _(auto)_          |
+| **NInfer port**    | `NINFER_SERVER_PORT` | `default_ninfer_server_port`          | `18080`           |
+| **NInfer host**    | `NINFER_SERVER_HOST` | `default_ninfer_server_host`          | `127.0.0.1`       |
 | **TUI Theme**      | `LLML_THEME`         | -                                     | `auto`            |
 
 **Detection Logic:**
@@ -331,6 +337,10 @@ Configure how `llml` finds and launches servers. You can edit these interactivel
 4. (llama.cpp) Probing for an already-running server on the configured port.
 5. (vLLM only) Common venv locations (e.g., `~/.venv-vllm-metal/bin` on macOS).
 6. (KoboldCpp only) Platform-specific name variants with CUDA preference on Linux; probes port for already-running instances.
+7. (NInfer only) NInfer has no install target, so `NINFER_PATH` may point at the checkout
+   root (llml looks in `build/apps/`), the build directory, or `ninfer-serve` itself. The
+   checkout's `models/` directory is added to the scan roots. The default port is `18080`
+   rather than ninfer-serve's own `8080`, which would collide with llama-server.
 
 ---
 

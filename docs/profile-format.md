@@ -32,7 +32,7 @@ canonical local profile schema, and writes the resulting profiles into
 
 ## Scope
 
-- Covers llama.cpp, vLLM, Ollama, and KoboldCpp backends.
+- Covers llama.cpp, vLLM, Ollama, KoboldCpp, and NInfer backends.
 - One file may contain multiple profiles, for multiple backends, targeting one or
   more model families.
 - Cross-backend translation (for example converting a llama.cpp profile to a
@@ -53,7 +53,7 @@ Each entry in `[[profiles]]` is one parameter profile.
 | Field        | Type            | Required | Description                                                                                                                |
 | ------------ | --------------- | -------- | -------------------------------------------------------------------------------------------------------------------------- |
 | `name`       | string          | yes      | Short human-readable name for this profile. Used as the profile name inside llml.                                          |
-| `backend`    | string          | yes      | One of: `llama`, `vllm`, `ollama`, `koboldcpp`. Semantics match llml's local canonical profile schema.                     |
+| `backend`    | string          | yes      | One of: `llama`, `vllm`, `ollama`, `koboldcpp`, `ninfer`. Semantics match llml's local canonical profile schema.           |
 | `model_hint` | string          | no       | Free-text hint for which local model these profiles should attach to (for example `"Llama-3-8B-GGUF"` or `"Qwen2.5-72B"`). |
 | `args`       | array of string | no       | Command-line arguments in panel-row format (see below). Defaults to empty.                                                 |
 | `env`        | array of table  | no       | Environment variables as `{key, value}` pairs. Defaults to empty.                                                          |
@@ -306,8 +306,8 @@ If you are an LLM reading this document in order to extract profiles from a sour
 follow these rules:
 
 1. **Backend detection:** Identify whether the source describes llama.cpp, vLLM,
-   Ollama, or KoboldCpp invocations. Use the `backend` field accordingly (`llama`,
-   `vllm`, `ollama`, `koboldcpp`). If the source covers multiple backends, emit one
+   Ollama, KoboldCpp, or NInfer invocations. Use the `backend` field accordingly (`llama`,
+   `vllm`, `ollama`, `koboldcpp`, `ninfer`). If the source covers multiple backends, emit one
    `[[profiles]]` entry per backend variant.
 
 2. **Args extraction:** Extract only flags and values that appear explicitly in the
@@ -369,6 +369,11 @@ follow these rules:
      `--config`, `--qlora-adapter-name-or-path`, `--lora-modules`,
      `--prompt-adapters`, `--speculative-config`, `--speculative-model`,
      `--tokenizer-pool-extra-config`.
+
+   **`ninfer`**
+   - Args: `--chat-template`. `ninfer-serve` takes the `.ninfer` artifact as its
+     positional argument, which llml supplies, so there is no model flag; a
+     chat template override is a local file that would not resolve elsewhere.
 
    Env keys are matched case-insensitively; args are matched on their first
    token, so `-m /models/a.gguf` and a bare `-m` are both stripped. Export has no
