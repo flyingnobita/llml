@@ -328,7 +328,9 @@ runtime on or off, and **enter** saves it with your field edits. A runtime you t
 in the list and "Off" in its detail pane: llml stops probing it and leaves it out of the runtime
 status line, and its fields stay editable. Saving re-detects runtimes without rescanning models.
 The on/off choices are stored in `runtimes.toml`, not `config.toml`, and no environment variable
-overrides them. A runtime with no stored choice is on.
+overrides them. The first time llml sees a runtime, it turns it on only if it finds the program or
+its server answers, and turns it off otherwise; a single alert lists any runtimes turned off this way.
+After that only your choice changes it, so a runtime you install later stays off until you tick it.
 
 | Feature             | Environment Variable | `config.toml` key (under `[runtime]`) | Default           |
 | :------------------ | :------------------- | :------------------------------------ | :---------------- |
