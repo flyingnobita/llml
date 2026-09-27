@@ -149,3 +149,34 @@ func TestMaybeBackupOnVersionChange_devNoBackup(t *testing.T) {
 		}
 	}
 }
+
+func TestMaybeBackupOnVersionChange_snapshotsRuntimeStates(t *testing.T) {
+	testIsolatedUserConfig(t)
+
+	rs, err := RuntimeStatesPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(rs), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(rs, []byte("[runtimes]\nllama = false\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := MaybeBackupOnVersionChange("1.2.3"); err != nil {
+		t.Fatal(err)
+	}
+	entries, err := os.ReadDir(filepath.Join(filepath.Dir(rs), BackupDirName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var found bool
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), "runtimes.toml.") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("version change did not snapshot runtimes.toml: %v", entries)
+	}
+}

@@ -115,8 +115,8 @@ func PruneOldBackups(backupDir, base string, keep int) error {
 }
 
 // MaybeBackupOnVersionChange compares currentVersion to .last-run-version. When the
-// version changed (or the marker is missing), it backs up config.toml and
-// model-params.json if they exist, then writes the marker. Skips version-based
+// version changed (or the marker is missing), it backs up config.toml,
+// model-params.json, and runtimes.toml if they exist, then writes the marker. Skips version-based
 // backup when currentVersion is empty or "dev" to avoid noisy backups during
 // development.
 //
@@ -148,12 +148,14 @@ func MaybeBackupOnVersionChange(currentVersion string) error {
 	if err := BackupFileIfExists(cfgPath); err != nil {
 		return err
 	}
-	mpPath, err := ModelParamsPath()
-	if err != nil {
-		return err
-	}
-	if err := BackupFileIfExists(mpPath); err != nil {
-		return err
+	for _, pathFn := range []func() (string, error){ModelParamsPath, RuntimeStatesPath} {
+		p, err := pathFn()
+		if err != nil {
+			return err
+		}
+		if err := BackupFileIfExists(p); err != nil {
+			return err
+		}
 	}
 
 	return writeVersionMarker(marker, cur)

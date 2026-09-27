@@ -68,3 +68,22 @@ func ParseBackend(s string) (ModelBackend, error) {
 		return 0, fmt.Errorf("unknown backend %q", s)
 	}
 }
+
+// BackendSet is a set of Runtimes, named by their backend. The zero value is
+// an empty set, and a nil set answers every [BackendSet.Has] with false.
+type BackendSet map[ModelBackend]struct{}
+
+// NewBackendSet returns a set holding bs.
+func NewBackendSet(bs ...ModelBackend) BackendSet {
+	s := make(BackendSet, len(bs))
+	for _, b := range bs {
+		s[b] = struct{}{}
+	}
+	return s
+}
+
+// Has reports whether b is in the set.
+func (s BackendSet) Has(b ModelBackend) bool {
+	_, ok := s[b]
+	return ok
+}
