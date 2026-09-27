@@ -171,11 +171,7 @@ func (m Model) renderCheckboxRow(
 	isFirst := true
 
 	for i, opt := range options {
-		check := "[ ]"
-		if hasTag(selected, opt) {
-			check = "[✓]"
-		}
-		chipText := check + " " + opt
+		chipText := checkbox(hasTag(selected, opt)) + " " + opt
 		chipW := lipgloss.Width(chipText)
 
 		var chipRendered string

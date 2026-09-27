@@ -108,11 +108,10 @@ func (m Model) runtimeListRow(rt runtimeDef) string {
 	}
 	name := nameStyle.Render(rt.name) + strings.Repeat(" ", runtimeNameWidth()-lipgloss.Width(rt.name))
 	on := m.panelRuntimeEnabled(rt.backend)
-	box := "[✓]"
+	box := checkbox(on)
 	var status string
 	switch {
 	case !on:
-		box = "[ ]"
 		status = " " + m.ui.styles.runtimeMarkOff.Render(runtimeMarkOff)
 	case m.runtimeStatusPending(rt.backend):
 		// No mark: detection skipped it, so any mark would be stale.

@@ -9,10 +9,6 @@ import (
 	"github.com/flyingnobita/llml/internal/profiles"
 )
 
-// runtimeOffSuffix follows the Runtime name of a dimmed row, and a Disabled
-// Runtime's option in the p panel.
-const runtimeOffSuffix = " (off)"
-
 // rowRuntime returns the Runtime row f launches on. For a GGUF row it is the
 // Active Profile's choice between llama.cpp and KoboldCpp, cached in
 // effectiveBackends; for any other row it is the row's own Runtime, so a row

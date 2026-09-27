@@ -11,6 +11,14 @@ import (
 	"github.com/flyingnobita/llml/internal/models"
 )
 
+// checkbox returns the box for a multi-select item: ticked when on.
+func checkbox(on bool) string {
+	if on {
+		return checkboxOn
+	}
+	return checkboxOff
+}
+
 // FormatPathDisplay shortens the user home directory prefix to ~/ for TUI display only.
 // Pass homeDir from [os.UserHomeDir] (or tests). If homeDir is empty, the path is returned
 // unchanged (no tilde shortening). The original path should be kept for programmatic use.
