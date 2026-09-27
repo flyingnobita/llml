@@ -391,3 +391,40 @@ func TestMissingNote_followsActiveProfileByParamsKey(t *testing.T) {
 		t.Errorf("the row launches on the missing KoboldCpp, note %q", m.lastRunNote)
 	}
 }
+
+// A Runtime that detection skipped, ticked on but not saved yet, shows no
+// status mark: it got no probe, so any mark would be stale. The detail header
+// says detection runs on save, and saving re-detects it.
+func TestRuntimePanel_toggledOnBeforeSaveShowsNoStaleStatus(t *testing.T) {
+	t.Parallel()
+
+	f := newStateFakes()
+	f.stored = config.RuntimeStates{}.With(models.BackendKobold, false)
+	m := NewWithServices(f.services)
+	m.layout.width, m.layout.height = 100, 30
+	m.loading, m.runtimeScanned = false, true
+	m.settings = defaultSettings()
+	m.runtimeStates = f.stored
+	m.runtime = panelRuntime(linuxPlatform)
+	m.runtime.Skipped = models.NewBackendSet(models.BackendKobold)
+	m = m.layoutTable()
+	m = press(t, m, keyText("c"), keyDown, keySpace) // KoboldCpp on, unsaved
+
+	row := listRow(t, m, "KoboldCpp")
+	for _, mark := range []string{runtimeMarkRunning, runtimeMarkFound, runtimeMarkMissing} {
+		if strings.Contains(row, mark) {
+			t.Errorf("an unprobed Runtime should show no status mark, row %q", row)
+		}
+	}
+	if view := plainView(m); !strings.Contains(view, "KoboldCpp · "+runtimeStatusPendingWord) {
+		t.Errorf("the detail header should say detection runs on save:\n%s", view)
+	}
+	if l := listRow(t, m, "Llama.cpp"); !strings.Contains(l, runtimeMarkRunning) {
+		t.Errorf("a probed Runtime keeps its mark, row %q", l)
+	}
+
+	press(t, m, keyEnter)
+	if n := len(f.skips); n != 1 || f.skips[0].Has(models.BackendKobold) {
+		t.Errorf("saving should re-detect with KoboldCpp probed, skip sets %v", f.skips)
+	}
+}

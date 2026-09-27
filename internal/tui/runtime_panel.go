@@ -19,6 +19,10 @@ const (
 	// runtimeMarkOff replaces the status mark of a Disabled Runtime, whose
 	// detection result would be stale: it is not probed.
 	runtimeMarkOff = "off"
+	// runtimeStatusPendingWord heads the detail pane of a Runtime ticked on
+	// but not saved yet, which detection skipped: it has no status to show
+	// until saving re-runs detection. Its list line shows no mark.
+	runtimeStatusPendingWord = "checked on save"
 )
 
 // vllmVenvInUse returns the venv root vLLM launches with: the configured root
@@ -105,15 +109,26 @@ func (m Model) runtimeListRow(rt runtimeDef) string {
 	name := nameStyle.Render(rt.name) + strings.Repeat(" ", runtimeNameWidth()-lipgloss.Width(rt.name))
 	on := m.panelRuntimeEnabled(rt.backend)
 	box := "[✓]"
-	status := m.ui.styles.runtimeMarkOff.Render(runtimeMarkOff)
-	if on {
-		sv := m.runtimeStatusView(rt.status(m.runtime))
-		status = sv.style.Render(sv.mark)
-	} else {
+	var status string
+	switch {
+	case !on:
 		box = "[ ]"
+		status = " " + m.ui.styles.runtimeMarkOff.Render(runtimeMarkOff)
+	case m.runtimeStatusPending(rt.backend):
+		// No mark: detection skipped it, so any mark would be stale.
+	default:
+		sv := m.runtimeStatusView(rt.status(m.runtime))
+		status = " " + sv.style.Render(sv.mark)
 	}
 	return runtimeListRowIndent + focusMarker(highlighted && m.rc.focus == runtimeFieldNone) +
-		m.ui.styles.runtimeCheckbox.Render(box) + " " + name + " " + status
+		m.ui.styles.runtimeCheckbox.Render(box) + " " + name + status
+}
+
+// runtimeStatusPending reports whether Runtime b, shown on in the panel, was
+// skipped by the last detection because it was off. It got no probe, so its
+// status is unknown until saving re-runs detection with it on.
+func (m Model) runtimeStatusPending(b models.ModelBackend) bool {
+	return m.runtime.Skipped.Has(b)
 }
 
 // runtimeNameWidth is the display width of the longest Runtime name.
@@ -163,12 +178,15 @@ func (m Model) runtimeLegend() string {
 func (m Model) runtimeDetailPane(width int) string {
 	rt := runtimeFor(m.rc.selected)
 	header := m.ui.styles.bodyBold.Render(rt.name) + m.ui.styles.runtimeInUse.Render(" · ")
-	if m.panelRuntimeEnabled(rt.backend) {
-		header += m.ui.styles.runtimeInUse.Render(m.runtimeStatusView(rt.status(m.runtime)).word)
-	} else {
+	switch {
+	case !m.panelRuntimeEnabled(rt.backend):
 		// A Disabled Runtime's fields stay editable; the header says editing
 		// them does not turn it on.
 		header += m.ui.styles.runtimeOffHeader.Render("Off")
+	case m.runtimeStatusPending(rt.backend):
+		header += m.ui.styles.runtimeInUse.Render(runtimeStatusPendingWord)
+	default:
+		header += m.ui.styles.runtimeInUse.Render(m.runtimeStatusView(rt.status(m.runtime)).word)
 	}
 	lines := []string{header}
 	for _, d := range rt.fields {
