@@ -231,6 +231,8 @@ const (
 	MissingOllamaFooterNote      = "ollama not found or not reachable - press " + FooterKeyConfigPort + " to set path or host"
 	MissingKoboldCppFooterNote   = "koboldcpp not found - press " + FooterKeyConfigPort + " to set path manually"
 	MissingNInferFooterNote      = "ninfer-serve not found - press " + FooterKeyConfigPort + " to set path manually"
+	MissingOMLXFooterNote        = "omlx not found - install oMLX.app or press " + FooterKeyConfigPort + " to set path manually"
+	MissingSplashFooterNote      = "splash not found - press " + FooterKeyConfigPort + " to set path manually"
 
 	FooterKeySortColumn   = ","
 	FooterDescSortColumn  = "sort"
@@ -264,6 +266,8 @@ const (
 	runtimeConfigHeaderOllama       = "Ollama"
 	runtimeConfigHeaderKoboldCpp    = "KoboldCpp"
 	runtimeConfigHeaderNInfer       = "NInfer"
+	runtimeConfigHeaderOMLX         = "oMLX"
+	runtimeConfigHeaderSplash       = "Splash"
 	runtimeConfigLabelLlamaCppPath  = "Path (llama-cli / llama-server)"
 	runtimeConfigLabelLlamaPort     = "Port"
 	runtimeConfigLabelLlamaHost     = "Host"
@@ -278,6 +282,10 @@ const (
 	runtimeConfigLabelNInferPath    = "Path (checkout or ninfer-serve)"
 	runtimeConfigLabelNInferPort    = "Port"
 	runtimeConfigLabelNInferHost    = "Host"
+	runtimeConfigLabelOMLXPath      = "Path (omlx CLI or ~/.omlx)"
+	runtimeConfigLabelSplashPath    = "Path (splash binary)"
+	runtimeConfigLabelPort          = "Port"
+	runtimeConfigLabelHost          = "Host"
 
 	// FooterHintTabSections is the shared "tab: sections" fragment used by split-pane
 	// and parameter modal footers.

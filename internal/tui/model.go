@@ -308,12 +308,18 @@ func newRuntimeConfigInputs() [runtimeFieldCount]textinput.Model {
 		runtimeFieldNInferPath:    newPathTextInput(),
 		runtimeFieldNInferPort:    newPortTextInput(),
 		runtimeFieldNInferHost:    newPathTextInput(),
+		runtimeFieldSplashPath:    newPathTextInput(),
+		runtimeFieldSplashPort:    newPortTextInput(),
+		runtimeFieldSplashHost:    newPathTextInput(),
 		runtimeFieldVLLMPath:      newPathTextInput(),
 		runtimeFieldVLLMVenv:      newPathTextInput(),
 		runtimeFieldVLLMPort:      newPortTextInput(),
 		runtimeFieldVLLMHost:      newPathTextInput(),
 		runtimeFieldKoboldCppPath: newPathTextInput(),
 		runtimeFieldKoboldCppPort: newPortTextInput(),
+		runtimeFieldOMLXPath:      newPathTextInput(),
+		runtimeFieldOMLXPort:      newPortTextInput(),
+		runtimeFieldOMLXHost:      newPathTextInput(),
 	}
 }
 
@@ -388,6 +394,8 @@ func (m Model) SelectedModel() (target string, backend models.ModelBackend) {
 //	vllm row   -> vllm
 //	ollama row -> ollama
 //	ninfer row -> ninfer
+//	omlx row   -> omlx
+//	splash row -> splash
 func (m Model) resolveEffectiveBackend() models.ModelBackend {
 	_, rowBackend := m.SelectedModel()
 	if rowBackend != models.BackendLlama {

@@ -28,6 +28,7 @@ func TestRuntimePanelLines(t *testing.T) {
 		NInferPath:       "/home/u/ninfer/build/apps/ninfer-serve",
 		NInferServerHost: "127.0.0.1",
 		NInferPort:       18080,
+		Platform:         models.Platform{GOOS: "linux", GOARCH: "amd64"},
 		ServerRunning:    false,
 		ProbePort:        8080,
 	}
@@ -56,6 +57,50 @@ func TestRuntimePanelLines(t *testing.T) {
 		if !strings.HasPrefix(lines[i], w.label+" ") || !strings.Contains(lines[i], w.value) {
 			t.Errorf("line %d = %q, want label %q with value %q", i, lines[i], w.label, w.value)
 		}
+	}
+}
+
+// On Apple Silicon the panel shows oMLX and Splash and hides NInfer, which
+// needs CUDA; the reverse holds on Linux.
+func TestRuntimePanelLines_platformGating(t *testing.T) {
+	t.Parallel()
+
+	r := models.RuntimeInfo{
+		OMLXPath:   "/Users/u/.omlx/bin/omlx",
+		OMLXHost:   "127.0.0.1",
+		OMLXPort:   8000,
+		SplashPath: "/opt/homebrew/bin/splash",
+		SplashHost: "127.0.0.1",
+		SplashPort: 8000,
+		NInferPort: 18080,
+	}
+	has := func(lines []string, label string) bool {
+		for _, l := range lines {
+			if strings.HasPrefix(l, label+" ") {
+				return true
+			}
+		}
+		return false
+	}
+
+	r.Platform = models.Platform{GOOS: "darwin", GOARCH: "arm64"}
+	mac := RuntimePanelLines(120, r)
+	for _, label := range []string{runtimePanelLabelOMLXPath, runtimePanelLabelOMLXPort, runtimePanelLabelSplashPath, runtimePanelLabelSplashHost} {
+		if !has(mac, label) {
+			t.Errorf("darwin/arm64: missing %q in %q", label, mac)
+		}
+	}
+	if has(mac, runtimePanelLabelNInferPath) {
+		t.Errorf("darwin/arm64 should hide NInfer: %q", mac)
+	}
+
+	r.Platform = models.Platform{GOOS: "linux", GOARCH: "amd64"}
+	linux := RuntimePanelLines(120, r)
+	if has(linux, runtimePanelLabelOMLXPath) || has(linux, runtimePanelLabelSplashPath) {
+		t.Errorf("linux should hide oMLX and Splash: %q", linux)
+	}
+	if !has(linux, runtimePanelLabelNInferPath) {
+		t.Errorf("linux should show NInfer: %q", linux)
 	}
 }
 
@@ -108,5 +153,27 @@ func TestRuntimePanelLines_VLLMVenvInferred(t *testing.T) {
 	want := FormatPathDisplay(filepath.Join(proj, ".venv"), home)
 	if got := vllmVenvPanelDisplay(info); got != want {
 		t.Fatalf("vllmVenvPanelDisplay: got %q want %q", got, want)
+	}
+}
+
+// Tab moves through the fields the platform shows, skipping hidden backends.
+func TestStepRuntimeFieldSkipsHiddenBackends(t *testing.T) {
+	t.Parallel()
+
+	m := Model{}
+	m.runtime.Platform = models.Platform{GOOS: "linux", GOARCH: "amd64"}
+	if got := m.stepRuntimeField(runtimeFieldNInferHost, 1); got != runtimeFieldVLLMPath {
+		t.Errorf("linux: after NInfer host got %d, want vLLM path (Splash hidden)", got)
+	}
+	if got := m.stepRuntimeField(runtimeFieldKoboldCppPort, 1); got != runtimeFieldLlamaCppPath {
+		t.Errorf("linux: after KoboldCpp port got %d, want wrap to llama path (oMLX hidden)", got)
+	}
+
+	m.runtime.Platform = models.Platform{GOOS: "darwin", GOARCH: "arm64"}
+	if got := m.stepRuntimeField(runtimeFieldOllamaHost, 1); got != runtimeFieldSplashPath {
+		t.Errorf("darwin: after Ollama host got %d, want Splash path (NInfer hidden)", got)
+	}
+	if got := m.stepRuntimeField(runtimeFieldLlamaCppPath, -1); got != runtimeFieldOMLXHost {
+		t.Errorf("darwin: before llama path got %d, want oMLX host", got)
 	}
 }

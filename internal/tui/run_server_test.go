@@ -882,3 +882,58 @@ func TestBuildServerSpec_ninfer(t *testing.T) {
 		t.Fatalf("spec = %+v", spec)
 	}
 }
+
+func TestOMLXLaunchArgs(t *testing.T) {
+	t.Parallel()
+	rt := models.RuntimeInfo{
+		OMLXPath:      "/Users/u/.omlx/bin/omlx",
+		OMLXHost:      "127.0.0.1",
+		OMLXPort:      8000,
+		OMLXModelDirs: []string{"/Users/u/.omlx/models"},
+	}
+	params := profiles.ModelParams{Args: []string{"--max-concurrent-requests", "4"}}
+	spec, err := buildServerSpec(models.BackendOMLX, "/Users/u/.omlx/models/org/m", params, rt, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"serve", "--model-dir", "/Users/u/.omlx/models", "--host", "127.0.0.1", "--port", "8000", "--max-concurrent-requests", "4"}
+	if got := spec.directArgs(); !slices.Equal(got, want) {
+		t.Fatalf("directArgs = %v, want %v", got, want)
+	}
+
+	// A model outside every oMLX dir is served from its parent directory.
+	spec, err = buildServerSpec(models.BackendOMLX, "/elsewhere/m", profiles.ModelParams{}, rt, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.modelDir != "/elsewhere" {
+		t.Fatalf("modelDir = %q", spec.modelDir)
+	}
+
+	if _, err := buildServerSpec(models.BackendOMLX, "/m", profiles.ModelParams{}, models.RuntimeInfo{}, true); err == nil ||
+		!strings.Contains(err.Error(), MissingOMLXFooterNote) {
+		t.Fatalf("strict launch without omlx: err = %v", err)
+	}
+}
+
+func TestSplashLaunchArgs(t *testing.T) {
+	t.Parallel()
+	rt := models.RuntimeInfo{SplashPath: "/opt/homebrew/bin/splash", SplashHost: "127.0.0.1", SplashPort: 8000}
+	dir := "/Users/u/.cache/huggingface/hub/models--incoai--Qwen3.8-27B-Splash/snapshots/abc"
+	spec, err := buildServerSpec(models.BackendSplash, dir, profiles.ModelParams{Args: []string{"--max-context", "128K"}}, rt, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"serve", "--model", "incoai/Qwen3.8-27B-Splash", "--host", "127.0.0.1", "--port", "8000", "--max-context", "128K"}
+	if got := spec.directArgs(); !slices.Equal(got, want) {
+		t.Fatalf("directArgs = %v, want %v", got, want)
+	}
+
+	spec, err = buildServerSpec(models.BackendSplash, dir, profiles.ModelParams{}, models.RuntimeInfo{}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.bin != "splash" || spec.port != settings.DefaultSplashPort {
+		t.Fatalf("unprobed runtime should use defaults, got %+v", spec)
+	}
+}

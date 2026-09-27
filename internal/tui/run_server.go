@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -29,6 +30,7 @@ type serverSpec struct {
 	host             string
 	params           profiles.ModelParams
 	activateScript   string   // vLLM only: path to venv activate script
+	modelDir         string   // oMLX only: the --model-dir that holds modelPath
 	mmprojPath       string   // auto-detected mmproj sidecar (llama/kobold only); empty when none found or profile already specifies one
 	mmprojCandidates []string // non-empty when multiple mmproj siblings exist and disambiguation failed (mmprojPath is empty)
 	mmprojMissing    bool     // image/audio tagged but no mmproj file found; launch proceeds without multimodal support
@@ -63,6 +65,8 @@ type vllmLaunchBackend struct{}
 type koboldLaunchBackend struct{}
 type ollamaLaunchBackend struct{}
 type ninferLaunchBackend struct{}
+type omlxLaunchBackend struct{}
+type splashLaunchBackend struct{}
 
 func (llamaLaunchBackend) args(s serverSpec) []launchArg {
 	args := []launchArg{
@@ -108,6 +112,28 @@ func (ninferLaunchBackend) args(s serverSpec) []launchArg {
 	}
 }
 
+// args for omlx serve, which serves every model in --model-dir and loads the
+// one a request names. Its per-model settings (draft model, sampling) live in
+// the oMLX app, not on the command line.
+func (omlxLaunchBackend) args(s serverSpec) []launchArg {
+	return []launchArg{
+		rawLaunchArg("serve"),
+		rawLaunchArg("--model-dir"), quotedLaunchArg(s.modelDir),
+		rawLaunchArg("--host"), rawLaunchArg(s.host),
+		rawLaunchArg("--port"), rawLaunchArg(fmt.Sprintf("%d", s.port)),
+	}
+}
+
+// args for splash serve, which resolves the bundle by Hugging Face repo id.
+func (splashLaunchBackend) args(s serverSpec) []launchArg {
+	return []launchArg{
+		rawLaunchArg("serve"),
+		rawLaunchArg("--model"), quotedLaunchArg(models.SplashModelRef(s.modelPath)),
+		rawLaunchArg("--host"), rawLaunchArg(s.host),
+		rawLaunchArg("--port"), rawLaunchArg(fmt.Sprintf("%d", s.port)),
+	}
+}
+
 func (ollamaLaunchBackend) args(serverSpec) []launchArg {
 	return []launchArg{rawLaunchArg("serve")}
 }
@@ -122,6 +148,10 @@ func (s serverSpec) launchBackend() launchBackend {
 		return koboldLaunchBackend{}
 	case models.BackendNInfer:
 		return ninferLaunchBackend{}
+	case models.BackendOMLX:
+		return omlxLaunchBackend{}
+	case models.BackendSplash:
+		return splashLaunchBackend{}
 	default:
 		return llamaLaunchBackend{}
 	}
@@ -231,6 +261,10 @@ func buildServerSpec(backend models.ModelBackend, modelPath string, params profi
 		return vllmServerSpec(modelPath, params, rt, strict)
 	case models.BackendNInfer:
 		return ninferServerSpec(modelPath, params, rt, strict)
+	case models.BackendOMLX:
+		return omlxServerSpec(modelPath, params, rt, strict)
+	case models.BackendSplash:
+		return splashServerSpec(modelPath, params, rt, strict)
 	case models.BackendKobold:
 		bin := models.ResolveKoboldCppPath(rt)
 		if strict && bin == "" {
@@ -313,6 +347,51 @@ func ninferServerSpec(modelPath string, params profiles.ModelParams, rt models.R
 		bin:       bin,
 		host:      hostOr(rt.NInferServerHost, settings.DefaultNInferHost),
 		port:      portOr(rt.NInferPort, settings.DefaultNInferServerPort),
+		modelPath: modelPath,
+		params:    params,
+	}, nil
+}
+
+// omlxServerSpec is the oMLX case of [buildServerSpec].
+func omlxServerSpec(modelPath string, params profiles.ModelParams, rt models.RuntimeInfo, strict bool) (serverSpec, error) {
+	bin := models.ResolveOMLXPath(rt)
+	if strict && bin == "" {
+		return serverSpec{}, errors.New(MissingOMLXFooterNote)
+	}
+	if bin == "" {
+		bin = "omlx"
+	}
+	// Rows are only claimed for oMLX under one of its model dirs, so the
+	// fallback serves a model placed elsewhere from its parent directory.
+	dir := models.OMLXModelDirFor(modelPath, rt.OMLXModelDirs)
+	if dir == "" {
+		dir = filepath.Dir(modelPath)
+	}
+	return serverSpec{
+		backend:   models.BackendOMLX,
+		bin:       bin,
+		host:      hostOr(rt.OMLXHost, settings.DefaultOMLXHost),
+		port:      portOr(rt.OMLXPort, settings.DefaultOMLXPort),
+		modelPath: modelPath,
+		modelDir:  dir,
+		params:    params,
+	}, nil
+}
+
+// splashServerSpec is the Splash case of [buildServerSpec].
+func splashServerSpec(modelPath string, params profiles.ModelParams, rt models.RuntimeInfo, strict bool) (serverSpec, error) {
+	bin := models.ResolveSplashPath(rt)
+	if strict && bin == "" {
+		return serverSpec{}, errors.New(MissingSplashFooterNote)
+	}
+	if bin == "" {
+		bin = "splash"
+	}
+	return serverSpec{
+		backend:   models.BackendSplash,
+		bin:       bin,
+		host:      hostOr(rt.SplashHost, settings.DefaultSplashHost),
+		port:      portOr(rt.SplashPort, settings.DefaultSplashPort),
 		modelPath: modelPath,
 		params:    params,
 	}, nil

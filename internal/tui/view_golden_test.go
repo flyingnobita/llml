@@ -90,6 +90,7 @@ func goldenModel(t *testing.T) Model {
 		NInferPath:       "/opt/ninfer/build/apps/ninfer-serve",
 		NInferServerHost: "127.0.0.1",
 		NInferPort:       18080,
+		Platform:         models.Platform{GOOS: "linux", GOARCH: "amd64"},
 	}
 	m.table.files = []models.ModelFile{
 		{

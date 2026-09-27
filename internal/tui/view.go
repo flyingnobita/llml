@@ -743,6 +743,43 @@ func (m Model) runtimeFieldRow(fieldID runtimeField, label string) []string {
 	}
 }
 
+// runtimeFieldLabel pairs a runtime config field with its label.
+type runtimeFieldLabel struct {
+	field runtimeField
+	label string
+}
+
+// runtimeConfigSection renders one backend's heading and fields, or "" when
+// the platform cannot run that backend (all of a section's fields share one).
+func (m Model) runtimeConfigSection(title string, fields ...runtimeFieldLabel) string {
+	if len(fields) == 0 || !m.runtimeFieldVisible(fields[0].field) {
+		return ""
+	}
+	rows := []string{m.ui.styles.bodyBold.Render(title), ""}
+	for i, f := range fields {
+		if i > 0 {
+			rows = append(rows, "")
+		}
+		rows = append(rows, m.runtimeFieldRow(f.field, f.label)...)
+	}
+	return lipgloss.JoinVertical(lipgloss.Left, rows...)
+}
+
+// joinSections stacks the non-empty sections with a blank line between them.
+func joinSections(sections []string) string {
+	var out []string
+	for _, s := range sections {
+		if s == "" {
+			continue
+		}
+		if len(out) > 0 {
+			out = append(out, "")
+		}
+		out = append(out, s)
+	}
+	return lipgloss.JoinVertical(lipgloss.Left, out...)
+}
+
 // runtimeConfigModalBlock returns the framed runtime configuration panel only
 // (no full-screen placement). Composed over the main view via [overlayCentered].
 // [runtimePanelView] is shown under the title.
@@ -751,48 +788,47 @@ func (m Model) runtimeConfigModalBlock() string {
 		return m.runtimeConfigDiscardConfirmBlock()
 	}
 	cw := m.paramPanelContentWidth()
-	header := func(text string) string { return m.ui.styles.bodyBold.Render(text) }
+	section := m.runtimeConfigSection
 
-	llamaRows := append([]string{header(runtimeConfigHeaderLlama), ""},
-		append(m.runtimeFieldRow(runtimeFieldLlamaCppPath, runtimeConfigLabelLlamaCppPath),
-			append([]string{""},
-				append(m.runtimeFieldRow(runtimeFieldLlamaPort, runtimeConfigLabelLlamaPort),
-					append([]string{""}, m.runtimeFieldRow(runtimeFieldLlamaHost, runtimeConfigLabelLlamaHost)...)...)...)...)...)
-	llamaBlock := lipgloss.JoinVertical(lipgloss.Left, llamaRows...)
-
-	vllmRows := append([]string{header(runtimeConfigHeaderVLLM), ""},
-		append(m.runtimeFieldRow(runtimeFieldVLLMPath, runtimeConfigLabelVLLMPath),
-			append([]string{""},
-				append(m.runtimeFieldRow(runtimeFieldVLLMVenv, runtimeConfigLabelVLLMVenv),
-					append([]string{""},
-						append(m.runtimeFieldRow(runtimeFieldVLLMPort, runtimeConfigLabelVLLMPort),
-							append([]string{""}, m.runtimeFieldRow(runtimeFieldVLLMHost, runtimeConfigLabelVLLMHost)...)...)...)...)...)...)...)
-	vllmBlock := lipgloss.JoinVertical(lipgloss.Left, vllmRows...)
-
-	ollamaRows := append([]string{header(runtimeConfigHeaderOllama), ""},
-		append(m.runtimeFieldRow(runtimeFieldOllamaPath, runtimeConfigLabelOllamaPath),
-			append([]string{""}, m.runtimeFieldRow(runtimeFieldOllamaHost, runtimeConfigLabelOllamaHost)...)...)...)
-	ollamaBlock := lipgloss.JoinVertical(lipgloss.Left, ollamaRows...)
-
-	koboldRows := append([]string{header(runtimeConfigHeaderKoboldCpp), ""},
-		append(m.runtimeFieldRow(runtimeFieldKoboldCppPath, runtimeConfigLabelKoboldCppPath),
-			append([]string{""}, m.runtimeFieldRow(runtimeFieldKoboldCppPort, runtimeConfigLabelKoboldCppPort)...)...)...)
-	koboldBlock := lipgloss.JoinVertical(lipgloss.Left, koboldRows...)
-
-	ninferRows := append([]string{header(runtimeConfigHeaderNInfer), ""},
-		append(m.runtimeFieldRow(runtimeFieldNInferPath, runtimeConfigLabelNInferPath),
-			append([]string{""},
-				append(m.runtimeFieldRow(runtimeFieldNInferPort, runtimeConfigLabelNInferPort),
-					append([]string{""}, m.runtimeFieldRow(runtimeFieldNInferHost, runtimeConfigLabelNInferHost)...)...)...)...)...)
-	ninferBlock := lipgloss.JoinVertical(lipgloss.Left, ninferRows...)
+	left := []string{
+		section(runtimeConfigHeaderLlama,
+			runtimeFieldLabel{runtimeFieldLlamaCppPath, runtimeConfigLabelLlamaCppPath},
+			runtimeFieldLabel{runtimeFieldLlamaPort, runtimeConfigLabelLlamaPort},
+			runtimeFieldLabel{runtimeFieldLlamaHost, runtimeConfigLabelLlamaHost}),
+		section(runtimeConfigHeaderOllama,
+			runtimeFieldLabel{runtimeFieldOllamaPath, runtimeConfigLabelOllamaPath},
+			runtimeFieldLabel{runtimeFieldOllamaHost, runtimeConfigLabelOllamaHost}),
+		section(runtimeConfigHeaderNInfer,
+			runtimeFieldLabel{runtimeFieldNInferPath, runtimeConfigLabelNInferPath},
+			runtimeFieldLabel{runtimeFieldNInferPort, runtimeConfigLabelNInferPort},
+			runtimeFieldLabel{runtimeFieldNInferHost, runtimeConfigLabelNInferHost}),
+		section(runtimeConfigHeaderSplash,
+			runtimeFieldLabel{runtimeFieldSplashPath, runtimeConfigLabelSplashPath},
+			runtimeFieldLabel{runtimeFieldSplashPort, runtimeConfigLabelPort},
+			runtimeFieldLabel{runtimeFieldSplashHost, runtimeConfigLabelHost}),
+	}
+	right := []string{
+		section(runtimeConfigHeaderVLLM,
+			runtimeFieldLabel{runtimeFieldVLLMPath, runtimeConfigLabelVLLMPath},
+			runtimeFieldLabel{runtimeFieldVLLMVenv, runtimeConfigLabelVLLMVenv},
+			runtimeFieldLabel{runtimeFieldVLLMPort, runtimeConfigLabelVLLMPort},
+			runtimeFieldLabel{runtimeFieldVLLMHost, runtimeConfigLabelVLLMHost}),
+		section(runtimeConfigHeaderKoboldCpp,
+			runtimeFieldLabel{runtimeFieldKoboldCppPath, runtimeConfigLabelKoboldCppPath},
+			runtimeFieldLabel{runtimeFieldKoboldCppPort, runtimeConfigLabelKoboldCppPort}),
+		section(runtimeConfigHeaderOMLX,
+			runtimeFieldLabel{runtimeFieldOMLXPath, runtimeConfigLabelOMLXPath},
+			runtimeFieldLabel{runtimeFieldOMLXPort, runtimeConfigLabelPort},
+			runtimeFieldLabel{runtimeFieldOMLXHost, runtimeConfigLabelHost}),
+	}
 
 	var inputBlock string
 	if cw >= 80 {
-		leftBlock := lipgloss.JoinVertical(lipgloss.Left, llamaBlock, "", ollamaBlock, "", ninferBlock)
-		rightBlock := lipgloss.JoinVertical(lipgloss.Left, vllmBlock, "", koboldBlock)
+		leftBlock := joinSections(left)
+		rightBlock := joinSections(right)
 		inputBlock = lipgloss.JoinHorizontal(lipgloss.Top, leftBlock, m.ui.styles.body.PaddingLeft(4).Render(rightBlock))
 	} else {
-		inputBlock = lipgloss.JoinVertical(lipgloss.Left, llamaBlock, "", ollamaBlock, "", vllmBlock, "", koboldBlock, "", ninferBlock)
+		inputBlock = joinSections(append(left, right...))
 	}
 
 	rows := []string{

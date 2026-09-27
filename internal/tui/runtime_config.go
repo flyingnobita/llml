@@ -26,14 +26,53 @@ const (
 	runtimeFieldNInferPath
 	runtimeFieldNInferPort
 	runtimeFieldNInferHost
+	runtimeFieldSplashPath
+	runtimeFieldSplashPort
+	runtimeFieldSplashHost
 	runtimeFieldVLLMPath
 	runtimeFieldVLLMVenv
 	runtimeFieldVLLMPort
 	runtimeFieldVLLMHost
 	runtimeFieldKoboldCppPath
 	runtimeFieldKoboldCppPort
+	runtimeFieldOMLXPath
+	runtimeFieldOMLXPort
+	runtimeFieldOMLXHost
 	runtimeFieldCount
 )
+
+// runtimeFieldBackend returns the backend a field configures, so fields for a
+// backend the platform cannot run are hidden and skipped by tab.
+func runtimeFieldBackend(f runtimeField) models.ModelBackend {
+	switch f {
+	case runtimeFieldNInferPath, runtimeFieldNInferPort, runtimeFieldNInferHost:
+		return models.BackendNInfer
+	case runtimeFieldSplashPath, runtimeFieldSplashPort, runtimeFieldSplashHost:
+		return models.BackendSplash
+	case runtimeFieldOMLXPath, runtimeFieldOMLXPort, runtimeFieldOMLXHost:
+		return models.BackendOMLX
+	default:
+		return models.BackendLlama
+	}
+}
+
+// runtimeFieldVisible reports whether field f is shown on this platform.
+func (m Model) runtimeFieldVisible(f runtimeField) bool {
+	return m.runtime.Platform.Supports(runtimeFieldBackend(f))
+}
+
+// stepRuntimeField returns the next visible field after from in direction
+// step (+1 or -1), wrapping around.
+func (m Model) stepRuntimeField(from runtimeField, step int) runtimeField {
+	f := from
+	for range runtimeFieldCount {
+		f = runtimeField((int(f) + step + int(runtimeFieldCount)) % int(runtimeFieldCount))
+		if m.runtimeFieldVisible(f) {
+			return f
+		}
+	}
+	return from
+}
 
 // parsePortField reads a port field. An empty field means "use defaultPort",
 // which is what makes clearing the field restore the built-in behavior.
@@ -119,6 +158,12 @@ func runtimeFieldValues(s settings.Settings) [runtimeFieldCount]string {
 	v[runtimeFieldNInferPath] = s.NInferPath
 	v[runtimeFieldNInferPort] = strconv.Itoa(s.NInferServerPort)
 	v[runtimeFieldNInferHost] = s.NInferServerHost
+	v[runtimeFieldOMLXPath] = s.OMLXPath
+	v[runtimeFieldOMLXPort] = strconv.Itoa(s.OMLXPort)
+	v[runtimeFieldOMLXHost] = s.OMLXHost
+	v[runtimeFieldSplashPath] = s.SplashPath
+	v[runtimeFieldSplashPort] = strconv.Itoa(s.SplashPort)
+	v[runtimeFieldSplashHost] = s.SplashHost
 	return v
 }
 
@@ -173,7 +218,7 @@ func (m Model) openRuntimeConfigFocused(focus runtimeField) (Model, tea.Cmd) {
 // backend binary, but [models.ResolveLlamaServerPath] or [models.ResolveVLLMPath] is empty.
 // GGUF rows require llama-server; vLLM rows require vllm. Clears the footer line when neither applies.
 func (m Model) maybeSetMissingRuntimeFooterNote() (Model, tea.Cmd) {
-	var wantLlama, wantVLLM, wantOllama, wantKobold, wantNInfer bool
+	var wantLlama, wantVLLM, wantOllama, wantKobold, wantNInfer, wantOMLX, wantSplash bool
 	for _, f := range m.table.files {
 		switch f.Backend {
 		case models.BackendLlama:
@@ -187,6 +232,10 @@ func (m Model) maybeSetMissingRuntimeFooterNote() (Model, tea.Cmd) {
 			wantOllama = true
 		case models.BackendNInfer:
 			wantNInfer = true
+		case models.BackendOMLX:
+			wantOMLX = true
+		case models.BackendSplash:
+			wantSplash = true
 		}
 	}
 	haveLlama := models.ResolveLlamaServerPath(m.runtime) != ""
@@ -194,6 +243,8 @@ func (m Model) maybeSetMissingRuntimeFooterNote() (Model, tea.Cmd) {
 	haveOllama := models.ResolveOllamaPath(m.runtime) != "" || m.runtime.OllamaRunning
 	haveKobold := models.ResolveKoboldCppPath(m.runtime) != ""
 	haveNInfer := models.ResolveNInferPath(m.runtime) != ""
+	haveOMLX := models.ResolveOMLXPath(m.runtime) != ""
+	haveSplash := models.ResolveSplashPath(m.runtime) != ""
 
 	var msgs []string
 	if wantLlama && !haveLlama {
@@ -210,6 +261,12 @@ func (m Model) maybeSetMissingRuntimeFooterNote() (Model, tea.Cmd) {
 	}
 	if wantNInfer && !haveNInfer {
 		msgs = append(msgs, MissingNInferFooterNote)
+	}
+	if wantOMLX && !haveOMLX {
+		msgs = append(msgs, MissingOMLXFooterNote)
+	}
+	if wantSplash && !haveSplash {
+		msgs = append(msgs, MissingSplashFooterNote)
 	}
 	if len(msgs) > 0 {
 		m = m.withLastRunError(strings.Join(msgs, "\n"))
@@ -273,6 +330,14 @@ func (m Model) settingsFromRuntimeInputs() (settings.Settings, error) {
 	if err != nil {
 		return s, fmt.Errorf("%s: %w", settings.EnvNInferServerPort, err)
 	}
+	omlxPort, err := parsePortField(m.rc.inputs[runtimeFieldOMLXPort].Value(), settings.DefaultOMLXPort)
+	if err != nil {
+		return s, fmt.Errorf("%s: %w", settings.EnvOMLXPort, err)
+	}
+	splashPort, err := parsePortField(m.rc.inputs[runtimeFieldSplashPort].Value(), settings.DefaultSplashPort)
+	if err != nil {
+		return s, fmt.Errorf("%s: %w", settings.EnvSplashPort, err)
+	}
 
 	s.LlamaCppPath = fsutil.NormalizePath(m.rc.inputs[runtimeFieldLlamaCppPath].Value())
 	s.VLLMPath = fsutil.NormalizePath(m.rc.inputs[runtimeFieldVLLMPath].Value())
@@ -280,15 +345,21 @@ func (m Model) settingsFromRuntimeInputs() (settings.Settings, error) {
 	s.OllamaPath = fsutil.NormalizePath(m.rc.inputs[runtimeFieldOllamaPath].Value())
 	s.KoboldCppPath = fsutil.NormalizePath(m.rc.inputs[runtimeFieldKoboldCppPath].Value())
 	s.NInferPath = fsutil.NormalizePath(m.rc.inputs[runtimeFieldNInferPath].Value())
+	s.OMLXPath = fsutil.NormalizePath(m.rc.inputs[runtimeFieldOMLXPath].Value())
+	s.SplashPath = fsutil.NormalizePath(m.rc.inputs[runtimeFieldSplashPath].Value())
 
 	s.LlamaServerPort = llamaPort
 	s.VLLMServerPort = vllmPort
 	s.KoboldCppPort = koboldPort
 	s.NInferServerPort = ninferPort
+	s.OMLXPort = omlxPort
+	s.SplashPort = splashPort
 
 	s.LlamaServerHost = hostField(m.rc.inputs[runtimeFieldLlamaHost].Value(), settings.DefaultLlamaServerHost)
 	s.VLLMServerHost = hostField(m.rc.inputs[runtimeFieldVLLMHost].Value(), settings.DefaultVLLMServerHost)
 	s.NInferServerHost = hostField(m.rc.inputs[runtimeFieldNInferHost].Value(), settings.DefaultNInferHost)
+	s.OMLXHost = hostField(m.rc.inputs[runtimeFieldOMLXHost].Value(), settings.DefaultOMLXHost)
+	s.SplashHost = hostField(m.rc.inputs[runtimeFieldSplashHost].Value(), settings.DefaultSplashHost)
 	s.OllamaHost = hostField(
 		settings.NormalizeOllamaHost(m.rc.inputs[runtimeFieldOllamaHost].Value()),
 		settings.DefaultOllamaHost,
@@ -297,7 +368,7 @@ func (m Model) settingsFromRuntimeInputs() (settings.Settings, error) {
 }
 
 func (m Model) commitRuntimeConfig() (Model, tea.Cmd) {
-	for _, f := range []runtimeField{runtimeFieldLlamaPort, runtimeFieldVLLMPort, runtimeFieldKoboldCppPort, runtimeFieldNInferPort} {
+	for _, f := range []runtimeField{runtimeFieldLlamaPort, runtimeFieldVLLMPort, runtimeFieldKoboldCppPort, runtimeFieldNInferPort, runtimeFieldOMLXPort, runtimeFieldSplashPort} {
 		if err := validatePortCommit(m.rc.inputs[f].Value()); err != nil {
 			m = m.withLastRunError(fmt.Sprintf("%s: %v", runtimePortEnvKey(f), err))
 			return m, clearLastRunNoteAfterCmd()
@@ -338,6 +409,10 @@ func runtimePortEnvKey(f runtimeField) string {
 		return settings.EnvKoboldCppPort
 	case runtimeFieldNInferPort:
 		return settings.EnvNInferServerPort
+	case runtimeFieldOMLXPort:
+		return settings.EnvOMLXPort
+	case runtimeFieldSplashPort:
+		return settings.EnvSplashPort
 	default:
 		return settings.EnvLlamaServerPort
 	}
@@ -361,12 +436,10 @@ func (m Model) updateRuntimeConfigKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m.commitRuntimeConfig()
 	}
 	if isTabKey(msg) {
-		next := (m.rc.focus + 1) % runtimeFieldCount
-		return m.focusRuntimeField(next)
+		return m.focusRuntimeField(m.stepRuntimeField(m.rc.focus, 1))
 	}
 	if isShiftTabKey(msg) {
-		prev := (m.rc.focus + runtimeFieldCount - 1) % runtimeFieldCount
-		return m.focusRuntimeField(prev)
+		return m.focusRuntimeField(m.stepRuntimeField(m.rc.focus, -1))
 	}
 	var cmd tea.Cmd
 	m.rc.inputs[m.rc.focus], cmd = m.rc.inputs[m.rc.focus].Update(msg)
