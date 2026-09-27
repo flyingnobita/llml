@@ -82,7 +82,13 @@ type styles struct {
 	runtimeMarkFound    lipgloss.Style
 	runtimeMarkMissing  lipgloss.Style
 	runtimeLegend       lipgloss.Style
-	runtimeFieldLabel   lipgloss.Style
+	// runtimeCheckbox draws a Runtime's [✓] / [ ] in the list.
+	runtimeCheckbox lipgloss.Style
+	// runtimeMarkOff is the "off" a Disabled Runtime shows in place of its
+	// status mark; runtimeOffHeader is the "Off" in its detail header.
+	runtimeMarkOff    lipgloss.Style
+	runtimeOffHeader  lipgloss.Style
+	runtimeFieldLabel lipgloss.Style
 	// runtimeFieldLabelFocused is the label of the field holding keyboard focus.
 	runtimeFieldLabelFocused lipgloss.Style
 	runtimeInUse             lipgloss.Style
@@ -254,6 +260,9 @@ func newStyles(theme Theme) styles {
 		runtimeMarkFound:         lipgloss.NewStyle().Foreground(theme.Body),
 		runtimeMarkMissing:       lipgloss.NewStyle().Foreground(theme.Subtitle),
 		runtimeLegend:            lipgloss.NewStyle().Foreground(theme.Footer),
+		runtimeCheckbox:          lipgloss.NewStyle().Foreground(theme.Body),
+		runtimeMarkOff:           lipgloss.NewStyle().Foreground(theme.Subtitle),
+		runtimeOffHeader:         lipgloss.NewStyle().Bold(true).Foreground(theme.Warn),
 		runtimeFieldLabel:        lipgloss.NewStyle().Foreground(theme.ParamMetadataLabel),
 		runtimeFieldLabelFocused: lipgloss.NewStyle().Bold(true).Foreground(theme.Body),
 		runtimeInUse:             lipgloss.NewStyle().Foreground(theme.RuntimePanel),

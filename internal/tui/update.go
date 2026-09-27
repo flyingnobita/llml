@@ -98,11 +98,12 @@ func (m Model) handleScanMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.settings = msg.settings
 		m.runtime = msg.runtime
 		m.runtimeScanned = true
-		return m, nil
+		return m.adoptRuntimeStates(msg.states, msg.runtime), nil
 
 	case startupCacheHitMsg:
 		m = m.cancelInFlightScan()
 		m.settings = msg.settings
+		m = m.adoptRuntimeStates(msg.states, msg.runtime)
 		return m.applyScanResult(&msg.runtime, msg.files, msg.lastScan, msg.configPaths, msg.writeErr, true)
 
 	case startupNeedFullScanMsg:
@@ -117,6 +118,7 @@ func (m Model) handleScanMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var runtime *models.RuntimeInfo
 		if msg.mode == scanModeFull {
 			runtime = &res.runtime
+			m = m.adoptRuntimeStates(res.states, res.runtime)
 		}
 		m2, cmd := m.applyScanResult(runtime, res.files, res.lastScan, res.configPaths, res.writeErr, msg.mode == scanModeFull)
 		return applyOllamaDiscoveryResult(m2, cmd, res.ollamaNote, res.ollamaWarn)
@@ -311,7 +313,8 @@ func (m Model) routeModalKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 }
 
 // handleRunServerKey launches the selected model, in the split pane or
-// fullscreen according to mode.
+// fullscreen according to mode. A dimmed row, one on a Disabled Runtime, is
+// not launched.
 func (m Model) handleRunServerKey(mode runServerMode) (tea.Model, tea.Cmd) {
 	if m.loading {
 		return m.flashError("Wait for the model scan to finish.")
@@ -322,22 +325,17 @@ func (m Model) handleRunServerKey(mode runServerMode) (tea.Model, tea.Cmd) {
 	}
 	m = m.withLastRunCleared()
 
-	params, _ := profiles.LoadParamsForRun(p)
 	be := m.resolveEffectiveBackend()
+	if !m.runtimeEnabled(be) {
+		return m.blockLaunchOnDisabledRuntime(be)
+	}
+	params, _ := profiles.LoadParamsForRun(p)
 	spec, err := buildServerSpec(be, p, params, m.runtime, true)
 	if err != nil {
 		return m.flashError(err.Error())
 	}
 	m = m.warnAboutMMProj(spec, p)
-
-	switch {
-	case be == models.BackendOllama:
-		return m, m.svc.runOllamaLaunchCmd(spec)
-	case mode == runServerModeFullscreen:
-		return m, runForegroundServerCmd(spec)
-	default:
-		return m, runSplitServerCmd(spec)
-	}
+	return m, m.svc.startServer(spec, mode)
 }
 
 // warnAboutMMProj records an alert when mmproj injection was requested but could

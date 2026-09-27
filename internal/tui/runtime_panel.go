@@ -16,6 +16,13 @@ const (
 	runtimeMarkRunning = "●"
 	runtimeMarkFound   = "○"
 	runtimeMarkMissing = "✗"
+	// runtimeMarkOff replaces the status mark of a Disabled Runtime, whose
+	// detection result would be stale: it is not probed.
+	runtimeMarkOff = "off"
+	// runtimeStatusPendingWord heads the detail pane of a Runtime ticked on
+	// but not saved yet, which detection skipped: it has no status to show
+	// until saving re-runs detection. Its list line shows no mark.
+	runtimeStatusPendingWord = "checked on save"
 )
 
 // vllmVenvInUse returns the venv root vLLM launches with: the configured root
@@ -26,7 +33,7 @@ func vllmVenvInUse(r models.RuntimeInfo) string {
 	if v := strings.TrimSpace(r.VLLMVenv); v != "" {
 		return v
 	}
-	vllmBin := models.ResolveVLLMPath(r)
+	vllmBin := r.Status(models.BackendVLLM).Path
 	act := models.ResolveVLLMActivateScript(vllmBin, r.VLLMVenv, r.VLLMConfiguredPath)
 	return models.VenvRootFromActivateScript(act)
 }
@@ -53,6 +60,7 @@ func (m Model) runtimeConfigModalBlock() string {
 	gap := strings.Repeat(" ", runtimePanelPaneGap)
 	detail := m.runtimeDetailPane(cw - runtimeListPaneWidth - runtimePanelPaneGap)
 	body := lipgloss.JoinHorizontal(lipgloss.Top, list, gap, detail)
+	body = lipgloss.PlaceVertical(m.runtimePanelBodyHeight(), lipgloss.Top, body)
 
 	rows := []string{
 		m.modalTitleRow(cw, m.ui.styles.portConfigTitle, "Runtime Environment"),
@@ -64,6 +72,26 @@ func (m Model) runtimeConfigModalBlock() string {
 		m.renderFooterHints(FooterRuntimeConfigHints),
 	}
 	return m.ui.styles.portConfigBox.Render(lipgloss.JoinVertical(lipgloss.Left, rows...))
+}
+
+// runtimePanelBodyHeight is the fixed height of the panel's list and detail
+// panes: room for the longer of the list and the tallest Runtime's detail
+// pane, plus [runtimePanelSpareRows]. Every Runtime counts, not only the ones
+// this platform lists, so the panel is the same height on every platform and
+// a Runtime with more fields cannot make it jump.
+func (m Model) runtimePanelBodyHeight() int {
+	h := lipgloss.Height(m.runtimeListPane())
+	for _, rt := range runtimeTable {
+		h = max(h, runtimeDetailPaneHeight(rt))
+	}
+	return h + runtimePanelSpareRows
+}
+
+// runtimeDetailPaneHeight is how many lines [Model.runtimeDetailPane] draws
+// for rt: a header, then a blank line, an input line, and an in-use line per field.
+func runtimeDetailPaneHeight(rt runtimeDef) int {
+	const linesPerField = 3
+	return 1 + linesPerField*len(rt.fields)
 }
 
 // runtimeListPane renders the supported Runtimes under the Model Format each
@@ -90,17 +118,46 @@ func focusMarker(focused bool) string {
 }
 
 // runtimeListRow renders one Runtime's list line: a focus marker when the list
-// has keyboard focus, its status mark, and its name, emphasized when it is the
-// highlighted Runtime.
+// has keyboard focus, its checkbox, its name (emphasized when it is the
+// highlighted Runtime), and its status mark, or "off" for a Disabled Runtime.
+// Names are padded to one width so the marks line up.
 func (m Model) runtimeListRow(rt runtimeDef) string {
 	highlighted := rt.backend == m.rc.selected
-	name := m.ui.styles.body.Render(rt.name)
+	nameStyle := m.ui.styles.body
 	if highlighted {
-		name = m.ui.styles.runtimeListSelected.Render(rt.name)
+		nameStyle = m.ui.styles.runtimeListSelected
 	}
-	sv := m.runtimeStatusView(rt.status(m.runtime))
+	name := nameStyle.Render(rt.name) + strings.Repeat(" ", runtimeNameWidth()-lipgloss.Width(rt.name))
+	on := m.panelRuntimeEnabled(rt.backend)
+	box := checkbox(on)
+	var status string
+	switch {
+	case !on:
+		status = " " + m.ui.styles.runtimeMarkOff.Render(runtimeMarkOff)
+	case m.runtimeStatusPending(rt.backend):
+		// No mark: detection skipped it, so any mark would be stale.
+	default:
+		sv := m.runtimeStatusView(rt.status(m.runtime))
+		status = " " + sv.style.Render(sv.mark)
+	}
 	return runtimeListRowIndent + focusMarker(highlighted && m.rc.focus == runtimeFieldNone) +
-		sv.style.Render(sv.mark) + " " + name
+		m.ui.styles.runtimeCheckbox.Render(box) + " " + name + status
+}
+
+// runtimeStatusPending reports whether Runtime b, shown on in the panel, was
+// skipped by the last detection because it was off. It got no probe, so its
+// status is unknown until saving re-runs detection with it on.
+func (m Model) runtimeStatusPending(b models.ModelBackend) bool {
+	return m.runtime.Skipped.Has(b)
+}
+
+// runtimeNameWidth is the display width of the longest Runtime name.
+func runtimeNameWidth() int {
+	w := 0
+	for _, rt := range runtimeTable {
+		w = max(w, lipgloss.Width(rt.name))
+	}
+	return w
 }
 
 // runtimeStatusView is how the panel shows one detection status: the list's
@@ -140,8 +197,17 @@ func (m Model) runtimeLegend() string {
 // width columns. Each field is an input line and a dimmed in-use line.
 func (m Model) runtimeDetailPane(width int) string {
 	rt := runtimeFor(m.rc.selected)
-	header := m.ui.styles.bodyBold.Render(rt.name) +
-		m.ui.styles.runtimeInUse.Render(" · "+m.runtimeStatusView(rt.status(m.runtime)).word)
+	header := m.ui.styles.bodyBold.Render(rt.name) + m.ui.styles.runtimeInUse.Render(" · ")
+	switch {
+	case !m.panelRuntimeEnabled(rt.backend):
+		// A Disabled Runtime's fields stay editable; the header says editing
+		// them does not turn it on.
+		header += m.ui.styles.runtimeOffHeader.Render("Off")
+	case m.runtimeStatusPending(rt.backend):
+		header += m.ui.styles.runtimeInUse.Render(runtimeStatusPendingWord)
+	default:
+		header += m.ui.styles.runtimeInUse.Render(m.runtimeStatusView(rt.status(m.runtime)).word)
+	}
 	lines := []string{header}
 	for _, d := range rt.fields {
 		lines = append(lines, "", m.runtimeFieldInputLine(d, width), m.runtimeFieldInUseLine(d, width))

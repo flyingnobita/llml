@@ -94,6 +94,10 @@ const (
 	runtimePanelPaneGap    = 2
 	runtimeFieldLabelWidth = 6 // "Path", "Venv", "Port", "Host" plus a space
 	runtimeInUseIndent     = 2 // under the field label, past the focus marker
+	// runtimePanelSpareRows pads the panel body past its tallest Runtime, so
+	// the panel keeps one size whichever Runtime is highlighted. One row is all
+	// 80x24 allows: vLLM's four fields already make the panel 23 rows.
+	runtimePanelSpareRows = 1
 	// runtimeListRowIndent sets Runtime rows one column in from their group label.
 	runtimeListRowIndent = " "
 
@@ -155,6 +159,7 @@ const (
 	defaultIDColW       = 28
 	maxIDColW           = 56
 	runtimeColW         = 11 // "llama.cpp", "vllm"
+	runtimeColOffW      = 16 // "koboldcpp (off)", when any row is dimmed
 	sizeColW            = 9
 	modTimeColW         = 17
 	maxFileNameColW     = 72
@@ -266,10 +271,23 @@ const (
 	splitServerStoppedWithHint = "Server stopped. Press Enter to close..."
 
 	// Runtime config modal.
-	FooterRuntimeConfigHints     = "↑/↓: runtime · tab/→: fields · enter: save · esc: back"
+	FooterRuntimeConfigHints     = "↑/↓: runtime · space: on/off · tab/→: fields · enter: save · esc: back"
 	FooterRuntimeConfigDiscardYN = "y: discard changes · n/esc: stay"
 	// runtimeConfigModalSubtitle sits above the runtime panel's key hints.
 	runtimeConfigModalSubtitle = "Saved to config.toml. Environment variables win over saved values."
+
+	// runtimeOffSuffix follows the Runtime name of a dimmed row, and a
+	// Disabled Runtime's option in the p panel.
+	runtimeOffSuffix = " (off)"
+
+	// checkboxOn and checkboxOff are the ticked and unticked boxes every
+	// multi-select list draws; see [checkbox].
+	checkboxOn  = "[✓]"
+	checkboxOff = "[ ]"
+
+	// runtimeOffPreviewNote sits under the launch preview of a dimmed row; %s
+	// names its Runtime. It follows the pattern of serverSpec.mmprojNote.
+	runtimeOffPreviewNote = "⚠ %s is off; turn it on in the runtime panel (" + FooterKeyConfigPort + ") to launch this model"
 
 	// FooterHintTabSections is the shared "tab: sections" fragment used by split-pane
 	// and parameter modal footers.

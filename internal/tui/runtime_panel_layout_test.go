@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 
@@ -279,7 +280,7 @@ func newPanelFakes(getenv settings.Getenv) *panelFakes {
 		f.written = append(f.written, c)
 		return nil
 	}
-	svc.discoverRuntime = func(_ context.Context, s settings.Settings) models.RuntimeInfo {
+	svc.discoverRuntime = func(_ context.Context, s settings.Settings, _ models.BackendSet) models.RuntimeInfo {
 		f.probed = append(f.probed, s)
 		return panelRuntime(linuxPlatform)
 	}
@@ -406,7 +407,7 @@ func TestRuntimePanel_fitsEightyByTwentyFour(t *testing.T) {
 				"Runtime Environment",
 				"● running  ○ found  ✗ not found",
 				runtimeConfigModalSubtitle,
-				"↑/↓: runtime · tab/→: fields · enter: save · esc: back",
+				FooterRuntimeConfigHints,
 			} {
 				if !strings.Contains(view, want) {
 					t.Errorf("%s/%s: clipped, missing %q:\n%s", p.GOOS, rt.name, want, view)
@@ -488,6 +489,9 @@ func TestRuntimePanel_envSourcedFieldStartsFromSavedValue(t *testing.T) {
 		t.Errorf("the environment's port should be in use:\n%s", view)
 	}
 
+	// Edit another field, so the save writes config.toml.
+	m = press(t, m, keyTab, keyCtrlU) // Llama.cpp Host
+	m = typeText(t, m, "127.0.0.2")
 	press(t, m, keyEnter)
 	if len(f.written) != 1 {
 		t.Fatalf("want one config write, got %d", len(f.written))
@@ -528,5 +532,39 @@ func TestRuntimePanel_missingProgramReadsNotFound(t *testing.T) {
 	m.runtime.ServerRunning = true // a server answering does not make the program found
 	if view := plainView(m); !strings.Contains(view, "in use: not found (default)") {
 		t.Errorf("a program found nowhere reads not found:\n%s", view)
+	}
+}
+
+// The panel keeps one size and position whichever Runtime is highlighted, so
+// moving through the list never makes the overlay jump. It is sized for the
+// tallest Runtime plus a spare row, and still fits 80x24.
+func TestRuntimePanel_sizeAndPositionStayFixed(t *testing.T) {
+	t.Parallel()
+
+	for _, sz := range [][2]int{{80, 24}, {127, 60}} {
+		for _, p := range []models.Platform{linuxPlatform, macPlatform} {
+			m := openPanel(t, testServices(), p, defaultSettings(), sz[0], sz[1])
+			var wantW, wantH, wantTop int
+			for i, rt := range m.panelRuntimes() {
+				block := m.runtimeConfigModalBlock()
+				w, h := lipgloss.Width(block), lipgloss.Height(block)
+				top := slices.IndexFunc(strings.Split(plainView(m), "\n"), func(l string) bool {
+					return strings.Contains(l, "Runtime Environment")
+				})
+				if i == 0 {
+					wantW, wantH, wantTop = w, h, top
+					// vLLM, the tallest Runtime, needs 23 rows; one spare row
+					// makes 24, which still fits an 80x24 terminal.
+					if h != 24 {
+						t.Errorf("%dx%d %s: panel is %d rows, want 24", sz[0], sz[1], p.GOOS, h)
+					}
+				}
+				if w != wantW || h != wantH || top != wantTop {
+					t.Errorf("%dx%d %s/%s: panel %dx%d at row %d, want %dx%d at row %d",
+						sz[0], sz[1], p.GOOS, rt.name, w, h, top, wantW, wantH, wantTop)
+				}
+				m = press(t, m, keyDown)
+			}
+		}
 	}
 }

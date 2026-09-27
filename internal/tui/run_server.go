@@ -537,7 +537,8 @@ func launchPreviewCommandLine(m Model) string {
 	return spec.previewLine()
 }
 
-// launchPreviewCmdAndNote returns both the preview command line and the mmproj note from a single
+// launchPreviewCmdAndNote returns both the preview command line and its notes (the Runtime being
+// off, then the mmproj warning) from a single
 // buildServerSpec call, avoiding the double os.ReadDir that occurs when the two are fetched
 // independently via launchPreviewCommandLine + launchPreviewMMProjNote.
 func launchPreviewCmdAndNote(m Model) (string, string) {
@@ -551,7 +552,14 @@ func launchPreviewCmdAndNote(m Model) (string, string) {
 	}
 	be := m.resolveEffectiveBackend()
 	spec, _ := buildServerSpec(be, modelPath, params, m.runtime, false)
-	return spec.previewLine(), spec.mmprojNote()
+	notes := make([]string, 0, 2)
+	if note := m.runtimeOffNote(be); note != "" {
+		notes = append(notes, note)
+	}
+	if note := spec.mmprojNote(); note != "" {
+		notes = append(notes, note)
+	}
+	return spec.previewLine(), strings.Join(notes, "\n")
 }
 
 func scanReaderLines(r io.Reader, ch chan<- tea.Msg, wg *sync.WaitGroup) {

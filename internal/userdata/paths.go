@@ -31,3 +31,13 @@ func ModelParamsPath() (string, error) {
 	}
 	return filepath.Join(d, "model-params.json"), nil
 }
+
+// RuntimeStatesPath returns the path to runtimes.toml, the runtime state store
+// that records which Runtimes are on.
+func RuntimeStatesPath() (string, error) {
+	d, err := LlmlDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(d, "runtimes.toml"), nil
+}

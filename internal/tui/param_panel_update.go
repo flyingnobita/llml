@@ -249,7 +249,8 @@ func (m Model) persistParamPanelState() (Model, tea.Cmd, bool) {
 	}
 	m = m.withLastRunCleared()
 	m = m.updateEffectiveBackendForPath(m.params.modelPath)
-	m = m.refreshTableRows()
+	// A full relayout, since a newly dimmed row can widen the Runtime column.
+	m = m.layoutTable()
 	m = m.withLaunchPreviewSynced()
 	m, noteCmd := m.maybeSetMissingRuntimeFooterNote()
 	return m, noteCmd, false

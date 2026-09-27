@@ -185,7 +185,7 @@ llml
 | `S`         | Full model filesystem rescan; refresh the discovery cache (`cache/models.toml`)                                                                       |
 | `R`         | Run server (split view: table + log pane)                                                                                                             |
 | `ctrl`+`R`  | Run server full-screen                                                                                                                                |
-| `c`         | Edit runtime environment (paths, ports)                                                                                                               |
+| `c`         | Edit runtime environment (paths, ports) and turn runtimes on or off                                                                                   |
 | `p`         | Edit parameter profiles for the selected model                                                                                                        |
 | `m`         | Edit extra model search paths (saved in `config.toml`)                                                                                                |
 | `,` / `.`   | Change sort column / reverse sort direction                                                                                                           |
@@ -225,6 +225,9 @@ Each model path can have **multiple named profiles**. Each profile stores:
 - **Extra arguments** (`--flag value` per line).
 
 **`R`** / **ctrl+`R`** use the **active** profile (the highlighted row in the `p` profile list is prefixed with **`(active)`** in the name column). Changes persist automatically. **tab** cycles: profile list → env → extra args. On the profile list: **`a`** add profile, **`c`** clone (duplicate) the highlighted profile, **`d`** delete (not the last), **`r`** rename. **`esc`** closes the panel (and **`n`** cancels a delete confirmation).
+
+For GGUF models, a profile's **Backend** chooses llama.cpp or KoboldCpp. A runtime that is turned
+off in `c` is still offered, labelled `(off)`, so you can set a profile up before turning it on.
 
 Profiles are stored in `model-params.json` (see [Storage & Locations](#storage--locations)).
 
@@ -304,11 +307,14 @@ User data and settings are stored in a dedicated folder. Routine app upgrades **
 **Key Files:**
 
 - **`config.toml`**: Stores your global settings (ports, binary paths, extra model roots). llml
-  rewrites it only when you save from the `c` or `m` panels, so comments and formatting survive
-  model scans.
+  rewrites it only when you save a changed setting from the `c` or `m` panels, so comments and
+  formatting survive model scans and runtime on/off toggles.
 - **`cache/models.toml`**: The model discovery cache. Machine-owned and safe to delete; llml
   rebuilds it on the next scan.
 - **`model-params.json`**: Stores your [named parameter profiles](#parameter-profiles-p) (args/env) for each model.
+- **`runtimes.toml`**: Which runtimes are on, as set with the checkboxes in the `c` panel. Owned
+  by llml, but not disposable like the cache: it is backed up before every overwrite. No
+  environment variable overrides it.
 - **`backups/`**: Automatic timestamped snapshots created before the app overwrites configuration.
 
 ---
@@ -321,6 +327,27 @@ found, or not found. **↑**/**↓** pick a runtime, **tab** or **→** move int
 saves, and **esc** discards. Under each field, an `in use` line shows the value llml runs with and
 where it came from: the environment variable's name, `config`, `default`, or `detected` (a program
 found with no path configured). An environment variable wins over the saved value until it is unset.
+
+Each runtime has a checkbox. **space** (in the list only, never in a field) turns the highlighted
+runtime on or off, and **enter** saves it with your field edits. A runtime you turn off shows `off`
+in the list and "Off" in its detail pane: llml stops probing it and leaves it out of the
+missing-runtime warning in the footer, and its fields stay editable. A runtime you tick back on shows no status mark until you
+save, since llml has not probed it. Saving re-detects runtimes without rescanning models.
+The on/off choices are stored in `runtimes.toml`, not `config.toml`, and no environment variable
+overrides them. The first time llml sees a runtime, it turns it on only if it finds the program or
+its server answers, and turns it off otherwise; a single alert lists any runtimes turned off this way.
+After that only your choice changes it, so a runtime you install later stays off until you tick it.
+
+Models whose runtime is off stay in the table, dimmed and marked `(off)` after the runtime name, so
+you can still see what is taking up disk space. You can select them, copy their command, and open
+their `p` panel, but **R** / **ctrl+R** will not launch them; an alert names the runtime to turn on
+in `c`, and a note under the launch preview says the runtime is off. A GGUF model follows its
+active profile: it is dimmed only when that profile's runtime (llama.cpp or KoboldCpp) is off, so
+switching profiles can make it launchable again.
+
+When Ollama is off, llml does not contact the Ollama daemon at all: startup and **S** neither start
+`ollama serve` nor call its API. The Ollama models from the last scan stay in the table, dimmed, and
+may be out of date until you turn Ollama back on and scan again.
 
 | Feature             | Environment Variable | `config.toml` key (under `[runtime]`) | Default           |
 | :------------------ | :------------------- | :------------------------------------ | :---------------- |
@@ -366,7 +393,8 @@ found with no path configured). An environment variable wins over the saved valu
    `splash serve --model <org/repo>`.
 
 NInfer is shown only on Linux, and oMLX and Splash only on Apple Silicon macOS; the `c`
-panel hides runtimes the platform cannot run.
+panel hides runtimes the platform cannot run. A runtime turned off in `c` gets no server probe, but
+llml still looks for its program on disk so the panel can show whether it is installed.
 
 ---
 
@@ -406,7 +434,7 @@ To protect your settings and cache, `llml` maintains a history of your configura
 
 - **Atomic Writes**: Files are written to a temporary location before being moved, preventing corruption.
 - **Automatic Backups**: The newest **10** versions of each file are kept in the `backups/` directory.
-- **Upgrade Snapshots**: When the `llml` version changes, a snapshot of both `config.toml` and `model-params.json` is created automatically so you can roll back if needed. The file **`.last-run-version`** in the same directory records the last run version for that behavior.
+- **Upgrade Snapshots**: When the `llml` version changes, a snapshot of `config.toml`, `model-params.json`, and `runtimes.toml` is created automatically so you can roll back if needed. The file **`.last-run-version`** in the same directory records the last run version for that behavior.
 
 ## 💻 Development
 

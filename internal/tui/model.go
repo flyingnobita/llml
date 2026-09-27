@@ -17,6 +17,7 @@ import (
 	"charm.land/lipgloss/v2/compat"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/flyingnobita/llml/internal/config"
 	"github.com/flyingnobita/llml/internal/fsutil"
 	"github.com/flyingnobita/llml/internal/models"
 	"github.com/flyingnobita/llml/internal/profiles"
@@ -50,8 +51,9 @@ type tableState struct {
 	sortCol  tableSortCol // default Runtime ascending
 	sortDesc bool         // false = ascending
 	lastScan time.Time
-	// effectiveBackends maps model identity to the backend its active profile
-	// selects. Model is copied by value throughout the TUI, and a map is a
+	// effectiveBackends maps a model's parameter-profile key
+	// ([profiles.ModelParamsKey] of its identity) to the backend its active
+	// profile selects; read it through [rowRuntime]. Model is copied by value throughout the TUI, and a map is a
 	// reference, so this field is copy-on-write: every mutator clones it before
 	// writing. Mutating it in place would make one copy's edit visible to all
 	// the others, silently breaking the value semantics the rest of the type has.
@@ -71,6 +73,9 @@ type runtimeConfigState struct {
 	// prefill is what each input held when the panel opened; the panel is
 	// dirty once any input differs from it.
 	prefill [runtimeFieldCount]string
+	// toggles is the on/off state the list shows: the stored state plus the
+	// user's unsaved space presses. enter stores it; esc drops it.
+	toggles config.RuntimeStates
 }
 
 // paramsState holds the parameter-profiles panel's state.
@@ -250,9 +255,12 @@ type Model struct {
 	// settings holds every resolved runtime value. It is set from the message a
 	// scan or reload produces, and from the c panel on save; nothing in the TUI
 	// reads the process environment for these values.
-	settings           settings.Settings
-	runtime            models.RuntimeInfo
-	runtimeScanned     bool
+	settings       settings.Settings
+	runtime        models.RuntimeInfo
+	runtimeScanned bool
+	// runtimeStates is the stored on/off state of each Runtime, as the last
+	// detection read it or the runtime panel saved it.
+	runtimeStates      config.RuntimeStates
 	lastRunNote        string
 	lastRunNoteSuccess bool // true: lastRunNote is non-error feedback (e.g. copy confirmation)
 	loading            bool
@@ -262,7 +270,7 @@ type Model struct {
 
 func newTableViewport(st styles, homeDir string) (btable.Model, viewport.Model) {
 	t := btable.New(
-		btable.WithColumns(tableColumns(100, nil, homeDir, defaultSortCol, false)),
+		btable.WithColumns(tableColumns(100, nil, homeDir, defaultSortCol, false, runtimeColW)),
 		btable.WithRows(nil),
 		btable.WithFocused(true),
 		btable.WithStyles(st.table),
@@ -488,15 +496,6 @@ func (m Model) loadEffectiveBackendForIdentity(identity string) Model {
 	return m
 }
 
-// refreshTableRows rebuilds the table rows from m.table.files and the effective
-// backend cache. It recalculates columns from current files and cache. It does not relayout body heights — use layoutTable
-// for a full relayout (e.g. after terminal resize or sort change).
-func (m Model) refreshTableRows() Model {
-	cols := tableColumns(m.innerWidth(), m.table.files, m.layout.homeDir, m.table.sortCol, m.table.sortDesc)
-	m.table.tbl.SetRows(buildTableRows(m.table.files, cols, m.layout.homeDir, m.table.effectiveBackends))
-	return m
-}
-
 // SelectedPath returns the stable identity of the highlighted row, or empty if none.
 func (m Model) SelectedPath() string {
 	f, ok := m.SelectedModelFile()
@@ -571,7 +570,7 @@ func tableRowAreaHeight(contentAreaH int) int {
 // layoutTableAtInnerW builds columns, body height, and hscroll for a given inner body width.
 func (m Model) layoutTableAtInnerW(innerW int) Model {
 	m.layout.bodyInnerW = innerW
-	cols := tableColumns(innerW, m.table.files, m.layout.homeDir, m.table.sortCol, m.table.sortDesc)
+	cols := m.tableColumnsAt(innerW)
 	m.table.tbl.SetColumns(cols)
 	m.table.tbl.SetStyles(m.ui.styles.table)
 	minW := tableContentMinWidth(cols)
@@ -585,7 +584,7 @@ func (m Model) layoutTableAtInnerW(innerW int) Model {
 	h := m.computeBodyHeight(needsLogHBar)
 	m = m.applyTableAndLogHeights(h, innerW, previewH)
 
-	m.table.tbl.SetRows(buildTableRows(m.table.files, cols, m.layout.homeDir, m.table.effectiveBackends))
+	m.table.tbl.SetRows(m.tableRows(cols))
 	tview := m.table.tbl.View()
 	m.layout.tableBodyH = max(1, strings.Count(tview, "\n")+1)
 	lines := strings.Split(tview, "\n")
