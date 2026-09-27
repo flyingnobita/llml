@@ -263,3 +263,31 @@ func TestFirstSeen_failedWriteIsReported(t *testing.T) {
 		t.Errorf("want the write failure and the upgrade alert, got %q", alerts)
 	}
 }
+
+// A Runtime turned off on first sight dims its rows as soon as detection
+// arrives, because deciding its state redraws the table.
+func TestFirstSeen_offRuntimeDimsRowsAtOnce(t *testing.T) {
+	t.Parallel()
+
+	f := newFirstSeenFakes(linuxDetection())
+	m := NewWithServices(f.services)
+	m.layout.width, m.layout.height = 140, 30
+	m.loading = false
+	next, _ := m.Update(modelsLoadedMsg{files: []models.ModelFile{
+		testRow(models.BackendVLLM, "/m/qwen-st"),
+		testRow(models.BackendLlama, "/m/gemma.gguf"),
+	}})
+	next, _ = next.(Model).Update(runtimeReadyMsg{
+		settings: defaultSettings(),
+		runtime:  linuxDetection(),
+		states:   runtimeStatesRead{},
+	})
+	m = next.(Model)
+
+	if !rowShowsDimmed(t, m, "qwen-st", "vllm") {
+		t.Errorf("a row on vLLM, turned off on first sight, should be dimmed:\n%s", plainView(m))
+	}
+	if rowShowsDimmed(t, m, "gemma", "llama.cpp") {
+		t.Errorf("a row on the detected llama.cpp should not be dimmed:\n%s", plainView(m))
+	}
+}
