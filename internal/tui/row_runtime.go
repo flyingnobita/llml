@@ -44,6 +44,16 @@ func (m Model) anyRowDimmed() bool {
 	return false
 }
 
+// runtimeOffNote returns the launch preview's note for a row on Runtime b when
+// b is off, or "" when it is on. The preview still shows the full command, so
+// it can be copied; the note says why R will not run it.
+func (m Model) runtimeOffNote(b models.ModelBackend) string {
+	if m.runtimeEnabled(b) {
+		return ""
+	}
+	return fmt.Sprintf(runtimeOffPreviewNote, runtimeFor(b).name)
+}
+
 // blockLaunchOnDisabledRuntime refuses to launch on Runtime b, which is off,
 // and tells the user where to turn it on.
 func (m Model) blockLaunchOnDisabledRuntime(b models.ModelBackend) (Model, tea.Cmd) {

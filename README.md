@@ -339,7 +339,7 @@ After that only your choice changes it, so a runtime you install later stays off
 Models whose runtime is off stay in the table, dimmed and marked `(off)` after the runtime name, so
 you can still see what is taking up disk space. You can select them, copy their command, and open
 their `p` panel, but **R** / **ctrl+R** will not launch them; an alert names the runtime to turn on
-in `c`. A GGUF model follows its active profile: it is dimmed only when that profile's runtime
+in `c`, and a note under the launch preview says the runtime is off. A GGUF model follows its active profile: it is dimmed only when that profile's runtime
 (llama.cpp or KoboldCpp) is off, so switching profiles can make it launchable again.
 
 When Ollama is off, llml does not contact the Ollama daemon at all: startup and **S** neither start

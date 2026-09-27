@@ -272,6 +272,10 @@ const (
 	// runtimeConfigModalSubtitle sits above the runtime panel's key hints.
 	runtimeConfigModalSubtitle = "Saved to config.toml. Environment variables win over saved values."
 
+	// runtimeOffPreviewNote sits under the launch preview of a dimmed row; %s
+	// names its Runtime. It follows the pattern of serverSpec.mmprojNote.
+	runtimeOffPreviewNote = "⚠ %s is off; turn it on in the runtime panel (" + FooterKeyConfigPort + ") to launch this model"
+
 	// FooterHintTabSections is the shared "tab: sections" fragment used by split-pane
 	// and parameter modal footers.
 	FooterHintTabSections = "tab: section"
