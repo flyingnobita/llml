@@ -263,6 +263,20 @@ committed (e.g. `dev-docs/llml/BACKLOG.md` for a personal backlog).
 ADRs live in `dev-docs/llml/adr/YYYYMMDD-short-title.md`; index in
 `dev-docs/llml/DECISIONS.md`. Add an ADR for any significant design choice.
 
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues on the public `flyingnobita/llml` repo, via `gh`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five-role vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: root `CONTEXT.md`, ADRs in `dev-docs/llml/adr/`. See `docs/agents/domain.md`.
+
 ## GBrain Configuration (configured by /setup-gbrain)
 
 - Mode: local-stdio
