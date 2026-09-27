@@ -26,20 +26,27 @@ func FromEnv(getenv Getenv) Layer {
 	setPath(&l.OllamaPath, getenv(EnvOllamaPath))
 	setPath(&l.KoboldCppPath, getenv(EnvKoboldCppPath))
 	setPath(&l.NInferPath, getenv(EnvNInferPath))
+	setPath(&l.OMLXPath, getenv(EnvOMLXPath))
+	setPath(&l.SplashPath, getenv(EnvSplashPath))
 	setPath(&l.HFHubCache, getenv(EnvHFHubCache))
 	setPath(&l.HFHome, getenv(EnvHFHome))
 
 	setHost(&l.LlamaServerHost, getenv(EnvLlamaServerHost))
 	setHost(&l.VLLMServerHost, getenv(EnvVLLMServerHost))
 	setHost(&l.NInferServerHost, getenv(EnvNInferServerHost))
+	setHost(&l.OMLXHost, getenv(EnvOMLXHost))
+	setHost(&l.SplashHost, getenv(EnvSplashHost))
 	setOllamaHost(&l.OllamaHost, getenv(EnvOllamaHost))
 
 	setPort(&l.LlamaServerPort, getenv(EnvLlamaServerPort))
 	setPort(&l.VLLMServerPort, getenv(EnvVLLMServerPort))
 	setPort(&l.KoboldCppPort, getenv(EnvKoboldCppPort))
 	setPort(&l.NInferServerPort, getenv(EnvNInferServerPort))
+	setPort(&l.OMLXPort, getenv(EnvOMLXPort))
+	setPort(&l.SplashPort, getenv(EnvSplashPort))
 
 	l.ExtraModelPaths = SplitPathList(getenv(EnvModelPaths))
+	l.OMLXModelDirs = SplitPathList(getenv(EnvOMLXModelDirs))
 	return l
 }
 

@@ -52,6 +52,23 @@ const (
 	EnvNInferServerPort = "NINFER_SERVER_PORT"
 	// EnvNInferServerHost is the listen host for ninfer-serve.
 	EnvNInferServerHost = "NINFER_SERVER_HOST"
+	// EnvOMLXPath is a directory containing the omlx CLI, the oMLX base
+	// directory (~/.omlx, whose bin/ holds the app's CLI shim), or the omlx path.
+	EnvOMLXPath = "OMLX_PATH"
+	// EnvOMLXHost is the listen host for omlx serve.
+	EnvOMLXHost = "OMLX_HOST"
+	// EnvOMLXPort is the TCP port for omlx serve and its /health probe.
+	EnvOMLXPort = "OMLX_PORT"
+	// EnvOMLXModelDirs lists oMLX model directories, comma-separated. When
+	// unset, the dirs configured in the oMLX app are used.
+	EnvOMLXModelDirs = "OMLX_MODEL_DIRS"
+	// EnvSplashPath is a directory containing the splash executable, or its path.
+	EnvSplashPath = "SPLASH_PATH"
+	// EnvSplashHost is the listen host for splash serve. Splash's own launcher
+	// scripts use the same name.
+	EnvSplashHost = "SPLASH_HOST"
+	// EnvSplashPort is the TCP port for splash serve; Splash itself reads it too.
+	EnvSplashPort = "SPLASH_PORT"
 	// EnvModelPaths lists extra model search roots, comma-separated.
 	EnvModelPaths = "LLML_MODEL_PATHS"
 	// EnvHFHubCache overrides the Hugging Face hub cache directory.
@@ -73,6 +90,12 @@ const (
 	// DefaultNInferServerPort differs from ninfer-serve's own default (8080) so
 	// it does not collide with llama-server's default port.
 	DefaultNInferServerPort = 18080
+	// DefaultOMLXHost and DefaultOMLXPort match oMLX's own defaults.
+	DefaultOMLXHost = "127.0.0.1"
+	DefaultOMLXPort = 8000
+	// DefaultSplashHost and DefaultSplashPort match Splash's own defaults.
+	DefaultSplashHost = "127.0.0.1"
+	DefaultSplashPort = 8000
 )
 
 // Settings holds every runtime value in fully resolved form. Path fields are
@@ -97,6 +120,17 @@ type Settings struct {
 	NInferPath       string
 	NInferServerHost string
 	NInferServerPort int
+
+	OMLXPath string
+	OMLXHost string
+	OMLXPort int
+	// OMLXModelDirs are oMLX's model directories. Models found under them are
+	// oMLX rows; see [Settings.OMLXModelRoots] for the fallback when empty.
+	OMLXModelDirs []string
+
+	SplashPath string
+	SplashHost string
+	SplashPort int
 
 	// ExtraModelPaths are additional filesystem roots to scan for models.
 	ExtraModelPaths []string
@@ -128,6 +162,18 @@ type Layer struct {
 	NInferServerHost *string
 	NInferServerPort *int
 
+	OMLXPath *string
+	OMLXHost *string
+	OMLXPort *int
+	// OMLXModelDirs is taken whole from the first layer that sets it; unlike
+	// ExtraModelPaths it does not accumulate, since it names oMLX's own
+	// configuration rather than extra places to look.
+	OMLXModelDirs []string
+
+	SplashPath *string
+	SplashHost *string
+	SplashPort *int
+
 	ExtraModelPaths []string
 	HFHubCache      *string
 	HFHome          *string
@@ -146,6 +192,11 @@ func Defaults() Layer {
 
 		NInferServerHost: ptr(DefaultNInferHost),
 		NInferServerPort: ptr(DefaultNInferServerPort),
+
+		OMLXHost:   ptr(DefaultOMLXHost),
+		OMLXPort:   ptr(DefaultOMLXPort),
+		SplashHost: ptr(DefaultSplashHost),
+		SplashPort: ptr(DefaultSplashPort),
 	}
 }
 
@@ -174,6 +225,17 @@ func Resolve(layers ...Layer) Settings {
 		takeString(&s.NInferPath, l.NInferPath)
 		takeString(&s.NInferServerHost, l.NInferServerHost)
 		takeInt(&s.NInferServerPort, l.NInferServerPort)
+		takeString(&s.OMLXPath, l.OMLXPath)
+		takeString(&s.OMLXHost, l.OMLXHost)
+		takeInt(&s.OMLXPort, l.OMLXPort)
+		if len(s.OMLXModelDirs) == 0 && len(l.OMLXModelDirs) > 0 {
+			var dirs fsutil.PathSet
+			dirs.Add(l.OMLXModelDirs...)
+			s.OMLXModelDirs = dirs.Slice()
+		}
+		takeString(&s.SplashPath, l.SplashPath)
+		takeString(&s.SplashHost, l.SplashHost)
+		takeInt(&s.SplashPort, l.SplashPort)
 		takeString(&s.HFHubCache, l.HFHubCache)
 		takeString(&s.HFHome, l.HFHome)
 		roots.Add(l.ExtraModelPaths...)

@@ -20,6 +20,11 @@ const (
 	BackendKobold
 	// BackendNInfer is a native NInfer artifact (*.ninfer) launched with ninfer-serve.
 	BackendNInfer
+	// BackendOMLX is an MLX model directory inside one of oMLX's model dirs,
+	// served by `omlx serve --model-dir`.
+	BackendOMLX
+	// BackendSplash is a Splash packed-weight bundle launched with `splash serve`.
+	BackendSplash
 )
 
 // String returns the canonical lowercase name for the backend.
@@ -33,6 +38,10 @@ func (b ModelBackend) String() string {
 		return "koboldcpp"
 	case BackendNInfer:
 		return "ninfer"
+	case BackendOMLX:
+		return "omlx"
+	case BackendSplash:
+		return "splash"
 	default:
 		return "llama"
 	}
@@ -51,6 +60,10 @@ func ParseBackend(s string) (ModelBackend, error) {
 		return BackendKobold, nil
 	case "ninfer":
 		return BackendNInfer, nil
+	case "omlx":
+		return BackendOMLX, nil
+	case "splash":
+		return BackendSplash, nil
 	default:
 		return 0, fmt.Errorf("unknown backend %q", s)
 	}

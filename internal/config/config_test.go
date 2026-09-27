@@ -244,6 +244,10 @@ func TestRuntimeConfigFromSettings_roundTrips(t *testing.T) {
 		settings.EnvNInferPath:       "/opt/ninfer",
 		settings.EnvNInferServerPort: "18181",
 		settings.EnvNInferServerHost: "0.0.0.0",
+		settings.EnvOMLXPath:         "/Users/u/.omlx",
+		settings.EnvOMLXPort:         "8100",
+		settings.EnvSplashPath:       "/opt/homebrew/bin/splash",
+		settings.EnvSplashHost:       "0.0.0.0",
 	})), settings.Defaults())
 
 	rc := RuntimeConfigFromSettings(want)
@@ -252,5 +256,38 @@ func TestRuntimeConfigFromSettings_roundTrips(t *testing.T) {
 	got.ExtraModelPaths = want.ExtraModelPaths // not part of the [runtime] table
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("round trip changed settings:\n got %+v\nwant %+v", got, want)
+	}
+}
+
+func TestOMLXAppLayer(t *testing.T) {
+	t.Parallel()
+
+	home := t.TempDir()
+	if l := OMLXAppLayer(home); l.OMLXModelDirs != nil {
+		t.Fatalf("no oMLX install should give an empty layer, got %v", l.OMLXModelDirs)
+	}
+	write := func(body string) {
+		t.Helper()
+		dir := filepath.Join(home, ".omlx")
+		if err := os.MkdirAll(dir, 0o750); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "settings.json"), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	write(`{"model":{"model_dirs":["/a","/b"],"model_dir":"/a"}}`)
+	if got := OMLXAppLayer(home).OMLXModelDirs; !reflect.DeepEqual(got, []string{"/a", "/b"}) {
+		t.Errorf("model_dirs = %v", got)
+	}
+	// Older settings files carry only the single model_dir.
+	write(`{"model":{"model_dir":"/only"}}`)
+	if got := OMLXAppLayer(home).OMLXModelDirs; !reflect.DeepEqual(got, []string{"/only"}) {
+		t.Errorf("model_dir fallback = %v", got)
+	}
+	write(`not json`)
+	if got := OMLXAppLayer(home).OMLXModelDirs; got != nil {
+		t.Errorf("unreadable settings should give an empty layer, got %v", got)
 	}
 }

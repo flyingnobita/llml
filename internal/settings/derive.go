@@ -22,9 +22,9 @@ func (s Settings) HuggingFaceHubCache(home string) string {
 }
 
 // DefaultSearchRoots returns the common directories where model weights are
-// stored: the llama.cpp, Hugging Face, and LM Studio caches, plus the models/
-// directory of a configured NInfer checkout. It returns nil when the home
-// directory cannot be resolved.
+// stored: the llama.cpp, Hugging Face, and LM Studio caches, the models/
+// directory of a configured NInfer checkout, and oMLX's model directories.
+// It returns nil when the home directory cannot be resolved.
 func (s Settings) DefaultSearchRoots() []string {
 	home := fsutil.HomeDir()
 	if home == "" {
@@ -39,7 +39,20 @@ func (s Settings) DefaultSearchRoots() []string {
 	if d := s.NInferModelsDir(); d != "" {
 		roots = append(roots, d)
 	}
-	return roots
+	return append(roots, s.OMLXModelRoots(home)...)
+}
+
+// OMLXModelRoots returns the directories oMLX serves models from: the
+// configured OMLXModelDirs, or oMLX's default ~/.omlx/models. The default is
+// returned even when oMLX is not installed; discovery skips missing roots.
+func (s Settings) OMLXModelRoots(home string) []string {
+	if len(s.OMLXModelDirs) > 0 {
+		return s.OMLXModelDirs
+	}
+	if home == "" {
+		return nil
+	}
+	return []string{filepath.Join(home, ".omlx", "models")}
 }
 
 // NInferModelsDir returns the models/ directory of the configured NInfer

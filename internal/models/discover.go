@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/flyingnobita/llml/internal/fsutil"
 	"github.com/flyingnobita/llml/internal/settings"
 )
 
@@ -155,7 +156,7 @@ func Discover(ctx context.Context, opts Options) ([]ModelFile, error) {
 		maxD = DefaultMaxDepth
 	}
 	roots := opts.Settings.SearchRoots(opts.ExtraRoots, opts.SkipDefaultRoots)
-	sources := []modelSource{ggufSource{}, safetensorsSource{}, ninferSource{}}
+	sources := []modelSource{ggufSource{}, safetensorsSource{}, ninferSource{}, splashSource{}}
 
 	candidates, err := collectCandidates(ctx, roots, sources, maxD)
 	if err != nil {
@@ -163,6 +164,7 @@ func Discover(ctx context.Context, opts Options) ([]ModelFile, error) {
 	}
 
 	out := buildModelFiles(candidates, sources)
+	claimOMLXRows(out, opts.Settings.OMLXModelRoots(fsutil.HomeDir()))
 	slices.SortFunc(out, compareForDefaultOrder)
 	return out, nil
 }
@@ -175,11 +177,17 @@ func compareForDefaultOrder(a, b ModelFile) int {
 	return strings.Compare(a.Identity(), b.Identity())
 }
 
-// isAuxiliaryModel drops non-LLM weight files (e.g. CLIP/mmproj sidecars in multimodal repos).
-// Applied to both GGUF and safetensors models after Parameters is populated.
+// isAuxiliaryModel drops weights that cannot be served on their own: CLIP/mmproj
+// sidecars in multimodal repos, and speculative-decoding drafts such as DFlash2,
+// which a runtime loads beside a target model. Applied to every source after
+// Parameters is populated.
 func isAuxiliaryModel(f ModelFile) bool {
-	switch strings.TrimSpace(strings.ToLower(f.Parameters)) {
+	params := strings.TrimSpace(strings.ToLower(f.Parameters))
+	switch params {
 	case "clip", "flip":
+		return true
+	}
+	if strings.Contains(params, "draftmodel") {
 		return true
 	}
 	return isMMProjName(f.Name)

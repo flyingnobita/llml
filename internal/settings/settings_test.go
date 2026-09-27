@@ -79,6 +79,44 @@ func TestFromEnvReadsNInfer(t *testing.T) {
 	}
 }
 
+func TestFromEnvReadsOMLXAndSplash(t *testing.T) {
+	t.Parallel()
+
+	s := Resolve(FromEnv(fakeEnv(map[string]string{
+		EnvOMLXPath:      "/Users/u/.omlx",
+		EnvOMLXPort:      "8100",
+		EnvOMLXModelDirs: "/a, /b/",
+		EnvSplashHost:    "0.0.0.0",
+		EnvSplashPort:    "8200",
+	})), Layer{OMLXModelDirs: []string{"/from/app"}}, Defaults())
+
+	if s.OMLXPath != "/Users/u/.omlx" || s.OMLXPort != 8100 || s.OMLXHost != DefaultOMLXHost {
+		t.Errorf("oMLX = %q %q %d", s.OMLXPath, s.OMLXHost, s.OMLXPort)
+	}
+	if s.SplashHost != "0.0.0.0" || s.SplashPort != 8200 {
+		t.Errorf("Splash = %q %d", s.SplashHost, s.SplashPort)
+	}
+	// The env list replaces the app's dirs rather than adding to them.
+	if !slices.Equal(s.OMLXModelDirs, []string{"/a", "/b"}) {
+		t.Errorf("OMLXModelDirs = %v", s.OMLXModelDirs)
+	}
+}
+
+func TestOMLXModelRoots(t *testing.T) {
+	t.Parallel()
+
+	if got := (Settings{}).OMLXModelRoots("/Users/u"); !slices.Equal(got, []string{"/Users/u/.omlx/models"}) {
+		t.Errorf("default roots = %v", got)
+	}
+	if got := (Settings{}).OMLXModelRoots(""); got != nil {
+		t.Errorf("no home should mean no default, got %v", got)
+	}
+	s := Settings{OMLXModelDirs: []string{"/x"}}
+	if got := s.OMLXModelRoots("/Users/u"); !slices.Equal(got, []string{"/x"}) {
+		t.Errorf("configured roots = %v", got)
+	}
+}
+
 func TestNInferModelsDir(t *testing.T) {
 	t.Parallel()
 

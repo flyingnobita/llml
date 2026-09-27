@@ -56,6 +56,12 @@ type RuntimeConfig struct {
 	DefaultNInferPath       string `toml:"default_ninfer_path"`
 	DefaultNInferServerHost string `toml:"default_ninfer_server_host"`
 	DefaultNInferServerPort *int   `toml:"default_ninfer_server_port,omitempty"`
+	DefaultOMLXPath         string `toml:"default_omlx_path"`
+	DefaultOMLXHost         string `toml:"default_omlx_host"`
+	DefaultOMLXPort         *int   `toml:"default_omlx_port,omitempty"`
+	DefaultSplashPath       string `toml:"default_splash_path"`
+	DefaultSplashHost       string `toml:"default_splash_host"`
+	DefaultSplashPort       *int   `toml:"default_splash_port,omitempty"`
 }
 
 // DiscoveryConfig holds the user's extra search roots. The last scan time is
@@ -163,14 +169,20 @@ func (r RuntimeConfig) Layer() settings.Layer {
 	setLayerPath(&l.OllamaPath, r.DefaultOllamaPath)
 	setLayerPath(&l.KoboldCppPath, r.DefaultKoboldCppPath)
 	setLayerPath(&l.NInferPath, r.DefaultNInferPath)
+	setLayerPath(&l.OMLXPath, r.DefaultOMLXPath)
+	setLayerPath(&l.SplashPath, r.DefaultSplashPath)
 	setLayerString(&l.LlamaServerHost, r.DefaultLlamaServerHost)
 	setLayerString(&l.VLLMServerHost, r.DefaultVLLMServerHost)
 	setLayerString(&l.NInferServerHost, r.DefaultNInferServerHost)
+	setLayerString(&l.OMLXHost, r.DefaultOMLXHost)
+	setLayerString(&l.SplashHost, r.DefaultSplashHost)
 	setLayerString(&l.OllamaHost, settings.NormalizeOllamaHost(r.DefaultOllamaHost))
 	setLayerPort(&l.LlamaServerPort, r.DefaultLlamaServerPort)
 	setLayerPort(&l.VLLMServerPort, r.DefaultVLLMServerPort)
 	setLayerPort(&l.KoboldCppPort, r.DefaultKoboldCppPort)
 	setLayerPort(&l.NInferServerPort, r.DefaultNInferServerPort)
+	setLayerPort(&l.OMLXPort, r.DefaultOMLXPort)
+	setLayerPort(&l.SplashPort, r.DefaultSplashPort)
 	return l
 }
 
@@ -186,15 +198,17 @@ func (c Config) Layer() settings.Layer {
 	return l
 }
 
-// Resolve reads config.toml and resolves it against the environment and the
-// built-in defaults, in that order of precedence. A missing or unreadable file
-// is not an error: the result is then the environment over the defaults.
+// Resolve reads config.toml and resolves it against the environment, the oMLX
+// app's own settings, and the built-in defaults, in that order of precedence.
+// A missing or unreadable file is not an error: the result is then the
+// environment over the remaining layers.
 func Resolve(getenv settings.Getenv) settings.Settings {
+	app := OMLXAppLayer(fsutil.HomeDir())
 	c, err := ReadFile()
 	if err != nil {
-		return settings.Resolve(settings.FromEnv(getenv), settings.Defaults())
+		return settings.Resolve(settings.FromEnv(getenv), app, settings.Defaults())
 	}
-	return settings.Resolve(settings.FromEnv(getenv), c.Layer(), settings.Defaults())
+	return settings.Resolve(settings.FromEnv(getenv), c.Layer(), app, settings.Defaults())
 }
 
 func setLayerPath(dst **string, value string) {
@@ -224,6 +238,8 @@ func RuntimeConfigFromSettings(s settings.Settings) RuntimeConfig {
 	vllmPort := s.VLLMServerPort
 	koboldPort := s.KoboldCppPort
 	ninferPort := s.NInferServerPort
+	omlxPort := s.OMLXPort
+	splashPort := s.SplashPort
 	return RuntimeConfig{
 		DefaultLlamaCppPath:    s.LlamaCppPath,
 		DefaultLlamaServerHost: s.LlamaServerHost,
@@ -240,6 +256,13 @@ func RuntimeConfigFromSettings(s settings.Settings) RuntimeConfig {
 		DefaultNInferPath:       s.NInferPath,
 		DefaultNInferServerHost: s.NInferServerHost,
 		DefaultNInferServerPort: &ninferPort,
+
+		DefaultOMLXPath:   s.OMLXPath,
+		DefaultOMLXHost:   s.OMLXHost,
+		DefaultOMLXPort:   &omlxPort,
+		DefaultSplashPath: s.SplashPath,
+		DefaultSplashHost: s.SplashHost,
+		DefaultSplashPort: &splashPort,
 	}
 }
 

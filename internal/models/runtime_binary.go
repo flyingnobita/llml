@@ -230,11 +230,59 @@ func findNInferBinary(ninferPath string) string {
 	return findBinaryInEnvAndCommonDirs(ninferServeName, "", common)
 }
 
+// findOMLXBinary resolves the omlx CLI from omlxPath, then the oMLX app's
+// shim at ~/.omlx/bin/omlx, then common install directories, then PATH.
+// omlxPath may be the CLI itself, a directory containing it, or the oMLX base
+// directory, whose bin/ holds the shim the macOS app installs.
+func findOMLXBinary(omlxPath string) string {
+	const name = "omlx"
+	var dirs []string
+	if d := omlxPath; d != "" {
+		clean := filepath.Clean(d)
+		if filepath.Base(clean) == name && isExecutableFile(clean) {
+			return clean
+		}
+		dirs = append(dirs, clean, filepath.Join(clean, "bin"))
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		dirs = append(dirs, filepath.Join(home, ".omlx", "bin"))
+	}
+	for _, dir := range dirs {
+		if p := filepath.Join(dir, name); isExecutableFile(p) {
+			return p
+		}
+	}
+	return findBinaryInEnvAndCommonDirs(name, "", commonBinaryDirs)
+}
+
+// findSplashBinary resolves the splash executable from splashPath (the binary
+// or a directory containing it), then common install directories (Homebrew),
+// then PATH.
+func findSplashBinary(splashPath string) string {
+	const name = "splash"
+	if d := splashPath; d != "" {
+		clean := filepath.Clean(d)
+		if filepath.Base(clean) == name && isExecutableFile(clean) {
+			return clean
+		}
+		if p := filepath.Join(clean, name); isExecutableFile(p) {
+			return p
+		}
+	}
+	return findBinaryInEnvAndCommonDirs(name, "", commonBinaryDirs)
+}
+
 // probeHealthEndpoint GETs /health on host:port, bounded by ctx. Used by
-// llama-server, KoboldCpp, and ninfer-serve. It shares the package HTTP client so repeated
-// probes reuse connections.
+// llama-server, KoboldCpp, ninfer-serve, and oMLX.
 func probeHealthEndpoint(ctx context.Context, host string, port int) bool {
-	url := fmt.Sprintf("http://%s:%d/health", host, port)
+	return probeHTTP(ctx, host, port, "/health")
+}
+
+// probeHTTP GETs path on host:port and reports whether it answered 200 OK,
+// bounded by ctx. It shares the package HTTP client so repeated probes reuse
+// connections.
+func probeHTTP(ctx context.Context, host string, port int, path string) bool {
+	url := fmt.Sprintf("http://%s:%d%s", host, port, path)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return false
@@ -294,6 +342,16 @@ func ResolveOllamaPath(r RuntimeInfo) string {
 // ResolveNInferPath returns the detected ninfer-serve binary path, or the first match on PATH.
 func ResolveNInferPath(r RuntimeInfo) string {
 	return resolvePath(r.NInferPath, ninferServeName)
+}
+
+// ResolveOMLXPath returns the detected omlx CLI path, or the first match on PATH.
+func ResolveOMLXPath(r RuntimeInfo) string {
+	return resolvePath(r.OMLXPath, "omlx")
+}
+
+// ResolveSplashPath returns the detected splash path, or the first match on PATH.
+func ResolveSplashPath(r RuntimeInfo) string {
+	return resolvePath(r.SplashPath, "splash")
 }
 
 // ResolveKoboldCppPath returns the detected koboldcpp binary path, or the first match on PATH.
