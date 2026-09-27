@@ -331,15 +331,7 @@ func (m Model) handleRunServerKey(mode runServerMode) (tea.Model, tea.Cmd) {
 		return m.flashError(err.Error())
 	}
 	m = m.warnAboutMMProj(spec, p)
-
-	switch {
-	case be == models.BackendOllama:
-		return m, m.svc.runOllamaLaunchCmd(spec)
-	case mode == runServerModeFullscreen:
-		return m, runForegroundServerCmd(spec)
-	default:
-		return m, runSplitServerCmd(spec)
-	}
+	return m, m.svc.startServer(spec, mode)
 }
 
 // warnAboutMMProj records an alert when mmproj injection was requested but could
