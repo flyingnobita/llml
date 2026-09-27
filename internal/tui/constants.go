@@ -230,6 +230,7 @@ const (
 	MissingVLLMFooterNote        = "vllm not found - press " + FooterKeyConfigPort + " to set path manually"
 	MissingOllamaFooterNote      = "ollama not found or not reachable - press " + FooterKeyConfigPort + " to set path or host"
 	MissingKoboldCppFooterNote   = "koboldcpp not found - press " + FooterKeyConfigPort + " to set path manually"
+	MissingNInferFooterNote      = "ninfer-serve not found - press " + FooterKeyConfigPort + " to set path manually"
 
 	FooterKeySortColumn   = ","
 	FooterDescSortColumn  = "sort"
@@ -262,6 +263,7 @@ const (
 	runtimeConfigHeaderVLLM         = "vLLM"
 	runtimeConfigHeaderOllama       = "Ollama"
 	runtimeConfigHeaderKoboldCpp    = "KoboldCpp"
+	runtimeConfigHeaderNInfer       = "NInfer"
 	runtimeConfigLabelLlamaCppPath  = "Path (llama-cli / llama-server)"
 	runtimeConfigLabelLlamaPort     = "Port"
 	runtimeConfigLabelLlamaHost     = "Host"
@@ -273,6 +275,9 @@ const (
 	runtimeConfigLabelOllamaHost    = "Host"
 	runtimeConfigLabelKoboldCppPath = "Path (koboldcpp binary)"
 	runtimeConfigLabelKoboldCppPort = "Port"
+	runtimeConfigLabelNInferPath    = "Path (checkout or ninfer-serve)"
+	runtimeConfigLabelNInferPort    = "Port"
+	runtimeConfigLabelNInferHost    = "Host"
 
 	// FooterHintTabSections is the shared "tab: sections" fragment used by split-pane
 	// and parameter modal footers.

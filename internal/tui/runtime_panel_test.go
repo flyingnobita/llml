@@ -16,55 +16,46 @@ func TestRuntimePanelLines(t *testing.T) {
 	t.Parallel()
 
 	r := models.RuntimeInfo{
-		LlamaServerPath: "/home/u/llama.cpp/bin/llama-server",
-		LlamaServerHost: "127.0.0.1",
-		LlamaServerPort: 8080,
-		VLLMPath:        "/home/u/.local/bin/vllm",
-		VLLMServerHost:  "127.0.0.1",
-		VLLMServerPort:  8000,
-		OllamaPath:      "/home/u/.local/bin/ollama",
-		OllamaHost:      "127.0.0.1:11434",
-		KoboldCppPort:   5001,
-		ServerRunning:   false,
-		ProbePort:       8080,
+		LlamaServerPath:  "/home/u/llama.cpp/bin/llama-server",
+		LlamaServerHost:  "127.0.0.1",
+		LlamaServerPort:  8080,
+		VLLMPath:         "/home/u/.local/bin/vllm",
+		VLLMServerHost:   "127.0.0.1",
+		VLLMServerPort:   8000,
+		OllamaPath:       "/home/u/.local/bin/ollama",
+		OllamaHost:       "127.0.0.1:11434",
+		KoboldCppPort:    5001,
+		NInferPath:       "/home/u/ninfer/build/apps/ninfer-serve",
+		NInferServerHost: "127.0.0.1",
+		NInferPort:       18080,
+		ServerRunning:    false,
+		ProbePort:        8080,
 	}
 	lines := RuntimePanelLines(80, r)
-	if len(lines) != 11 {
-		t.Fatalf("got %d lines", len(lines))
+	// Rows are sorted alphabetically by label.
+	want := []struct{ label, value string }{
+		{runtimePanelLabelKoboldCppPath, ""},
+		{runtimePanelLabelKoboldCppPort, "5001"},
+		{runtimePanelLabelLlamaServerPath, "llama-server"},
+		{runtimePanelLabelLlamaServerHost, "127.0.0.1"},
+		{runtimePanelLabelLlamaServerPort, "8080"},
+		{runtimePanelLabelNInferHost, "127.0.0.1"},
+		{runtimePanelLabelNInferPath, "ninfer-serve"},
+		{runtimePanelLabelNInferPort, "18080"},
+		{runtimePanelLabelOllamaHost, "127.0.0.1:11434"},
+		{runtimePanelLabelOllamaPath, "ollama"},
+		{runtimePanelLabelVLLMHost, "127.0.0.1"},
+		{runtimePanelLabelVLLMPath, "vllm"},
+		{runtimePanelLabelVLLMPort, "8000"},
+		{runtimePanelLabelVLLMVenv, "—"},
 	}
-	// Alphabetical: koboldcpp path, koboldcpp port, llama-server path, llama.cpp host, llama.cpp port, ollama host, ollama path, vllm host, vllm path, vllm port, vllm venv path
-	if !strings.Contains(lines[0], runtimePanelLabelKoboldCppPath) {
-		t.Errorf("koboldcpp path line: %q", lines[0])
+	if len(lines) != len(want) {
+		t.Fatalf("got %d lines, want %d", len(lines), len(want))
 	}
-	if !strings.Contains(lines[1], runtimePanelLabelKoboldCppPort) || !strings.Contains(lines[1], "5001") {
-		t.Errorf("koboldcpp port line: %q", lines[1])
-	}
-	if !strings.Contains(lines[2], runtimePanelLabelLlamaServerPath) || !strings.Contains(lines[2], "llama-server") {
-		t.Errorf("llama-server path line: %q", lines[2])
-	}
-	if !strings.Contains(lines[3], runtimePanelLabelLlamaServerHost) || !strings.Contains(lines[3], "127.0.0.1") {
-		t.Errorf("llama.cpp host line: %q", lines[3])
-	}
-	if !strings.Contains(lines[4], runtimePanelLabelLlamaServerPort) || !strings.Contains(lines[4], "8080") {
-		t.Errorf("llama.cpp port line: %q", lines[4])
-	}
-	if !strings.Contains(lines[5], runtimePanelLabelOllamaHost) || !strings.Contains(lines[5], "127.0.0.1:11434") {
-		t.Errorf("ollama host line: %q", lines[5])
-	}
-	if !strings.Contains(lines[6], runtimePanelLabelOllamaPath) || !strings.Contains(lines[6], "ollama") {
-		t.Errorf("ollama path line: %q", lines[6])
-	}
-	if !strings.Contains(lines[7], runtimePanelLabelVLLMHost) || !strings.Contains(lines[7], "127.0.0.1") {
-		t.Errorf("vllm host line: %q", lines[7])
-	}
-	if !strings.Contains(lines[8], runtimePanelLabelVLLMPath) || !strings.Contains(lines[8], "vllm") {
-		t.Errorf("vllm path line: %q", lines[8])
-	}
-	if !strings.Contains(lines[9], runtimePanelLabelVLLMPort) || !strings.Contains(lines[9], "8000") {
-		t.Errorf("vllm port line: %q", lines[9])
-	}
-	if !strings.Contains(lines[10], runtimePanelLabelVLLMVenv) || !strings.Contains(lines[10], "—") {
-		t.Errorf("vllm venv path line: %q", lines[10])
+	for i, w := range want {
+		if !strings.HasPrefix(lines[i], w.label+" ") || !strings.Contains(lines[i], w.value) {
+			t.Errorf("line %d = %q, want label %q with value %q", i, lines[i], w.label, w.value)
+		}
 	}
 }
 

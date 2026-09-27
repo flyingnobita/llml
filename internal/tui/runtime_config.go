@@ -23,6 +23,9 @@ const (
 	runtimeFieldLlamaHost
 	runtimeFieldOllamaPath
 	runtimeFieldOllamaHost
+	runtimeFieldNInferPath
+	runtimeFieldNInferPort
+	runtimeFieldNInferHost
 	runtimeFieldVLLMPath
 	runtimeFieldVLLMVenv
 	runtimeFieldVLLMPort
@@ -113,6 +116,9 @@ func runtimeFieldValues(s settings.Settings) [runtimeFieldCount]string {
 	v[runtimeFieldVLLMHost] = s.VLLMServerHost
 	v[runtimeFieldKoboldCppPath] = s.KoboldCppPath
 	v[runtimeFieldKoboldCppPort] = strconv.Itoa(s.KoboldCppPort)
+	v[runtimeFieldNInferPath] = s.NInferPath
+	v[runtimeFieldNInferPort] = strconv.Itoa(s.NInferServerPort)
+	v[runtimeFieldNInferHost] = s.NInferServerHost
 	return v
 }
 
@@ -167,7 +173,7 @@ func (m Model) openRuntimeConfigFocused(focus runtimeField) (Model, tea.Cmd) {
 // backend binary, but [models.ResolveLlamaServerPath] or [models.ResolveVLLMPath] is empty.
 // GGUF rows require llama-server; vLLM rows require vllm. Clears the footer line when neither applies.
 func (m Model) maybeSetMissingRuntimeFooterNote() (Model, tea.Cmd) {
-	var wantLlama, wantVLLM, wantOllama, wantKobold bool
+	var wantLlama, wantVLLM, wantOllama, wantKobold, wantNInfer bool
 	for _, f := range m.table.files {
 		switch f.Backend {
 		case models.BackendLlama:
@@ -179,12 +185,15 @@ func (m Model) maybeSetMissingRuntimeFooterNote() (Model, tea.Cmd) {
 			wantVLLM = true
 		case models.BackendOllama:
 			wantOllama = true
+		case models.BackendNInfer:
+			wantNInfer = true
 		}
 	}
 	haveLlama := models.ResolveLlamaServerPath(m.runtime) != ""
 	haveVLLM := models.ResolveVLLMPath(m.runtime) != ""
 	haveOllama := models.ResolveOllamaPath(m.runtime) != "" || m.runtime.OllamaRunning
 	haveKobold := models.ResolveKoboldCppPath(m.runtime) != ""
+	haveNInfer := models.ResolveNInferPath(m.runtime) != ""
 
 	var msgs []string
 	if wantLlama && !haveLlama {
@@ -198,6 +207,9 @@ func (m Model) maybeSetMissingRuntimeFooterNote() (Model, tea.Cmd) {
 	}
 	if wantKobold && !haveKobold {
 		msgs = append(msgs, MissingKoboldCppFooterNote)
+	}
+	if wantNInfer && !haveNInfer {
+		msgs = append(msgs, MissingNInferFooterNote)
 	}
 	if len(msgs) > 0 {
 		m = m.withLastRunError(strings.Join(msgs, "\n"))
@@ -257,19 +269,26 @@ func (m Model) settingsFromRuntimeInputs() (settings.Settings, error) {
 	if err != nil {
 		return s, fmt.Errorf("%s: %w", settings.EnvKoboldCppPort, err)
 	}
+	ninferPort, err := parsePortField(m.rc.inputs[runtimeFieldNInferPort].Value(), settings.DefaultNInferServerPort)
+	if err != nil {
+		return s, fmt.Errorf("%s: %w", settings.EnvNInferServerPort, err)
+	}
 
 	s.LlamaCppPath = fsutil.NormalizePath(m.rc.inputs[runtimeFieldLlamaCppPath].Value())
 	s.VLLMPath = fsutil.NormalizePath(m.rc.inputs[runtimeFieldVLLMPath].Value())
 	s.VLLMVenv = fsutil.NormalizePath(m.rc.inputs[runtimeFieldVLLMVenv].Value())
 	s.OllamaPath = fsutil.NormalizePath(m.rc.inputs[runtimeFieldOllamaPath].Value())
 	s.KoboldCppPath = fsutil.NormalizePath(m.rc.inputs[runtimeFieldKoboldCppPath].Value())
+	s.NInferPath = fsutil.NormalizePath(m.rc.inputs[runtimeFieldNInferPath].Value())
 
 	s.LlamaServerPort = llamaPort
 	s.VLLMServerPort = vllmPort
 	s.KoboldCppPort = koboldPort
+	s.NInferServerPort = ninferPort
 
 	s.LlamaServerHost = hostField(m.rc.inputs[runtimeFieldLlamaHost].Value(), settings.DefaultLlamaServerHost)
 	s.VLLMServerHost = hostField(m.rc.inputs[runtimeFieldVLLMHost].Value(), settings.DefaultVLLMServerHost)
+	s.NInferServerHost = hostField(m.rc.inputs[runtimeFieldNInferHost].Value(), settings.DefaultNInferHost)
 	s.OllamaHost = hostField(
 		settings.NormalizeOllamaHost(m.rc.inputs[runtimeFieldOllamaHost].Value()),
 		settings.DefaultOllamaHost,
@@ -278,7 +297,7 @@ func (m Model) settingsFromRuntimeInputs() (settings.Settings, error) {
 }
 
 func (m Model) commitRuntimeConfig() (Model, tea.Cmd) {
-	for _, f := range []runtimeField{runtimeFieldLlamaPort, runtimeFieldVLLMPort, runtimeFieldKoboldCppPort} {
+	for _, f := range []runtimeField{runtimeFieldLlamaPort, runtimeFieldVLLMPort, runtimeFieldKoboldCppPort, runtimeFieldNInferPort} {
 		if err := validatePortCommit(m.rc.inputs[f].Value()); err != nil {
 			m = m.withLastRunError(fmt.Sprintf("%s: %v", runtimePortEnvKey(f), err))
 			return m, clearLastRunNoteAfterCmd()
@@ -317,6 +336,8 @@ func runtimePortEnvKey(f runtimeField) string {
 		return settings.EnvVLLMServerPort
 	case runtimeFieldKoboldCppPort:
 		return settings.EnvKoboldCppPort
+	case runtimeFieldNInferPort:
+		return settings.EnvNInferServerPort
 	default:
 		return settings.EnvLlamaServerPort
 	}

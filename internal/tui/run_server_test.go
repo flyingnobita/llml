@@ -832,3 +832,53 @@ func TestServerSpec_mmprojNote_clean(t *testing.T) {
 		t.Fatalf("expected empty note for clean spec, got %q", note)
 	}
 }
+
+func TestNInferLaunchArgs(t *testing.T) {
+	t.Parallel()
+	spec := serverSpec{
+		backend:   models.BackendNInfer,
+		bin:       "/opt/ninfer/build/apps/ninfer-serve",
+		host:      "127.0.0.1",
+		port:      18080,
+		modelPath: "/opt/ninfer/models/q.ninfer",
+		params:    profiles.ModelParams{Args: []string{"--kv-dtype", "fp8"}},
+	}
+	want := []string{"/opt/ninfer/models/q.ninfer", "--host", "127.0.0.1", "--port", "18080", "--kv-dtype", "fp8"}
+	if got := spec.directArgs(); !slices.Equal(got, want) {
+		t.Fatalf("directArgs = %v, want %v", got, want)
+	}
+	preview := spec.previewLine()
+	if !strings.Contains(preview, "'/opt/ninfer/build/apps/ninfer-serve'") || !strings.Contains(preview, "'/opt/ninfer/models/q.ninfer'") {
+		t.Fatalf("preview = %q", preview)
+	}
+	// ninfer-serve is a plain binary: the split pane runs it directly, not via sh.
+	if cmd := spec.splitCmd(); filepath.Base(cmd.Path) != "ninfer-serve" {
+		t.Fatalf("split cmd = %v", cmd.Args)
+	}
+}
+
+func TestBuildServerSpec_ninfer(t *testing.T) {
+	t.Parallel()
+
+	if _, err := buildServerSpec(models.BackendNInfer, "/m/q.ninfer", profiles.ModelParams{}, models.RuntimeInfo{}, true); err == nil ||
+		!strings.Contains(err.Error(), MissingNInferFooterNote) {
+		t.Fatalf("strict launch without ninfer-serve: err = %v", err)
+	}
+
+	spec, err := buildServerSpec(models.BackendNInfer, "/m/q.ninfer", profiles.ModelParams{}, models.RuntimeInfo{}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.bin != "ninfer-serve" || spec.port != settings.DefaultNInferServerPort || spec.host != settings.DefaultNInferHost {
+		t.Fatalf("unprobed runtime should use defaults, got %+v", spec)
+	}
+
+	rt := models.RuntimeInfo{NInferPath: "/x/ninfer-serve", NInferServerHost: "0.0.0.0", NInferPort: 19000}
+	spec, err = buildServerSpec(models.BackendNInfer, "/m/q.ninfer", profiles.ModelParams{}, rt, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.bin != "/x/ninfer-serve" || spec.port != 19000 || spec.host != "0.0.0.0" {
+		t.Fatalf("spec = %+v", spec)
+	}
+}

@@ -779,13 +779,20 @@ func (m Model) runtimeConfigModalBlock() string {
 			append([]string{""}, m.runtimeFieldRow(runtimeFieldKoboldCppPort, runtimeConfigLabelKoboldCppPort)...)...)...)
 	koboldBlock := lipgloss.JoinVertical(lipgloss.Left, koboldRows...)
 
+	ninferRows := append([]string{header(runtimeConfigHeaderNInfer), ""},
+		append(m.runtimeFieldRow(runtimeFieldNInferPath, runtimeConfigLabelNInferPath),
+			append([]string{""},
+				append(m.runtimeFieldRow(runtimeFieldNInferPort, runtimeConfigLabelNInferPort),
+					append([]string{""}, m.runtimeFieldRow(runtimeFieldNInferHost, runtimeConfigLabelNInferHost)...)...)...)...)...)
+	ninferBlock := lipgloss.JoinVertical(lipgloss.Left, ninferRows...)
+
 	var inputBlock string
 	if cw >= 80 {
-		leftBlock := lipgloss.JoinVertical(lipgloss.Left, llamaBlock, "", ollamaBlock)
+		leftBlock := lipgloss.JoinVertical(lipgloss.Left, llamaBlock, "", ollamaBlock, "", ninferBlock)
 		rightBlock := lipgloss.JoinVertical(lipgloss.Left, vllmBlock, "", koboldBlock)
 		inputBlock = lipgloss.JoinHorizontal(lipgloss.Top, leftBlock, m.ui.styles.body.PaddingLeft(4).Render(rightBlock))
 	} else {
-		inputBlock = lipgloss.JoinVertical(lipgloss.Left, llamaBlock, "", ollamaBlock, "", vllmBlock, "", koboldBlock)
+		inputBlock = lipgloss.JoinVertical(lipgloss.Left, llamaBlock, "", ollamaBlock, "", vllmBlock, "", koboldBlock, "", ninferBlock)
 	}
 
 	rows := []string{

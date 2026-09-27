@@ -17,6 +17,9 @@ const (
 	runtimePanelLabelLlamaServerPath = "llama-server path"
 	runtimePanelLabelLlamaServerPort = "llama.cpp port"
 	runtimePanelLabelLlamaServerHost = "llama.cpp host"
+	runtimePanelLabelNInferPath      = "ninfer path"
+	runtimePanelLabelNInferPort      = "ninfer port"
+	runtimePanelLabelNInferHost      = "ninfer host"
 	runtimePanelLabelOllamaHost      = "ollama host"
 	runtimePanelLabelOllamaPath      = "ollama path"
 	runtimePanelLabelVLLMPath        = "vllm path"
@@ -103,6 +106,18 @@ func koboldCppPathPanelDisplay(r models.RuntimeInfo) string {
 	return FormatPathDisplay(p, fsutil.HomeDir())
 }
 
+// ninferPathPanelDisplay returns the resolved ninfer-serve path, or "(server at
+// :port)" when ninfer-serve answers /health but no binary was found, or "—".
+func ninferPathPanelDisplay(r models.RuntimeInfo) string {
+	if p := models.ResolveNInferPath(r); p != "" {
+		return FormatPathDisplay(p, fsutil.HomeDir())
+	}
+	if r.NInferRunning {
+		return fmt.Sprintf("(server at :%d)", r.NInferPort)
+	}
+	return "—"
+}
+
 func ollamaPathPanelDisplay(r models.RuntimeInfo) string {
 	p := models.ResolveOllamaPath(r)
 	if p == "" {
@@ -138,6 +153,9 @@ func RuntimePanelLines(maxWidth int, r models.RuntimeInfo) []string {
 		{runtimePanelLabelLlamaServerPath, llamaServerPathPanelDisplay(r)},
 		{runtimePanelLabelLlamaServerHost, valueOrDash(r.LlamaServerHost)},
 		{runtimePanelLabelLlamaServerPort, portDisplay(r.LlamaServerPort)},
+		{runtimePanelLabelNInferPath, ninferPathPanelDisplay(r)},
+		{runtimePanelLabelNInferPort, portDisplay(r.NInferPort)},
+		{runtimePanelLabelNInferHost, valueOrDash(r.NInferServerHost)},
 		{runtimePanelLabelOllamaHost, valueOrDash(r.OllamaHost)},
 		{runtimePanelLabelOllamaPath, ollamaPathPanelDisplay(r)},
 		{runtimePanelLabelVLLMPath, vllmPathPanelDisplay(r)},

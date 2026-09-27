@@ -300,17 +300,20 @@ func newAlertViewport(st styles) viewport.Model {
 
 func newRuntimeConfigInputs() [runtimeFieldCount]textinput.Model {
 	return [runtimeFieldCount]textinput.Model{
-		newPathTextInput(),
-		newPortTextInput(),
-		newPathTextInput(),
-		newPathTextInput(),
-		newPathTextInput(),
-		newPathTextInput(),
-		newPathTextInput(),
-		newPortTextInput(),
-		newPathTextInput(),
-		newPathTextInput(),
-		newPortTextInput(),
+		runtimeFieldLlamaCppPath:  newPathTextInput(),
+		runtimeFieldLlamaPort:     newPortTextInput(),
+		runtimeFieldLlamaHost:     newPathTextInput(),
+		runtimeFieldOllamaPath:    newPathTextInput(),
+		runtimeFieldOllamaHost:    newPathTextInput(),
+		runtimeFieldNInferPath:    newPathTextInput(),
+		runtimeFieldNInferPort:    newPortTextInput(),
+		runtimeFieldNInferHost:    newPathTextInput(),
+		runtimeFieldVLLMPath:      newPathTextInput(),
+		runtimeFieldVLLMVenv:      newPathTextInput(),
+		runtimeFieldVLLMPort:      newPortTextInput(),
+		runtimeFieldVLLMHost:      newPathTextInput(),
+		runtimeFieldKoboldCppPath: newPathTextInput(),
+		runtimeFieldKoboldCppPort: newPortTextInput(),
 	}
 }
 
@@ -384,6 +387,7 @@ func (m Model) SelectedModel() (target string, backend models.ModelBackend) {
 //
 //	vllm row   -> vllm
 //	ollama row -> ollama
+//	ninfer row -> ninfer
 func (m Model) resolveEffectiveBackend() models.ModelBackend {
 	_, rowBackend := m.SelectedModel()
 	if rowBackend != models.BackendLlama {

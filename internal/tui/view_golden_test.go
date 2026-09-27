@@ -78,14 +78,18 @@ func goldenModel(t *testing.T) Model {
 	m.layout.homeDir = "/home/u"
 	m.loading = false
 	m.runtime = models.RuntimeInfo{
-		LlamaServerPath: "/opt/llama/bin/llama-server",
-		LlamaServerHost: "127.0.0.1",
-		LlamaServerPort: 8080,
-		VLLMServerHost:  "127.0.0.1",
-		VLLMServerPort:  8000,
-		OllamaHost:      "127.0.0.1:11434",
-		OllamaPath:      "/usr/local/bin/ollama",
-		KoboldCppPort:   5001,
+		LlamaServerPath:  "/opt/llama/bin/llama-server",
+		LlamaServerHost:  "127.0.0.1",
+		LlamaServerPort:  8080,
+		VLLMPath:         "/opt/vllm/bin/vllm",
+		VLLMServerHost:   "127.0.0.1",
+		VLLMServerPort:   8000,
+		OllamaHost:       "127.0.0.1:11434",
+		OllamaPath:       "/usr/local/bin/ollama",
+		KoboldCppPort:    5001,
+		NInferPath:       "/opt/ninfer/build/apps/ninfer-serve",
+		NInferServerHost: "127.0.0.1",
+		NInferPort:       18080,
 	}
 	m.table.files = []models.ModelFile{
 		{

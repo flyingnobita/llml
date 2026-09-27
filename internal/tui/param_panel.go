@@ -71,7 +71,7 @@ var paramMetadataFieldLabels = [...]string{
 }
 
 var (
-	paramBackendOptionsAll  = []string{"", "llama", "vllm", "ollama", "koboldcpp"}
+	paramBackendOptionsAll  = []string{"", "llama", "vllm", "ollama", "koboldcpp", "ninfer"}
 	paramBackendOptionsGGUF = []string{"", "llama", "koboldcpp"}
 )
 

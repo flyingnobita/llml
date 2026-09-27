@@ -62,6 +62,7 @@ type llamaLaunchBackend struct{}
 type vllmLaunchBackend struct{}
 type koboldLaunchBackend struct{}
 type ollamaLaunchBackend struct{}
+type ninferLaunchBackend struct{}
 
 func (llamaLaunchBackend) args(s serverSpec) []launchArg {
 	args := []launchArg{
@@ -96,6 +97,17 @@ func (koboldLaunchBackend) args(s serverSpec) []launchArg {
 	return args
 }
 
+// args for ninfer-serve, which takes the artifact as its first positional
+// argument. The served model name defaults to the artifact's metadata name;
+// profiles override it with --model-id.
+func (ninferLaunchBackend) args(s serverSpec) []launchArg {
+	return []launchArg{
+		quotedLaunchArg(s.modelPath),
+		rawLaunchArg("--host"), rawLaunchArg(s.host),
+		rawLaunchArg("--port"), rawLaunchArg(fmt.Sprintf("%d", s.port)),
+	}
+}
+
 func (ollamaLaunchBackend) args(serverSpec) []launchArg {
 	return []launchArg{rawLaunchArg("serve")}
 }
@@ -108,6 +120,8 @@ func (s serverSpec) launchBackend() launchBackend {
 		return vllmLaunchBackend{}
 	case models.BackendKobold:
 		return koboldLaunchBackend{}
+	case models.BackendNInfer:
+		return ninferLaunchBackend{}
 	default:
 		return llamaLaunchBackend{}
 	}
@@ -214,28 +228,9 @@ func buildServerSpec(backend models.ModelBackend, modelPath string, params profi
 			params:    params,
 		}, nil
 	case models.BackendVLLM:
-		bin := models.ResolveVLLMPath(rt)
-		activate := models.ResolveVLLMActivateScript(bin, rt.VLLMVenv, rt.VLLMConfiguredPath)
-		host := hostOr(rt.VLLMServerHost, settings.DefaultVLLMServerHost)
-		if strict {
-			if bin == "" {
-				return serverSpec{}, errors.New(MissingVLLMFooterNote)
-			}
-			if runtime.GOOS == "windows" && activate != "" {
-				return serverSpec{}, fmt.Errorf("vLLM venv activation is not supported on Windows from this app; run vllm from an activated shell or add vllm to PATH (detected %s)", activate)
-			}
-		} else if bin == "" {
-			bin = "vllm"
-		}
-		return serverSpec{
-			backend:        models.BackendVLLM,
-			bin:            bin,
-			host:           host,
-			port:           portOr(rt.VLLMServerPort, settings.DefaultVLLMServerPort),
-			modelPath:      modelPath,
-			params:         params,
-			activateScript: activate,
-		}, nil
+		return vllmServerSpec(modelPath, params, rt, strict)
+	case models.BackendNInfer:
+		return ninferServerSpec(modelPath, params, rt, strict)
 	case models.BackendKobold:
 		bin := models.ResolveKoboldCppPath(rt)
 		if strict && bin == "" {
@@ -277,6 +272,50 @@ func buildServerSpec(backend models.ModelBackend, modelPath string, params profi
 			mmprojMissing:    mmprojMissing,
 		}, nil
 	}
+}
+
+// vllmServerSpec is the vLLM case of [buildServerSpec].
+func vllmServerSpec(modelPath string, params profiles.ModelParams, rt models.RuntimeInfo, strict bool) (serverSpec, error) {
+	bin := models.ResolveVLLMPath(rt)
+	activate := models.ResolveVLLMActivateScript(bin, rt.VLLMVenv, rt.VLLMConfiguredPath)
+	if strict {
+		if bin == "" {
+			return serverSpec{}, errors.New(MissingVLLMFooterNote)
+		}
+		if runtime.GOOS == "windows" && activate != "" {
+			return serverSpec{}, fmt.Errorf("vLLM venv activation is not supported on Windows from this app; run vllm from an activated shell or add vllm to PATH (detected %s)", activate)
+		}
+	} else if bin == "" {
+		bin = "vllm"
+	}
+	return serverSpec{
+		backend:        models.BackendVLLM,
+		bin:            bin,
+		host:           hostOr(rt.VLLMServerHost, settings.DefaultVLLMServerHost),
+		port:           portOr(rt.VLLMServerPort, settings.DefaultVLLMServerPort),
+		modelPath:      modelPath,
+		params:         params,
+		activateScript: activate,
+	}, nil
+}
+
+// ninferServerSpec is the NInfer case of [buildServerSpec].
+func ninferServerSpec(modelPath string, params profiles.ModelParams, rt models.RuntimeInfo, strict bool) (serverSpec, error) {
+	bin := models.ResolveNInferPath(rt)
+	if strict && bin == "" {
+		return serverSpec{}, errors.New(MissingNInferFooterNote)
+	}
+	if bin == "" {
+		bin = "ninfer-serve"
+	}
+	return serverSpec{
+		backend:   models.BackendNInfer,
+		bin:       bin,
+		host:      hostOr(rt.NInferServerHost, settings.DefaultNInferHost),
+		port:      portOr(rt.NInferPort, settings.DefaultNInferServerPort),
+		modelPath: modelPath,
+		params:    params,
+	}, nil
 }
 
 // mmprojNote returns a one-line warning string when mmproj state is abnormal for this spec.
