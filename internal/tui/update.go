@@ -98,12 +98,12 @@ func (m Model) handleScanMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.settings = msg.settings
 		m.runtime = msg.runtime
 		m.runtimeScanned = true
-		return m.adoptRuntimeStates(msg.states), nil
+		return m.adoptRuntimeStates(msg.states, msg.runtime), nil
 
 	case startupCacheHitMsg:
 		m = m.cancelInFlightScan()
 		m.settings = msg.settings
-		m = m.adoptRuntimeStates(msg.states)
+		m = m.adoptRuntimeStates(msg.states, msg.runtime)
 		return m.applyScanResult(&msg.runtime, msg.files, msg.lastScan, msg.configPaths, msg.writeErr, true)
 
 	case startupNeedFullScanMsg:
@@ -118,7 +118,7 @@ func (m Model) handleScanMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var runtime *models.RuntimeInfo
 		if msg.mode == scanModeFull {
 			runtime = &res.runtime
-			m = m.adoptRuntimeStates(res.states)
+			m = m.adoptRuntimeStates(res.states, res.runtime)
 		}
 		m2, cmd := m.applyScanResult(runtime, res.files, res.lastScan, res.configPaths, res.writeErr, msg.mode == scanModeFull)
 		return applyOllamaDiscoveryResult(m2, cmd, res.ollamaNote, res.ollamaWarn)
