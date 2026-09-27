@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 
@@ -531,5 +532,39 @@ func TestRuntimePanel_missingProgramReadsNotFound(t *testing.T) {
 	m.runtime.ServerRunning = true // a server answering does not make the program found
 	if view := plainView(m); !strings.Contains(view, "in use: not found (default)") {
 		t.Errorf("a program found nowhere reads not found:\n%s", view)
+	}
+}
+
+// The panel keeps one size and position whichever Runtime is highlighted, so
+// moving through the list never makes the overlay jump. It is sized for the
+// tallest Runtime plus a spare row, and still fits 80x24.
+func TestRuntimePanel_sizeAndPositionStayFixed(t *testing.T) {
+	t.Parallel()
+
+	for _, sz := range [][2]int{{80, 24}, {127, 60}} {
+		for _, p := range []models.Platform{linuxPlatform, macPlatform} {
+			m := openPanel(t, testServices(), p, defaultSettings(), sz[0], sz[1])
+			var wantW, wantH, wantTop int
+			for i, rt := range m.panelRuntimes() {
+				block := m.runtimeConfigModalBlock()
+				w, h := lipgloss.Width(block), lipgloss.Height(block)
+				top := slices.IndexFunc(strings.Split(plainView(m), "\n"), func(l string) bool {
+					return strings.Contains(l, "Runtime Environment")
+				})
+				if i == 0 {
+					wantW, wantH, wantTop = w, h, top
+					// vLLM, the tallest Runtime, needs 23 rows; one spare row
+					// makes 24, which still fits an 80x24 terminal.
+					if h != 24 {
+						t.Errorf("%dx%d %s: panel is %d rows, want 24", sz[0], sz[1], p.GOOS, h)
+					}
+				}
+				if w != wantW || h != wantH || top != wantTop {
+					t.Errorf("%dx%d %s/%s: panel %dx%d at row %d, want %dx%d at row %d",
+						sz[0], sz[1], p.GOOS, rt.name, w, h, top, wantW, wantH, wantTop)
+				}
+				m = press(t, m, keyDown)
+			}
+		}
 	}
 }

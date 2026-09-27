@@ -94,6 +94,10 @@ const (
 	runtimePanelPaneGap    = 2
 	runtimeFieldLabelWidth = 6 // "Path", "Venv", "Port", "Host" plus a space
 	runtimeInUseIndent     = 2 // under the field label, past the focus marker
+	// runtimePanelSpareRows pads the panel body past its tallest Runtime, so
+	// the panel keeps one size whichever Runtime is highlighted. One row is all
+	// 80x24 allows: vLLM's four fields already make the panel 23 rows.
+	runtimePanelSpareRows = 1
 	// runtimeListRowIndent sets Runtime rows one column in from their group label.
 	runtimeListRowIndent = " "
 

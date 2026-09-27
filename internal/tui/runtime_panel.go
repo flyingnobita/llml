@@ -60,6 +60,7 @@ func (m Model) runtimeConfigModalBlock() string {
 	gap := strings.Repeat(" ", runtimePanelPaneGap)
 	detail := m.runtimeDetailPane(cw - runtimeListPaneWidth - runtimePanelPaneGap)
 	body := lipgloss.JoinHorizontal(lipgloss.Top, list, gap, detail)
+	body = lipgloss.PlaceVertical(m.runtimePanelBodyHeight(), lipgloss.Top, body)
 
 	rows := []string{
 		m.modalTitleRow(cw, m.ui.styles.portConfigTitle, "Runtime Environment"),
@@ -71,6 +72,26 @@ func (m Model) runtimeConfigModalBlock() string {
 		m.renderFooterHints(FooterRuntimeConfigHints),
 	}
 	return m.ui.styles.portConfigBox.Render(lipgloss.JoinVertical(lipgloss.Left, rows...))
+}
+
+// runtimePanelBodyHeight is the fixed height of the panel's list and detail
+// panes: room for the longer of the list and the tallest Runtime's detail
+// pane, plus [runtimePanelSpareRows]. Every Runtime counts, not only the ones
+// this platform lists, so the panel is the same height on every platform and
+// a Runtime with more fields cannot make it jump.
+func (m Model) runtimePanelBodyHeight() int {
+	h := lipgloss.Height(m.runtimeListPane())
+	for _, rt := range runtimeTable {
+		h = max(h, runtimeDetailPaneHeight(rt))
+	}
+	return h + runtimePanelSpareRows
+}
+
+// runtimeDetailPaneHeight is how many lines [Model.runtimeDetailPane] draws
+// for rt: a header, then a blank line, an input line, and an in-use line per field.
+func runtimeDetailPaneHeight(rt runtimeDef) int {
+	const linesPerField = 3
+	return 1 + linesPerField*len(rt.fields)
 }
 
 // runtimeListPane renders the supported Runtimes under the Model Format each
