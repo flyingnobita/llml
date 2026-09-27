@@ -19,7 +19,7 @@ func OSGetenv(key string) string { return os.Getenv(key) }
 // Unset, empty, and unparseable values are left nil so a lower layer supplies
 // them.
 func FromEnv(getenv Getenv) Layer {
-	var l Layer
+	l := Layer{Origin: OriginEnv}
 	setPath(&l.LlamaCppPath, getenv(EnvLlamaCppPath))
 	setPath(&l.VLLMPath, getenv(EnvVLLMPath))
 	setPath(&l.VLLMVenv, getenv(EnvVLLMVenv))
