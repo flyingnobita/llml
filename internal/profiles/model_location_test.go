@@ -134,3 +134,21 @@ func TestLocationRules_documentedShapesArePresent(t *testing.T) {
 		t.Error("documented LLAMA_ARG_ prefix rule is missing")
 	}
 }
+
+// ninfer-serve takes the artifact positionally, so only the chat template
+// override is machine-specific; tuning flags must survive import.
+func TestStripModelLocationParams_ninfer(t *testing.T) {
+	t.Parallel()
+
+	args := []string{"--chat-template /home/u/t.jinja", "--kv-dtype fp8", "--spec mtp", "--draft-tokens 3"}
+	_, kept, _, dropped := StripModelLocationParams("ninfer", nil, args)
+	if want := []string{"--kv-dtype fp8", "--spec mtp", "--draft-tokens 3"}; !slices.Equal(kept, want) {
+		t.Errorf("kept = %v, want %v", kept, want)
+	}
+	if len(dropped) != 1 {
+		t.Errorf("dropped = %v, want the chat template only", dropped)
+	}
+	if got := NormalizeBackendInput(" NInfer "); got != "ninfer" {
+		t.Errorf("NormalizeBackendInput = %q", got)
+	}
+}

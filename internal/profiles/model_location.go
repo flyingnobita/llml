@@ -113,12 +113,23 @@ var vllmRules = locationRules{
 	},
 }
 
+// ninferRules covers NInfer. The artifact is ninfer-serve's positional
+// argument, which llml supplies, so there is no model flag to strip. A chat
+// template override is a local file tied to the artifact, like vLLM's
+// --tokenizer, and would not resolve on another machine.
+var ninferRules = locationRules{
+	argTokens: map[string]bool{
+		"--chat-template": true,
+	},
+}
+
 // rulesByBackend maps a backend name to its rules. llama and koboldcpp share
 // ggufRules by value, so they cannot drift apart.
 var rulesByBackend = map[string]locationRules{
 	"llama":     ggufRules,
 	"koboldcpp": ggufRules,
 	"vllm":      vllmRules,
+	"ninfer":    ninferRules,
 }
 
 // isAnyBackendLocationEnv reports whether key is a model-location variable for
