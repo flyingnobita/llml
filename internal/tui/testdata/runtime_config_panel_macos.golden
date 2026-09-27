@@ -7,16 +7,16 @@
   ││                                                                                            │
   ││  Runtime Environment                                                                       │
   ││                                                                                            │
-  ││  GGUF                    Llama.cpp · found                                                 │
-  ││   › ○ Llama.cpp                                                                            │
-  ││     ✗ KoboldCpp            Path  > /opt/llama/bin                                          │
-  ││  Safetensors               in use: /opt/llama/bin/llama-server (config)                    │
+  ││  GGUF                    oMLX · running                                                    │
+  ││     ○ Llama.cpp                                                                            │
+  ││     ✗ KoboldCpp            Path  > omlx CLI or ~/.omlx                                     │
+  ││  Safetensors               in use: /Users/u/.omlx/bin/omlx (detected)                      │
   ││     ○ vLLM                                                                                 │
-  ││  NInfer (.ninfer)          Port  > 8080                                                    │
-  ││     ○ NInfer               in use: 8081 (LLAMA_SERVER_PORT)                                │
-  ││  Ollama library                                                                            │
-  ││     ○ Ollama               Host  > 127.0.0.1                                               │
-  ╰│                            in use: 127.0.0.1 (default)                                     │
+  ││   › ● oMLX                 Port  > 8000                                                    │
+  ││  Splash bundle             in use: 8000 (default)                                          │
+  ││     ○ Splash                                                                               │
+  ││  Ollama library            Host  > 127.0.0.1                                               │
+  ╰│     ○ Ollama               in use: 127.0.0.1 (default)                                     │
    │                                                                                            │
    │  ● running  ○ found  ✗ not found                                                           │
   L│  Saved to config.toml. Environment variables win over saved values.                        │

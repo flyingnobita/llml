@@ -58,12 +58,19 @@ type tableState struct {
 	effectiveBackends map[string]models.ModelBackend
 }
 
-// runtimeConfigState holds the runtime-config modal's open/focus/input state.
+// runtimeConfigState holds the runtime panel's open/focus/input state.
 type runtimeConfigState struct {
-	open           bool
+	open bool
+	// selected is the Runtime highlighted in the list; the detail pane shows its fields.
+	selected models.ModelBackend
+	// focus is the focused field of the selected Runtime, or runtimeFieldNone
+	// while the list has keyboard focus.
 	focus          runtimeField
 	discardConfirm bool
 	inputs         [runtimeFieldCount]textinput.Model
+	// prefill is what each input held when the panel opened; the panel is
+	// dirty once any input differs from it.
+	prefill [runtimeFieldCount]string
 }
 
 // paramsState holds the parameter-profiles panel's state.
@@ -307,6 +314,7 @@ func newRuntimeConfigInputs() [runtimeFieldCount]textinput.Model {
 			} else {
 				inputs[d.field] = newPathTextInput()
 			}
+			inputs[d.field].Placeholder = d.hint
 		}
 	}
 	return inputs

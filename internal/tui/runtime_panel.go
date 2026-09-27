@@ -1,171 +1,228 @@
 package tui
 
 import (
-	"fmt"
-	"slices"
-	"strconv"
+	"path/filepath"
 	"strings"
 
-	"github.com/flyingnobita/llml/internal/fsutil"
+	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
+
 	"github.com/flyingnobita/llml/internal/models"
+	"github.com/flyingnobita/llml/internal/settings"
 )
 
-// Runtime panel row labels (sorted alphabetically in [RuntimePanelLines]).
+// Runtime status marks in the runtime panel list, and the legend that explains them.
 const (
-	runtimePanelLabelKoboldCppPath   = "koboldcpp path"
-	runtimePanelLabelKoboldCppPort   = "koboldcpp port"
-	runtimePanelLabelLlamaServerPath = "llama-server path"
-	runtimePanelLabelLlamaServerPort = "llama.cpp port"
-	runtimePanelLabelLlamaServerHost = "llama.cpp host"
-	runtimePanelLabelNInferPath      = "ninfer path"
-	runtimePanelLabelNInferPort      = "ninfer port"
-	runtimePanelLabelNInferHost      = "ninfer host"
-	runtimePanelLabelOMLXPath        = "omlx path"
-	runtimePanelLabelOMLXPort        = "omlx port"
-	runtimePanelLabelOMLXHost        = "omlx host"
-	runtimePanelLabelSplashPath      = "splash path"
-	runtimePanelLabelSplashPort      = "splash port"
-	runtimePanelLabelSplashHost      = "splash host"
-	runtimePanelLabelOllamaHost      = "ollama host"
-	runtimePanelLabelOllamaPath      = "ollama path"
-	runtimePanelLabelVLLMPath        = "vllm path"
-	runtimePanelLabelVLLMPort        = "vllm port"
-	runtimePanelLabelVLLMHost        = "vllm host"
-	runtimePanelLabelVLLMVenv        = "vllm venv path"
+	runtimeMarkRunning = "●"
+	runtimeMarkFound   = "○"
+	runtimeMarkMissing = "✗"
 )
 
-// runtimePanelEnvLabelWidth is the width of the left column (labels) in RuntimePanelLines.
-const runtimePanelEnvLabelWidth = len(runtimePanelLabelLlamaServerPath) // 17; longest label
-
-// portDisplay renders a resolved TCP port, or "—" when the runtime has not been probed.
-func portDisplay(port int) string {
-	if port <= 0 {
-		return "—"
-	}
-	return strconv.Itoa(port)
-}
-
-// pathDisplay renders a configured path relative to the home directory, or "—" when unset.
-func pathDisplay(v string) string {
-	if v = strings.TrimSpace(v); v == "" {
-		return "—"
-	}
-	return FormatPathDisplay(v, fsutil.HomeDir())
-}
-
-// valueOrDash renders a resolved string value, or "—" when it is empty.
-func valueOrDash(v string) string {
-	if v = strings.TrimSpace(v); v == "" {
-		return "—"
-	}
-	return v
-}
-
-// llamaServerPathPanelDisplay returns the resolved llama-server binary path for the runtime
-// panel, or "(server at :port)" when a server responds on the health probe but no binary was
-// found, or "—" otherwise.
-func llamaServerPathPanelDisplay(r models.RuntimeInfo) string {
-	p := models.ResolveLlamaServerPath(r)
-	if p != "" {
-		return FormatPathDisplay(p, fsutil.HomeDir())
-	}
-	if r.ServerRunning {
-		port := r.ProbePort
-		if port <= 0 {
-			port = r.LlamaServerPort
-		}
-		return fmt.Sprintf("(server at :%d)", port)
-	}
-	return "—"
-}
-
-// vllmPathPanelDisplay returns the resolved vllm binary path for the runtime panel, or "—".
-func vllmPathPanelDisplay(r models.RuntimeInfo) string {
-	p := models.ResolveVLLMPath(r)
-	if p == "" {
-		return "—"
-	}
-	return FormatPathDisplay(p, fsutil.HomeDir())
-}
-
-// vllmVenvPanelDisplay returns the value shown for vLLM venv in the runtime panel:
-// the configured venv root when set, otherwise the root inferred from the same
-// rules as vLLM activation (adjacent bin layout, $VLLM_PATH/.venv,
-// dirname(vllm)/.venv), or "—" when none applies.
-func vllmVenvPanelDisplay(r models.RuntimeInfo) string {
-	if strings.TrimSpace(r.VLLMVenv) != "" {
-		return pathDisplay(r.VLLMVenv)
+// vllmVenvInUse returns the venv root vLLM launches with: the configured root
+// when set, otherwise the root inferred by the same rules as vLLM activation
+// (adjacent bin layout, $VLLM_PATH/.venv, dirname(vllm)/.venv), or "" when
+// none applies.
+func vllmVenvInUse(r models.RuntimeInfo) string {
+	if v := strings.TrimSpace(r.VLLMVenv); v != "" {
+		return v
 	}
 	vllmBin := models.ResolveVLLMPath(r)
 	act := models.ResolveVLLMActivateScript(vllmBin, r.VLLMVenv, r.VLLMConfiguredPath)
-	if root := models.VenvRootFromActivateScript(act); root != "" {
-		return FormatPathDisplay(root, fsutil.HomeDir())
-	}
-	return "—"
+	return models.VenvRootFromActivateScript(act)
 }
 
-func koboldCppPathPanelDisplay(r models.RuntimeInfo) string {
-	p := models.ResolveKoboldCppPath(r)
-	if p == "" {
-		return "—"
-	}
-	return FormatPathDisplay(p, fsutil.HomeDir())
-}
-
-// binaryPathPanelDisplay renders a resolved binary path relative to home, or
-// "(server at :port)" when only a running server was found, or "—".
-func binaryPathPanelDisplay(path string, running bool, port int) string {
-	if path != "" {
-		return FormatPathDisplay(path, fsutil.HomeDir())
-	}
-	if running {
-		return fmt.Sprintf("(server at :%d)", port)
-	}
-	return "—"
-}
-
-func ollamaPathPanelDisplay(r models.RuntimeInfo) string {
-	p := models.ResolveOllamaPath(r)
-	if p == "" {
-		return "—"
-	}
-	return FormatPathDisplay(p, fsutil.HomeDir())
-}
-
-// RuntimePanelLines returns lines for the TUI footer: each row is a label (left) and its current
-// value (right), sorted alphabetically by label. Binary paths use [models.ResolveLlamaServerPath]
-// and [models.ResolveVLLMPath]; host and port rows come from the resolved settings
-// carried on r. The venv row shows the configured venv root when set, otherwise
-// the inferred venv root when activation would run. Lines are truncated to maxWidth display width.
-func RuntimePanelLines(maxWidth int, r models.RuntimeInfo) []string {
-	if maxWidth < MinModalInnerWidth {
-		maxWidth = MinModalInnerWidth
-	}
-	valW := maxWidth - runtimePanelEnvLabelWidth - 1
-	if valW < 8 {
-		valW = 8
-	}
-	line := func(label, value string) string {
-		v := TruncateRunes(value, valW)
-		s := fmt.Sprintf("%-*s %s", runtimePanelEnvLabelWidth, label, v)
-		return TruncateRunes(s, maxWidth)
-	}
-	type row struct{ key, value string }
-	var rows []row
+// panelRuntimes returns the Runtimes this platform supports, in list order.
+func (m Model) panelRuntimes() []runtimeDef {
+	var out []runtimeDef
 	for _, rt := range runtimeTable {
-		if !rt.supported(r.Platform) {
-			continue
+		if rt.supported(m.runtime.Platform) {
+			out = append(out, rt)
 		}
-		for _, d := range rt.fields {
-			rows = append(rows, row{d.summaryLabel, d.summary(r)})
-		}
-	}
-	slices.SortFunc(rows, func(a, b row) int {
-		return strings.Compare(a.key, b.key)
-	})
-	out := make([]string, len(rows))
-	for i := range rows {
-		out[i] = line(rows[i].key, rows[i].value)
 	}
 	return out
+}
+
+// runtimeConfigModalBlock returns the framed runtime panel only (no
+// full-screen placement). Composed over the main view via [overlayCentered].
+func (m Model) runtimeConfigModalBlock() string {
+	if m.rc.discardConfirm {
+		return m.runtimeConfigDiscardConfirmBlock()
+	}
+	cw := m.paramPanelContentWidth()
+	list := m.runtimeListPane()
+	gap := strings.Repeat(" ", runtimePanelPaneGap)
+	detail := m.runtimeDetailPane(cw - runtimeListPaneWidth - runtimePanelPaneGap)
+	body := lipgloss.JoinHorizontal(lipgloss.Top, list, gap, detail)
+
+	rows := []string{
+		m.modalTitleRow(cw, m.ui.styles.portConfigTitle, "Runtime Environment"),
+		"",
+		body,
+		"",
+		m.runtimeLegend(),
+		m.ui.styles.subtitle.Width(cw).Render(runtimeConfigModalSubtitle),
+		m.renderFooterHints(FooterRuntimeConfigHints),
+	}
+	return m.ui.styles.portConfigBox.Render(lipgloss.JoinVertical(lipgloss.Left, rows...))
+}
+
+// runtimeListPane renders the supported Runtimes under the Model Format each
+// one runs. A format no supported Runtime runs gets no label.
+func (m Model) runtimeListPane() string {
+	var lines []string
+	rts := m.panelRuntimes()
+	for i, rt := range rts {
+		if i == 0 || rt.format != rts[i-1].format {
+			lines = append(lines, m.ui.styles.runtimeGroupLabel.Render(rt.format.String()))
+		}
+		lines = append(lines, m.runtimeListRow(rt))
+	}
+	return m.ui.styles.runtimeListPane.Width(runtimeListPaneWidth).Render(strings.Join(lines, "\n"))
+}
+
+// focusMarker is the "›" that marks the one line holding keyboard focus, or
+// blank space of the same width.
+func focusMarker(focused bool) string {
+	if focused {
+		return "› "
+	}
+	return "  "
+}
+
+// runtimeListRow renders one Runtime's list line: a focus marker when the list
+// has keyboard focus, its status mark, and its name, emphasized when it is the
+// highlighted Runtime.
+func (m Model) runtimeListRow(rt runtimeDef) string {
+	highlighted := rt.backend == m.rc.selected
+	name := m.ui.styles.body.Render(rt.name)
+	if highlighted {
+		name = m.ui.styles.runtimeListSelected.Render(rt.name)
+	}
+	sv := m.runtimeStatusView(rt.status(m.runtime))
+	return runtimeListRowIndent + focusMarker(highlighted && m.rc.focus == runtimeFieldNone) +
+		sv.style.Render(sv.mark) + " " + name
+}
+
+// runtimeStatusView is how the panel shows one detection status: the list's
+// mark, the word the legend and detail header use, and the mark's style.
+type runtimeStatusView struct {
+	mark  string
+	word  string
+	style lipgloss.Style
+}
+
+// runtimeStatusView returns how the panel shows st.
+func (m Model) runtimeStatusView(st runtimeStatus) runtimeStatusView {
+	switch {
+	case st.running:
+		return runtimeStatusView{runtimeMarkRunning, "running", m.ui.styles.runtimeMarkRunning}
+	case st.found:
+		return runtimeStatusView{runtimeMarkFound, "found", m.ui.styles.runtimeMarkFound}
+	default:
+		return runtimeStatusView{runtimeMarkMissing, "not found", m.ui.styles.runtimeMarkMissing}
+	}
+}
+
+// runtimeLegend explains the list's status marks, or says detection is still running.
+func (m Model) runtimeLegend() string {
+	if !m.runtimeScanned && m.loading {
+		return m.ui.styles.runtimeLegend.Render("Detecting runtimes…")
+	}
+	var parts []string
+	for _, st := range []runtimeStatus{{running: true}, {found: true}, {}} {
+		sv := m.runtimeStatusView(st)
+		parts = append(parts, sv.style.Render(sv.mark)+m.ui.styles.runtimeLegend.Render(" "+sv.word))
+	}
+	return strings.Join(parts, m.ui.styles.runtimeLegend.Render("  "))
+}
+
+// runtimeDetailPane renders the highlighted Runtime's header and fields in
+// width columns. Each field is an input line and a dimmed in-use line.
+func (m Model) runtimeDetailPane(width int) string {
+	rt := runtimeFor(m.rc.selected)
+	header := m.ui.styles.bodyBold.Render(rt.name) +
+		m.ui.styles.runtimeInUse.Render(" · "+m.runtimeStatusView(rt.status(m.runtime)).word)
+	lines := []string{header}
+	for _, d := range rt.fields {
+		lines = append(lines, "", m.runtimeFieldInputLine(d, width), m.runtimeFieldInUseLine(d, width))
+	}
+	return strings.Join(lines, "\n")
+}
+
+// runtimeFieldInputLine renders a field's focus marker, label, and input.
+func (m Model) runtimeFieldInputLine(d runtimeFieldDef, width int) string {
+	focused := m.rc.focus == d.field
+	prefix := focusMarker(focused)
+	labelStyle := m.ui.styles.runtimeFieldLabel
+	if focused {
+		labelStyle = m.ui.styles.runtimeFieldLabelFocused
+	}
+	in := m.rc.inputs[d.field]
+	if d.port == nil {
+		// textinput.View adds the prompt and one cell for the cursor.
+		const cursorCell = 1
+		in.SetWidth(max(width-lipgloss.Width(prefix)-runtimeFieldLabelWidth-lipgloss.Width(in.Prompt)-cursorCell, 1))
+	}
+	return m.ui.styles.body.Render(prefix) + labelStyle.Width(runtimeFieldLabelWidth).Render(d.label) + in.View()
+}
+
+// runtimeFieldInUseLine renders "in use: <value> (<source>)" for a field. The
+// value is truncated to fit width, and the source is never cut; an
+// environment source is shown in the warning colour, since a saved value
+// does not take effect while the variable is set.
+func (m Model) runtimeFieldInUseLine(d runtimeFieldDef, width int) string {
+	value, src := m.runtimeFieldInUse(d)
+	indent := strings.Repeat(" ", runtimeInUseIndent)
+	tag := " (" + src.label + ")"
+	lead := "in use: "
+	room := width - runtimeInUseIndent - len(lead) - lipgloss.Width(tag)
+	value = truncateLeft(value, max(room, 0))
+	tagStyle := m.ui.styles.runtimeInUse
+	if src.env {
+		tagStyle = m.ui.styles.runtimeEnvSource
+	}
+	return indent + m.ui.styles.runtimeInUse.Render(lead+value) + tagStyle.Render(tag)
+}
+
+// fieldSource is where a field's in-use value came from, as the panel names it.
+type fieldSource struct {
+	label string
+	env   bool
+}
+
+// runtimeFieldInUse returns the value llml runs with for d and where it came
+// from. A program found anywhere but the configured path reads "detected".
+func (m Model) runtimeFieldInUse(d runtimeFieldDef) (string, fieldSource) {
+	src := m.settings.Source(d.setting)
+	out := fieldSource{label: src.String(), env: src.Origin == settings.OriginEnv}
+	if d.inUse == nil {
+		return d.value(m.settings), out
+	}
+	p := d.inUse(m.runtime)
+	if p == "" {
+		return "not found", out
+	}
+	if !pathWithin(p, *d.str(&m.settings)) {
+		out.label = "detected"
+	}
+	return FormatPathDisplay(p, m.layout.homeDir), out
+}
+
+// pathWithin reports whether p is root or lies under it. An empty root
+// contains nothing.
+func pathWithin(p, root string) bool {
+	if root == "" {
+		return false
+	}
+	return p == root || strings.HasPrefix(p, strings.TrimSuffix(root, string(filepath.Separator))+string(filepath.Separator))
+}
+
+// truncateLeft shortens s to w display columns by dropping its start, so a
+// long path keeps the program name at its end.
+func truncateLeft(s string, w int) string {
+	over := lipgloss.Width(s) - w
+	if over <= 0 {
+		return s
+	}
+	return ansi.TruncateLeft(s, over+1, "…")
 }

@@ -262,7 +262,9 @@ func (m Model) routeTextInputMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 	if m.rc.open {
-		m.rc.inputs[m.rc.focus], cmd = m.rc.inputs[m.rc.focus].Update(msg)
+		if f := m.rc.focus; f != runtimeFieldNone {
+			m.rc.inputs[f], cmd = m.rc.inputs[f].Update(msg)
+		}
 		return m, cmd
 	}
 	if m.discovery.open && m.discovery.editOpen {

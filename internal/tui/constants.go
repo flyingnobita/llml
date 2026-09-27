@@ -88,6 +88,15 @@ const (
 	// PathTextInputWidth is the textinput width for path fields.
 	PathTextInputWidth = 38
 
+	// Runtime panel (c) layout. The list pane is sized for the longest group
+	// label and Runtime row; the detail pane takes the rest of the width.
+	runtimeListPaneWidth   = 22
+	runtimePanelPaneGap    = 2
+	runtimeFieldLabelWidth = 6 // "Path", "Venv", "Port", "Host" plus a space
+	runtimeInUseIndent     = 2 // under the field label, past the focus marker
+	// runtimeListRowIndent sets Runtime rows one column in from their group label.
+	runtimeListRowIndent = " "
+
 	// FilterInputCharLimit is the max characters for the export filter text input.
 	FilterInputCharLimit = 128
 
@@ -257,10 +266,10 @@ const (
 	splitServerStoppedWithHint = "Server stopped. Press Enter to close..."
 
 	// Runtime config modal.
-	FooterRuntimeConfigHints     = "tab: fields · enter: save · esc: back"
+	FooterRuntimeConfigHints     = "↑/↓: runtime · tab/→: fields · enter: save · esc: back"
 	FooterRuntimeConfigDiscardYN = "y: discard changes · n/esc: stay"
-	// runtimeConfigModalSubtitle appears below the modal title (values here override startup discovery).
-	runtimeConfigModalSubtitle = "Overrides saved to config.toml. Shell environment variables take precedence."
+	// runtimeConfigModalSubtitle sits above the runtime panel's key hints.
+	runtimeConfigModalSubtitle = "Saved to config.toml. Environment variables win over saved values."
 
 	// FooterHintTabSections is the shared "tab: sections" fragment used by split-pane
 	// and parameter modal footers.

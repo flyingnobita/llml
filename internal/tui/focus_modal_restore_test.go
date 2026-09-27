@@ -64,7 +64,7 @@ func TestCloseRuntimeConfig_RestoresLaunchPreviewFocus(t *testing.T) {
 	m.preview.focused = true
 	m.table.tbl.Blur()
 
-	m, _ = m.openRuntimeConfigFocused(runtimeFieldLlamaCppPath)
+	m, _ = m.openRuntimeConfig()
 	if m.preview.focused {
 		t.Fatal("expected launch preview unfocused while runtime modal is open")
 	}
@@ -81,7 +81,7 @@ func TestCloseRuntimeConfig_RestoresSplitLogFocus(t *testing.T) {
 	m.preview.focused = false
 	m.table.tbl.Blur()
 
-	m, _ = m.openRuntimeConfigFocused(runtimeFieldLlamaCppPath)
+	m, _ = m.openRuntimeConfig()
 	if !m.server.splitFocused {
 		t.Fatal("expected split log focus unchanged while modal open")
 	}
