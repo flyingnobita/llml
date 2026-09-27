@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -40,22 +41,36 @@ const (
 	runtimeFieldCount
 )
 
-// runtimeFieldVisible reports whether field f is shown on this platform.
-func (m Model) runtimeFieldVisible(f runtimeField) bool {
-	return runtimeForField(f).supported(m.runtime.Platform)
+// runtimeFieldNone is the runtime panel's focus while the list, not a field,
+// has the keyboard.
+const runtimeFieldNone runtimeField = -1
+
+// stepRuntimeField returns the focus after from in direction step (+1 or -1).
+// Focus cycles through the list and then the selected Runtime's fields in
+// visual order, so it never reaches a field the detail pane is not showing.
+func (m Model) stepRuntimeField(from runtimeField, step int) runtimeField {
+	order := []runtimeField{runtimeFieldNone}
+	for _, d := range runtimeFor(m.rc.selected).fields {
+		order = append(order, d.field)
+	}
+	i := max(slices.Index(order, from), 0)
+	return order[(i+step+len(order))%len(order)]
 }
 
-// stepRuntimeField returns the next visible field after from in direction
-// step (+1 or -1), wrapping around.
-func (m Model) stepRuntimeField(from runtimeField, step int) runtimeField {
-	f := from
-	for range runtimeFieldCount {
-		f = runtimeField((int(f) + step + int(runtimeFieldCount)) % int(runtimeFieldCount))
-		if m.runtimeFieldVisible(f) {
-			return f
-		}
+// moveRuntimeCursor highlights the supported Runtime step rows away from the
+// current one, stopping at either end. Group labels are not rows.
+func (m Model) moveRuntimeCursor(step int) Model {
+	rts := m.panelRuntimes()
+	i := slices.IndexFunc(rts, func(rt runtimeDef) bool { return rt.backend == m.rc.selected })
+	if i < 0 {
+		i = 0
+	} else {
+		i = min(max(i+step, 0), len(rts)-1)
 	}
-	return from
+	if len(rts) > 0 {
+		m.rc.selected = rts[i].backend
+	}
+	return m
 }
 
 // parsePortField reads a port field. An empty field means "use defaultPort",
@@ -165,14 +180,9 @@ func (m Model) updateRuntimeConfigDiscardConfirmKey(msg tea.KeyPressMsg) (Model,
 	return m, nil
 }
 
-// openRuntimeConfig shows editors for the same env vars summarized in the runtimes footer.
+// openRuntimeConfig opens the runtime panel with the list focused on the
+// first supported Runtime, and clears any footer status line ([Model.lastRunNote]).
 func (m Model) openRuntimeConfig() (Model, tea.Cmd) {
-	return m.openRuntimeConfigFocused(runtimeFieldLlamaCppPath)
-}
-
-// openRuntimeConfigFocused opens the runtime editor with the given field focused and clears any
-// footer status line ([Model.lastRunNote]).
-func (m Model) openRuntimeConfigFocused(focus runtimeField) (Model, tea.Cmd) {
 	m = m.saveMainPaneFocusForModal()
 	m.rc.open = true
 	m.rc.discardConfirm = false
@@ -180,7 +190,10 @@ func (m Model) openRuntimeConfigFocused(focus runtimeField) (Model, tea.Cmd) {
 	for i, v := range runtimeFieldValues(m.settings) {
 		m.rc.inputs[i].SetValue(v)
 	}
-	return m.focusRuntimeField(focus)
+	if rts := m.panelRuntimes(); len(rts) > 0 {
+		m.rc.selected = rts[0].backend
+	}
+	return m.focusRuntimeField(runtimeFieldNone)
 }
 
 // maybeSetMissingRuntimeFooterNote sets [Model.lastRunNote] when the scan found models that need a
@@ -263,9 +276,11 @@ func (m Model) closeRuntimeConfig() Model {
 	return m.restoreMainPaneFocusAfterModal()
 }
 
+// focusRuntimeField gives field i the keyboard, or the list when i is
+// [runtimeFieldNone].
 func (m Model) focusRuntimeField(i runtimeField) (Model, tea.Cmd) {
-	if i < 0 || i >= runtimeFieldCount {
-		i = 0
+	if i < runtimeFieldNone || i >= runtimeFieldCount {
+		i = runtimeFieldNone
 	}
 	m.rc.focus = i
 	var cmd tea.Cmd
@@ -288,11 +303,38 @@ func (m Model) settingsFromRuntimeInputs() (settings.Settings, error) {
 	for _, rt := range runtimeTable {
 		for _, d := range rt.fields {
 			if err := d.apply(&s, m.rc.inputs[d.field].Value()); err != nil {
-				return m.settings, fmt.Errorf("%s: %w", d.env, err)
+				return m.settings, fmt.Errorf("%s: %w", d.env(), err)
 			}
 		}
 	}
 	return s, nil
+}
+
+// resolveSavedSettings returns the settings in use once saved holds what the
+// panel wrote to config.toml: the environment still wins, and every value
+// reports the source it now has. Values the panel does not edit (extra model
+// roots, oMLX model dirs, the HF cache) are carried over unchanged.
+func (m Model) resolveSavedSettings(saved settings.Settings) settings.Settings {
+	carried := settings.Layer{
+		ExtraModelPaths: saved.ExtraModelPaths,
+		OMLXModelDirs:   saved.OMLXModelDirs,
+		HFHubCache:      &saved.HFHubCache,
+		HFHome:          &saved.HFHome,
+	}
+	return settings.Resolve(
+		settings.FromEnv(m.svc.getenv),
+		m.svc.runtimeConfig(saved).Layer(),
+		carried,
+		settings.Defaults(),
+	)
+}
+
+// writeRuntimeConfig writes saved, the panel's values, to config.toml. It
+// writes these rather than the settings in use, so a field the environment
+// overrides still saves what the user typed.
+func (m Model) writeRuntimeConfig(saved settings.Settings) error {
+	m.settings = saved
+	return writeConfigFromModel(m)
 }
 
 func (m Model) commitRuntimeConfig() (Model, tea.Cmd) {
@@ -302,7 +344,7 @@ func (m Model) commitRuntimeConfig() (Model, tea.Cmd) {
 				continue
 			}
 			if err := validatePortCommit(m.rc.inputs[d.field].Value()); err != nil {
-				m = m.withLastRunError(fmt.Sprintf("%s: %v", d.env, err))
+				m = m.withLastRunError(fmt.Sprintf("%s: %v", d.env(), err))
 				return m, clearLastRunNoteAfterCmd()
 			}
 		}
@@ -312,7 +354,7 @@ func (m Model) commitRuntimeConfig() (Model, tea.Cmd) {
 		m = m.withLastRunError(err.Error())
 		return m, clearLastRunNoteAfterCmd()
 	}
-	m.settings = next
+	m.settings = m.resolveSavedSettings(next)
 	// Re-probing is synchronous here because the panel must show the result of
 	// the save immediately; the timeout keeps an unreachable backend from
 	// freezing the UI.
@@ -320,7 +362,7 @@ func (m Model) commitRuntimeConfig() (Model, tea.Cmd) {
 	defer cancel()
 	m.runtime = m.svc.discoverRuntime(ctx, m.settings)
 	var cmd tea.Cmd
-	if err := writeConfigFromModel(m); err != nil {
+	if err := m.writeRuntimeConfig(next); err != nil {
 		m = m.withLastRunError("Could not save config: " + err.Error())
 		m = m.addAlert(alertSeverityWarn, "Config", "Could not save config: "+err.Error())
 		cmd = clearLastRunNoteAfterCmd()
@@ -332,12 +374,14 @@ func (m Model) commitRuntimeConfig() (Model, tea.Cmd) {
 	return m, cmd
 }
 
-// updateRuntimeConfigKey handles keys while the runtime env editor is open.
+// updateRuntimeConfigKey handles keys while the runtime panel is open. Keys
+// every focus shares are handled here; the rest go to the list or the field.
 func (m Model) updateRuntimeConfigKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	if m.rc.discardConfirm {
 		return m.updateRuntimeConfigDiscardConfirmKey(msg)
 	}
-	if isEscapeKey(msg) {
+	switch {
+	case isEscapeKey(msg):
 		if m.runtimeConfigDirty() {
 			m.rc.discardConfirm = true
 			return m, nil
@@ -345,17 +389,31 @@ func (m Model) updateRuntimeConfigKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		m = m.withLastRunCleared()
 		m = m.closeRuntimeConfig()
 		return m, nil
-	}
-	if isEnterKey(msg) {
+	case isEnterKey(msg):
 		return m.commitRuntimeConfig()
-	}
-	if isTabKey(msg) {
+	case isShiftTabKey(msg): // before isTabKey, which also matches shift+tab's key code
+		return m.focusRuntimeField(m.stepRuntimeField(m.rc.focus, -1))
+	case isTabKey(msg):
 		return m.focusRuntimeField(m.stepRuntimeField(m.rc.focus, 1))
 	}
-	if isShiftTabKey(msg) {
-		return m.focusRuntimeField(m.stepRuntimeField(m.rc.focus, -1))
+	if m.rc.focus == runtimeFieldNone {
+		return m.updateRuntimeListKey(msg)
 	}
 	var cmd tea.Cmd
 	m.rc.inputs[m.rc.focus], cmd = m.rc.inputs[m.rc.focus].Update(msg)
 	return m, cmd
+}
+
+// updateRuntimeListKey handles keys while the runtime list has focus: move the
+// highlight, or step right into the highlighted Runtime's first field.
+func (m Model) updateRuntimeListKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	switch msg.String() {
+	case "up", "k":
+		return m.moveRuntimeCursor(-1), nil
+	case "down", "j":
+		return m.moveRuntimeCursor(1), nil
+	case "right":
+		return m.focusRuntimeField(m.stepRuntimeField(runtimeFieldNone, 1))
+	}
+	return m, nil
 }

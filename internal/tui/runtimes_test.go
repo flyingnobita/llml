@@ -18,7 +18,7 @@ func TestRuntimeTableGroupOrder(t *testing.T) {
 		{"GGUF", "KoboldCpp"},
 		{"Safetensors", "vLLM"},
 		{"Safetensors", "oMLX"},
-		{"NInfer", "NInfer"},
+		{"NInfer (.ninfer)", "NInfer"},
 		{"Splash bundle", "Splash"},
 		{"Ollama library", "Ollama"},
 	}
@@ -53,7 +53,7 @@ func TestRuntimeTableFields(t *testing.T) {
 				t.Errorf("field %d listed twice", f.field)
 			}
 			seen[f.field] = true
-			envs = append(envs, f.env)
+			envs = append(envs, f.env())
 		}
 		if !slices.Equal(envs, want[rt.backend]) {
 			t.Errorf("%s fields: got %v, want %v", rt.name, envs, want[rt.backend])

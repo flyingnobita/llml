@@ -8,8 +8,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-
-	"github.com/flyingnobita/llml/internal/models"
 )
 
 // mainPaneCaptionLine renders a full-width pane caption (lipgloss v2 has no border Title API).
@@ -202,29 +200,6 @@ func (m Model) launchPreviewPaneView() string {
 	}
 	stack := lipgloss.JoinVertical(lipgloss.Left, title, inner)
 	return m.ui.styles.launchPreview.Render(stack)
-}
-
-// runtimePanelView renders the runtimes summary (label = value per line) for the runtime
-// config modal opened with c.
-func runtimePanelView(m Model, contentWidth int) string {
-	if m.layout.width == 0 {
-		return ""
-	}
-	if contentWidth < MinModalInnerWidth {
-		contentWidth = MinModalInnerWidth
-	}
-	var block string
-	if !m.runtimeScanned && m.loading {
-		block = "Detecting runtimes…"
-	} else {
-		lines := RuntimePanelLines(contentWidth, m.runtime)
-		block = strings.Join(lines, "\n")
-		if !m.table.lastScan.IsZero() {
-			block += "\nLast model scan: " + m.table.lastScan.Local().Format(time.RFC3339)
-		}
-	}
-	inner := m.ui.styles.paramSectionHeading.Render("Active Configuration") + "\n" + block
-	return m.ui.styles.runtimePanel.Width(contentWidth).Render(inner)
 }
 
 // lastRunNoteView renders lastRunNote as one styled line per newline-separated
@@ -731,96 +706,4 @@ func (m Model) runtimeConfigDiscardConfirmBlock() string {
 
 	block := lipgloss.JoinVertical(lipgloss.Left, rows...)
 	return panelBox.Width(cw + panelBox.GetHorizontalFrameSize()).Render(block)
-}
-
-// runtimeFieldRow renders a label + input pair for one runtime config field.
-func (m Model) runtimeFieldRow(fieldID runtimeField, label string) []string {
-	prefix := "  "
-	if m.rc.focus == fieldID {
-		prefix = "› "
-	}
-	return []string{
-		m.ui.styles.body.Render(prefix + label),
-		m.rc.inputs[fieldID].View(),
-	}
-}
-
-// runtimeConfigSection renders one Runtime's heading and fields, or "" when
-// the platform cannot run it.
-func (m Model) runtimeConfigSection(b models.ModelBackend) string {
-	rt := runtimeFor(b)
-	if !rt.supported(m.runtime.Platform) {
-		return ""
-	}
-	rows := []string{m.ui.styles.bodyBold.Render(rt.name), ""}
-	for i, d := range rt.fields {
-		if i > 0 {
-			rows = append(rows, "")
-		}
-		rows = append(rows, m.runtimeFieldRow(d.field, d.label)...)
-	}
-	return lipgloss.JoinVertical(lipgloss.Left, rows...)
-}
-
-// joinSections stacks the non-empty sections with a blank line between them.
-func joinSections(sections []string) string {
-	var out []string
-	for _, s := range sections {
-		if s == "" {
-			continue
-		}
-		if len(out) > 0 {
-			out = append(out, "")
-		}
-		out = append(out, s)
-	}
-	return lipgloss.JoinVertical(lipgloss.Left, out...)
-}
-
-// runtimeConfigModalBlock returns the framed runtime configuration panel only
-// (no full-screen placement). Composed over the main view via [overlayCentered].
-// [runtimePanelView] is shown under the title.
-func (m Model) runtimeConfigModalBlock() string {
-	if m.rc.discardConfirm {
-		return m.runtimeConfigDiscardConfirmBlock()
-	}
-	cw := m.paramPanelContentWidth()
-	section := m.runtimeConfigSection
-
-	// The column split is layout only; each section's contents come from the
-	// runtime table.
-	left := []string{
-		section(models.BackendLlama),
-		section(models.BackendOllama),
-		section(models.BackendNInfer),
-		section(models.BackendSplash),
-	}
-	right := []string{
-		section(models.BackendVLLM),
-		section(models.BackendKobold),
-		section(models.BackendOMLX),
-	}
-
-	var inputBlock string
-	if cw >= 80 {
-		leftBlock := joinSections(left)
-		rightBlock := joinSections(right)
-		inputBlock = lipgloss.JoinHorizontal(lipgloss.Top, leftBlock, m.ui.styles.body.PaddingLeft(4).Render(rightBlock))
-	} else {
-		inputBlock = joinSections(append(left, right...))
-	}
-
-	rows := []string{
-		m.modalTitleRow(cw, m.ui.styles.portConfigTitle, "Runtime Environment"),
-		runtimePanelView(m, cw),
-		"",
-		m.ui.styles.paramSectionHeading.Render("Overrides"),
-		m.ui.styles.subtitle.Width(cw).Render(runtimeConfigModalSubtitle),
-		"",
-		inputBlock,
-		"",
-		m.renderFooterHints(FooterRuntimeConfigHints),
-	}
-	block := lipgloss.JoinVertical(lipgloss.Left, rows...)
-	return m.ui.styles.portConfigBox.Render(block)
 }

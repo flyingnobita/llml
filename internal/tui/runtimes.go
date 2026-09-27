@@ -14,7 +14,7 @@ func (f modelFormat) String() string {
 	case formatSafetensors:
 		return "Safetensors"
 	case formatNInfer:
-		return "NInfer"
+		return "NInfer (.ninfer)"
 	case formatSplash:
 		return "Splash bundle"
 	case formatOllama:
@@ -32,16 +32,19 @@ type runtimeStatus struct {
 }
 
 // runtimeFieldDef describes one editable field of a Runtime: the settings
-// value it edits, the environment variable that overrides it, and how the
-// runtime panel labels it.
+// value it edits and how the runtime panel labels it.
 type runtimeFieldDef struct {
 	field runtimeField
-	env   string
-	// label names the input in the runtime panel; summaryLabel names the same
-	// value in the Active Configuration list, whose value comes from summary.
-	label        string
-	summaryLabel string
-	summary      func(models.RuntimeInfo) string
+	// setting is the settings value the field edits; it names the environment
+	// variable that overrides the field and reports where the value came from.
+	setting settings.Field
+	// label names the input in the detail pane; hint is its placeholder.
+	label string
+	hint  string
+	// inUse returns the program path detection resolved, or "" when none was
+	// found. It is set only for path fields: a host or port is in use exactly
+	// as resolved.
+	inUse func(models.RuntimeInfo) string
 
 	// Exactly one of str and port is set. Path and host fields are strings;
 	// an empty host or port input falls back to its default.
@@ -53,6 +56,9 @@ type runtimeFieldDef struct {
 	// normalize rewrites a host input before it is stored (Ollama accepts URLs).
 	normalize func(string) string
 }
+
+// env returns the environment variable that overrides the field.
+func (d runtimeFieldDef) env() string { return d.setting.EnvVar() }
 
 // value returns what the field's input shows for s.
 func (d runtimeFieldDef) value(s settings.Settings) string {
@@ -98,24 +104,16 @@ func (d runtimeDef) supported(p models.Platform) bool {
 	return p.Supports(d.backend)
 }
 
-func pathFieldDef(f runtimeField, env, label, summaryLabel string, summary func(models.RuntimeInfo) string, str func(*settings.Settings) *string) runtimeFieldDef {
-	return runtimeFieldDef{field: f, env: env, label: label, summaryLabel: summaryLabel, summary: summary, str: str, isPath: true}
+func pathFieldDef(f runtimeField, setting settings.Field, label, hint string, inUse func(models.RuntimeInfo) string, str func(*settings.Settings) *string) runtimeFieldDef {
+	return runtimeFieldDef{field: f, setting: setting, label: label, hint: hint, inUse: inUse, str: str, isPath: true}
 }
 
-func portFieldDef(f runtimeField, env, summaryLabel string, summary func(models.RuntimeInfo) int, port func(*settings.Settings) *int, def int) runtimeFieldDef {
-	return runtimeFieldDef{
-		field: f, env: env, label: "Port", summaryLabel: summaryLabel,
-		summary: func(r models.RuntimeInfo) string { return portDisplay(summary(r)) },
-		port:    port, defaultPort: def,
-	}
+func portFieldDef(f runtimeField, setting settings.Field, port func(*settings.Settings) *int, def int) runtimeFieldDef {
+	return runtimeFieldDef{field: f, setting: setting, label: "Port", port: port, defaultPort: def}
 }
 
-func hostFieldDef(f runtimeField, env, summaryLabel string, summary func(models.RuntimeInfo) string, str func(*settings.Settings) *string, def string) runtimeFieldDef {
-	return runtimeFieldDef{
-		field: f, env: env, label: "Host", summaryLabel: summaryLabel,
-		summary: func(r models.RuntimeInfo) string { return valueOrDash(summary(r)) },
-		str:     str, defaultHost: def,
-	}
+func hostFieldDef(f runtimeField, setting settings.Field, str func(*settings.Settings) *string, def string) runtimeFieldDef {
+	return runtimeFieldDef{field: f, setting: setting, label: "Host", str: str, defaultHost: def}
 }
 
 // runtimeTable describes every Runtime, grouped by Model Format in the order
@@ -124,14 +122,11 @@ var runtimeTable = []runtimeDef{
 	{
 		backend: models.BackendLlama, name: "Llama.cpp", format: formatGGUF,
 		fields: []runtimeFieldDef{
-			pathFieldDef(runtimeFieldLlamaCppPath, settings.EnvLlamaCppPath, "Path (llama-cli / llama-server)",
-				runtimePanelLabelLlamaServerPath, llamaServerPathPanelDisplay,
-				func(s *settings.Settings) *string { return &s.LlamaCppPath }),
-			portFieldDef(runtimeFieldLlamaPort, settings.EnvLlamaServerPort, runtimePanelLabelLlamaServerPort,
-				func(r models.RuntimeInfo) int { return r.LlamaServerPort },
+			pathFieldDef(runtimeFieldLlamaCppPath, settings.FieldLlamaCppPath, "Path", "dir with llama-cli / llama-server",
+				models.ResolveLlamaServerPath, func(s *settings.Settings) *string { return &s.LlamaCppPath }),
+			portFieldDef(runtimeFieldLlamaPort, settings.FieldLlamaServerPort,
 				func(s *settings.Settings) *int { return &s.LlamaServerPort }, settings.DefaultLlamaServerPort),
-			hostFieldDef(runtimeFieldLlamaHost, settings.EnvLlamaServerHost, runtimePanelLabelLlamaServerHost,
-				func(r models.RuntimeInfo) string { return r.LlamaServerHost },
+			hostFieldDef(runtimeFieldLlamaHost, settings.FieldLlamaServerHost,
 				func(s *settings.Settings) *string { return &s.LlamaServerHost }, settings.DefaultLlamaServerHost),
 		},
 		status: func(r models.RuntimeInfo) runtimeStatus {
@@ -141,11 +136,9 @@ var runtimeTable = []runtimeDef{
 	{
 		backend: models.BackendKobold, name: "KoboldCpp", format: formatGGUF,
 		fields: []runtimeFieldDef{
-			pathFieldDef(runtimeFieldKoboldCppPath, settings.EnvKoboldCppPath, "Path (koboldcpp binary)",
-				runtimePanelLabelKoboldCppPath, koboldCppPathPanelDisplay,
-				func(s *settings.Settings) *string { return &s.KoboldCppPath }),
-			portFieldDef(runtimeFieldKoboldCppPort, settings.EnvKoboldCppPort, runtimePanelLabelKoboldCppPort,
-				func(r models.RuntimeInfo) int { return r.KoboldCppPort },
+			pathFieldDef(runtimeFieldKoboldCppPath, settings.FieldKoboldCppPath, "Path", "koboldcpp binary or its dir",
+				models.ResolveKoboldCppPath, func(s *settings.Settings) *string { return &s.KoboldCppPath }),
+			portFieldDef(runtimeFieldKoboldCppPort, settings.FieldKoboldCppPort,
 				func(s *settings.Settings) *int { return &s.KoboldCppPort }, settings.DefaultKoboldCppPort),
 		},
 		status: func(r models.RuntimeInfo) runtimeStatus {
@@ -155,17 +148,13 @@ var runtimeTable = []runtimeDef{
 	{
 		backend: models.BackendVLLM, name: "vLLM", format: formatSafetensors,
 		fields: []runtimeFieldDef{
-			pathFieldDef(runtimeFieldVLLMPath, settings.EnvVLLMPath, "Path (vllm binary)",
-				runtimePanelLabelVLLMPath, vllmPathPanelDisplay,
-				func(s *settings.Settings) *string { return &s.VLLMPath }),
-			pathFieldDef(runtimeFieldVLLMVenv, settings.EnvVLLMVenv, "Venv Root (Optional)",
-				runtimePanelLabelVLLMVenv, vllmVenvPanelDisplay,
-				func(s *settings.Settings) *string { return &s.VLLMVenv }),
-			portFieldDef(runtimeFieldVLLMPort, settings.EnvVLLMServerPort, runtimePanelLabelVLLMPort,
-				func(r models.RuntimeInfo) int { return r.VLLMServerPort },
+			pathFieldDef(runtimeFieldVLLMPath, settings.FieldVLLMPath, "Path", "dir with the vllm binary",
+				models.ResolveVLLMPath, func(s *settings.Settings) *string { return &s.VLLMPath }),
+			pathFieldDef(runtimeFieldVLLMVenv, settings.FieldVLLMVenv, "Venv", "venv root (optional)",
+				vllmVenvInUse, func(s *settings.Settings) *string { return &s.VLLMVenv }),
+			portFieldDef(runtimeFieldVLLMPort, settings.FieldVLLMServerPort,
 				func(s *settings.Settings) *int { return &s.VLLMServerPort }, settings.DefaultVLLMServerPort),
-			hostFieldDef(runtimeFieldVLLMHost, settings.EnvVLLMServerHost, runtimePanelLabelVLLMHost,
-				func(r models.RuntimeInfo) string { return r.VLLMServerHost },
+			hostFieldDef(runtimeFieldVLLMHost, settings.FieldVLLMServerHost,
 				func(s *settings.Settings) *string { return &s.VLLMServerHost }, settings.DefaultVLLMServerHost),
 		},
 		// vLLM has no server probe.
@@ -176,16 +165,11 @@ var runtimeTable = []runtimeDef{
 	{
 		backend: models.BackendOMLX, name: "oMLX", format: formatSafetensors,
 		fields: []runtimeFieldDef{
-			pathFieldDef(runtimeFieldOMLXPath, settings.EnvOMLXPath, "Path (omlx CLI or ~/.omlx)",
-				runtimePanelLabelOMLXPath, func(r models.RuntimeInfo) string {
-					return binaryPathPanelDisplay(models.ResolveOMLXPath(r), r.OMLXRunning, r.OMLXPort)
-				},
-				func(s *settings.Settings) *string { return &s.OMLXPath }),
-			portFieldDef(runtimeFieldOMLXPort, settings.EnvOMLXPort, runtimePanelLabelOMLXPort,
-				func(r models.RuntimeInfo) int { return r.OMLXPort },
+			pathFieldDef(runtimeFieldOMLXPath, settings.FieldOMLXPath, "Path", "omlx CLI or ~/.omlx",
+				models.ResolveOMLXPath, func(s *settings.Settings) *string { return &s.OMLXPath }),
+			portFieldDef(runtimeFieldOMLXPort, settings.FieldOMLXPort,
 				func(s *settings.Settings) *int { return &s.OMLXPort }, settings.DefaultOMLXPort),
-			hostFieldDef(runtimeFieldOMLXHost, settings.EnvOMLXHost, runtimePanelLabelOMLXHost,
-				func(r models.RuntimeInfo) string { return r.OMLXHost },
+			hostFieldDef(runtimeFieldOMLXHost, settings.FieldOMLXHost,
 				func(s *settings.Settings) *string { return &s.OMLXHost }, settings.DefaultOMLXHost),
 		},
 		status: func(r models.RuntimeInfo) runtimeStatus {
@@ -195,16 +179,11 @@ var runtimeTable = []runtimeDef{
 	{
 		backend: models.BackendNInfer, name: "NInfer", format: formatNInfer,
 		fields: []runtimeFieldDef{
-			pathFieldDef(runtimeFieldNInferPath, settings.EnvNInferPath, "Path (checkout or ninfer-serve)",
-				runtimePanelLabelNInferPath, func(r models.RuntimeInfo) string {
-					return binaryPathPanelDisplay(models.ResolveNInferPath(r), r.NInferRunning, r.NInferPort)
-				},
-				func(s *settings.Settings) *string { return &s.NInferPath }),
-			portFieldDef(runtimeFieldNInferPort, settings.EnvNInferServerPort, runtimePanelLabelNInferPort,
-				func(r models.RuntimeInfo) int { return r.NInferPort },
+			pathFieldDef(runtimeFieldNInferPath, settings.FieldNInferPath, "Path", "checkout or ninfer-serve",
+				models.ResolveNInferPath, func(s *settings.Settings) *string { return &s.NInferPath }),
+			portFieldDef(runtimeFieldNInferPort, settings.FieldNInferServerPort,
 				func(s *settings.Settings) *int { return &s.NInferServerPort }, settings.DefaultNInferServerPort),
-			hostFieldDef(runtimeFieldNInferHost, settings.EnvNInferServerHost, runtimePanelLabelNInferHost,
-				func(r models.RuntimeInfo) string { return r.NInferServerHost },
+			hostFieldDef(runtimeFieldNInferHost, settings.FieldNInferServerHost,
 				func(s *settings.Settings) *string { return &s.NInferServerHost }, settings.DefaultNInferHost),
 		},
 		status: func(r models.RuntimeInfo) runtimeStatus {
@@ -214,16 +193,11 @@ var runtimeTable = []runtimeDef{
 	{
 		backend: models.BackendSplash, name: "Splash", format: formatSplash,
 		fields: []runtimeFieldDef{
-			pathFieldDef(runtimeFieldSplashPath, settings.EnvSplashPath, "Path (splash binary)",
-				runtimePanelLabelSplashPath, func(r models.RuntimeInfo) string {
-					return binaryPathPanelDisplay(models.ResolveSplashPath(r), r.SplashRunning, r.SplashPort)
-				},
-				func(s *settings.Settings) *string { return &s.SplashPath }),
-			portFieldDef(runtimeFieldSplashPort, settings.EnvSplashPort, runtimePanelLabelSplashPort,
-				func(r models.RuntimeInfo) int { return r.SplashPort },
+			pathFieldDef(runtimeFieldSplashPath, settings.FieldSplashPath, "Path", "splash binary or its dir",
+				models.ResolveSplashPath, func(s *settings.Settings) *string { return &s.SplashPath }),
+			portFieldDef(runtimeFieldSplashPort, settings.FieldSplashPort,
 				func(s *settings.Settings) *int { return &s.SplashPort }, settings.DefaultSplashPort),
-			hostFieldDef(runtimeFieldSplashHost, settings.EnvSplashHost, runtimePanelLabelSplashHost,
-				func(r models.RuntimeInfo) string { return r.SplashHost },
+			hostFieldDef(runtimeFieldSplashHost, settings.FieldSplashHost,
 				func(s *settings.Settings) *string { return &s.SplashHost }, settings.DefaultSplashHost),
 		},
 		status: func(r models.RuntimeInfo) runtimeStatus {
@@ -233,12 +207,10 @@ var runtimeTable = []runtimeDef{
 	{
 		backend: models.BackendOllama, name: "Ollama", format: formatOllama,
 		fields: []runtimeFieldDef{
-			pathFieldDef(runtimeFieldOllamaPath, settings.EnvOllamaPath, "Path (ollama binary)",
-				runtimePanelLabelOllamaPath, ollamaPathPanelDisplay,
-				func(s *settings.Settings) *string { return &s.OllamaPath }),
+			pathFieldDef(runtimeFieldOllamaPath, settings.FieldOllamaPath, "Path", "ollama binary or its dir",
+				models.ResolveOllamaPath, func(s *settings.Settings) *string { return &s.OllamaPath }),
 			func() runtimeFieldDef {
-				d := hostFieldDef(runtimeFieldOllamaHost, settings.EnvOllamaHost, runtimePanelLabelOllamaHost,
-					func(r models.RuntimeInfo) string { return r.OllamaHost },
+				d := hostFieldDef(runtimeFieldOllamaHost, settings.FieldOllamaHost,
 					func(s *settings.Settings) *string { return &s.OllamaHost }, settings.DefaultOllamaHost)
 				d.normalize = settings.NormalizeOllamaHost
 				return d
@@ -255,18 +227,6 @@ func runtimeFor(b models.ModelBackend) runtimeDef {
 	for _, rt := range runtimeTable {
 		if rt.backend == b {
 			return rt
-		}
-	}
-	return runtimeTable[0]
-}
-
-// runtimeForField returns the Runtime that owns field f.
-func runtimeForField(f runtimeField) runtimeDef {
-	for _, rt := range runtimeTable {
-		for _, d := range rt.fields {
-			if d.field == f {
-				return rt
-			}
 		}
 	}
 	return runtimeTable[0]

@@ -31,7 +31,6 @@ type styles struct {
 	alertTitleInfo         lipgloss.Style
 	alertTitleWarn         lipgloss.Style
 	alertTitleError        lipgloss.Style
-	runtimePanel           lipgloss.Style
 	portConfigTitle        lipgloss.Style
 	portConfigBox          lipgloss.Style
 	paramPanelBox          lipgloss.Style
@@ -73,6 +72,19 @@ type styles struct {
 	helpSectionTitle lipgloss.Style
 	// importBox frames the import filepicker.
 	importBox lipgloss.Style
+	// Runtime panel (c): group labels, the list pane and its highlighted
+	// Runtime, status marks, the legend, field labels, and the dimmed in-use
+	// line whose source turns to the warning colour when the environment wins.
+	runtimeGroupLabel   lipgloss.Style
+	runtimeListPane     lipgloss.Style
+	runtimeListSelected lipgloss.Style
+	runtimeMarkRunning  lipgloss.Style
+	runtimeMarkFound    lipgloss.Style
+	runtimeMarkMissing  lipgloss.Style
+	runtimeLegend       lipgloss.Style
+	runtimeFieldLabel   lipgloss.Style
+	runtimeInUse        lipgloss.Style
+	runtimeEnvSource    lipgloss.Style
 	// notesTextarea is the Notes field's textarea styling, with the distracting
 	// bubbles defaults (cursor-line highlight, base padding) cleared.
 	notesTextarea textarea.Styles
@@ -124,12 +136,6 @@ func newStyles(theme Theme) styles {
 		alertTitleInfo:  lipgloss.NewStyle().Bold(true).Foreground(theme.Info),
 		alertTitleWarn:  lipgloss.NewStyle().Bold(true).Foreground(theme.Warn),
 		alertTitleError: lipgloss.NewStyle().Bold(true).Foreground(theme.Error),
-		runtimePanel: lipgloss.NewStyle().
-			BorderTop(true).
-			BorderForeground(theme.Border).
-			Foreground(theme.RuntimePanel).
-			Padding(1, 0).
-			MarginTop(1),
 		portConfigTitle: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(theme.ModalTitle),
@@ -239,7 +245,17 @@ func newStyles(theme Theme) styles {
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(theme.Border).
 			Padding(0, 2),
-		notesTextarea: newNotesTextareaStyles(),
+		runtimeGroupLabel:   lipgloss.NewStyle().Bold(true).Foreground(theme.ParamSectionHeading),
+		runtimeListPane:     lipgloss.NewStyle(),
+		runtimeListSelected: lipgloss.NewStyle().Bold(true).Foreground(theme.ParamProfileName),
+		runtimeMarkRunning:  lipgloss.NewStyle().Foreground(theme.Info),
+		runtimeMarkFound:    lipgloss.NewStyle().Foreground(theme.Body),
+		runtimeMarkMissing:  lipgloss.NewStyle().Foreground(theme.Subtitle),
+		runtimeLegend:       lipgloss.NewStyle().Foreground(theme.Footer),
+		runtimeFieldLabel:   lipgloss.NewStyle().Foreground(theme.ParamMetadataLabel),
+		runtimeInUse:        lipgloss.NewStyle().Foreground(theme.RuntimePanel),
+		runtimeEnvSource:    lipgloss.NewStyle().Foreground(theme.Warn),
+		notesTextarea:       newNotesTextareaStyles(),
 	}
 }
 

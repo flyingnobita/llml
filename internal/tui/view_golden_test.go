@@ -9,9 +9,11 @@ import (
 	"testing"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/flyingnobita/llml/internal/models"
+	"github.com/flyingnobita/llml/internal/settings"
 )
 
 // clockRE matches the [HH:MM:SS] stamp on alert history lines.
@@ -71,6 +73,9 @@ func goldenModel(t *testing.T) Model {
 	t.Setenv("XDG_CONFIG_HOME", dir)
 	t.Setenv("HOME", dir)
 	t.Setenv("AppData", dir)
+	// Program lookups fall back to PATH; an empty one keeps the runtime
+	// panel's status marks independent of what the host has installed.
+	t.Setenv("PATH", t.TempDir())
 
 	m := NewWithServices(testServices())
 	m.layout.width = 100
@@ -129,12 +134,39 @@ func TestGolden_mainViewEmpty(t *testing.T) {
 	assertGolden(t, "main_view_empty", m.View().Content)
 }
 
+// goldenPanelSettings sets one value from each source, so the golden files
+// show every kind of in-use line: config, an environment variable, detected,
+// and default.
+func goldenPanelSettings() settings.Settings {
+	env := map[string]string{settings.EnvLlamaServerPort: "8081"}
+	return settings.Resolve(
+		settings.FromEnv(func(k string) string { return env[k] }),
+		settings.Layer{Origin: settings.OriginConfig, LlamaCppPath: ptrTo("/opt/llama/bin")},
+		settings.Defaults(),
+	)
+}
+
 func TestGolden_runtimeConfigPanel(t *testing.T) {
 	m := goldenModel(t)
-	m.settings.LlamaCppPath = "/opt/llama/bin"
-	m.settings.LlamaServerPort = 8080
+	m.settings = goldenPanelSettings()
 	m, _ = m.openRuntimeConfig()
 	assertGolden(t, "runtime_config_panel", m.View().Content)
+}
+
+// On Apple Silicon the list gains oMLX and the Splash bundle group and loses
+// NInfer; oMLX is highlighted so its fields are pinned too.
+func TestGolden_runtimeConfigPanelMacOS(t *testing.T) {
+	m := goldenModel(t)
+	m.settings = goldenPanelSettings()
+	m.runtime.Platform = models.Platform{GOOS: "darwin", GOARCH: "arm64"}
+	m.runtime.OMLXPath = "/Users/u/.omlx/bin/omlx"
+	m.runtime.OMLXRunning = true
+	m.runtime.SplashPath = "/opt/homebrew/bin/splash"
+	m, _ = m.openRuntimeConfig()
+	for range 3 {
+		m, _ = m.updateRuntimeConfigKey(tea.KeyPressMsg{Code: tea.KeyDown})
+	}
+	assertGolden(t, "runtime_config_panel_macos", m.View().Content)
 }
 
 func TestGolden_helpPanel(t *testing.T) {
