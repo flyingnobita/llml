@@ -329,7 +329,8 @@ found with no path configured). An environment variable wins over the saved valu
 Each runtime has a checkbox. **space** (in the list only, never in a field) turns the highlighted
 runtime on or off, and **enter** saves it with your field edits. A runtime you turn off shows `off`
 in the list and "Off" in its detail pane: llml stops probing it and leaves it out of the runtime
-status line, and its fields stay editable. Saving re-detects runtimes without rescanning models.
+status line, and its fields stay editable. A runtime you tick back on shows no status mark until you
+save, since llml has not probed it. Saving re-detects runtimes without rescanning models.
 The on/off choices are stored in `runtimes.toml`, not `config.toml`, and no environment variable
 overrides them. The first time llml sees a runtime, it turns it on only if it finds the program or
 its server answers, and turns it off otherwise; a single alert lists any runtimes turned off this way.
@@ -338,7 +339,7 @@ After that only your choice changes it, so a runtime you install later stays off
 Models whose runtime is off stay in the table, dimmed and marked `(off)` after the runtime name, so
 you can still see what is taking up disk space. You can select them, copy their command, and open
 their `p` panel, but **R** / **ctrl+R** will not launch them; an alert names the runtime to turn on
-in `c`. A GGUF model follows its active profile: it is dimmed only when that profile's runtime
+in `c`, and a note under the launch preview says the runtime is off. A GGUF model follows its active profile: it is dimmed only when that profile's runtime
 (llama.cpp or KoboldCpp) is off, so switching profiles can make it launchable again.
 
 When Ollama is off, llml does not contact the Ollama daemon at all: startup and **S** neither start

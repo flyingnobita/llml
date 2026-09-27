@@ -102,3 +102,15 @@ func TestTruncateRunes(t *testing.T) {
 		t.Fatalf("expected ellipsis suffix")
 	}
 }
+
+// Every multi-select list draws the same boxes.
+func TestCheckbox(t *testing.T) {
+	t.Parallel()
+
+	if got := checkbox(true); got != "[✓]" {
+		t.Errorf("checkbox(true) = %q", got)
+	}
+	if got := checkbox(false); got != "[ ]" {
+		t.Errorf("checkbox(false) = %q", got)
+	}
+}

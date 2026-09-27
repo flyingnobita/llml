@@ -405,10 +405,7 @@ func (m Model) renderImportGroupRow(i int, g importGroup) string {
 		cursor = st.bodyBold.Render("> ")
 	}
 
-	checkbox := "[ ]"
-	if g.checked {
-		checkbox = "[" + st.bodyBold.Render("x") + "]"
-	}
+	box := checkbox(g.checked)
 
 	hint := st.bodyBold.Render(g.modelHint)
 	status := ""
@@ -428,7 +425,7 @@ func (m Model) renderImportGroupRow(i int, g importGroup) string {
 	}
 	count += ")"
 
-	return cursor + checkbox + " " + hint + status + " " + st.bodyDim.Render(count) + "\n"
+	return cursor + box + " " + hint + status + " " + st.bodyDim.Render(count) + "\n"
 }
 
 func (m Model) importVisibleRange() (start, end int) {

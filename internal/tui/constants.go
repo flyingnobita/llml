@@ -272,6 +272,19 @@ const (
 	// runtimeConfigModalSubtitle sits above the runtime panel's key hints.
 	runtimeConfigModalSubtitle = "Saved to config.toml. Environment variables win over saved values."
 
+	// runtimeOffSuffix follows the Runtime name of a dimmed row, and a
+	// Disabled Runtime's option in the p panel.
+	runtimeOffSuffix = " (off)"
+
+	// checkboxOn and checkboxOff are the ticked and unticked boxes every
+	// multi-select list draws; see [checkbox].
+	checkboxOn  = "[✓]"
+	checkboxOff = "[ ]"
+
+	// runtimeOffPreviewNote sits under the launch preview of a dimmed row; %s
+	// names its Runtime. It follows the pattern of serverSpec.mmprojNote.
+	runtimeOffPreviewNote = "⚠ %s is off; turn it on in the runtime panel (" + FooterKeyConfigPort + ") to launch this model"
+
 	// FooterHintTabSections is the shared "tab: sections" fragment used by split-pane
 	// and parameter modal footers.
 	FooterHintTabSections = "tab: section"

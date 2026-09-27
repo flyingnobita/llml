@@ -9,10 +9,6 @@ import (
 	"github.com/flyingnobita/llml/internal/profiles"
 )
 
-// runtimeOffSuffix follows the Runtime name of a dimmed row, and a Disabled
-// Runtime's option in the p panel.
-const runtimeOffSuffix = " (off)"
-
 // rowRuntime returns the Runtime row f launches on. For a GGUF row it is the
 // Active Profile's choice between llama.cpp and KoboldCpp, cached in
 // effectiveBackends; for any other row it is the row's own Runtime, so a row
@@ -42,6 +38,16 @@ func (m Model) anyRowDimmed() bool {
 		}
 	}
 	return false
+}
+
+// runtimeOffNote returns the launch preview's note for a row on Runtime b when
+// b is off, or "" when it is on. The preview still shows the full command, so
+// it can be copied; the note says why R will not run it.
+func (m Model) runtimeOffNote(b models.ModelBackend) string {
+	if m.runtimeEnabled(b) {
+		return ""
+	}
+	return fmt.Sprintf(runtimeOffPreviewNote, runtimeFor(b).name)
 }
 
 // blockLaunchOnDisabledRuntime refuses to launch on Runtime b, which is off,

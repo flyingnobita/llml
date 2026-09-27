@@ -186,9 +186,12 @@ func (m Model) savedRuntimeSettings() settings.Settings {
 // runtimeConfigDirty reports whether any input differs from what it held when
 // the panel opened, or any Runtime was toggled.
 func (m Model) runtimeConfigDirty() bool {
-	if m.runtimeTogglesDirty() {
-		return true
-	}
+	return m.runtimeTogglesDirty() || m.runtimeFieldsDirty()
+}
+
+// runtimeFieldsDirty reports whether any input differs from what it held when
+// the panel opened. Only then does saving write config.toml.
+func (m Model) runtimeFieldsDirty() bool {
 	for i := range m.rc.prefill {
 		if m.rc.inputs[i].Value() != m.rc.prefill[i] {
 			return true
@@ -256,9 +259,7 @@ func (m Model) maybeSetMissingRuntimeFooterNote() (Model, tea.Cmd) {
 	want := map[models.ModelBackend]bool{}
 	for _, f := range m.table.files {
 		want[f.Backend] = true
-		if f.Backend == models.BackendLlama && m.table.effectiveBackends[f.Identity()] == models.BackendKobold {
-			want[models.BackendKobold] = true
-		}
+		want[rowRuntime(f, m.table.effectiveBackends)] = true
 	}
 	var msgs []string
 	for _, r := range missingRuntimeNotes {
@@ -370,7 +371,10 @@ func (m Model) commitRuntimeConfig() (Model, tea.Cmd) {
 		m = m.withLastRunError(err.Error())
 		return m, clearLastRunNoteAfterCmd()
 	}
-	m.settings = m.resolveSavedSettings(next)
+	fieldsChanged := m.runtimeFieldsDirty()
+	if fieldsChanged {
+		m.settings = m.resolveSavedSettings(next)
+	}
 	m = m.saveRuntimeToggles()
 	// Re-probing is synchronous here because the panel must show the result of
 	// the save immediately; the timeout keeps an unreachable backend from
@@ -379,14 +383,17 @@ func (m Model) commitRuntimeConfig() (Model, tea.Cmd) {
 	defer cancel()
 	m.runtime = m.svc.discoverRuntime(ctx, m.settings, m.runtimeStates.Disabled())
 	var cmd tea.Cmd
-	// config.toml gets the panel's values, not the settings in use, so a field
-	// the environment overrides still saves what the panel holds.
-	if err := m.svc.writeSettings(next); err != nil {
-		m = m.withLastRunError("Could not save config: " + err.Error())
-		m = m.addAlert(alertSeverityWarn, "Config", "Could not save config: "+err.Error())
-		cmd = clearLastRunNoteAfterCmd()
-	} else {
-		m = m.withLastRunCleared()
+	m = m.withLastRunCleared()
+	// config.toml is user-owned: it is rewritten only when a field changed, so
+	// a save that only toggles Runtimes keeps the file, comments and all. It
+	// gets the panel's values, not the settings in use, so a field the
+	// environment overrides still saves what the panel holds.
+	if fieldsChanged {
+		if err := m.svc.writeSettings(next); err != nil {
+			m = m.withLastRunError("Could not save config: " + err.Error())
+			m = m.addAlert(alertSeverityWarn, "Config", "Could not save config: "+err.Error())
+			cmd = clearLastRunNoteAfterCmd()
+		}
 	}
 	m = m.closeRuntimeConfig()
 	m = m.withLaunchPreviewSynced()

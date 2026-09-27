@@ -88,14 +88,28 @@ func (d runtimeFieldDef) apply(s *settings.Settings, raw string) error {
 	return nil
 }
 
-// runtimeDef describes one Runtime: its name, the Model Format it runs, its
-// fields in display order, and how to read its detection status.
+// runtimeDef describes one Runtime: its name, the Model Format it runs, and
+// its fields in display order.
 type runtimeDef struct {
 	backend models.ModelBackend
 	name    string
 	format  modelFormat
 	fields  []runtimeFieldDef
-	status  func(models.RuntimeInfo) runtimeStatus
+}
+
+// status returns what detection learned about the Runtime. It reads
+// [models.RuntimeInfo.Status], the same record the first-seen check and the
+// runtime summary use, so the panel never shows a Runtime found that
+// detection did not find.
+func (d runtimeDef) status(r models.RuntimeInfo) runtimeStatus {
+	st := r.Status(d.backend)
+	return runtimeStatus{found: st.Found(), running: st.Running}
+}
+
+// detectedProgram returns an in-use reader for Runtime b's path field: the
+// program detection found, or "" when it found none.
+func detectedProgram(b models.ModelBackend) func(models.RuntimeInfo) string {
+	return func(r models.RuntimeInfo) string { return r.Status(b).Path }
 }
 
 // supported reports whether the Runtime can run on p. The rule itself lives in
@@ -123,33 +137,27 @@ var runtimeTable = []runtimeDef{
 		backend: models.BackendLlama, name: "Llama.cpp", format: formatGGUF,
 		fields: []runtimeFieldDef{
 			pathFieldDef(runtimeFieldLlamaCppPath, settings.FieldLlamaCppPath, "Path", "dir with llama-cli / llama-server",
-				models.ResolveLlamaServerPath, func(s *settings.Settings) *string { return &s.LlamaCppPath }),
+				detectedProgram(models.BackendLlama), func(s *settings.Settings) *string { return &s.LlamaCppPath }),
 			portFieldDef(runtimeFieldLlamaPort, settings.FieldLlamaServerPort,
 				func(s *settings.Settings) *int { return &s.LlamaServerPort }, settings.DefaultLlamaServerPort),
 			hostFieldDef(runtimeFieldLlamaHost, settings.FieldLlamaServerHost,
 				func(s *settings.Settings) *string { return &s.LlamaServerHost }, settings.DefaultLlamaServerHost),
-		},
-		status: func(r models.RuntimeInfo) runtimeStatus {
-			return runtimeStatus{found: models.ResolveLlamaServerPath(r) != "", running: r.ServerRunning}
 		},
 	},
 	{
 		backend: models.BackendKobold, name: "KoboldCpp", format: formatGGUF,
 		fields: []runtimeFieldDef{
 			pathFieldDef(runtimeFieldKoboldCppPath, settings.FieldKoboldCppPath, "Path", "koboldcpp binary or its dir",
-				models.ResolveKoboldCppPath, func(s *settings.Settings) *string { return &s.KoboldCppPath }),
+				detectedProgram(models.BackendKobold), func(s *settings.Settings) *string { return &s.KoboldCppPath }),
 			portFieldDef(runtimeFieldKoboldCppPort, settings.FieldKoboldCppPort,
 				func(s *settings.Settings) *int { return &s.KoboldCppPort }, settings.DefaultKoboldCppPort),
-		},
-		status: func(r models.RuntimeInfo) runtimeStatus {
-			return runtimeStatus{found: models.ResolveKoboldCppPath(r) != "", running: r.KoboldCppRunning}
 		},
 	},
 	{
 		backend: models.BackendVLLM, name: "vLLM", format: formatSafetensors,
 		fields: []runtimeFieldDef{
 			pathFieldDef(runtimeFieldVLLMPath, settings.FieldVLLMPath, "Path", "dir with the vllm binary",
-				models.ResolveVLLMPath, func(s *settings.Settings) *string { return &s.VLLMPath }),
+				detectedProgram(models.BackendVLLM), func(s *settings.Settings) *string { return &s.VLLMPath }),
 			pathFieldDef(runtimeFieldVLLMVenv, settings.FieldVLLMVenv, "Venv", "venv root (optional)",
 				vllmVenvInUse, func(s *settings.Settings) *string { return &s.VLLMVenv }),
 			portFieldDef(runtimeFieldVLLMPort, settings.FieldVLLMServerPort,
@@ -157,67 +165,51 @@ var runtimeTable = []runtimeDef{
 			hostFieldDef(runtimeFieldVLLMHost, settings.FieldVLLMServerHost,
 				func(s *settings.Settings) *string { return &s.VLLMServerHost }, settings.DefaultVLLMServerHost),
 		},
-		// vLLM has no server probe.
-		status: func(r models.RuntimeInfo) runtimeStatus {
-			return runtimeStatus{found: models.ResolveVLLMPath(r) != ""}
-		},
 	},
 	{
 		backend: models.BackendOMLX, name: "oMLX", format: formatSafetensors,
 		fields: []runtimeFieldDef{
 			pathFieldDef(runtimeFieldOMLXPath, settings.FieldOMLXPath, "Path", "omlx CLI or ~/.omlx",
-				models.ResolveOMLXPath, func(s *settings.Settings) *string { return &s.OMLXPath }),
+				detectedProgram(models.BackendOMLX), func(s *settings.Settings) *string { return &s.OMLXPath }),
 			portFieldDef(runtimeFieldOMLXPort, settings.FieldOMLXPort,
 				func(s *settings.Settings) *int { return &s.OMLXPort }, settings.DefaultOMLXPort),
 			hostFieldDef(runtimeFieldOMLXHost, settings.FieldOMLXHost,
 				func(s *settings.Settings) *string { return &s.OMLXHost }, settings.DefaultOMLXHost),
-		},
-		status: func(r models.RuntimeInfo) runtimeStatus {
-			return runtimeStatus{found: models.ResolveOMLXPath(r) != "", running: r.OMLXRunning}
 		},
 	},
 	{
 		backend: models.BackendNInfer, name: "NInfer", format: formatNInfer,
 		fields: []runtimeFieldDef{
 			pathFieldDef(runtimeFieldNInferPath, settings.FieldNInferPath, "Path", "checkout or ninfer-serve",
-				models.ResolveNInferPath, func(s *settings.Settings) *string { return &s.NInferPath }),
+				detectedProgram(models.BackendNInfer), func(s *settings.Settings) *string { return &s.NInferPath }),
 			portFieldDef(runtimeFieldNInferPort, settings.FieldNInferServerPort,
 				func(s *settings.Settings) *int { return &s.NInferServerPort }, settings.DefaultNInferServerPort),
 			hostFieldDef(runtimeFieldNInferHost, settings.FieldNInferServerHost,
 				func(s *settings.Settings) *string { return &s.NInferServerHost }, settings.DefaultNInferHost),
-		},
-		status: func(r models.RuntimeInfo) runtimeStatus {
-			return runtimeStatus{found: models.ResolveNInferPath(r) != "", running: r.NInferRunning}
 		},
 	},
 	{
 		backend: models.BackendSplash, name: "Splash", format: formatSplash,
 		fields: []runtimeFieldDef{
 			pathFieldDef(runtimeFieldSplashPath, settings.FieldSplashPath, "Path", "splash binary or its dir",
-				models.ResolveSplashPath, func(s *settings.Settings) *string { return &s.SplashPath }),
+				detectedProgram(models.BackendSplash), func(s *settings.Settings) *string { return &s.SplashPath }),
 			portFieldDef(runtimeFieldSplashPort, settings.FieldSplashPort,
 				func(s *settings.Settings) *int { return &s.SplashPort }, settings.DefaultSplashPort),
 			hostFieldDef(runtimeFieldSplashHost, settings.FieldSplashHost,
 				func(s *settings.Settings) *string { return &s.SplashHost }, settings.DefaultSplashHost),
-		},
-		status: func(r models.RuntimeInfo) runtimeStatus {
-			return runtimeStatus{found: models.ResolveSplashPath(r) != "", running: r.SplashRunning}
 		},
 	},
 	{
 		backend: models.BackendOllama, name: "Ollama", format: formatOllama,
 		fields: []runtimeFieldDef{
 			pathFieldDef(runtimeFieldOllamaPath, settings.FieldOllamaPath, "Path", "ollama binary or its dir",
-				models.ResolveOllamaPath, func(s *settings.Settings) *string { return &s.OllamaPath }),
+				detectedProgram(models.BackendOllama), func(s *settings.Settings) *string { return &s.OllamaPath }),
 			func() runtimeFieldDef {
 				d := hostFieldDef(runtimeFieldOllamaHost, settings.FieldOllamaHost,
 					func(s *settings.Settings) *string { return &s.OllamaHost }, settings.DefaultOllamaHost)
 				d.normalize = settings.NormalizeOllamaHost
 				return d
 			}(),
-		},
-		status: func(r models.RuntimeInfo) runtimeStatus {
-			return runtimeStatus{found: models.ResolveOllamaPath(r) != "", running: r.OllamaRunning}
 		},
 	},
 }

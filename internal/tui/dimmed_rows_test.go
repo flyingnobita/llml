@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -29,7 +30,7 @@ type launchFakes struct {
 func newLaunchFakes() *launchFakes {
 	f := &launchFakes{}
 	svc := testServices()
-	svc.launchServer = func(spec serverSpec, _ runServerMode) tea.Cmd {
+	svc.launchServer = func(_ services, spec serverSpec, _ runServerMode) tea.Cmd {
 		f.launches = append(f.launches, spec.backend)
 		return nil
 	}
@@ -363,5 +364,32 @@ func TestDimmedRows_followPanelSave(t *testing.T) {
 	}
 	if f.rescans != 0 {
 		t.Errorf("toggling should not rescan, got %d", f.rescans)
+	}
+}
+
+// The launch preview of a dimmed row still shows its command, with a note
+// under it, like the mmproj warning, that the Runtime is off. A row on a
+// Runtime that is on gets none.
+func TestDimmedRows_launchPreviewNotesRuntimeOff(t *testing.T) {
+	t.Parallel()
+
+	previewText := func(m Model) string { return ansi.Strip(m.preview.viewport.GetContent()) }
+
+	off := config.RuntimeStates{}.With(models.BackendVLLM, false)
+	m := dimModel(t, newLaunchFakes().services, linuxPlatform, off, testRow(models.BackendVLLM, "/m/qwen-st"))
+	got := previewText(m)
+	if !strings.Contains(got, "/m/qwen-st") {
+		t.Fatalf("the preview should still show the command:\n%s", got)
+	}
+	if !strings.Contains(got, "vLLM is off") || !strings.Contains(got, "("+FooterKeyConfigPort+")") {
+		t.Errorf("the preview should note that vLLM is off and point at c:\n%s", got)
+	}
+	if note := m.ui.styles.warnLine.Render(fmt.Sprintf(runtimeOffPreviewNote, "vLLM")); !strings.Contains(m.preview.viewport.GetContent(), note) {
+		t.Error("the note should use the warning style")
+	}
+
+	on := dimModel(t, newLaunchFakes().services, linuxPlatform, config.RuntimeStates{}, testRow(models.BackendVLLM, "/m/qwen-st"))
+	if got := previewText(on); strings.Contains(got, "is off") {
+		t.Errorf("a row on an enabled Runtime should have no off note:\n%s", got)
 	}
 }

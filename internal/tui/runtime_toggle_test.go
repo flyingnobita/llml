@@ -10,6 +10,7 @@ import (
 
 	"github.com/flyingnobita/llml/internal/config"
 	"github.com/flyingnobita/llml/internal/models"
+	"github.com/flyingnobita/llml/internal/profiles"
 	"github.com/flyingnobita/llml/internal/settings"
 )
 
@@ -269,12 +270,10 @@ func TestRuntimeToggles_reloadAndFullScanSkipDisabled(t *testing.T) {
 }
 
 // A Disabled Runtime is left out of the main screen's runtime status: rows
-// that need it do not produce a "not found" note for it.
-//
-// Not parallel: program lookups fall back to PATH, which the test empties so
-// nothing is found on the host.
+// that need it do not produce a "not found" note for it. Availability reads
+// only the detection result, so the host's PATH does not matter.
 func TestRuntimeToggles_disabledRuntimeLeftOutOfMissingNote(t *testing.T) {
-	t.Setenv("PATH", t.TempDir())
+	t.Parallel()
 
 	m := NewWithServices(testServices())
 	m.runtime = models.RuntimeInfo{Platform: linuxPlatform}
@@ -321,3 +320,111 @@ func TestRuntimeToggles_unreadableStateFileAlerts(t *testing.T) {
 type errTest string
 
 func (e errTest) Error() string { return string(e) }
+
+// countConfigWrites counts writes to config.toml through f's services.
+func (f *stateFakes) countConfigWrites() *int {
+	n := new(int)
+	f.services.writeConfig = func(config.Config) error {
+		*n++
+		return nil
+	}
+	return n
+}
+
+// A save that only toggles Runtimes writes the state file and leaves
+// config.toml alone, so a hand-edited file keeps its comments.
+func TestRuntimePanel_toggleOnlySaveLeavesConfigAlone(t *testing.T) {
+	t.Parallel()
+
+	f := newStateFakes()
+	configWrites := f.countConfigWrites()
+	m := openPanel(t, f.services, linuxPlatform, defaultSettings(), 100, 30)
+	press(t, m, keyDown, keySpace, keyEnter) // KoboldCpp off
+
+	if f.writes != 1 {
+		t.Errorf("the toggle should be written to the state file, got %d writes", f.writes)
+	}
+	if *configWrites != 0 {
+		t.Errorf("no field changed, so config.toml should not be written, got %d writes", *configWrites)
+	}
+}
+
+// A save that edits a field writes config.toml, alongside any toggles.
+func TestRuntimePanel_fieldEditSaveWritesConfig(t *testing.T) {
+	t.Parallel()
+
+	f := newStateFakes()
+	configWrites := f.countConfigWrites()
+	m := openPanel(t, f.services, linuxPlatform, defaultSettings(), 100, 30)
+	m = press(t, m, keyRight, keyCtrlU) // Llama.cpp Path
+	m = typeText(t, m, "/opt/llama")
+	press(t, m, keyEnter)
+
+	if *configWrites != 1 {
+		t.Errorf("an edited field should be written to config.toml once, got %d writes", *configWrites)
+	}
+	if f.writes != 0 {
+		t.Errorf("no toggle changed, so the state file should not be written, got %d writes", f.writes)
+	}
+}
+
+// The missing-runtime note follows a GGUF row's Active Profile the same way
+// dimming and launch do: through the parameter-profile key, which cleans the
+// row's identity. A row whose identity is not already clean still finds the
+// KoboldCpp choice stored for it.
+func TestMissingNote_followsActiveProfileByParamsKey(t *testing.T) {
+	t.Parallel()
+
+	m := NewWithServices(testServices())
+	m.runtime = models.RuntimeInfo{Platform: linuxPlatform, LlamaServerPath: "/bin/llama-server"}
+	row := models.ModelFile{Backend: models.BackendLlama, ID: "/m/./a.gguf", Path: "/m/a.gguf", Name: "a.gguf"}
+	m.table.files = []models.ModelFile{row}
+	m.table.effectiveBackends = map[string]models.ModelBackend{
+		profiles.ModelParamsKey(row.Identity()): models.BackendKobold,
+	}
+	if row.Identity() == profiles.ModelParamsKey(row.Identity()) {
+		t.Fatal("fixture: the identity should differ from its params key")
+	}
+
+	m, _ = m.maybeSetMissingRuntimeFooterNote()
+	if !strings.Contains(m.lastRunNote, MissingKoboldCppFooterNote) {
+		t.Errorf("the row launches on the missing KoboldCpp, note %q", m.lastRunNote)
+	}
+}
+
+// A Runtime that detection skipped, ticked on but not saved yet, shows no
+// status mark: it got no probe, so any mark would be stale. The detail header
+// says detection runs on save, and saving re-detects it.
+func TestRuntimePanel_toggledOnBeforeSaveShowsNoStaleStatus(t *testing.T) {
+	t.Parallel()
+
+	f := newStateFakes()
+	f.stored = config.RuntimeStates{}.With(models.BackendKobold, false)
+	m := NewWithServices(f.services)
+	m.layout.width, m.layout.height = 100, 30
+	m.loading, m.runtimeScanned = false, true
+	m.settings = defaultSettings()
+	m.runtimeStates = f.stored
+	m.runtime = panelRuntime(linuxPlatform)
+	m.runtime.Skipped = models.NewBackendSet(models.BackendKobold)
+	m = m.layoutTable()
+	m = press(t, m, keyText("c"), keyDown, keySpace) // KoboldCpp on, unsaved
+
+	row := listRow(t, m, "KoboldCpp")
+	for _, mark := range []string{runtimeMarkRunning, runtimeMarkFound, runtimeMarkMissing} {
+		if strings.Contains(row, mark) {
+			t.Errorf("an unprobed Runtime should show no status mark, row %q", row)
+		}
+	}
+	if view := plainView(m); !strings.Contains(view, "KoboldCpp · "+runtimeStatusPendingWord) {
+		t.Errorf("the detail header should say detection runs on save:\n%s", view)
+	}
+	if l := listRow(t, m, "Llama.cpp"); !strings.Contains(l, runtimeMarkRunning) {
+		t.Errorf("a probed Runtime keeps its mark, row %q", l)
+	}
+
+	press(t, m, keyEnter)
+	if n := len(f.skips); n != 1 || f.skips[0].Has(models.BackendKobold) {
+		t.Errorf("saving should re-detect with KoboldCpp probed, skip sets %v", f.skips)
+	}
+}

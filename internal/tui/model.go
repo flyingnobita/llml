@@ -51,8 +51,9 @@ type tableState struct {
 	sortCol  tableSortCol // default Runtime ascending
 	sortDesc bool         // false = ascending
 	lastScan time.Time
-	// effectiveBackends maps model identity to the backend its active profile
-	// selects. Model is copied by value throughout the TUI, and a map is a
+	// effectiveBackends maps a model's parameter-profile key
+	// ([profiles.ModelParamsKey] of its identity) to the backend its active
+	// profile selects; read it through [rowRuntime]. Model is copied by value throughout the TUI, and a map is a
 	// reference, so this field is copy-on-write: every mutator clones it before
 	// writing. Mutating it in place would make one copy's edit visible to all
 	// the others, silently breaking the value semantics the rest of the type has.
