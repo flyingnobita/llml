@@ -307,12 +307,14 @@ User data and settings are stored in a dedicated folder. Routine app upgrades **
 **Key Files:**
 
 - **`config.toml`**: Stores your global settings (ports, binary paths, extra model roots). llml
-  rewrites it only when you save from the `c` or `m` panels, so comments and formatting survive
-  model scans.
+  rewrites it only when you save a changed setting from the `c` or `m` panels, so comments and
+  formatting survive model scans and runtime on/off toggles.
 - **`cache/models.toml`**: The model discovery cache. Machine-owned and safe to delete; llml
   rebuilds it on the next scan.
 - **`model-params.json`**: Stores your [named parameter profiles](#parameter-profiles-p) (args/env) for each model.
-- **`runtimes.toml`**: Which runtimes are on, as set with the checkboxes in the `c` panel.
+- **`runtimes.toml`**: Which runtimes are on, as set with the checkboxes in the `c` panel. Owned
+  by llml, but not disposable like the cache: it is backed up before every overwrite. No
+  environment variable overrides it.
 - **`backups/`**: Automatic timestamped snapshots created before the app overwrites configuration.
 
 ---
@@ -328,8 +330,8 @@ found with no path configured). An environment variable wins over the saved valu
 
 Each runtime has a checkbox. **space** (in the list only, never in a field) turns the highlighted
 runtime on or off, and **enter** saves it with your field edits. A runtime you turn off shows `off`
-in the list and "Off" in its detail pane: llml stops probing it and leaves it out of the runtime
-status line, and its fields stay editable. A runtime you tick back on shows no status mark until you
+in the list and "Off" in its detail pane: llml stops probing it and leaves it out of the
+missing-runtime warning in the footer, and its fields stay editable. A runtime you tick back on shows no status mark until you
 save, since llml has not probed it. Saving re-detects runtimes without rescanning models.
 The on/off choices are stored in `runtimes.toml`, not `config.toml`, and no environment variable
 overrides them. The first time llml sees a runtime, it turns it on only if it finds the program or
@@ -339,8 +341,9 @@ After that only your choice changes it, so a runtime you install later stays off
 Models whose runtime is off stay in the table, dimmed and marked `(off)` after the runtime name, so
 you can still see what is taking up disk space. You can select them, copy their command, and open
 their `p` panel, but **R** / **ctrl+R** will not launch them; an alert names the runtime to turn on
-in `c`, and a note under the launch preview says the runtime is off. A GGUF model follows its active profile: it is dimmed only when that profile's runtime
-(llama.cpp or KoboldCpp) is off, so switching profiles can make it launchable again.
+in `c`, and a note under the launch preview says the runtime is off. A GGUF model follows its
+active profile: it is dimmed only when that profile's runtime (llama.cpp or KoboldCpp) is off, so
+switching profiles can make it launchable again.
 
 When Ollama is off, llml does not contact the Ollama daemon at all: startup and **S** neither start
 `ollama serve` nor call its API. The Ollama models from the last scan stay in the table, dimmed, and
@@ -390,7 +393,8 @@ may be out of date until you turn Ollama back on and scan again.
    `splash serve --model <org/repo>`.
 
 NInfer is shown only on Linux, and oMLX and Splash only on Apple Silicon macOS; the `c`
-panel hides runtimes the platform cannot run.
+panel hides runtimes the platform cannot run. A runtime turned off in `c` gets no server probe, but
+llml still looks for its program on disk so the panel can show whether it is installed.
 
 ---
 
