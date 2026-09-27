@@ -18,6 +18,8 @@ const (
 	BackendOllama
 	// BackendKobold is a GGUF weight file launched with KoboldCpp instead of llama-server.
 	BackendKobold
+	// BackendNInfer is a native NInfer artifact (*.ninfer) launched with ninfer-serve.
+	BackendNInfer
 )
 
 // String returns the canonical lowercase name for the backend.
@@ -29,6 +31,8 @@ func (b ModelBackend) String() string {
 		return "vllm"
 	case BackendKobold:
 		return "koboldcpp"
+	case BackendNInfer:
+		return "ninfer"
 	default:
 		return "llama"
 	}
@@ -45,6 +49,8 @@ func ParseBackend(s string) (ModelBackend, error) {
 		return BackendOllama, nil
 	case "koboldcpp":
 		return BackendKobold, nil
+	case "ninfer":
+		return BackendNInfer, nil
 	default:
 		return 0, fmt.Errorf("unknown backend %q", s)
 	}

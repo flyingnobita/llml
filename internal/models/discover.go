@@ -28,7 +28,7 @@ var skipDirNames = map[string]struct{}{
 	".pytest_cache": {},
 }
 
-// ModelFile is one local model (GGUF file or Hugging Face-style safetensors directory)
+// ModelFile is one local model (GGUF file, Hugging Face-style safetensors directory, or NInfer artifact)
 // plus parsed metadata for the Parameters column.
 type ModelFile struct {
 	Backend ModelBackend
@@ -139,8 +139,8 @@ func buildModelFiles(candidates []candidate, sources []modelSource) []ModelFile 
 	return out
 }
 
-// Discover scans configured paths for .gguf files and Hugging Face-style safetensors directories
-// (config.json + *.safetensors) in a single filesystem walk, dedupes, sorts by path, and fills
+// Discover scans configured paths for .gguf files, Hugging Face-style safetensors directories
+// (config.json + *.safetensors), and native NInfer artifacts (.ninfer) in a single filesystem walk, dedupes, sorts by path, and fills
 // Parameters. isAuxiliaryModel is applied to both backends after Parameters is populated.
 //
 // Discover touches the filesystem only. Rows from the Ollama API are the
@@ -155,7 +155,7 @@ func Discover(ctx context.Context, opts Options) ([]ModelFile, error) {
 		maxD = DefaultMaxDepth
 	}
 	roots := opts.Settings.SearchRoots(opts.ExtraRoots, opts.SkipDefaultRoots)
-	sources := []modelSource{ggufSource{}, safetensorsSource{}}
+	sources := []modelSource{ggufSource{}, safetensorsSource{}, ninferSource{}}
 
 	candidates, err := collectCandidates(ctx, roots, sources, maxD)
 	if err != nil {

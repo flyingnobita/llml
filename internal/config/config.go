@@ -42,17 +42,20 @@ type Config struct {
 // RuntimeConfig mirrors env vars LLAMA_CPP_PATH, VLLM_PATH, VLLM_VENV, and server ports.
 // Empty strings mean unset; ports use pointers so zero can mean "omit default in file".
 type RuntimeConfig struct {
-	DefaultLlamaCppPath    string `toml:"default_llama_cpp_path"`
-	DefaultLlamaServerHost string `toml:"default_llama_server_host"`
-	DefaultVLLMPath        string `toml:"default_vllm_path"`
-	DefaultVLLMServerHost  string `toml:"default_vllm_server_host"`
-	DefaultVLLMVenv        string `toml:"default_vllm_venv"`
-	DefaultOllamaPath      string `toml:"default_ollama_path"`
-	DefaultOllamaHost      string `toml:"default_ollama_host"`
-	DefaultKoboldCppPath   string `toml:"default_koboldcpp_path"`
-	DefaultLlamaServerPort *int   `toml:"default_llama_server_port,omitempty"`
-	DefaultVLLMServerPort  *int   `toml:"default_vllm_server_port,omitempty"`
-	DefaultKoboldCppPort   *int   `toml:"default_koboldcpp_port,omitempty"`
+	DefaultLlamaCppPath     string `toml:"default_llama_cpp_path"`
+	DefaultLlamaServerHost  string `toml:"default_llama_server_host"`
+	DefaultVLLMPath         string `toml:"default_vllm_path"`
+	DefaultVLLMServerHost   string `toml:"default_vllm_server_host"`
+	DefaultVLLMVenv         string `toml:"default_vllm_venv"`
+	DefaultOllamaPath       string `toml:"default_ollama_path"`
+	DefaultOllamaHost       string `toml:"default_ollama_host"`
+	DefaultKoboldCppPath    string `toml:"default_koboldcpp_path"`
+	DefaultLlamaServerPort  *int   `toml:"default_llama_server_port,omitempty"`
+	DefaultVLLMServerPort   *int   `toml:"default_vllm_server_port,omitempty"`
+	DefaultKoboldCppPort    *int   `toml:"default_koboldcpp_port,omitempty"`
+	DefaultNInferPath       string `toml:"default_ninfer_path"`
+	DefaultNInferServerHost string `toml:"default_ninfer_server_host"`
+	DefaultNInferServerPort *int   `toml:"default_ninfer_server_port,omitempty"`
 }
 
 // DiscoveryConfig holds the user's extra search roots. The last scan time is
@@ -159,12 +162,15 @@ func (r RuntimeConfig) Layer() settings.Layer {
 	setLayerPath(&l.VLLMVenv, r.DefaultVLLMVenv)
 	setLayerPath(&l.OllamaPath, r.DefaultOllamaPath)
 	setLayerPath(&l.KoboldCppPath, r.DefaultKoboldCppPath)
+	setLayerPath(&l.NInferPath, r.DefaultNInferPath)
 	setLayerString(&l.LlamaServerHost, r.DefaultLlamaServerHost)
 	setLayerString(&l.VLLMServerHost, r.DefaultVLLMServerHost)
+	setLayerString(&l.NInferServerHost, r.DefaultNInferServerHost)
 	setLayerString(&l.OllamaHost, settings.NormalizeOllamaHost(r.DefaultOllamaHost))
 	setLayerPort(&l.LlamaServerPort, r.DefaultLlamaServerPort)
 	setLayerPort(&l.VLLMServerPort, r.DefaultVLLMServerPort)
 	setLayerPort(&l.KoboldCppPort, r.DefaultKoboldCppPort)
+	setLayerPort(&l.NInferServerPort, r.DefaultNInferServerPort)
 	return l
 }
 
@@ -217,6 +223,7 @@ func RuntimeConfigFromSettings(s settings.Settings) RuntimeConfig {
 	llamaPort := s.LlamaServerPort
 	vllmPort := s.VLLMServerPort
 	koboldPort := s.KoboldCppPort
+	ninferPort := s.NInferServerPort
 	return RuntimeConfig{
 		DefaultLlamaCppPath:    s.LlamaCppPath,
 		DefaultLlamaServerHost: s.LlamaServerHost,
@@ -229,6 +236,10 @@ func RuntimeConfigFromSettings(s settings.Settings) RuntimeConfig {
 		DefaultLlamaServerPort: &llamaPort,
 		DefaultVLLMServerPort:  &vllmPort,
 		DefaultKoboldCppPort:   &koboldPort,
+
+		DefaultNInferPath:       s.NInferPath,
+		DefaultNInferServerHost: s.NInferServerHost,
+		DefaultNInferServerPort: &ninferPort,
 	}
 }
 

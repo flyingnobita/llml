@@ -45,6 +45,13 @@ const (
 	EnvKoboldCppPath = "KOBOLDCPP_PATH"
 	// EnvKoboldCppPort is the TCP port for KoboldCpp.
 	EnvKoboldCppPort = "KOBOLDCPP_PORT"
+	// EnvNInferPath is an NInfer checkout root, a directory containing
+	// ninfer-serve, or the absolute ninfer-serve path.
+	EnvNInferPath = "NINFER_PATH"
+	// EnvNInferServerPort is the TCP port for ninfer-serve and its /health probe.
+	EnvNInferServerPort = "NINFER_SERVER_PORT"
+	// EnvNInferServerHost is the listen host for ninfer-serve.
+	EnvNInferServerHost = "NINFER_SERVER_HOST"
 	// EnvModelPaths lists extra model search roots, comma-separated.
 	EnvModelPaths = "LLML_MODEL_PATHS"
 	// EnvHFHubCache overrides the Hugging Face hub cache directory.
@@ -62,6 +69,10 @@ const (
 	DefaultVLLMServerPort = 8000
 	DefaultKoboldCppPort  = 5001
 	DefaultOllamaHost     = "127.0.0.1:11434"
+	DefaultNInferHost     = "127.0.0.1"
+	// DefaultNInferServerPort differs from ninfer-serve's own default (8080) so
+	// it does not collide with llama-server's default port.
+	DefaultNInferServerPort = 18080
 )
 
 // Settings holds every runtime value in fully resolved form. Path fields are
@@ -82,6 +93,10 @@ type Settings struct {
 
 	KoboldCppPath string
 	KoboldCppPort int
+
+	NInferPath       string
+	NInferServerHost string
+	NInferServerPort int
 
 	// ExtraModelPaths are additional filesystem roots to scan for models.
 	ExtraModelPaths []string
@@ -109,6 +124,10 @@ type Layer struct {
 	KoboldCppPath *string
 	KoboldCppPort *int
 
+	NInferPath       *string
+	NInferServerHost *string
+	NInferServerPort *int
+
 	ExtraModelPaths []string
 	HFHubCache      *string
 	HFHome          *string
@@ -124,6 +143,9 @@ func Defaults() Layer {
 		VLLMServerPort:  ptr(DefaultVLLMServerPort),
 		OllamaHost:      ptr(DefaultOllamaHost),
 		KoboldCppPort:   ptr(DefaultKoboldCppPort),
+
+		NInferServerHost: ptr(DefaultNInferHost),
+		NInferServerPort: ptr(DefaultNInferServerPort),
 	}
 }
 
@@ -149,6 +171,9 @@ func Resolve(layers ...Layer) Settings {
 		takeString(&s.OllamaHost, l.OllamaHost)
 		takeString(&s.KoboldCppPath, l.KoboldCppPath)
 		takeInt(&s.KoboldCppPort, l.KoboldCppPort)
+		takeString(&s.NInferPath, l.NInferPath)
+		takeString(&s.NInferServerHost, l.NInferServerHost)
+		takeInt(&s.NInferServerPort, l.NInferServerPort)
 		takeString(&s.HFHubCache, l.HFHubCache)
 		takeString(&s.HFHome, l.HFHome)
 		roots.Add(l.ExtraModelPaths...)

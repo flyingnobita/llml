@@ -237,10 +237,13 @@ func TestRuntimeConfigFromSettings_roundTrips(t *testing.T) {
 	t.Parallel()
 
 	want := settings.Resolve(settings.FromEnv(fakeEnv(map[string]string{
-		settings.EnvLlamaCppPath:   "/opt/llama",
-		settings.EnvKoboldCppPort:  "6000",
-		settings.EnvOllamaHost:     "box:11434",
-		settings.EnvVLLMServerHost: "0.0.0.0",
+		settings.EnvLlamaCppPath:     "/opt/llama",
+		settings.EnvKoboldCppPort:    "6000",
+		settings.EnvOllamaHost:       "box:11434",
+		settings.EnvVLLMServerHost:   "0.0.0.0",
+		settings.EnvNInferPath:       "/opt/ninfer",
+		settings.EnvNInferServerPort: "18181",
+		settings.EnvNInferServerHost: "0.0.0.0",
 	})), settings.Defaults())
 
 	rc := RuntimeConfigFromSettings(want)

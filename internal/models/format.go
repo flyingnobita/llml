@@ -34,6 +34,8 @@ func FormatRuntimeLabel(b ModelBackend) string {
 		return "vllm"
 	case BackendKobold:
 		return "koboldcpp"
+	case BackendNInfer:
+		return "ninfer"
 	default:
 		return "llama.cpp"
 	}

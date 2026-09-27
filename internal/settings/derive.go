@@ -21,20 +21,46 @@ func (s Settings) HuggingFaceHubCache(home string) string {
 	return filepath.Join(home, ".cache", "huggingface", "hub")
 }
 
-// DefaultSearchRoots returns the common directories where GGUF weights are
-// stored for llama.cpp workflows. It returns nil when the home directory cannot
-// be resolved.
+// DefaultSearchRoots returns the common directories where model weights are
+// stored: the llama.cpp, Hugging Face, and LM Studio caches, plus the models/
+// directory of a configured NInfer checkout. It returns nil when the home
+// directory cannot be resolved.
 func (s Settings) DefaultSearchRoots() []string {
 	home := fsutil.HomeDir()
 	if home == "" {
 		return nil
 	}
-	return []string{
+	roots := []string{
 		filepath.Join(home, "models"),
 		filepath.Join(home, ".cache", "llama.cpp"),
 		s.HuggingFaceHubCache(home),
 		filepath.Join(home, ".cache", "lm-studio", "models"),
 	}
+	if d := s.NInferModelsDir(); d != "" {
+		roots = append(roots, d)
+	}
+	return roots
+}
+
+// NInferModelsDir returns the models/ directory of the configured NInfer
+// checkout, where NInfer's own download instructions place *.ninfer
+// artifacts. It is "" when NInferPath is unset. NInferPath may also name the
+// build output directory (build/apps) or the ninfer-serve binary inside it,
+// since NInfer has no install target; both are walked back to the checkout
+// root. The directory is not checked for existence here; discovery skips
+// roots that do not exist.
+func (s Settings) NInferModelsDir() string {
+	p := s.NInferPath
+	if p == "" {
+		return ""
+	}
+	if filepath.Base(p) == "ninfer-serve" {
+		p = filepath.Dir(p)
+	}
+	if filepath.Base(p) == "apps" && filepath.Base(filepath.Dir(p)) == "build" {
+		p = filepath.Dir(filepath.Dir(p))
+	}
+	return filepath.Join(p, "models")
 }
 
 // SearchRoots combines the default roots, the resolved ExtraModelPaths, and any

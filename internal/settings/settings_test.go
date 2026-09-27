@@ -57,6 +57,59 @@ func TestResolveDefaultsAlwaysProduceUsableHostsAndPorts(t *testing.T) {
 	if s.LlamaServerHost == "" || s.VLLMServerHost == "" || s.OllamaHost == "" {
 		t.Errorf("hosts not defaulted: %+v", s)
 	}
+	if s.NInferServerPort != DefaultNInferServerPort || s.NInferServerHost != DefaultNInferHost {
+		t.Errorf("ninfer not defaulted: %+v", s)
+	}
+	if s.NInferServerPort == s.LlamaServerPort {
+		t.Errorf("ninfer default port %d collides with llama-server's", s.NInferServerPort)
+	}
+}
+
+func TestFromEnvReadsNInfer(t *testing.T) {
+	t.Parallel()
+
+	s := Resolve(FromEnv(fakeEnv(map[string]string{
+		EnvNInferPath:       "/opt/ninfer/",
+		EnvNInferServerPort: "19000",
+		EnvNInferServerHost: "0.0.0.0",
+	})), Defaults())
+
+	if s.NInferPath != "/opt/ninfer" || s.NInferServerPort != 19000 || s.NInferServerHost != "0.0.0.0" {
+		t.Errorf("ninfer env not applied: %+v", s)
+	}
+}
+
+func TestNInferModelsDir(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		path, want string
+	}{
+		{"", ""},
+		{"/opt/ninfer", "/opt/ninfer/models"},
+		{"/opt/ninfer/build/apps", "/opt/ninfer/models"},
+		{"/opt/ninfer/build/apps/ninfer-serve", "/opt/ninfer/models"},
+		{"/usr/local/bin/ninfer-serve", "/usr/local/bin/models"},
+	}
+	for _, tt := range tests {
+		if got := (Settings{NInferPath: tt.path}).NInferModelsDir(); got != tt.want {
+			t.Errorf("NInferModelsDir(%q) = %q, want %q", tt.path, got, tt.want)
+		}
+	}
+}
+
+func TestDefaultSearchRootsIncludeNInferModels(t *testing.T) {
+	t.Parallel()
+
+	with := Settings{NInferPath: "/opt/ninfer"}.DefaultSearchRoots()
+	if with != nil && !slices.Contains(with, "/opt/ninfer/models") {
+		t.Errorf("roots %v missing the NInfer models dir", with)
+	}
+	for _, r := range (Settings{}).DefaultSearchRoots() {
+		if filepath.Base(r) == "models" && filepath.Base(filepath.Dir(r)) == "ninfer" {
+			t.Errorf("unexpected NInfer root %q without NInferPath", r)
+		}
+	}
 }
 
 func TestFromEnvIgnoresBlankAndInvalidValues(t *testing.T) {

@@ -24,12 +24,16 @@ type RuntimeInfo struct {
 	ProbePort          int // port used when ServerRunning is true (0 if not probed)
 	KoboldCppRunning   bool
 	KoboldCppProbePort int // port used when KoboldCppRunning is true
+	NInferPath         string
+	NInferServerHost   string
+	NInferRunning      bool // ninfer-serve answered /health on NInferServerPort
 
 	// Resolved listen ports, carried here so launch and preview code reads them
 	// from the detected runtime instead of re-reading configuration.
 	LlamaServerPort int
 	VLLMServerPort  int
 	KoboldCppPort   int
+	NInferPort      int
 
 	// VLLMVenv and VLLMConfiguredPath are the configured (not detected) vLLM
 	// locations, carried so venv activation can be resolved from a RuntimeInfo alone.
@@ -39,7 +43,7 @@ type RuntimeInfo struct {
 
 // Available is true if any backend binary was found, or a llama-server responded on the health probe.
 func (r RuntimeInfo) Available() bool {
-	return r.LlamaCLIPath != "" || r.LlamaServerPath != "" || r.VLLMPath != "" || r.OllamaPath != "" || r.KoboldCppPath != "" || r.OllamaRunning || r.ServerRunning || r.KoboldCppRunning
+	return r.LlamaCLIPath != "" || r.LlamaServerPath != "" || r.VLLMPath != "" || r.OllamaPath != "" || r.KoboldCppPath != "" || r.NInferPath != "" || r.OllamaRunning || r.ServerRunning || r.KoboldCppRunning || r.NInferRunning
 }
 
 func formatBinLabel(abs string) string {
@@ -83,6 +87,16 @@ func (r RuntimeInfo) Summary() string {
 			k = "koboldcpp: running"
 		}
 	}
+	n := "ninfer: —"
+	showNInfer := r.NInferPath != "" || r.NInferRunning
+	switch {
+	case r.NInferPath != "" && r.NInferRunning:
+		n = "ninfer: ✓ running"
+	case r.NInferPath != "":
+		n = "ninfer: ✓ stopped"
+	case r.NInferRunning:
+		n = "ninfer: running"
+	}
 	o := "ollama: —"
 	showOllama := r.OllamaPath != "" || r.OllamaRunning
 	switch {
@@ -98,6 +112,9 @@ func (r RuntimeInfo) Summary() string {
 	if showKobold {
 		parts = append(parts, k)
 	}
+	if showNInfer {
+		parts = append(parts, n)
+	}
 	if showOllama {
 		parts = append(parts, o)
 	}
@@ -108,32 +125,35 @@ func (r RuntimeInfo) Summary() string {
 // directories (including Homebrew on Apple Silicon), then PATH. If neither binary exists,
 // it probes http://{s.LlamaServerHost}:{s.LlamaServerPort}/health.
 //
-// The three network probes run concurrently, so an unreachable backend costs one
-// timeout rather than three in sequence, and all of them observe ctx: a cancelled
+// The network probes run concurrently, so an unreachable backend costs one
+// timeout rather than one per backend in sequence, and all of them observe ctx: a cancelled
 // or expired context returns whatever the filesystem lookups found.
 func DiscoverRuntime(ctx context.Context, s settings.Settings) RuntimeInfo {
 	cli := findLlamaBinary("llama-cli", s.LlamaCppPath)
 	srv := findLlamaBinary("llama-server", s.LlamaCppPath)
 	info := RuntimeInfo{
-		LlamaCLIPath:    cli,
-		LlamaServerPath: srv,
-		LlamaServerHost: s.LlamaServerHost,
-		VLLMPath:        findVLLMBinary(s.VLLMPath, s.VLLMVenv),
-		VLLMServerHost:  s.VLLMServerHost,
-		OllamaPath:      findOllamaBinary(s.OllamaPath),
-		OllamaHost:      s.OllamaHost,
-		KoboldCppPath:   findKoboldCppBinary(s.KoboldCppPath),
-		ProbePort:       s.LlamaServerPort,
-		LlamaServerPort: s.LlamaServerPort,
-		VLLMServerPort:  s.VLLMServerPort,
-		KoboldCppPort:   s.KoboldCppPort,
+		LlamaCLIPath:     cli,
+		LlamaServerPath:  srv,
+		LlamaServerHost:  s.LlamaServerHost,
+		VLLMPath:         findVLLMBinary(s.VLLMPath, s.VLLMVenv),
+		VLLMServerHost:   s.VLLMServerHost,
+		OllamaPath:       findOllamaBinary(s.OllamaPath),
+		OllamaHost:       s.OllamaHost,
+		KoboldCppPath:    findKoboldCppBinary(s.KoboldCppPath),
+		NInferPath:       findNInferBinary(s.NInferPath),
+		NInferServerHost: s.NInferServerHost,
+		ProbePort:        s.LlamaServerPort,
+		LlamaServerPort:  s.LlamaServerPort,
+		VLLMServerPort:   s.VLLMServerPort,
+		KoboldCppPort:    s.KoboldCppPort,
+		NInferPort:       s.NInferServerPort,
 
 		VLLMVenv:           s.VLLMVenv,
 		VLLMConfiguredPath: s.VLLMPath,
 	}
 
 	var wg sync.WaitGroup
-	var llamaRunning, ollamaRunning, koboldRunning bool
+	var llamaRunning, ollamaRunning, koboldRunning, ninferRunning bool
 
 	// Probing llama-server is only informative when neither binary was found.
 	if cli == "" && srv == "" {
@@ -143,7 +163,11 @@ func DiscoverRuntime(ctx context.Context, s settings.Settings) RuntimeInfo {
 			llamaRunning = probeHealthEndpoint(ctx, s.LlamaServerHost, s.LlamaServerPort)
 		}()
 	}
-	wg.Add(2)
+	wg.Add(3)
+	go func() {
+		defer wg.Done()
+		ninferRunning = probeHealthEndpoint(ctx, probeHost(s.NInferServerHost), s.NInferServerPort)
+	}()
 	go func() {
 		defer wg.Done()
 		ollamaRunning = NewOllamaClient(s.OllamaHost).Probe(ctx)
@@ -156,6 +180,7 @@ func DiscoverRuntime(ctx context.Context, s settings.Settings) RuntimeInfo {
 
 	info.ServerRunning = llamaRunning
 	info.OllamaRunning = ollamaRunning
+	info.NInferRunning = ninferRunning
 	if koboldRunning {
 		info.KoboldCppRunning = true
 		info.KoboldCppProbePort = s.KoboldCppPort

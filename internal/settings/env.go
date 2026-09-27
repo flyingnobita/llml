@@ -25,16 +25,19 @@ func FromEnv(getenv Getenv) Layer {
 	setPath(&l.VLLMVenv, getenv(EnvVLLMVenv))
 	setPath(&l.OllamaPath, getenv(EnvOllamaPath))
 	setPath(&l.KoboldCppPath, getenv(EnvKoboldCppPath))
+	setPath(&l.NInferPath, getenv(EnvNInferPath))
 	setPath(&l.HFHubCache, getenv(EnvHFHubCache))
 	setPath(&l.HFHome, getenv(EnvHFHome))
 
 	setHost(&l.LlamaServerHost, getenv(EnvLlamaServerHost))
 	setHost(&l.VLLMServerHost, getenv(EnvVLLMServerHost))
+	setHost(&l.NInferServerHost, getenv(EnvNInferServerHost))
 	setOllamaHost(&l.OllamaHost, getenv(EnvOllamaHost))
 
 	setPort(&l.LlamaServerPort, getenv(EnvLlamaServerPort))
 	setPort(&l.VLLMServerPort, getenv(EnvVLLMServerPort))
 	setPort(&l.KoboldCppPort, getenv(EnvKoboldCppPort))
+	setPort(&l.NInferServerPort, getenv(EnvNInferServerPort))
 
 	l.ExtraModelPaths = SplitPathList(getenv(EnvModelPaths))
 	return l

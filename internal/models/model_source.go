@@ -8,7 +8,8 @@ import (
 
 // modelSource matches walk entries and builds ModelFile values.
 // GGUF is file-based (build path = the .gguf file itself);
-// safetensors is directory-based (build path = the parent dir of any .safetensors file).
+// safetensors is directory-based (build path = the parent dir of any .safetensors file);
+// NInfer is file-based like GGUF (build path = the .ninfer file itself, see ninfer.go).
 type modelSource interface {
 	// match returns the path to pass to build for this walk entry, or "" to skip.
 	match(full, parentDir string, ent os.DirEntry) string

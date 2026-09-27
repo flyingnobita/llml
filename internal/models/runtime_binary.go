@@ -201,8 +201,37 @@ func findKoboldCppBinary(koboldCppPath string) string {
 	return ""
 }
 
-// probeHealthEndpoint GETs /health on host:port, bounded by ctx. Used by both
-// llama-server and KoboldCpp. It shares the package HTTP client so repeated
+// ninferServeName is the NInfer HTTP server executable.
+const ninferServeName = "ninfer-serve"
+
+// findNInferBinary resolves ninfer-serve from ninferPath, then common install
+// directories, then PATH. ninferPath may be the binary itself, a directory
+// containing it, or an NInfer checkout root: NInfer has no install target, so
+// its build leaves the server at build/apps/ninfer-serve inside the checkout.
+func findNInferBinary(ninferPath string) string {
+	if d := ninferPath; d != "" {
+		clean := filepath.Clean(d)
+		if isRegularFile(clean) && filepath.Base(clean) == ninferServeName && isExecutableFile(clean) {
+			return clean
+		}
+		for _, candidate := range []string{
+			filepath.Join(clean, ninferServeName),
+			filepath.Join(clean, "build", "apps", ninferServeName),
+		} {
+			if isExecutableFile(candidate) {
+				return candidate
+			}
+		}
+	}
+	common := slices.Clone(commonBinaryDirs)
+	if home, err := os.UserHomeDir(); err == nil {
+		common = append(common, filepath.Join(home, ".local", "bin"))
+	}
+	return findBinaryInEnvAndCommonDirs(ninferServeName, "", common)
+}
+
+// probeHealthEndpoint GETs /health on host:port, bounded by ctx. Used by
+// llama-server, KoboldCpp, and ninfer-serve. It shares the package HTTP client so repeated
 // probes reuse connections.
 func probeHealthEndpoint(ctx context.Context, host string, port int) bool {
 	url := fmt.Sprintf("http://%s:%d/health", host, port)
@@ -223,6 +252,18 @@ func probeHealthEndpoint(ctx context.Context, host string, port int) bool {
 // defaultProbeHost is the loopback address used for health probes that have no
 // configurable host of their own (KoboldCpp).
 const defaultProbeHost = "127.0.0.1"
+
+// probeHost returns the address to probe a server configured to listen on
+// host. A wildcard listen address accepts loopback connections but is not a
+// portable destination, so it is probed on loopback.
+func probeHost(host string) string {
+	switch strings.TrimSpace(host) {
+	case "", "0.0.0.0", "::", "[::]":
+		return defaultProbeHost
+	default:
+		return strings.TrimSpace(host)
+	}
+}
 
 // resolvePath returns existing if non-empty, otherwise the first match for cmdName on PATH.
 func resolvePath(existing, cmdName string) string {
@@ -248,6 +289,11 @@ func ResolveVLLMPath(r RuntimeInfo) string {
 // ResolveOllamaPath returns the detected ollama binary path, or the first match on PATH.
 func ResolveOllamaPath(r RuntimeInfo) string {
 	return resolvePath(r.OllamaPath, "ollama")
+}
+
+// ResolveNInferPath returns the detected ninfer-serve binary path, or the first match on PATH.
+func ResolveNInferPath(r RuntimeInfo) string {
+	return resolvePath(r.NInferPath, ninferServeName)
 }
 
 // ResolveKoboldCppPath returns the detected koboldcpp binary path, or the first match on PATH.

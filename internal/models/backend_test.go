@@ -11,6 +11,7 @@ func TestBackendString(t *testing.T) {
 		{BackendVLLM, "vllm"},
 		{BackendOllama, "ollama"},
 		{BackendKobold, "koboldcpp"},
+		{BackendNInfer, "ninfer"},
 		{ModelBackend(99), "llama"}, // unknown → llama
 	}
 	for _, tt := range tests {
@@ -35,6 +36,8 @@ func TestParseBackend(t *testing.T) {
 		{"ollama", BackendOllama, false},
 		{"koboldcpp", BackendKobold, false},
 		{"koboldCpp", BackendKobold, false},
+		{"ninfer", BackendNInfer, false},
+		{"NInfer", BackendNInfer, false},
 		{"unknown", 0, true},
 		{" llama ", BackendLlama, false},
 	}
