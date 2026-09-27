@@ -71,8 +71,9 @@ var paramMetadataFieldLabels = [...]string{
 }
 
 var (
-	paramBackendOptionsAll  = []string{"", "llama", "vllm", "ollama", "koboldcpp", "ninfer", "omlx", "splash"}
-	paramBackendOptionsGGUF = []string{"", "llama", "koboldcpp"}
+	paramBackendOptionsAll = []string{"", "llama", "vllm", "ollama", "koboldcpp", "ninfer", "omlx", "splash"}
+	// paramBackendOptionsGGUF offers "" (no override) and each Runtime that runs GGUF.
+	paramBackendOptionsGGUF = append([]string{""}, runtimeBackendsIn(formatGGUF)...)
 )
 
 // paramBackendOptionsForModel returns the valid backend options for the given

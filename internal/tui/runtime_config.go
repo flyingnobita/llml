@@ -10,7 +10,6 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/flyingnobita/llml/internal/fsutil"
 	"github.com/flyingnobita/llml/internal/models"
 	"github.com/flyingnobita/llml/internal/settings"
 )
@@ -41,24 +40,10 @@ const (
 	runtimeFieldCount
 )
 
-// runtimeFieldBackend returns the backend a field configures, so fields for a
-// backend the platform cannot run are hidden and skipped by tab.
-func runtimeFieldBackend(f runtimeField) models.ModelBackend {
-	switch f {
-	case runtimeFieldNInferPath, runtimeFieldNInferPort, runtimeFieldNInferHost:
-		return models.BackendNInfer
-	case runtimeFieldSplashPath, runtimeFieldSplashPort, runtimeFieldSplashHost:
-		return models.BackendSplash
-	case runtimeFieldOMLXPath, runtimeFieldOMLXPort, runtimeFieldOMLXHost:
-		return models.BackendOMLX
-	default:
-		return models.BackendLlama
-	}
-}
-
 // runtimeFieldVisible reports whether field f is shown on this platform.
 func (m Model) runtimeFieldVisible(f runtimeField) bool {
-	return m.runtime.Platform.Supports(runtimeFieldBackend(f))
+	rt, _ := runtimeFieldDefFor(f)
+	return rt.supported(m.runtime.Platform)
 }
 
 // stepRuntimeField returns the next visible field after from in direction
@@ -144,26 +129,11 @@ func newPathTextInput() textinput.Model {
 // [runtimeField]. Prefill and dirty-checking share it so they cannot drift.
 func runtimeFieldValues(s settings.Settings) [runtimeFieldCount]string {
 	var v [runtimeFieldCount]string
-	v[runtimeFieldLlamaCppPath] = s.LlamaCppPath
-	v[runtimeFieldLlamaPort] = strconv.Itoa(s.LlamaServerPort)
-	v[runtimeFieldLlamaHost] = s.LlamaServerHost
-	v[runtimeFieldOllamaPath] = s.OllamaPath
-	v[runtimeFieldOllamaHost] = s.OllamaHost
-	v[runtimeFieldVLLMPath] = s.VLLMPath
-	v[runtimeFieldVLLMVenv] = s.VLLMVenv
-	v[runtimeFieldVLLMPort] = strconv.Itoa(s.VLLMServerPort)
-	v[runtimeFieldVLLMHost] = s.VLLMServerHost
-	v[runtimeFieldKoboldCppPath] = s.KoboldCppPath
-	v[runtimeFieldKoboldCppPort] = strconv.Itoa(s.KoboldCppPort)
-	v[runtimeFieldNInferPath] = s.NInferPath
-	v[runtimeFieldNInferPort] = strconv.Itoa(s.NInferServerPort)
-	v[runtimeFieldNInferHost] = s.NInferServerHost
-	v[runtimeFieldOMLXPath] = s.OMLXPath
-	v[runtimeFieldOMLXPort] = strconv.Itoa(s.OMLXPort)
-	v[runtimeFieldOMLXHost] = s.OMLXHost
-	v[runtimeFieldSplashPath] = s.SplashPath
-	v[runtimeFieldSplashPort] = strconv.Itoa(s.SplashPort)
-	v[runtimeFieldSplashHost] = s.SplashHost
+	for _, rt := range runtimeTable {
+		for _, d := range rt.fields {
+			v[d.field] = d.value(s)
+		}
+	}
 	return v
 }
 
@@ -238,13 +208,15 @@ func (m Model) maybeSetMissingRuntimeFooterNote() (Model, tea.Cmd) {
 			wantSplash = true
 		}
 	}
-	haveLlama := models.ResolveLlamaServerPath(m.runtime) != ""
-	haveVLLM := models.ResolveVLLMPath(m.runtime) != ""
-	haveOllama := models.ResolveOllamaPath(m.runtime) != "" || m.runtime.OllamaRunning
-	haveKobold := models.ResolveKoboldCppPath(m.runtime) != ""
-	haveNInfer := models.ResolveNInferPath(m.runtime) != ""
-	haveOMLX := models.ResolveOMLXPath(m.runtime) != ""
-	haveSplash := models.ResolveSplashPath(m.runtime) != ""
+	found := func(b models.ModelBackend) bool { return runtimeFor(b).status(m.runtime).found }
+	haveLlama := found(models.BackendLlama)
+	haveVLLM := found(models.BackendVLLM)
+	// Ollama models launch through a running daemon, so the program is optional.
+	haveOllama := found(models.BackendOllama) || runtimeFor(models.BackendOllama).status(m.runtime).running
+	haveKobold := found(models.BackendKobold)
+	haveNInfer := found(models.BackendNInfer)
+	haveOMLX := found(models.BackendOMLX)
+	haveSplash := found(models.BackendSplash)
 
 	var msgs []string
 	if wantLlama && !haveLlama {
@@ -313,65 +285,26 @@ func (m Model) focusRuntimeField(i runtimeField) (Model, tea.Cmd) {
 // carried over from the current settings unchanged.
 func (m Model) settingsFromRuntimeInputs() (settings.Settings, error) {
 	s := m.settings
-
-	llamaPort, err := parsePortField(m.rc.inputs[runtimeFieldLlamaPort].Value(), settings.DefaultLlamaServerPort)
-	if err != nil {
-		return s, fmt.Errorf("%s: %w", settings.EnvLlamaServerPort, err)
+	for _, rt := range runtimeTable {
+		for _, d := range rt.fields {
+			if err := d.apply(&s, m.rc.inputs[d.field].Value()); err != nil {
+				return m.settings, fmt.Errorf("%s: %w", d.env, err)
+			}
+		}
 	}
-	vllmPort, err := parsePortField(m.rc.inputs[runtimeFieldVLLMPort].Value(), settings.DefaultVLLMServerPort)
-	if err != nil {
-		return s, fmt.Errorf("%s: %w", settings.EnvVLLMServerPort, err)
-	}
-	koboldPort, err := parsePortField(m.rc.inputs[runtimeFieldKoboldCppPort].Value(), settings.DefaultKoboldCppPort)
-	if err != nil {
-		return s, fmt.Errorf("%s: %w", settings.EnvKoboldCppPort, err)
-	}
-	ninferPort, err := parsePortField(m.rc.inputs[runtimeFieldNInferPort].Value(), settings.DefaultNInferServerPort)
-	if err != nil {
-		return s, fmt.Errorf("%s: %w", settings.EnvNInferServerPort, err)
-	}
-	omlxPort, err := parsePortField(m.rc.inputs[runtimeFieldOMLXPort].Value(), settings.DefaultOMLXPort)
-	if err != nil {
-		return s, fmt.Errorf("%s: %w", settings.EnvOMLXPort, err)
-	}
-	splashPort, err := parsePortField(m.rc.inputs[runtimeFieldSplashPort].Value(), settings.DefaultSplashPort)
-	if err != nil {
-		return s, fmt.Errorf("%s: %w", settings.EnvSplashPort, err)
-	}
-
-	s.LlamaCppPath = fsutil.NormalizePath(m.rc.inputs[runtimeFieldLlamaCppPath].Value())
-	s.VLLMPath = fsutil.NormalizePath(m.rc.inputs[runtimeFieldVLLMPath].Value())
-	s.VLLMVenv = fsutil.NormalizePath(m.rc.inputs[runtimeFieldVLLMVenv].Value())
-	s.OllamaPath = fsutil.NormalizePath(m.rc.inputs[runtimeFieldOllamaPath].Value())
-	s.KoboldCppPath = fsutil.NormalizePath(m.rc.inputs[runtimeFieldKoboldCppPath].Value())
-	s.NInferPath = fsutil.NormalizePath(m.rc.inputs[runtimeFieldNInferPath].Value())
-	s.OMLXPath = fsutil.NormalizePath(m.rc.inputs[runtimeFieldOMLXPath].Value())
-	s.SplashPath = fsutil.NormalizePath(m.rc.inputs[runtimeFieldSplashPath].Value())
-
-	s.LlamaServerPort = llamaPort
-	s.VLLMServerPort = vllmPort
-	s.KoboldCppPort = koboldPort
-	s.NInferServerPort = ninferPort
-	s.OMLXPort = omlxPort
-	s.SplashPort = splashPort
-
-	s.LlamaServerHost = hostField(m.rc.inputs[runtimeFieldLlamaHost].Value(), settings.DefaultLlamaServerHost)
-	s.VLLMServerHost = hostField(m.rc.inputs[runtimeFieldVLLMHost].Value(), settings.DefaultVLLMServerHost)
-	s.NInferServerHost = hostField(m.rc.inputs[runtimeFieldNInferHost].Value(), settings.DefaultNInferHost)
-	s.OMLXHost = hostField(m.rc.inputs[runtimeFieldOMLXHost].Value(), settings.DefaultOMLXHost)
-	s.SplashHost = hostField(m.rc.inputs[runtimeFieldSplashHost].Value(), settings.DefaultSplashHost)
-	s.OllamaHost = hostField(
-		settings.NormalizeOllamaHost(m.rc.inputs[runtimeFieldOllamaHost].Value()),
-		settings.DefaultOllamaHost,
-	)
 	return s, nil
 }
 
 func (m Model) commitRuntimeConfig() (Model, tea.Cmd) {
-	for _, f := range []runtimeField{runtimeFieldLlamaPort, runtimeFieldVLLMPort, runtimeFieldKoboldCppPort, runtimeFieldNInferPort, runtimeFieldOMLXPort, runtimeFieldSplashPort} {
-		if err := validatePortCommit(m.rc.inputs[f].Value()); err != nil {
-			m = m.withLastRunError(fmt.Sprintf("%s: %v", runtimePortEnvKey(f), err))
-			return m, clearLastRunNoteAfterCmd()
+	for _, rt := range runtimeTable {
+		for _, d := range rt.fields {
+			if d.port == nil {
+				continue
+			}
+			if err := validatePortCommit(m.rc.inputs[d.field].Value()); err != nil {
+				m = m.withLastRunError(fmt.Sprintf("%s: %v", d.env, err))
+				return m, clearLastRunNoteAfterCmd()
+			}
 		}
 	}
 	next, err := m.settingsFromRuntimeInputs()
@@ -397,25 +330,6 @@ func (m Model) commitRuntimeConfig() (Model, tea.Cmd) {
 	m = m.closeRuntimeConfig()
 	m = m.withLaunchPreviewSynced()
 	return m, cmd
-}
-
-// runtimePortEnvKey names the environment variable a port field corresponds to,
-// so validation errors point at something the user can also set from the shell.
-func runtimePortEnvKey(f runtimeField) string {
-	switch f {
-	case runtimeFieldVLLMPort:
-		return settings.EnvVLLMServerPort
-	case runtimeFieldKoboldCppPort:
-		return settings.EnvKoboldCppPort
-	case runtimeFieldNInferPort:
-		return settings.EnvNInferServerPort
-	case runtimeFieldOMLXPort:
-		return settings.EnvOMLXPort
-	case runtimeFieldSplashPort:
-		return settings.EnvSplashPort
-	default:
-		return settings.EnvLlamaServerPort
-	}
 }
 
 // updateRuntimeConfigKey handles keys while the runtime env editor is open.

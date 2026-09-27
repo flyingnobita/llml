@@ -150,36 +150,16 @@ func RuntimePanelLines(maxWidth int, r models.RuntimeInfo) []string {
 		s := fmt.Sprintf("%-*s %s", runtimePanelEnvLabelWidth, label, v)
 		return TruncateRunes(s, maxWidth)
 	}
-	type row struct {
-		key     string
-		value   string
-		backend models.ModelBackend
+	type row struct{ key, value string }
+	var rows []row
+	for _, rt := range runtimeTable {
+		if !rt.supported(r.Platform) {
+			continue
+		}
+		for _, d := range rt.fields {
+			rows = append(rows, row{d.summaryLabel, d.summary(r)})
+		}
 	}
-	// portable marks rows every platform shows; see [models.Platform.Supports].
-	const portable = models.BackendLlama
-	rows := []row{
-		{runtimePanelLabelKoboldCppPath, koboldCppPathPanelDisplay(r), portable},
-		{runtimePanelLabelKoboldCppPort, portDisplay(r.KoboldCppPort), portable},
-		{runtimePanelLabelLlamaServerPath, llamaServerPathPanelDisplay(r), portable},
-		{runtimePanelLabelLlamaServerHost, valueOrDash(r.LlamaServerHost), portable},
-		{runtimePanelLabelLlamaServerPort, portDisplay(r.LlamaServerPort), portable},
-		{runtimePanelLabelNInferPath, binaryPathPanelDisplay(models.ResolveNInferPath(r), r.NInferRunning, r.NInferPort), models.BackendNInfer},
-		{runtimePanelLabelNInferPort, portDisplay(r.NInferPort), models.BackendNInfer},
-		{runtimePanelLabelNInferHost, valueOrDash(r.NInferServerHost), models.BackendNInfer},
-		{runtimePanelLabelOMLXPath, binaryPathPanelDisplay(models.ResolveOMLXPath(r), r.OMLXRunning, r.OMLXPort), models.BackendOMLX},
-		{runtimePanelLabelOMLXPort, portDisplay(r.OMLXPort), models.BackendOMLX},
-		{runtimePanelLabelOMLXHost, valueOrDash(r.OMLXHost), models.BackendOMLX},
-		{runtimePanelLabelSplashPath, binaryPathPanelDisplay(models.ResolveSplashPath(r), r.SplashRunning, r.SplashPort), models.BackendSplash},
-		{runtimePanelLabelSplashPort, portDisplay(r.SplashPort), models.BackendSplash},
-		{runtimePanelLabelSplashHost, valueOrDash(r.SplashHost), models.BackendSplash},
-		{runtimePanelLabelOllamaHost, valueOrDash(r.OllamaHost), portable},
-		{runtimePanelLabelOllamaPath, ollamaPathPanelDisplay(r), portable},
-		{runtimePanelLabelVLLMPath, vllmPathPanelDisplay(r), portable},
-		{runtimePanelLabelVLLMPort, portDisplay(r.VLLMServerPort), portable},
-		{runtimePanelLabelVLLMHost, valueOrDash(r.VLLMServerHost), portable},
-		{runtimePanelLabelVLLMVenv, vllmVenvPanelDisplay(r), portable},
-	}
-	rows = slices.DeleteFunc(rows, func(x row) bool { return !r.Platform.Supports(x.backend) })
 	slices.SortFunc(rows, func(a, b row) int {
 		return strings.Compare(a.key, b.key)
 	})
