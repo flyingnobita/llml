@@ -316,6 +316,11 @@ User data and settings are stored in a dedicated folder. Routine app upgrades **
 ### Runtime Engines
 
 Configure how `llml` finds and launches servers. You can edit these interactively in the UI (**`c`**).
+The panel lists the runtimes this machine can run, grouped by model format, each marked running,
+found, or not found. **↑**/**↓** pick a runtime, **tab** or **→** move into its fields, **enter**
+saves, and **esc** discards. Under each field, an `in use` line shows the value llml runs with and
+where it came from: the environment variable's name, `config`, `default`, or `detected` (a program
+found with no path configured). An environment variable wins over the saved value until it is unset.
 
 | Feature             | Environment Variable | `config.toml` key (under `[runtime]`) | Default           |
 | :------------------ | :------------------- | :------------------------------------ | :---------------- |
