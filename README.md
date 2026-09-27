@@ -226,6 +226,9 @@ Each model path can have **multiple named profiles**. Each profile stores:
 
 **`R`** / **ctrl+`R`** use the **active** profile (the highlighted row in the `p` profile list is prefixed with **`(active)`** in the name column). Changes persist automatically. **tab** cycles: profile list → env → extra args. On the profile list: **`a`** add profile, **`c`** clone (duplicate) the highlighted profile, **`d`** delete (not the last), **`r`** rename. **`esc`** closes the panel (and **`n`** cancels a delete confirmation).
 
+For GGUF models, a profile's **Backend** chooses llama.cpp or KoboldCpp. A runtime that is turned
+off in `c` is still offered, labelled `(off)`, so you can set a profile up before turning it on.
+
 Profiles are stored in `model-params.json` (see [Storage & Locations](#storage--locations)).
 
 ### Agent skill files
@@ -329,6 +332,12 @@ in the list and "Off" in its detail pane: llml stops probing it and leaves it ou
 status line, and its fields stay editable. Saving re-detects runtimes without rescanning models.
 The on/off choices are stored in `runtimes.toml`, not `config.toml`, and no environment variable
 overrides them. A runtime with no stored choice is on.
+
+Models whose runtime is off stay in the table, dimmed and marked `(off)` after the runtime name, so
+you can still see what is taking up disk space. You can select them, copy their command, and open
+their `p` panel, but **R** / **ctrl+R** will not launch them; an alert names the runtime to turn on
+in `c`. A GGUF model follows its active profile: it is dimmed only when that profile's runtime
+(llama.cpp or KoboldCpp) is off, so switching profiles can make it launchable again.
 
 | Feature             | Environment Variable | `config.toml` key (under `[runtime]`) | Default           |
 | :------------------ | :------------------- | :------------------------------------ | :---------------- |
