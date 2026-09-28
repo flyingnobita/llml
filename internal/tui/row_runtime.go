@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"slices"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -9,24 +10,38 @@ import (
 	"github.com/flyingnobita/llml/internal/profiles"
 )
 
-// rowRuntime returns the Runtime row f launches on. For a GGUF row it is the
-// Active Profile's choice between llama.cpp and KoboldCpp, cached in
-// effectiveBackends; for any other row it is the row's own Runtime, so a row
-// in oMLX's model folders stays oMLX.
-func rowRuntime(f models.ModelFile, effectiveBackends map[string]models.ModelBackend) models.ModelBackend {
-	if f.Backend != models.BackendLlama {
-		return f.Backend
+// rowRuntimeChoices returns the Runtimes row f may launch on: those that run
+// its Model Format on this platform. A GGUF row chooses between llama.cpp and
+// KoboldCpp; a Safetensors row between the Safetensors Runtimes, with oMLX
+// offered only for rows inside one of its model folders.
+func (m Model) rowRuntimeChoices(f models.ModelFile) []models.ModelBackend {
+	return runtimeChoices(f.Backend, m.runtime.Platform)
+}
+
+// usableRuntime returns chosen when row f may launch on it, and otherwise the
+// Runtime discovery gave f. A profile can name a Runtime the row cannot use
+// (an imported profile, or no override at all), and that choice is ignored.
+func (m Model) usableRuntime(f models.ModelFile, chosen models.ModelBackend) models.ModelBackend {
+	if slices.Contains(m.rowRuntimeChoices(f), chosen) {
+		return chosen
 	}
-	if b, ok := effectiveBackends[profiles.ModelParamsKey(f.Identity())]; ok {
-		return b
+	return f.Backend
+}
+
+// rowRuntime returns the Runtime row f launches on: its Active Profile's
+// choice, cached in effectiveBackends, when the row may use it, and otherwise
+// the Runtime discovery gave the row.
+func (m Model) rowRuntime(f models.ModelFile) models.ModelBackend {
+	if b, ok := m.table.effectiveBackends[profiles.ModelParamsKey(f.Identity())]; ok {
+		return m.usableRuntime(f, b)
 	}
-	return models.BackendLlama
+	return f.Backend
 }
 
 // rowDimmed reports whether row f is on a Disabled Runtime: listed, dimmed,
 // and marked (off), but not launchable.
 func (m Model) rowDimmed(f models.ModelFile) bool {
-	return !m.runtimeEnabled(rowRuntime(f, m.table.effectiveBackends))
+	return !m.runtimeEnabled(m.rowRuntime(f))
 }
 
 // anyRowDimmed reports whether any row is dimmed, which widens the Runtime

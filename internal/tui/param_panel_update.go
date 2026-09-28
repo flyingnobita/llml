@@ -7,7 +7,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/flyingnobita/llml/internal/fsutil"
-	"github.com/flyingnobita/llml/internal/models"
 	"github.com/flyingnobita/llml/internal/profiles"
 )
 
@@ -215,20 +214,11 @@ func (m Model) moveProfile(delta int) Model {
 }
 
 // persistParamPanel writes the current parameter profiles to disk without closing the panel.
-// paramsModelIsGGUF reports whether the param panel's model is a GGUF row
-// (the only kind where profile backend overrides matter).
-func (m Model) paramsModelIsGGUF() bool {
-	for _, f := range m.table.files {
-		if f.Identity() == m.params.modelPath {
-			return f.Backend == models.BackendLlama
-		}
-	}
-	return false
-}
-
 func (m Model) persistParamPanelState() (Model, tea.Cmd, bool) {
 	ent := m.params.editor.Entry()
-	if !m.paramsModelIsGGUF() {
+	// A row with one Runtime has nothing to choose, so a stored override
+	// (from an import, say) is dropped rather than kept unused.
+	if len(m.paramBackendOptionsForModel()) == 0 {
 		hadBackend := false
 		for i := range ent.Profiles {
 			if ent.Profiles[i].Backend != "" {
@@ -240,7 +230,7 @@ func (m Model) persistParamPanelState() (Model, tea.Cmd, bool) {
 			m.params.editor.profiles[i].Backend = ""
 		}
 		if hadBackend {
-			m = m.withLastRunError("Backend override cleared: only GGUF models support profile backend selection")
+			m = m.withLastRunError("Backend override cleared: this model has only one Runtime")
 		}
 	}
 	if err := profiles.SaveEntry(m.params.modelPath, ent); err != nil {

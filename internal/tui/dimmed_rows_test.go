@@ -22,6 +22,7 @@ var keyCtrlR = tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl}
 // test can prove a blocked launch started nothing.
 type launchFakes struct {
 	launches  []models.ModelBackend
+	specs     []serverSpec
 	ollamaHit int
 	clipboard []string
 	services  services
@@ -32,6 +33,7 @@ func newLaunchFakes() *launchFakes {
 	svc := testServices()
 	svc.launchServer = func(_ services, spec serverSpec, _ runServerMode) tea.Cmd {
 		f.launches = append(f.launches, spec.backend)
+		f.specs = append(f.specs, spec)
 		return nil
 	}
 	svc.startOllamaDaemon = func(serverSpec) error { f.ollamaHit++; return nil }
