@@ -308,3 +308,31 @@ func TestMissingRuntimeFooter_followsChosenRuntime(t *testing.T) {
 		t.Errorf("a row with no override on the missing vLLM should be reported, note %q", m.lastRunNote)
 	}
 }
+
+// A stored backend the row cannot use (an mlx-lm profile imported on a
+// platform without MLX) survives a save from the p panel: the row ignores it,
+// but the profile keeps it for a machine where it applies.
+func TestSafetensorsRuntime_saveKeepsUnusableStoredBackend(t *testing.T) {
+	dir := useTempConfigDir(t)
+	row := hfRow(dir)
+	saveProfiles(t, row.Path, profiles.Entry{Profiles: []profiles.Profile{{Name: "imported", Backend: "mlx-lm"}}})
+
+	windows := models.Platform{GOOS: "windows", GOARCH: "amd64"}
+	m := dimModel(t, newLaunchFakes().services, windows, config.RuntimeStates{}, row)
+	m = press(t, m, keyText("p"), keyText("c"), keyEsc) // c duplicates and saves
+	if strings.Contains(m.lastRunNote, "cleared") {
+		t.Errorf("saving should not report clearing the backend: %q", m.lastRunNote)
+	}
+	ent, err := profiles.LoadEntry(profiles.ModelParamsKey(row.Path))
+	if err != nil || len(ent.Profiles) != 2 {
+		t.Fatalf("want the imported profile and its copy saved, got %+v (err %v)", ent, err)
+	}
+	for _, p := range ent.Profiles {
+		if p.Backend != "mlx-lm" {
+			t.Errorf("profile %q lost its stored backend: %q", p.Name, p.Backend)
+		}
+	}
+	if got := runtimeCell(t, m, "qwen-st"); got != "vllm" {
+		t.Errorf("the row should still run on vLLM, got %q", got)
+	}
+}

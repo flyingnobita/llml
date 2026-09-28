@@ -4,8 +4,8 @@ package models
 // found, if any, and whether the Runtime's server answered its probe.
 //
 // [RuntimeInfo.Status] is the one place that maps a Runtime to its detection
-// fields. The first-seen check ([RuntimeInfo.Detected]), the runtime panel's
-// status marks, and [RuntimeInfo.Summary] all read it, so they cannot disagree.
+// fields. The first-seen check ([RuntimeInfo.Detected]) and the runtime
+// panel's status marks both read it, so they cannot disagree.
 type RuntimeStatus struct {
 	// Path is the program detection found (configured path, common install
 	// locations, or PATH), or "" when none was found.

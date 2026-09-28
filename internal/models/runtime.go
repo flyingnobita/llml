@@ -2,8 +2,6 @@ package models
 
 import (
 	"context"
-	"fmt"
-	"strings"
 	"sync"
 
 	"github.com/flyingnobita/llml/internal/fsutil"
@@ -23,7 +21,6 @@ type RuntimeInfo struct {
 	KoboldCppPath      string
 	OllamaRunning      bool
 	ServerRunning      bool
-	ProbePort          int // port the llama-server probe used
 	KoboldCppRunning   bool
 	KoboldCppProbePort int // port used when KoboldCppRunning is true
 	NInferPath         string
@@ -77,87 +74,6 @@ func (r RuntimeInfo) Available() bool {
 	return r.LlamaCLIPath != "" || r.LlamaServerPath != "" || r.VLLMPath != "" || r.OllamaPath != "" || r.KoboldCppPath != "" || r.NInferPath != "" || r.OMLXPath != "" || r.SplashPath != "" || r.MLXLMPath != "" || r.MLXVLMPath != "" || r.OllamaRunning || r.ServerRunning || r.VLLMRunning || r.KoboldCppRunning || r.NInferRunning || r.OMLXRunning || r.SplashRunning || r.MLXLMRunning || r.MLXVLMRunning
 }
 
-// binaryStatus renders "name: ✓ running" / "name: ✓ stopped" / "name: running"
-// for a backend that was found or answered its probe, and reports false when
-// neither happened so the caller can leave it out of the summary.
-func binaryStatus(name string, st RuntimeStatus) (string, bool) {
-	switch {
-	case st.Found() && st.Running:
-		return name + ": ✓ running", true
-	case st.Found():
-		return name + ": ✓ stopped", true
-	case st.Running:
-		return name + ": running", true
-	default:
-		return "", false
-	}
-}
-
-func formatBinLabel(abs string) string {
-	if abs == "" {
-		return "—"
-	}
-	return "✓"
-}
-
-// llamaSummary is the llama.cpp part of [RuntimeInfo.Summary].
-func (r RuntimeInfo) llamaSummary() string {
-	switch {
-	case r.LlamaCLIPath != "" && r.LlamaServerPath != "":
-		return fmt.Sprintf("llama.cpp: cli %s · server %s", formatBinLabel(r.LlamaCLIPath), formatBinLabel(r.LlamaServerPath))
-	case r.LlamaCLIPath != "":
-		return fmt.Sprintf("llama.cpp: cli %s · server —", formatBinLabel(r.LlamaCLIPath))
-	case r.LlamaServerPath != "":
-		return fmt.Sprintf("llama.cpp: cli — · server %s", formatBinLabel(r.LlamaServerPath))
-	case r.ServerRunning:
-		return fmt.Sprintf("llama.cpp: binaries not on PATH — server running :%d", r.ProbePort)
-	default:
-		return "llama.cpp: not found — set " + settings.EnvLlamaCppPath + " or install to PATH (Homebrew: ensure /opt/homebrew/bin is on PATH)"
-	}
-}
-
-// Summary is a single-line status for the TUI (no trailing newline). The
-// Runtimes detection skipped (the Disabled Runtimes) are left out.
-func (r RuntimeInfo) Summary() string {
-	var parts []string
-	if !r.Skipped.Has(BackendLlama) {
-		parts = append(parts, r.llamaSummary())
-	}
-	if !r.Skipped.Has(BackendVLLM) {
-		// vLLM keeps a mark when it is neither found nor running, unlike the
-		// Runtimes below, and shows "running" only when its server answers.
-		st := r.Status(BackendVLLM)
-		v, ok := binaryStatus("vllm", st)
-		switch {
-		case !ok:
-			v = "vllm: —"
-		case !st.Running:
-			v = "vllm: ✓"
-		}
-		parts = append(parts, v)
-	}
-	for _, b := range []struct {
-		backend ModelBackend
-		name    string
-	}{
-		{BackendKobold, "koboldcpp"},
-		{BackendNInfer, "ninfer"},
-		{BackendOMLX, "omlx"},
-		{BackendMLXLM, "mlx-lm"},
-		{BackendMLXVLM, "mlx-vlm"},
-		{BackendSplash, "splash"},
-		{BackendOllama, "ollama"},
-	} {
-		if r.Skipped.Has(b.backend) {
-			continue
-		}
-		if s, ok := binaryStatus(b.name, r.Status(b.backend)); ok {
-			parts = append(parts, s)
-		}
-	}
-	return strings.Join(parts, " · ")
-}
-
 // DiscoverRuntime locates each Runtime's program and probes its server.
 //
 // llama-cli and llama-server are looked up in s.LlamaCppPath, common install
@@ -196,7 +112,6 @@ func locateRuntimes(s settings.Settings) RuntimeInfo {
 		MLXVLMPath:       findMLXVLMScript(s.MLXVLMPath),
 		MLXVLMHost:       s.MLXVLMHost,
 		Platform:         CurrentPlatform(),
-		ProbePort:        s.LlamaServerPort,
 		LlamaServerPort:  s.LlamaServerPort,
 		VLLMServerPort:   s.VLLMServerPort,
 		KoboldCppPort:    s.KoboldCppPort,

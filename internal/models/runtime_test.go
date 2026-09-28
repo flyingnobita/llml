@@ -4,41 +4,6 @@ import (
 	"testing"
 )
 
-func TestRuntimeInfo_Summary(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		r    RuntimeInfo
-		want string
-	}{
-		{
-			r:    RuntimeInfo{LlamaCLIPath: "/a/llama-cli", LlamaServerPath: "/b/llama-server"},
-			want: "llama.cpp: cli ✓ · server ✓ · vllm: —",
-		},
-		{
-			r:    RuntimeInfo{LlamaCLIPath: "/a/llama-cli", LlamaServerPath: "/b/llama-server", VLLMPath: "/c/vllm", KoboldCppPath: "/d/koboldcpp-linux-x64"},
-			want: "llama.cpp: cli ✓ · server ✓ · vllm: ✓ · koboldcpp: ✓ stopped",
-		},
-		{
-			r:    RuntimeInfo{VLLMPath: "/c/vllm", VLLMRunning: true},
-			want: "llama.cpp: not found — set LLAMA_CPP_PATH or install to PATH (Homebrew: ensure /opt/homebrew/bin is on PATH) · vllm: ✓ running",
-		},
-		{
-			r:    RuntimeInfo{LlamaServerPath: "/b/llama-server", VLLMRunning: true},
-			want: "llama.cpp: cli — · server ✓ · vllm: running",
-		},
-		{
-			r:    RuntimeInfo{ServerRunning: true, ProbePort: 8000},
-			want: "llama.cpp: binaries not on PATH — server running :8000 · vllm: —",
-		},
-	}
-	for _, tc := range cases {
-		if g := tc.r.Summary(); g != tc.want {
-			t.Errorf("Summary() = %q want %q", g, tc.want)
-		}
-	}
-}
-
 func TestRuntimeInfo_Available_koboldCpp(t *testing.T) {
 	t.Parallel()
 

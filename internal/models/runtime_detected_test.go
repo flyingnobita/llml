@@ -1,7 +1,6 @@
 package models
 
 import (
-	"strings"
 	"testing"
 )
 
@@ -49,10 +48,10 @@ func TestRuntimeInfoDetected(t *testing.T) {
 	}
 }
 
-// Status is the one mapping from a Runtime to its detection fields, and the
-// runtime summary follows it: a Runtime shows in the summary exactly when
-// Status says its program was found or its server answered.
-func TestRuntimeInfoStatusDrivesSummary(t *testing.T) {
+// Status is the one mapping from a Runtime to its detection fields, and
+// Detected follows it: a Runtime is detected exactly when Status says its
+// program was found or its server answered.
+func TestRuntimeInfoStatusDrivesDetected(t *testing.T) {
 	t.Parallel()
 
 	names := map[ModelBackend]string{
@@ -74,12 +73,8 @@ func TestRuntimeInfoStatusDrivesSummary(t *testing.T) {
 		{MLXVLMRunning: true, MLXLMPath: "/venv/bin/mlx_lm.server"},
 	}
 	for i, info := range infos {
-		sum := info.Summary()
 		for b, name := range names {
 			st := info.Status(b)
-			if shown := strings.Contains(sum, name+":"); shown != (st.Found() || st.Running) {
-				t.Errorf("info %d: %s in summary = %t, status %+v", i, name, shown, st)
-			}
 			if info.Detected(b) != (st.Found() || st.Running) {
 				t.Errorf("info %d: Detected(%s) disagrees with status %+v", i, name, st)
 			}

@@ -215,24 +215,10 @@ func (m Model) moveProfile(delta int) Model {
 
 // persistParamPanel writes the current parameter profiles to disk without closing the panel.
 func (m Model) persistParamPanelState() (Model, tea.Cmd, bool) {
+	// A stored backend the row cannot use (an import made for another
+	// platform, say) is kept: rowRuntime ignores it here, and the profile
+	// still carries it to a machine where it applies.
 	ent := m.params.editor.Entry()
-	// A row with one Runtime has nothing to choose, so a stored override
-	// (from an import, say) is dropped rather than kept unused.
-	if f, ok := m.paramsRow(); !ok || !m.rowHasRuntimeChoice(f) {
-		hadBackend := false
-		for i := range ent.Profiles {
-			if ent.Profiles[i].Backend != "" {
-				hadBackend = true
-			}
-			ent.Profiles[i].Backend = ""
-		}
-		for i := range m.params.editor.profiles {
-			m.params.editor.profiles[i].Backend = ""
-		}
-		if hadBackend {
-			m = m.withLastRunError("Backend override cleared: this model has only one Runtime")
-		}
-	}
 	if err := profiles.SaveEntry(m.params.modelPath, ent); err != nil {
 		m = m.withLastRunError(err.Error())
 		return m, clearLastRunNoteAfterCmd(), true
