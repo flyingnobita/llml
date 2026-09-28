@@ -397,7 +397,7 @@ may be out of date until you turn Ollama back on and scan again.
    report in `/v1/models`, mlx-lm by a `/health` status of `ok` from Python's HTTP server (a
    `Server` header starting `BaseHTTP/`), mlx-vlm by a `/health` status of `healthy`,
    llama.cpp by a `/health` answer from a server that is not NInfer, mlx-lm, or mlx-vlm, and
-   vLLM by an answer from a server that is not oMLX or Splash.
+   vLLM by an answer from a server that is not oMLX, Splash, mlx-lm, or mlx-vlm.
 5. (vLLM only) Common venv locations (e.g., `~/.venv-vllm-metal/bin` on macOS).
 6. (KoboldCpp only) Platform-specific name variants with CUDA preference on Linux.
 7. (NInfer only) NInfer has no install target, so `NINFER_PATH` may point at the checkout

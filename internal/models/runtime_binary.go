@@ -448,9 +448,14 @@ func probeMLXVLM(ctx context.Context, host string, port int) bool {
 
 // probeVLLM reports whether vLLM answers on host:port. vLLM shares port 8000
 // with oMLX and Splash, which both answer /health too, so a 200 counts as vLLM
-// unless the model list names one of them as the owner.
+// unless the model list names one of them as the owner. An MLX server moved
+// onto the port is not vLLM either.
 func probeVLLM(ctx context.Context, host string, port int) bool {
-	return getHealth(ctx, host, port).ok && !probeModelsOwner(ctx, host, port, ownerOMLX, ownerSplash)
+	h := getHealth(ctx, host, port)
+	if !h.ok || h.fromMLXLM() || h.fromMLXVLM() {
+		return false
+	}
+	return !probeModelsOwner(ctx, host, port, ownerOMLX, ownerSplash)
 }
 
 // defaultProbeHost is the loopback address used for health probes that have no
