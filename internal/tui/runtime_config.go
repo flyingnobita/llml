@@ -392,7 +392,9 @@ func (m Model) commitRuntimeConfig() (Model, tea.Cmd) {
 	defer cancel()
 	m.runtime = m.svc.discoverRuntime(ctx, m.settings, m.runtimeStates.Disabled())
 	var cmd tea.Cmd
-	m = m.withLastRunCleared()
+	// The footer follows the new detection; a config write error below
+	// replaces it and is also kept in the alert history.
+	m, _ = m.maybeSetMissingRuntimeFooterNote()
 	// config.toml is user-owned: it is rewritten only when a field changed, so
 	// a save that only toggles Runtimes keeps the file, comments and all. It
 	// gets the panel's values, not the settings in use, so a field the
