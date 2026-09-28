@@ -55,8 +55,17 @@ homebrew_casks:
     ids:
       - llml
     homepage: https://github.com/flyingnobita/llml
-    description: Terminal UI to discover local models and launch llama-server, vLLM, or Ollama
+    description: Terminal UI to discover local LLMs and launch llama.cpp, vLLM, Ollama, or MLX
     skip_upload: '{{ not (isEnvSet "HOMEBREW_TAP_GITHUB_TOKEN") }}'
+    # The binary is not signed or notarized, so Gatekeeper refuses to open it
+    # while it carries the quarantine flag Homebrew sets on downloads. Homebrew
+    # still allows this in a third-party tap; signing is the lasting fix.
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/llml"]
+          end
     repository:
       owner: flyingnobita
       name: homebrew-tap
@@ -70,7 +79,7 @@ scoops:
     ids:
       - llml
     homepage: https://github.com/flyingnobita/llml
-    description: Terminal UI to discover local models and launch llama-server, vLLM, or Ollama
+    description: Terminal UI to discover local LLMs and launch llama.cpp, vLLM, Ollama, or MLX
     license: MIT
     skip_upload: '{{ not (isEnvSet "SCOOP_BUCKET_GITHUB_TOKEN") }}'
     repository:
@@ -89,7 +98,7 @@ winget:
     publisher_url: https://github.com/flyingnobita
     publisher_support_url: https://github.com/flyingnobita/llml/issues
     package_identifier: FlyingNobita.llml
-    short_description: Terminal UI to discover local models and launch llama-server, vLLM, or Ollama
+    short_description: Terminal UI to discover local LLMs and launch llama.cpp, vLLM, Ollama, or MLX
     license: MIT
     homepage: https://github.com/flyingnobita/llml
     skip_upload: '{{ not (isEnvSet "WINGET_GITHUB_TOKEN") }}'
