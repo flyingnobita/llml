@@ -146,21 +146,12 @@ is_tracked_workspace_copy() {
   [ "$scope" = "workspace" ] && [ "$tool" = "claude" ]
 }
 
-# A tracked copy git holds unchanged can be replaced without --force: the
-# replaced version is still in git, so nothing is lost.
-is_committed_copy() {
-  local dir=$1
-  command -v git >/dev/null 2>&1 || return 1
-  git -C "$REPO_ROOT" ls-files --error-unmatch -- "$dir/SKILL.md" >/dev/null 2>&1 || return 1
-  [ -z "$(git -C "$REPO_ROOT" status --porcelain -- "$dir" 2>/dev/null)" ]
-}
-
+# The tracked Claude copy is generated from the canonical skill and held in
+# git, so it is always replaced without --force: a stale copy is exactly what
+# a refresh is for, and git keeps the previous version.
 is_replaceable_target() {
   local dir=$1 tool=$2 scope=$3
-  if is_managed_target "$dir" || is_adoptable_target "$dir"; then
-    return 0
-  fi
-  is_tracked_workspace_copy "$tool" "$scope" && is_committed_copy "$dir"
+  is_managed_target "$dir" || is_adoptable_target "$dir" || is_tracked_workspace_copy "$tool" "$scope"
 }
 
 write_meta() {
@@ -225,7 +216,7 @@ status_target() {
   if [ -d "$dir" ]; then
     if is_tracked_workspace_copy "$tool" "$scope" && is_adoptable_target "$dir"; then
       log "$label: installed (tracked compatibility copy) at $dir"
-    elif is_tracked_workspace_copy "$tool" "$scope" && is_committed_copy "$dir"; then
+    elif is_tracked_workspace_copy "$tool" "$scope"; then
       log "$label: out of date (tracked compatibility copy) at $dir"
     elif is_managed_target "$dir"; then
       log "$label: installed (managed) at $dir"
