@@ -361,7 +361,7 @@ may be out of date until you turn Ollama back on and scan again.
 | **KoboldCpp path**  | `KOBOLDCPP_PATH`     | `default_koboldcpp_path`              | _(auto)_          |
 | **KoboldCpp port**  | `KOBOLDCPP_PORT`     | `default_koboldcpp_port`              | `5001`            |
 | **NInfer path**     | `NINFER_PATH`        | `default_ninfer_path`                 | _(auto)_          |
-| **NInfer port**     | `NINFER_SERVER_PORT` | `default_ninfer_server_port`          | `18080`           |
+| **NInfer port**     | `NINFER_SERVER_PORT` | `default_ninfer_server_port`          | `8080`            |
 | **NInfer host**     | `NINFER_SERVER_HOST` | `default_ninfer_server_host`          | `127.0.0.1`       |
 | **oMLX path**       | `OMLX_PATH`          | `default_omlx_path`                   | _(auto)_          |
 | **oMLX port**       | `OMLX_PORT`          | `default_omlx_port`                   | `8000`            |
@@ -377,13 +377,18 @@ may be out of date until you turn Ollama back on and scan again.
 1. Explicitly configured paths (Env/TOML).
 2. Common system directories (e.g., `/usr/local/bin`, `/opt/homebrew/bin`, `~/.local/bin`).
 3. Binary names available on your system `PATH`.
-4. (llama.cpp) Probing for an already-running server on the configured port.
+4. Probing each runtime's port for an already-running server. Several runtimes share a
+   default port (llama.cpp and NInfer on `8080`; vLLM, oMLX, and Splash on `8000`), so llml
+   checks which server answers: NInfer, oMLX, and Splash by the owner they report in
+   `/v1/models`, llama.cpp by a `/health` answer from a server that is not NInfer, and vLLM
+   by an answer from a server that is not oMLX or Splash.
 5. (vLLM only) Common venv locations (e.g., `~/.venv-vllm-metal/bin` on macOS).
-6. (KoboldCpp only) Platform-specific name variants with CUDA preference on Linux; probes port for already-running instances.
+6. (KoboldCpp only) Platform-specific name variants with CUDA preference on Linux.
 7. (NInfer only) NInfer has no install target, so `NINFER_PATH` may point at the checkout
    root (llml looks in `build/apps/`), the build directory, or `ninfer-serve` itself. The
-   checkout's `models/` directory is added to the scan roots. The default port is `18080`
-   rather than ninfer-serve's own `8080`, which would collide with llama-server.
+   checkout's `models/` directory is added to the scan roots. The default port is `8080`,
+   ninfer-serve's own default, which llama-server shares; only one of them can listen on it
+   at a time.
 8. (oMLX only) llml uses the CLI shim the oMLX app installs (`~/.omlx/bin/omlx`) and reads
    the app's model directories from its `settings.json`, so models placed there appear as
    oMLX rows. `R` runs `omlx serve --model-dir <dir>`; oMLX serves every model in that
