@@ -562,7 +562,8 @@ func tableRowAreaHeight(contentAreaH int) int {
 }
 
 // layoutTableAtInnerW builds columns, body height, and hscroll for a given inner body width.
-func (m Model) layoutTableAtInnerW(innerW int) Model {
+// pv is the selected row's launch preview, which decides how tall the preview pane is.
+func (m Model) layoutTableAtInnerW(innerW int, pv launchPreview) Model {
 	m.layout.bodyInnerW = innerW
 	cols := m.tableColumnsAt(innerW)
 	m.table.tbl.SetColumns(cols)
@@ -574,7 +575,7 @@ func (m Model) layoutTableAtInnerW(innerW int) Model {
 	logFrameH := m.server.viewport.Style.GetHorizontalFrameSize()
 	needsLogHBar := m.server.running && !m.server.wrap && maxAnsiLineWidth(m.server.log) > max(1, innerW-logFrameH)
 
-	previewH := m.launchPreviewPaneLayoutHeight()
+	previewH := m.launchPreviewPaneLayoutHeight(innerW, pv)
 	h := m.computeBodyHeight(needsLogHBar)
 	m = m.applyTableAndLogHeights(h, innerW, previewH)
 
@@ -616,15 +617,22 @@ func (m Model) layoutTable() Model {
 		innerBase = w - appPaddingH*2
 	}
 
-	m = m.layoutTableAtInnerW(innerBase)
+	// The preview reads the selection from the table's rows, which a first
+	// layout, or one after the model list changed length, has not set yet.
+	if len(m.table.tbl.Rows()) != len(m.table.files) {
+		m.table.tbl.SetRows(m.tableRows(m.tableColumnsAt(innerBase)))
+	}
+	// One preview per layout pass: building it reads the model's profiles from disk.
+	pv := m.selectedLaunchPreview()
+	m = m.layoutTableAtInnerW(innerBase, pv)
 	m.table.hscroll.SetYOffset(0)
 
 	if len(m.table.files) > 0 && innerBase > minInnerWidth && m.tablePaneShowsVerticalIndicator() {
-		m = m.layoutTableAtInnerW(innerBase - 1)
+		m = m.layoutTableAtInnerW(innerBase-1, pv)
 		m.table.hscroll.SetYOffset(0)
 	}
 
-	m = m.syncLaunchPreviewViewport(m.layout.bodyInnerW)
+	m = m.syncLaunchPreviewViewport(m.layout.bodyInnerW, pv)
 	m = m.syncAlertViewport()
 	m = m.applyMainPaneFocusStyles()
 	return m
@@ -696,15 +704,66 @@ func (m Model) applyTableAndLogHeights(bodyH, innerW, previewH int) Model {
 
 // launchPreviewPaneLayoutHeight returns vertical rows consumed by the launch command preview
 // (margin + pane title + bordered viewport) when models are listed.
-func (m Model) launchPreviewPaneLayoutHeight() int {
+func (m Model) launchPreviewPaneLayoutHeight(innerW int, pv launchPreview) int {
 	if !m.launchPreviewVisible() {
 		return 0
 	}
-	// MarginTop(1) on [styles.launchPreview], caption row, then the fixed-height bordered viewport.
+	// MarginTop(1) on [styles.launchPreview], caption row, then the bordered viewport.
 	return m.ui.styles.launchPreview.GetMarginTop() +
 		mainPaneTitleLines +
 		m.ui.styles.launchPreviewViewport.GetVerticalFrameSize() +
-		launchPreviewVisibleLines
+		m.launchPreviewTextLines(innerW, pv)
+}
+
+// selectedLaunchPreview is the launch preview for the highlighted row, or the
+// zero value when the preview is hidden.
+func (m Model) selectedLaunchPreview() launchPreview {
+	if !m.launchPreviewVisible() {
+		return launchPreview{}
+	}
+	return launchPreviewFor(m)
+}
+
+// launchPreviewTextWidth is the width the preview wraps its text to at inner
+// width innerW, with or without the column its scrollbar takes.
+func (m Model) launchPreviewTextWidth(innerW int, scrollbar bool) int {
+	// The same floor syncLaunchPreviewViewport applies, so measuring and
+	// drawing agree on narrow terminals.
+	w := max(innerW, minInnerWidth) - m.preview.viewport.Style.GetHorizontalFrameSize()
+	if scrollbar {
+		w--
+	}
+	return max(w, MinTextDisplayWidth)
+}
+
+// launchPreviewPinned renders what sits above the command: the model id line,
+// then each warning. Each is rendered on its own at textWidth; rendered as one
+// block, a short warning was padded to the longest one's width, and soft wrap
+// turned the padding into an empty row.
+func (m Model) launchPreviewPinned(pv launchPreview, textWidth int) []string {
+	var blocks []string
+	if pv.info != "" {
+		blocks = append(blocks, m.ui.styles.infoLine.Width(textWidth).Render(pv.info))
+	}
+	for note := range strings.SplitSeq(pv.note, "\n") {
+		if note != "" {
+			blocks = append(blocks, m.ui.styles.warnLine.Width(textWidth).Render(note))
+		}
+	}
+	return blocks
+}
+
+// launchPreviewTextLines is how many text rows the launch preview shows:
+// launchPreviewVisibleLines, or more when the model id and warnings wrap past
+// them, so that no warning needs scrolling and the command keeps its first
+// line. They are measured at the narrower, scrollbar width, so they never
+// wrap further than counted.
+func (m Model) launchPreviewTextLines(innerW int, pv launchPreview) int {
+	pinned := 0
+	for _, b := range m.launchPreviewPinned(pv, m.launchPreviewTextWidth(innerW, true)) {
+		pinned += lipgloss.Height(b)
+	}
+	return max(launchPreviewVisibleLines, pinned+1)
 }
 
 func (m Model) alertPaneLayoutHeight() int {
@@ -717,8 +776,9 @@ func (m Model) alertPaneLayoutHeight() int {
 		alertPaneVisibleLines
 }
 
-// syncLaunchPreviewViewport sets viewport dimensions and wrapped content from the selected row.
-func (m Model) syncLaunchPreviewViewport(innerW int) Model {
+// syncLaunchPreviewViewport sets viewport dimensions and wrapped content from
+// pv, the selected row's launch preview.
+func (m Model) syncLaunchPreviewViewport(innerW int, pv launchPreview) Model {
 	if innerW < minInnerWidth {
 		innerW = minInnerWidth
 	}
@@ -727,58 +787,48 @@ func (m Model) syncLaunchPreviewViewport(innerW int) Model {
 		m.preview.lastCmd = ""
 		return m
 	}
-	pv := launchPreviewFor(m)
 	cmd := pv.cmd
 	if cmd != m.preview.lastCmd {
 		m.preview.viewport.GotoTop()
 		m.preview.lastCmd = cmd
 	}
 	m.preview.activeProfileName = activeProfileNameForPreview(m)
-	fr := m.preview.viewport.Style.GetHorizontalFrameSize()
-	textW := innerW - fr
-	if textW < MinTextDisplayWidth {
-		textW = MinTextDisplayWidth
-	}
-	pvFrV := m.preview.viewport.Style.GetVerticalFrameSize()
-	outerH := launchPreviewVisibleLines + pvFrV
+	outerH := m.launchPreviewTextLines(innerW, pv) + m.preview.viewport.Style.GetVerticalFrameSize()
 	buildRendered := func(textWidth int) string {
 		// The info line and the warnings go above the command: a long command
 		// fills the preview's visible lines, and neither what clients must
 		// send nor why the launch may fail should need scrolling.
-		var lines []string
-		if pv.info != "" {
-			lines = append(lines, m.ui.styles.infoLine.Width(textWidth).Render(pv.info))
-		}
-		if pv.note != "" {
-			lines = append(lines, m.ui.styles.warnLine.Render(pv.note))
-		}
+		lines := m.launchPreviewPinned(pv, textWidth)
 		lines = append(lines, m.ui.styles.launchPreviewContent.Width(textWidth).Render(cmd))
 		return strings.Join(lines, "\n")
 	}
 	m.preview.viewport.SetWidth(innerW)
-	rendered := buildRendered(textW)
-	m.preview.viewport.SetContent(rendered)
+	m.preview.viewport.SetContent(buildRendered(m.launchPreviewTextWidth(innerW, false)))
 	m.preview.viewport.SetHeight(outerH)
 	if m.preview.viewport.TotalLineCount() > m.preview.viewport.VisibleLineCount() {
 		m.preview.viewport.SetWidth(innerW - 1)
-		textW = innerW - 1 - fr
-		if textW < MinTextDisplayWidth {
-			textW = MinTextDisplayWidth
-		}
-		rendered = buildRendered(textW)
-		m.preview.viewport.SetContent(rendered)
+		m.preview.viewport.SetContent(buildRendered(m.launchPreviewTextWidth(innerW, true)))
 		m.preview.viewport.SetHeight(outerH)
 	}
 	return m
 }
 
-// withLaunchPreviewSynced refreshes the launch preview after table input without a full layout pass.
+// withLaunchPreviewSynced refreshes the launch preview after table input
+// without a full layout pass, unless the newly selected row needs a preview of
+// a different height: then the table must give up or take back rows.
 func (m Model) withLaunchPreviewSynced() Model {
 	iw := m.layout.bodyInnerW
 	if iw < 1 {
 		iw = m.innerWidth()
 	}
-	return m.syncLaunchPreviewViewport(iw)
+	pv := m.selectedLaunchPreview()
+	if m.launchPreviewVisible() {
+		want := m.launchPreviewTextLines(iw, pv) + m.preview.viewport.Style.GetVerticalFrameSize()
+		if m.preview.viewport.Height() != want {
+			return m.layoutTable()
+		}
+	}
+	return m.syncLaunchPreviewViewport(iw, pv)
 }
 
 func (m Model) syncServerLogViewportContent() Model {
