@@ -347,6 +347,12 @@ func (h healthAnswer) fromMLXVLM() bool {
 	return h.ok && h.status == "healthy"
 }
 
+// fromLlamaCpp reports whether the answer came from a llama-server that names
+// itself. Older builds send no Server header, so false does not rule it out.
+func (h healthAnswer) fromLlamaCpp() bool {
+	return h.ok && strings.HasPrefix(h.server, "llama.cpp")
+}
+
 // getHealth GETs /health on host:port, bounded by ctx. It shares the package
 // HTTP client so repeated probes reuse connections.
 func getHealth(ctx context.Context, host string, port int) healthAnswer {
@@ -380,9 +386,11 @@ func probeGet(ctx context.Context, host string, port int, path string) (*http.Re
 
 // Model owners that name a Runtime in /v1/models.
 const (
-	ownerNInfer = "ninfer"
-	ownerOMLX   = "omlx"
-	ownerSplash = "splash"
+	ownerNInfer   = "ninfer"
+	ownerOMLX     = "omlx"
+	ownerSplash   = "splash"
+	ownerVLLM     = "vllm"
+	ownerLlamaCpp = "llamacpp"
 )
 
 // probeModelsOwner reports whether the OpenAI-compatible server on host:port
@@ -420,7 +428,8 @@ func probeModelsOwner(ctx context.Context, host string, port int, owners ...stri
 // llama-server, ninfer-serve, mlx_lm.server, and mlx_vlm.server all default
 // to port 8080 and all answer /health with 200, so a 200 there is
 // llama-server unless the answer is mlx-lm's or mlx-vlm's, or the model list
-// names NInfer as the owner.
+// names NInfer as the owner. vLLM, moved onto the same port, names itself the
+// owner too.
 // Current llama-server builds send "Server: llama.cpp", which settles it
 // without the second request; older builds may not, so the header is not
 // required.
@@ -429,7 +438,7 @@ func probeLlamaServer(ctx context.Context, host string, port int) bool {
 	if !h.ok || h.fromMLXLM() || h.fromMLXVLM() {
 		return false
 	}
-	return strings.HasPrefix(h.server, "llama.cpp") || !probeModelsOwner(ctx, host, port, ownerNInfer)
+	return h.fromLlamaCpp() || !probeModelsOwner(ctx, host, port, ownerNInfer, ownerVLLM)
 }
 
 // probeMLXLM reports whether mlx_lm.server answers on host:port. Its model
@@ -448,14 +457,15 @@ func probeMLXVLM(ctx context.Context, host string, port int) bool {
 
 // probeVLLM reports whether vLLM answers on host:port. vLLM shares port 8000
 // with oMLX and Splash, which both answer /health too, so a 200 counts as vLLM
-// unless the model list names one of them as the owner. An MLX server moved
-// onto the port is not vLLM either.
+// unless the model list names one of them as the owner. An MLX server or a
+// llama-server moved onto the port is not vLLM either; a llama-server without
+// a Server header still names llamacpp as the owner.
 func probeVLLM(ctx context.Context, host string, port int) bool {
 	h := getHealth(ctx, host, port)
-	if !h.ok || h.fromMLXLM() || h.fromMLXVLM() {
+	if !h.ok || h.fromMLXLM() || h.fromMLXVLM() || h.fromLlamaCpp() {
 		return false
 	}
-	return !probeModelsOwner(ctx, host, port, ownerOMLX, ownerSplash)
+	return !probeModelsOwner(ctx, host, port, ownerOMLX, ownerSplash, ownerLlamaCpp)
 }
 
 // defaultProbeHost is the loopback address used for health probes that have no

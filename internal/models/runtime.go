@@ -17,7 +17,7 @@ type RuntimeInfo struct {
 	LlamaServerHost    string
 	VLLMPath           string
 	VLLMServerHost     string
-	VLLMRunning        bool // a server other than oMLX or Splash answered on VLLMServerPort
+	VLLMRunning        bool // a server other than oMLX, Splash, or llama-server answered on VLLMServerPort
 	OllamaPath         string
 	OllamaHost         string
 	KoboldCppPath      string
