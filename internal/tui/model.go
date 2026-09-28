@@ -738,16 +738,18 @@ func (m Model) syncLaunchPreviewViewport(innerW int) Model {
 	pvFrV := m.preview.viewport.Style.GetVerticalFrameSize()
 	outerH := launchPreviewVisibleLines + pvFrV
 	buildRendered := func(textWidth int) string {
-		r := m.ui.styles.launchPreviewContent.Width(textWidth).Render(cmd)
-		// The info line goes first: a long command fills the preview's
-		// visible lines, and what clients must send should not need scrolling.
+		// The info line and the warnings go above the command: a long command
+		// fills the preview's visible lines, and neither what clients must
+		// send nor why the launch may fail should need scrolling.
+		var lines []string
 		if pv.info != "" {
-			r = m.ui.styles.infoLine.Width(textWidth).Render(pv.info) + "\n" + r
+			lines = append(lines, m.ui.styles.infoLine.Width(textWidth).Render(pv.info))
 		}
 		if pv.note != "" {
-			r = r + "\n" + m.ui.styles.warnLine.Render(pv.note)
+			lines = append(lines, m.ui.styles.warnLine.Render(pv.note))
 		}
-		return r
+		lines = append(lines, m.ui.styles.launchPreviewContent.Width(textWidth).Render(cmd))
+		return strings.Join(lines, "\n")
 	}
 	m.preview.viewport.SetWidth(innerW)
 	rendered := buildRendered(textW)

@@ -369,9 +369,9 @@ func TestDimmedRows_followPanelSave(t *testing.T) {
 	}
 }
 
-// The launch preview of a dimmed row still shows its command, with a note
-// under it, like the mmproj warning, that the Runtime is off. A row on a
-// Runtime that is on gets none.
+// The launch preview of a dimmed row still shows its command, with a note,
+// like the mmproj warning, that the Runtime is off. A row on a Runtime that
+// is on gets none.
 func TestDimmedRows_launchPreviewNotesRuntimeOff(t *testing.T) {
 	t.Parallel()
 
@@ -393,5 +393,44 @@ func TestDimmedRows_launchPreviewNotesRuntimeOff(t *testing.T) {
 	on := dimModel(t, newLaunchFakes().services, linuxPlatform, config.RuntimeStates{}, testRow(models.BackendVLLM, "/m/qwen-st"))
 	if got := previewText(on); strings.Contains(got, "is off") {
 		t.Errorf("a row on an enabled Runtime should have no off note:\n%s", got)
+	}
+}
+
+// Launch warnings sit above the command, after the model id line, so a long
+// command cannot push them out of the preview's visible lines. The copied
+// command carries none of them.
+func TestLaunchPreview_warningsAboveCommand(t *testing.T) {
+	dir := useTempConfigDir(t)
+	gone := testRow(models.BackendVLLM, filepath.Join(dir, "hf", "gone")) // no such folder
+	args := []string{"--max-tokens", "4096", "--temp", "0.7", "--top-p", "0.9", "--chat-template-args", "{}", "--prompt-cache-size", "8"}
+	saveProfiles(t, gone.Path, profiles.Entry{Profiles: []profiles.Profile{{Name: "mlx", Backend: "mlx-lm", Args: args}}})
+
+	f := newLaunchFakes()
+	off := config.RuntimeStates{}.With(models.BackendMLXLM, false)
+	m := dimModel(t, f.services, linuxPlatform, off, gone)
+	m.layout.width = 100
+	m = m.layoutTable()
+
+	content := ansi.Strip(m.preview.viewport.GetContent())
+	cmdAt := strings.Index(content, "mlx_lm.server")
+	offAt := strings.Index(content, "mlx-lm is off")
+	missingAt := strings.Index(content, "model folder not found")
+	idAt := strings.Index(content, strings.TrimSpace(launchPreviewModelIDLabel))
+	if cmdAt < 0 || offAt < 0 || missingAt < 0 || idAt < 0 {
+		t.Fatalf("preview should show the id, both warnings, and the command:\n%s", content)
+	}
+	if offAt > cmdAt || missingAt > cmdAt || idAt > offAt {
+		t.Errorf("want the id line, then the warnings, then the command:\n%s", content)
+	}
+	if view := plainView(m); !strings.Contains(view, "mlx-lm is off") || !strings.Contains(view, "model folder not found") {
+		t.Errorf("the warnings should show without scrolling:\n%s", view)
+	}
+
+	press(t, m, keyTab, keyEnter) // focus the launch preview, then copy
+	if len(f.clipboard) != 1 {
+		t.Fatalf("want one copy, got %q", f.clipboard)
+	}
+	if c := f.clipboard[0]; strings.Contains(c, "is off") || strings.Contains(c, "not found") {
+		t.Errorf("the copy should be the command alone: %q", c)
 	}
 }
