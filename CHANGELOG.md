@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
+- Sep-28, 2026 - 11:23 PM +0800 - [v0.8.1 release: the Homebrew cask clears the macOS quarantine flag, so the unsigned binary opens without a Gatekeeper prompt; updated package descriptions]
 - Sep-28, 2026 - 11:14 PM +0800 - [Homebrew: the cask now clears the quarantine flag after install, so macOS no longer refuses to open the unsigned `llml` binary ("llml" Not Opened). Package descriptions now name llama.cpp, vLLM, Ollama, and MLX. The README explains the flag for direct archive downloads]
 - Sep-28, 2026 - 11:00 PM +0800 - [v0.8.0 release: NInfer, oMLX, Splash, mlx-lm, and mlx-vlm runtimes; a redesigned runtime panel with per-runtime on/off; per-profile runtime choice for safetensors models; port-sharing detection; build identity in `--version` and the `?` panel]
 - Sep-28, 2026 - 10:51 PM +0800 - [Launch preview: every warning now shows without scrolling, even when a long model path wraps the "model id for requests" line. The preview grows by the rows the id and warnings need, and only then, and the command's first line stays visible. A blank row that appeared between two warnings is gone]
