@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/flyingnobita/llml/internal/buildinfo"
 )
 
 // runCLI drives run with fake streams and returns the exit code plus what each
@@ -27,8 +29,8 @@ func TestRun_version(t *testing.T) {
 		if code != 0 {
 			t.Errorf("%s: exit %d, want 0", flag, code)
 		}
-		if strings.TrimSpace(out) != version {
-			t.Errorf("%s: stdout %q, want %q", flag, out, version)
+		if want := buildinfo.Identity(version); strings.TrimSpace(out) != want {
+			t.Errorf("%s: stdout %q, want %q", flag, out, want)
 		}
 	}
 }

@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/flyingnobita/llml/internal/buildinfo"
 	"github.com/flyingnobita/llml/internal/config"
 	"github.com/flyingnobita/llml/internal/models"
 	"github.com/flyingnobita/llml/internal/profiles"
@@ -59,7 +60,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	for _, arg := range args {
 		switch arg {
 		case "-version", "--version", "-v":
-			fmt.Fprintln(stdout, version)
+			fmt.Fprintln(stdout, buildinfo.Identity(version))
 			return 0
 		}
 	}
