@@ -49,6 +49,12 @@ func findBinaryInEnvAndCommonDirs(name, envDir string, commonDirs []string) stri
 // findVLLMBinary resolves the vllm executable from vllmPath, then venvRoot, then
 // common install directories, then PATH. Both parameters may be empty.
 func findVLLMBinary(vllmPath, venvRoot string) string {
+	return findVLLMBinaryInDirs(vllmPath, venvRoot, commonBinaryDirs)
+}
+
+// findVLLMBinaryInDirs is [findVLLMBinary] with the system install directories
+// passed in, so a test can leave out a vllm the host has installed there.
+func findVLLMBinaryInDirs(vllmPath, venvRoot string, systemDirs []string) string {
 	if dir := vllmPath; dir != "" {
 		clean := filepath.Clean(dir)
 		if isRegularFile(clean) && filepath.Base(clean) == "vllm" {
@@ -68,7 +74,7 @@ func findVLLMBinary(vllmPath, venvRoot string) string {
 			return p
 		}
 	}
-	common := slices.Clone(commonBinaryDirs)
+	common := slices.Clone(systemDirs)
 	if home, err := os.UserHomeDir(); err == nil {
 		common = append(common, filepath.Join(home, ".local", "bin"))
 		if runtime.GOOS == "darwin" {
@@ -169,6 +175,13 @@ func isExecutableFile(path string) bool {
 // directory or a direct file path), then common install directories, then PATH.
 // koboldCppPath may be empty.
 func findKoboldCppBinary(koboldCppPath string) string {
+	return findKoboldCppBinaryInDirs(koboldCppPath, commonBinaryDirs)
+}
+
+// findKoboldCppBinaryInDirs is [findKoboldCppBinary] with the system install
+// directories passed in, so a test can leave out a koboldcpp the host has
+// installed there.
+func findKoboldCppBinaryInDirs(koboldCppPath string, systemDirs []string) string {
 	var envDir string
 	if d := koboldCppPath; d != "" {
 		envDir = filepath.Clean(d)
@@ -188,7 +201,7 @@ func findKoboldCppBinary(koboldCppPath string) string {
 		}
 	}
 	// 3) Common directories.
-	common := slices.Clone(commonBinaryDirs)
+	common := slices.Clone(systemDirs)
 	if home, err := os.UserHomeDir(); err == nil {
 		common = append(common, filepath.Join(home, ".local", "bin"))
 	}

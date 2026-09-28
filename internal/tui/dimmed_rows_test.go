@@ -400,8 +400,11 @@ func TestDimmedRows_launchPreviewNotesRuntimeOff(t *testing.T) {
 // command cannot push them out of the preview's visible lines. The copied
 // command carries none of them.
 func TestLaunchPreview_warningsAboveCommand(t *testing.T) {
-	dir := useTempConfigDir(t)
-	gone := testRow(models.BackendVLLM, filepath.Join(dir, "hf", "gone")) // no such folder
+	useTempConfigDir(t)
+	// A fixed, short, missing folder: a temp dir's path varies in length by OS
+	// (macOS's /var/folders/… wraps where Linux's /tmp/… does not), and the
+	// wrapped model id line would decide whether the warnings fit.
+	gone := testRow(models.BackendVLLM, filepath.FromSlash("/nonexistent-llml/hf/gone"))
 	args := []string{"--max-tokens", "4096", "--temp", "0.7", "--top-p", "0.9", "--chat-template-args", "{}", "--prompt-cache-size", "8"}
 	saveProfiles(t, gone.Path, profiles.Entry{Profiles: []profiles.Profile{{Name: "mlx", Backend: "mlx-lm", Args: args}}})
 
