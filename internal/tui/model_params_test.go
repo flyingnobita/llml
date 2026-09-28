@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/flyingnobita/llml/internal/config"
+	"github.com/flyingnobita/llml/internal/models"
 	"github.com/flyingnobita/llml/internal/profiles"
 )
 
@@ -263,5 +265,51 @@ func TestModelParamsFile_exists(t *testing.T) {
 	_, err := profiles.LoadParamsForRun("/x/y.gguf")
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+// Opening the p panel and closing it with esc writes nothing when nothing
+// changed: a model with no stored entry still has none, and a stored entry's
+// file is left byte for byte. A real change is still saved.
+func TestParamPanel_escWithoutChangeWritesNothing(t *testing.T) {
+	dir := useTempConfigDir(t)
+	fresh := testRow(models.BackendOMLX, filepath.Join(dir, ".omlx", "models", "fresh"))
+	stored := testRow(models.BackendSplash, filepath.Join(dir, "splash", "stored"))
+	saveProfiles(t, stored.Path, profiles.Entry{Profiles: []profiles.Profile{{Name: "mine", Args: []string{"--x"}}}})
+	cfg, err := profiles.ConfigPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.ReadFile(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	m := dimModel(t, newLaunchFakes().services, macPlatform, config.RuntimeStates{}, fresh, stored)
+	m.runtime.SplashPath = ""
+	for _, row := range []models.ModelFile{fresh, stored} {
+		m = selectRow(t, m, row)
+		m = press(t, m, keyText("p"), keyEsc)
+		if m.params.open {
+			t.Fatalf("esc should close the panel for %s", row.Path)
+		}
+		// Opening the panel clears the footer; closing it restores the note.
+		if !strings.Contains(m.lastRunNote, MissingSplashFooterNote) {
+			t.Errorf("closing p should restore the missing-Runtime footer, note %q", m.lastRunNote)
+		}
+	}
+	after, err := os.ReadFile(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(after) != string(before) {
+		t.Fatalf("p then esc rewrote model-params.json:\nbefore %s\nafter  %s", before, after)
+	}
+
+	m = selectRow(t, m, fresh)
+	m = press(t, m, keyText("p"), keyText("c"), keyEsc) // c duplicates the profile
+	ent, err := profiles.LoadEntry(profiles.ModelParamsKey(fresh.Path))
+	if err != nil || len(ent.Profiles) != 2 {
+		t.Errorf("a duplicated profile should be saved, got %+v (err %v)", ent, err)
 	}
 }

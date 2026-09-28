@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -223,6 +224,7 @@ func (m Model) persistParamPanelState() (Model, tea.Cmd, bool) {
 		m = m.withLastRunError(err.Error())
 		return m, clearLastRunNoteAfterCmd(), true
 	}
+	m.params.saved = profiles.NormalizeEntry(ent)
 	m = m.withLastRunCleared()
 	m = m.loadEffectiveBackendForIdentity(m.params.modelPath)
 	// A full relayout, since a newly dimmed row can widen the Runtime column.
@@ -238,7 +240,13 @@ func (m Model) persistParamPanel() (Model, tea.Cmd) {
 }
 
 // closeParamPanelWithPersist saves first; on error the panel stays open and lastRunNote is set.
+// With nothing changed since the entry was loaded or last saved it writes
+// nothing, so opening the panel does not store a default entry.
 func (m Model) closeParamPanelWithPersist() (Model, tea.Cmd) {
+	if reflect.DeepEqual(profiles.NormalizeEntry(m.params.editor.Entry()), m.params.saved) {
+		// Opening the panel cleared the footer; restore it as a save would.
+		return m.closeParamPanel().maybeSetMissingRuntimeFooterNote()
+	}
 	m, cmd, failed := m.persistParamPanelState()
 	if failed {
 		return m, cmd

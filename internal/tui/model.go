@@ -86,6 +86,7 @@ type paramsState struct {
 	modelDisplayName    string
 	focus               paramFocus
 	editor              profileEditor
+	saved               profiles.Entry // the entry as last loaded or saved, normalized; esc skips the save while the editor matches it
 	metadataCursor      int
 	primaryCursor       int // horizontal cursor within the Use Case Primary checkbox row
 	tagCursor           int // horizontal cursor within the Tags checkbox row
