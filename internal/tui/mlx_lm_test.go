@@ -118,7 +118,7 @@ func TestMLXLM_previewShowsModelIDAndCopiesCommand(t *testing.T) {
 	top := plainView(m)
 	// Focus the launch preview and scroll to its end.
 	scrolled := plainView(press(t, m, keyTab, keyDown, keyDown, keyDown, keyDown))
-	want := "model id for requests: " + row.Path
+	want := launchPreviewModelIDLabel + row.Path
 	if !strings.Contains(scrolled, want) {
 		t.Errorf("preview should show %q:\n%s", want, scrolled)
 	}
@@ -129,7 +129,7 @@ func TestMLXLM_previewShowsModelIDAndCopiesCommand(t *testing.T) {
 		t.Fatalf("want one copy, got %q", f.clipboard)
 	}
 	copied := f.clipboard[0]
-	if strings.Contains(copied, "model id") || !strings.Contains(copied, "mlx_lm.server") {
+	if strings.Contains(copied, launchPreviewModelIDLabel) || !strings.Contains(copied, "mlx_lm.server") {
 		t.Errorf("the copy should be the command alone: %q", copied)
 	}
 	for _, line := range strings.Split(copied, "\n") {
@@ -145,7 +145,7 @@ func TestMLXLM_previewModelIDOnlyForMLXLM(t *testing.T) {
 	m := dimModel(t, newLaunchFakes().services, linuxPlatform, config.RuntimeStates{}, mlxLMRow(t, dir))
 	m.layout.width = 240
 	m = press(t, m.layoutTable(), keyTab, keyDown, keyDown, keyDown, keyDown)
-	if view := plainView(m); strings.Contains(view, "model id for requests") || !strings.Contains(view, "--port 8000") {
+	if view := plainView(m); strings.Contains(view, launchPreviewModelIDLabel) || !strings.Contains(view, "--port 8000") {
 		t.Errorf("a vLLM row should show its whole command and no model-id line:\n%s", view)
 	}
 }
@@ -186,6 +186,12 @@ func TestMLXLM_missingModelFolderIsRefused(t *testing.T) {
 	m := dimModel(t, f.services, linuxPlatform, config.RuntimeStates{}, row)
 	if err := os.RemoveAll(row.Path); err != nil {
 		t.Fatal(err)
+	}
+	m = m.withLaunchPreviewSynced()
+	m.layout.width = 240
+	scrolled := plainView(press(t, m.layoutTable(), keyTab, keyDown, keyDown, keyDown, keyDown, keyDown))
+	if !strings.Contains(scrolled, "model folder not found - mlx-lm would download") {
+		t.Errorf("the preview should warn that the folder is gone, since the command can be copied:\n%s", scrolled)
 	}
 	m = press(t, m, keyText("R"), keyCtrlR)
 	if len(f.launches) != 0 {

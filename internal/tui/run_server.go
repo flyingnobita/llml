@@ -602,7 +602,8 @@ type launchPreview struct {
 	// info is a line of information under the command: the model id clients
 	// must send, for a Runtime that needs one. It is not part of the command.
 	info string
-	// note warns about the launch: the Runtime being off, then the mmproj state.
+	// note warns about the launch: the Runtime being off, a missing model
+	// folder, then the mmproj state.
 	note string
 }
 
@@ -620,9 +621,12 @@ func launchPreviewFor(m Model) launchPreview {
 	}
 	be := m.resolveEffectiveBackend()
 	spec, _ := buildServerSpec(be, modelPath, params, m.runtime, false)
-	notes := make([]string, 0, 2)
+	notes := make([]string, 0, 3)
 	if note := m.runtimeOffNote(be); note != "" {
 		notes = append(notes, note)
+	}
+	if rt := runtimeFor(be); rt.loadsRequestedModel && !isDir(modelPath) {
+		notes = append(notes, fmt.Sprintf(missingModelFolderPreviewNote, rt.name))
 	}
 	if note := spec.mmprojNote(); note != "" {
 		notes = append(notes, note)

@@ -256,7 +256,10 @@ const (
 	// missingModelFolderAlert is the warning when such a Runtime is asked to
 	// launch a model folder that no longer exists. It names the folder and
 	// the Runtime.
-	missingModelFolderAlert = "Model folder not found: %s. %s would take the path for a Hugging Face repo id and download it, so it was not launched. Press S to rescan."
+	// missingModelFolderPreviewNote is the launch preview's note for the same
+	// case, since the command can still be copied. It names the Runtime.
+	missingModelFolderPreviewNote = "⚠ model folder not found - %s would download a Hugging Face repo by this name; R will not run it"
+	missingModelFolderAlert       = "Model folder not found: %s. %s would take the path for a Hugging Face repo id and download it, so it was not launched. Press " + FooterKeyRescan + " to rescan."
 
 	FooterKeySortColumn   = ","
 	FooterDescSortColumn  = "sort"
