@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -311,5 +312,16 @@ func TestParamPanel_escWithoutChangeWritesNothing(t *testing.T) {
 	ent, err := profiles.LoadEntry(profiles.ModelParamsKey(fresh.Path))
 	if err != nil || len(ent.Profiles) != 2 {
 		t.Errorf("a duplicated profile should be saved, got %+v (err %v)", ent, err)
+	}
+
+	// Every key in the panel saves its own edit, so an edit left for esc to
+	// save is made through the editor directly.
+	m = press(t, m, keyText("p"))
+	m.params.editor.AddEnvRow()
+	m.params.editor.SetEnvRow(len(m.params.editor.EnvRows())-1, profiles.EnvVar{Key: "UNSAVED", Value: "1"})
+	m = press(t, m, keyEsc)
+	ent, err = profiles.LoadEntry(profiles.ModelParamsKey(fresh.Path))
+	if err != nil || !slices.ContainsFunc(ent.Profiles[ent.ActiveIndex].Env, func(e profiles.EnvVar) bool { return e.Key == "UNSAVED" }) {
+		t.Errorf("esc should save an edit not yet saved, got %+v (err %v)", ent, err)
 	}
 }

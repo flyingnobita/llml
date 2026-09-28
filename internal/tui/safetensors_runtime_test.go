@@ -335,4 +335,7 @@ func TestSafetensorsRuntime_saveKeepsUnusableStoredBackend(t *testing.T) {
 	if got := runtimeCell(t, m, "qwen-st"); got != "vllm" {
 		t.Errorf("the row should still run on vLLM, got %q", got)
 	}
+	if rowShowsDimmed(t, m, "qwen-st", "vllm") {
+		t.Error("a kept backend the row cannot use should not dim it")
+	}
 }

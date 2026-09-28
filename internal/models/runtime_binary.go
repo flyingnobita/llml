@@ -347,10 +347,13 @@ func (h healthAnswer) fromMLXVLM() bool {
 	return h.ok && h.status == "healthy"
 }
 
+// llamaCppServerHeader begins the Server header of current llama-server builds.
+const llamaCppServerHeader = "llama.cpp"
+
 // fromLlamaCpp reports whether the answer came from a llama-server that names
 // itself. Older builds send no Server header, so false does not rule it out.
 func (h healthAnswer) fromLlamaCpp() bool {
-	return h.ok && strings.HasPrefix(h.server, "llama.cpp")
+	return h.ok && strings.HasPrefix(h.server, llamaCppServerHeader)
 }
 
 // getHealth GETs /health on host:port, bounded by ctx. It shares the package

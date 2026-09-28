@@ -239,11 +239,17 @@ func (m Model) persistParamPanel() (Model, tea.Cmd) {
 	return m, cmd
 }
 
+// paramPanelChanged reports whether the editor differs from the entry as last
+// loaded or saved.
+func (m Model) paramPanelChanged() bool {
+	return !reflect.DeepEqual(profiles.NormalizeEntry(m.params.editor.Entry()), m.params.saved)
+}
+
 // closeParamPanelWithPersist saves first; on error the panel stays open and lastRunNote is set.
 // With nothing changed since the entry was loaded or last saved it writes
 // nothing, so opening the panel does not store a default entry.
 func (m Model) closeParamPanelWithPersist() (Model, tea.Cmd) {
-	if reflect.DeepEqual(profiles.NormalizeEntry(m.params.editor.Entry()), m.params.saved) {
+	if !m.paramPanelChanged() {
 		// Opening the panel cleared the footer; restore it as a save would.
 		return m.closeParamPanel().maybeSetMissingRuntimeFooterNote()
 	}

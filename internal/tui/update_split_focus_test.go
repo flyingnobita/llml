@@ -115,19 +115,19 @@ func TestUpdateServerSplitKeys_TabAppliesBorderStyles(t *testing.T) {
 // "Press Enter to close" line says, from the table as well as the log. On the
 // focused preview Enter copies the command instead (see
 // TestUpdateServerSplitKeys_ExitedPreviewEnterDoesNotDismissLog).
-func TestUpdateServerSplitKeys_enterClosesStoppedServerFromAnyFocus(t *testing.T) {
+func TestUpdateServerSplitKeys_enterClosesStoppedServerFromTableOrLog(t *testing.T) {
 	for _, tc := range []struct {
-		name           string
-		preview, split bool
+		name  string
+		split bool
 	}{
-		{"table", false, false},
-		{"log", false, true},
+		{"table", false},
+		{"log", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			m := newTestModel()
 			m.table.files = []models.ModelFile{{Path: "/tmp/foo.gguf", Backend: models.BackendLlama}}
 			m.server.running, m.server.exited = true, true
-			m.preview.focused, m.server.splitFocused = tc.preview, tc.split
+			m.server.splitFocused = tc.split
 
 			got, _ := m.updateServerSplitKeys(tea.KeyPressMsg{Code: tea.KeyEnter})
 			if got.server.running || got.server.exited {
