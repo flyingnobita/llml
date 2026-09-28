@@ -157,7 +157,8 @@ profiles into portable TOML. Keep that `.agents` file as the source of truth. Th
 tracked Claude workspace copy at **`.claude/skills/llml-import/SKILL.md`** must stay
 byte-for-byte in sync; refresh it with
 **`./scripts/sync-skill --workspace --tool claude`** after editing the canonical
-skill. User-level installs for local agent tools are handled by **`scripts/sync-skill`**.
+skill; it replaces the copy without `--force` as long as the copy has no
+uncommitted edits. User-level installs for local agent tools are handled by **`scripts/sync-skill`**.
 
 Set machine-specific env (for example `LLAMA_CPP_PATH`) in `mise.local.toml` (gitignored); keep shared tool/tasks config in `mise.toml`. For a **linked git worktree**, run **`mise run worktree-setup`** in that checkout so dependencies install and **`scripts/sync_gitignore_agents.sh`** runs with **`LLML_AGENTS_SYNC=import`**, pulling gitignored paths listed at the top of that script (agent dirs, `TODOS.md`, `mise.local.toml`) from the **primary** checkout by default; set **`LLML_AGENTS_PEER`** or **`LLML_AGENTS_SYNC`** (`import` / `export` / `none`) to override.
 

@@ -137,6 +137,75 @@ func TestSyncSkillUserInstallDetectedToolAndProtectsUnmanagedTargets(t *testing.
 	}
 }
 
+// The tracked Claude copy is refreshed without --force once the canonical
+// skill changes, since git holds the old version. An uncommitted edit to it
+// is not in git, so it is still protected.
+func TestSyncSkillWorkspaceRefreshesStaleTrackedClaudeCopy(t *testing.T) {
+	repo := testRepo(t)
+	runSync(t, repo, nil, "--workspace", "--tool", "claude")
+	gitInit(t, repo)
+
+	canonical := filepath.Join(repo, ".agents", "skills", "llml-import", "SKILL.md")
+	tracked := filepath.Join(repo, ".claude", "skills", "llml-import", "SKILL.md")
+	appendTo(t, canonical, "\nA canonical change.\n")
+
+	status := runSync(t, repo, nil, "--workspace", "--tool", "claude", "--status")
+	if !strings.Contains(status, "workspace claude: out of date (tracked compatibility copy)") {
+		t.Fatalf("status should report the stale tracked copy: %s", status)
+	}
+
+	runSync(t, repo, nil, "--workspace", "--tool", "claude")
+	want, _ := os.ReadFile(canonical)
+	got, _ := os.ReadFile(tracked)
+	if string(got) != string(want) {
+		t.Fatal("tracked copy was not refreshed from the canonical skill")
+	}
+	if _, err := os.Stat(filepath.Join(filepath.Dir(tracked), ".skill-sync-meta")); !os.IsNotExist(err) {
+		t.Fatalf("tracked copy should have no .skill-sync-meta, got err=%v", err)
+	}
+
+	gitRun(t, repo, "commit", "-qam", "refresh")
+	appendTo(t, tracked, "\nA local edit.\n")
+	appendTo(t, canonical, "\nAnother canonical change.\n")
+	cmd := syncCmd(t, repo, nil, "--workspace", "--tool", "claude")
+	out, err := cmd.CombinedOutput()
+	if err == nil || !strings.Contains(string(out), "refusing to overwrite unmanaged target") {
+		t.Fatalf("an uncommitted edit to the tracked copy should be refused, err=%v: %s", err, out)
+	}
+}
+
+// gitInit makes repo a git repository with everything in it committed.
+func gitInit(t *testing.T, repo string) {
+	t.Helper()
+	gitRun(t, repo, "init", "-q")
+	gitRun(t, repo, "add", "-A")
+	gitRun(t, repo, "commit", "-qm", "init")
+}
+
+// gitRun runs git in repo, isolated from the user's and system git config.
+func gitRun(t *testing.T, repo string, args ...string) {
+	t.Helper()
+	base := []string{"-c", "user.name=test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false"}
+	cmd := exec.Command("git", append(base, args...)...)
+	cmd.Dir = repo
+	cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, out)
+	}
+}
+
+func appendTo(t *testing.T, path, text string) {
+	t.Helper()
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = f.Close() }()
+	if _, err := f.WriteString(text); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func testRepo(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
