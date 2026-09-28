@@ -1,9 +1,12 @@
 package tui
 
 import (
+	"path/filepath"
 	"testing"
 
+	"github.com/flyingnobita/llml/internal/config"
 	"github.com/flyingnobita/llml/internal/models"
+	"github.com/flyingnobita/llml/internal/profiles"
 )
 
 // setupPreviewScrollableModel returns a model with a selected model row and enough
@@ -86,5 +89,51 @@ func TestLaunchPreviewFocus_TabFocusesWhenVisible(t *testing.T) {
 	}
 	if !gm.preview.focused {
 		t.Fatalf("expected launchPreviewFocused=true after Tab on visible preview, got false")
+	}
+}
+
+// [ and ] scroll a launch preview too long to show at once, without moving
+// focus: from the table in the idle view, and from the table or the log
+// beside a split-pane server. The help panel lists them from the same binding.
+func TestLaunchPreview_bracketsScrollWithoutFocus(t *testing.T) {
+	dir := useTempConfigDir(t)
+	row := testRow(models.BackendLlama, filepath.Join(dir, "gemma.gguf"))
+	args := []string{"--ctx-size", "32768", "--temp", "0.7", "--top-p", "0.9", "--top-k", "40", "--min-p", "0.05", "--flash-attn", "on"}
+	saveProfiles(t, row.Path, profiles.Entry{Profiles: []profiles.Profile{{Name: "long", Args: args}}})
+
+	for _, tc := range []struct {
+		name       string
+		split, log bool
+	}{
+		{"idle", false, false},
+		{"split table", true, false},
+		{"split log", true, true},
+	} {
+		m := dimModel(t, newLaunchFakes().services, linuxPlatform, config.RuntimeStates{}, row)
+		m.server.running, m.server.splitFocused = tc.split, tc.log
+		if m.preview.viewport.TotalLineCount() <= m.preview.viewport.VisibleLineCount() {
+			t.Fatalf("the preview should overflow for this test:\n%s", plainView(m))
+		}
+		m = press(t, m, keyText("]"), keyText("]"))
+		if got := m.preview.viewport.YOffset(); got != 2 {
+			t.Errorf("%s: ] twice should scroll the preview down 2 lines, offset %d", tc.name, got)
+		}
+		if m.preview.focused || m.server.splitFocused != tc.log {
+			t.Errorf("%s: ] should not move focus", tc.name)
+		}
+		m = press(t, m, keyText("["))
+		if got := m.preview.viewport.YOffset(); got != 1 {
+			t.Errorf("%s: [ should scroll the preview up a line, offset %d", tc.name, got)
+		}
+	}
+
+	var listed bool
+	for _, s := range helpSections() {
+		for _, e := range s.entries {
+			listed = listed || (e.key == DefaultKeyMap().ScrollPreviewUp.Help().Key && e.desc == DefaultKeyMap().ScrollPreviewUp.Help().Desc)
+		}
+	}
+	if !listed {
+		t.Error("the help panel should list the preview scroll binding")
 	}
 }

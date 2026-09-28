@@ -196,6 +196,42 @@ func TestDiscoverRuntime_vLLMOMLXAndSplashOnOnePort(t *testing.T) {
 	}
 }
 
+// llama.cpp and vLLM only share a port when the user moves one of them, but
+// then only the one answering is running: vLLM names itself the model owner,
+// and llama-server sends Server: llama.cpp and names llamacpp as the owner.
+func TestDiscoverRuntime_llamaAndVLLMOnOnePort(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name      string
+		server    fakeServer
+		wantLlama bool
+		wantVLLM  bool
+	}{
+		{"vllm serve", fakeVLLMServe, false, true},
+		{"llama-server", fakeLlamaServer, true, false},
+		{"llama-server without a Server header", fakeOldLlamaServer, true, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			host, port := tc.server.start(t)
+			s := settings.Resolve(settings.Defaults())
+			s.LlamaServerHost, s.LlamaServerPort = host, port
+			s.VLLMServerHost, s.VLLMServerPort = host, port
+
+			info := DiscoverRuntime(context.Background(), s, skipAllBut(BackendLlama, BackendVLLM))
+			if got := info.Status(BackendLlama).Running; got != tc.wantLlama {
+				t.Errorf("llama.cpp running = %t, want %t", got, tc.wantLlama)
+			}
+			if got := info.Status(BackendVLLM).Running; got != tc.wantVLLM {
+				t.Errorf("vLLM running = %t, want %t", got, tc.wantVLLM)
+			}
+		})
+	}
+}
+
 // A port nothing listens on reports no Runtime running.
 func TestDiscoverRuntime_nothingAnswering(t *testing.T) {
 	t.Parallel()

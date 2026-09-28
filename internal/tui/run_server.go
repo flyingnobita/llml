@@ -626,7 +626,7 @@ type launchPreview struct {
 	// must send, for a Runtime that needs one. It is not part of the command.
 	info string
 	// note warns about the launch: the Runtime being off, a missing model
-	// folder, then the mmproj state.
+	// folder, then the mmproj state. It is drawn above the command too.
 	note string
 }
 

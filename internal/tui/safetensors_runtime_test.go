@@ -283,3 +283,59 @@ func TestSafetensorsRuntime_importedProfileChoosesRuntime(t *testing.T) {
 		t.Errorf("launched on %v, want vLLM", got.backend)
 	}
 }
+
+// The missing-Runtime footer follows the Runtime each row launches with: a
+// row switched off its discovery Runtime no longer counts toward it, and a
+// row with no override still does.
+func TestMissingRuntimeFooter_followsChosenRuntime(t *testing.T) {
+	dir := useTempConfigDir(t)
+	omlx := omlxRow(dir)
+	gguf := testRow(models.BackendLlama, filepath.Join(dir, "gemma.gguf"))
+	saveProfiles(t, omlx.Path, profiles.Entry{Profiles: []profiles.Profile{{Name: "vllm", Backend: "vllm"}}})
+	saveProfiles(t, gguf.Path, profiles.Entry{Profiles: []profiles.Profile{{Name: "kobold", Backend: "koboldcpp"}}})
+
+	m := dimModel(t, newLaunchFakes().services, macPlatform, config.RuntimeStates{}, omlx, gguf)
+	m.runtime.OMLXPath, m.runtime.LlamaServerPath, m.runtime.ServerRunning = "", "", false
+	m, _ = m.maybeSetMissingRuntimeFooterNote()
+	if m.lastRunNote != "" {
+		t.Errorf("no row launches with oMLX or llama.cpp, yet the footer says %q", m.lastRunNote)
+	}
+
+	m = dimModel(t, newLaunchFakes().services, macPlatform, config.RuntimeStates{}, omlxRow(dir), hfRow(dir))
+	m.runtime.VLLMPath = ""
+	m, _ = m.maybeSetMissingRuntimeFooterNote()
+	if !strings.Contains(m.lastRunNote, MissingVLLMFooterNote) {
+		t.Errorf("a row with no override on the missing vLLM should be reported, note %q", m.lastRunNote)
+	}
+}
+
+// A stored backend the row cannot use (an mlx-lm profile imported on a
+// platform without MLX) survives a save from the p panel: the row ignores it,
+// but the profile keeps it for a machine where it applies.
+func TestSafetensorsRuntime_saveKeepsUnusableStoredBackend(t *testing.T) {
+	dir := useTempConfigDir(t)
+	row := hfRow(dir)
+	saveProfiles(t, row.Path, profiles.Entry{Profiles: []profiles.Profile{{Name: "imported", Backend: "mlx-lm"}}})
+
+	windows := models.Platform{GOOS: "windows", GOARCH: "amd64"}
+	m := dimModel(t, newLaunchFakes().services, windows, config.RuntimeStates{}, row)
+	m = press(t, m, keyText("p"), keyText("c"), keyEsc) // c duplicates and saves
+	if strings.Contains(m.lastRunNote, "cleared") {
+		t.Errorf("saving should not report clearing the backend: %q", m.lastRunNote)
+	}
+	ent, err := profiles.LoadEntry(profiles.ModelParamsKey(row.Path))
+	if err != nil || len(ent.Profiles) != 2 {
+		t.Fatalf("want the imported profile and its copy saved, got %+v (err %v)", ent, err)
+	}
+	for _, p := range ent.Profiles {
+		if p.Backend != "mlx-lm" {
+			t.Errorf("profile %q lost its stored backend: %q", p.Name, p.Backend)
+		}
+	}
+	if got := runtimeCell(t, m, "qwen-st"); got != "vllm" {
+		t.Errorf("the row should still run on vLLM, got %q", got)
+	}
+	if rowShowsDimmed(t, m, "qwen-st", "vllm") {
+		t.Error("a kept backend the row cannot use should not dim it")
+	}
+}

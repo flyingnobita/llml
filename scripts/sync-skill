@@ -146,6 +146,14 @@ is_tracked_workspace_copy() {
   [ "$scope" = "workspace" ] && [ "$tool" = "claude" ]
 }
 
+# The tracked Claude copy is generated from the canonical skill and held in
+# git, so it is always replaced without --force: a stale copy is exactly what
+# a refresh is for, and git keeps the previous version.
+is_replaceable_target() {
+  local dir=$1 tool=$2 scope=$3
+  is_managed_target "$dir" || is_adoptable_target "$dir" || is_tracked_workspace_copy "$tool" "$scope"
+}
+
 write_meta() {
   local dir=$1 tool=$2 scope=$3
   cat >"$dir/$META_FILE" <<EOF
@@ -158,9 +166,9 @@ EOF
 }
 
 prepare_target_dir() {
-  local dir=$1
+  local dir=$1 tool=$2 scope=$3
   if [ -e "$dir" ]; then
-    if is_managed_target "$dir" || is_adoptable_target "$dir"; then
+    if is_replaceable_target "$dir" "$tool" "$scope"; then
       rm -rf "$dir"
     elif $force; then
       rm -rf "$dir"
@@ -174,7 +182,7 @@ prepare_target_dir() {
 sync_dir() {
   local tool=$1 scope=$2 base_dir=$3
   local target_dir="$base_dir/$SKILL_NAME"
-  prepare_target_dir "$target_dir"
+  prepare_target_dir "$target_dir" "$tool" "$scope"
   cp -R "$SOURCE_DIR"/. "$target_dir"/
   if is_tracked_workspace_copy "$tool" "$scope"; then
     rm -f "$target_dir/$META_FILE"
@@ -208,6 +216,8 @@ status_target() {
   if [ -d "$dir" ]; then
     if is_tracked_workspace_copy "$tool" "$scope" && is_adoptable_target "$dir"; then
       log "$label: installed (tracked compatibility copy) at $dir"
+    elif is_tracked_workspace_copy "$tool" "$scope"; then
+      log "$label: out of date (tracked compatibility copy) at $dir"
     elif is_managed_target "$dir"; then
       log "$label: installed (managed) at $dir"
     elif is_adoptable_target "$dir"; then

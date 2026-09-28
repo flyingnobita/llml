@@ -119,7 +119,8 @@ func TestSyncSkillUserInstallDetectedToolAndProtectsUnmanagedTargets(t *testing.
 
 	unmanagedRepo := testRepo(t)
 	unmanagedHome := t.TempDir()
-	targetDir := filepath.Join(unmanagedRepo, ".claude", "skills", "llml-import")
+	// Cline's workspace copy is not tracked, so a hand-made one is protected.
+	targetDir := filepath.Join(unmanagedRepo, ".cline", "skills", "llml-import")
 	if err := os.MkdirAll(targetDir, 0o755); err != nil {
 		t.Fatalf("mkdir unmanaged target: %v", err)
 	}
@@ -127,13 +128,54 @@ func TestSyncSkillUserInstallDetectedToolAndProtectsUnmanagedTargets(t *testing.
 		t.Fatalf("write unmanaged skill: %v", err)
 	}
 
-	cmd := syncCmd(t, unmanagedRepo, []string{"HOME=" + unmanagedHome}, "--workspace", "--tool", "claude")
+	cmd := syncCmd(t, unmanagedRepo, []string{"HOME=" + unmanagedHome}, "--workspace", "--tool", "cline")
 	outBytes, err := cmd.CombinedOutput()
 	if err == nil {
 		t.Fatalf("expected unmanaged overwrite refusal, got success: %s", outBytes)
 	}
 	if !strings.Contains(string(outBytes), "refusing to overwrite unmanaged target") {
 		t.Fatalf("unexpected unmanaged overwrite error: %s", outBytes)
+	}
+}
+
+// The tracked Claude copy is refreshed without --force whenever the canonical
+// skill has changed, including a second time before the first refresh is
+// committed, since it is generated and git holds the previous version.
+func TestSyncSkillWorkspaceRefreshesStaleTrackedClaudeCopy(t *testing.T) {
+	repo := testRepo(t)
+	runSync(t, repo, nil, "--workspace", "--tool", "claude")
+
+	canonical := filepath.Join(repo, ".agents", "skills", "llml-import", "SKILL.md")
+	tracked := filepath.Join(repo, ".claude", "skills", "llml-import", "SKILL.md")
+	for _, change := range []string{"\nA canonical change.\n", "\nAnother canonical change.\n"} {
+		appendTo(t, canonical, change)
+
+		status := runSync(t, repo, nil, "--workspace", "--tool", "claude", "--status")
+		if !strings.Contains(status, "workspace claude: out of date (tracked compatibility copy)") {
+			t.Fatalf("status should report the stale tracked copy: %s", status)
+		}
+
+		runSync(t, repo, nil, "--workspace", "--tool", "claude")
+		want, _ := os.ReadFile(canonical)
+		got, _ := os.ReadFile(tracked)
+		if string(got) != string(want) {
+			t.Fatal("tracked copy was not refreshed from the canonical skill")
+		}
+		if _, err := os.Stat(filepath.Join(filepath.Dir(tracked), ".skill-sync-meta")); !os.IsNotExist(err) {
+			t.Fatalf("tracked copy should have no .skill-sync-meta, got err=%v", err)
+		}
+	}
+}
+
+func appendTo(t *testing.T, path, text string) {
+	t.Helper()
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = f.Close() }()
+	if _, err := f.WriteString(text); err != nil {
+		t.Fatal(err)
 	}
 }
 

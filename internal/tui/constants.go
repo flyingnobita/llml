@@ -21,6 +21,9 @@ const (
 	// hScrollStep is the number of columns scrolled per arrow/key press.
 	hScrollStep = 4
 
+	// previewScrollStep is the number of lines [ and ] scroll the launch preview.
+	previewScrollStep = 1
+
 	// appTitle is the primary application name rendered in the title bar.
 	appTitle = "LLM Launcher"
 
@@ -234,6 +237,13 @@ const (
 	FooterKeyCopyPath  = "enter"
 	FooterDescCopyPath = "copy cmd"
 	FooterHintCopyPath = FooterKeyCopyPath + ": " + FooterDescCopyPath
+
+	// FooterKeyPreviewUp / FooterKeyPreviewDown scroll the launch preview
+	// without focusing it; FooterKeyPreviewScroll is their shared help label.
+	FooterKeyPreviewUp      = "["
+	FooterKeyPreviewDown    = "]"
+	FooterKeyPreviewScroll  = FooterKeyPreviewUp + "/" + FooterKeyPreviewDown
+	FooterDescPreviewScroll = "Scroll launch preview"
 
 	// CopyCommandFeedback* are shown below the footer after Enter copies the launch command.
 	CopyCommandFeedbackSuccess = "Command copied to clipboard"

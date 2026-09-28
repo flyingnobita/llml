@@ -183,6 +183,7 @@ func (m Model) openParamPanel() (Model, tea.Cmd) {
 		}
 	}
 	m.params.editor = newProfileEditor(ent)
+	m.params.saved = profiles.NormalizeEntry(m.params.editor.Entry())
 	m.params.metadataCursor = 0
 	m.params.focus = paramFocusProfiles
 	m.params.editInput.SetWidth(m.paramEditInnerWidth())
@@ -209,6 +210,7 @@ func (m Model) closeParamPanel() Model {
 	m.params.notesInput.Reset()
 	m.params.notesInput.Blur()
 	m.params.editor = profileEditor{}
+	m.params.saved = profiles.Entry{}
 	m.params.modelPath = ""
 	m.params.modelDisplayName = ""
 	m.params.metadataCursor = 0

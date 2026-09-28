@@ -82,7 +82,7 @@ func rowIsOn(t *testing.T, m Model, rt string) bool {
 }
 
 // space in the list flips the highlighted Runtime's checkbox; a Disabled
-// Runtime shows off in place of its status mark and "Off" in the detail header.
+// Runtime shows off in place of its status mark and in the detail header.
 func TestRuntimePanel_spaceTogglesHighlightedRuntime(t *testing.T) {
 	t.Parallel()
 
@@ -97,8 +97,8 @@ func TestRuntimePanel_spaceTogglesHighlightedRuntime(t *testing.T) {
 	if !rowIsOn(t, m, "Llama.cpp") {
 		t.Fatal("space must only toggle the highlighted Runtime")
 	}
-	if view := plainView(m); !strings.Contains(view, "KoboldCpp · Off") {
-		t.Errorf("the detail header should say Off:\n%s", view)
+	if view := plainView(m); !strings.Contains(view, "KoboldCpp · "+runtimeMarkOff) {
+		t.Errorf("the detail header should say off:\n%s", view)
 	}
 	m = press(t, m, keySpace)
 	if !rowIsOn(t, m, "KoboldCpp") {

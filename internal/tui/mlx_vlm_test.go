@@ -176,9 +176,9 @@ func TestMLXVLM_missingModelFolderIsRefused(t *testing.T) {
 	}
 	m = m.withLaunchPreviewSynced()
 	m.layout.width = 240
-	scrolled := plainView(press(t, m.layoutTable(), keyTab, keyDown, keyDown, keyDown, keyDown, keyDown))
-	if !strings.Contains(scrolled, "model folder not found - mlx-vlm would download") {
-		t.Errorf("the preview should warn that the folder is gone:\n%s", scrolled)
+	top := plainView(m.layoutTable()) // the warning shows without scrolling
+	if !strings.Contains(top, "model folder not found - mlx-vlm would download") {
+		t.Errorf("the preview should warn that the folder is gone:\n%s", top)
 	}
 	m = press(t, m, keyText("R"), keyCtrlR)
 	if len(f.launches) != 0 {

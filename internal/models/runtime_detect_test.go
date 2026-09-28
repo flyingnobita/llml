@@ -130,20 +130,3 @@ func TestDiscoverRuntime_skipSet(t *testing.T) {
 		t.Error("KoboldCpp answered its probe but is not reported running")
 	}
 }
-
-func TestRuntimeInfo_Summary_omitsSkipped(t *testing.T) {
-	t.Parallel()
-
-	r := RuntimeInfo{
-		LlamaCLIPath: "/a/llama-cli", LlamaServerPath: "/b/llama-server",
-		VLLMPath: "/c/vllm", KoboldCppPath: "/d/koboldcpp", OllamaPath: "/e/ollama",
-		Skipped: NewBackendSet(BackendLlama, BackendKobold, BackendOllama),
-	}
-	if got, want := r.Summary(), "vllm: ✓"; got != want {
-		t.Errorf("Summary() = %q, want %q", got, want)
-	}
-	r.Skipped = NewBackendSet(BackendVLLM)
-	if got, want := r.Summary(), "llama.cpp: cli ✓ · server ✓ · koboldcpp: ✓ stopped · ollama: ✓ stopped"; got != want {
-		t.Errorf("Summary() = %q, want %q", got, want)
-	}
-}

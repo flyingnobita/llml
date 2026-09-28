@@ -27,6 +27,10 @@ type KeyMap struct {
 	Export       key.Binding
 	Import       key.Binding
 	Help         key.Binding
+	// ScrollPreviewUp and ScrollPreviewDown scroll the launch preview a line
+	// without focusing it. They share one help entry.
+	ScrollPreviewUp   key.Binding
+	ScrollPreviewDown key.Binding
 }
 
 type runServerMode int
@@ -80,6 +84,14 @@ func DefaultKeyMap() KeyMap {
 		Help: key.NewBinding(
 			key.WithKeys("?"),
 			key.WithHelp("?", "help"),
+		),
+		ScrollPreviewUp: key.NewBinding(
+			key.WithKeys(FooterKeyPreviewUp),
+			key.WithHelp(FooterKeyPreviewScroll, FooterDescPreviewScroll),
+		),
+		ScrollPreviewDown: key.NewBinding(
+			key.WithKeys(FooterKeyPreviewDown),
+			key.WithHelp(FooterKeyPreviewScroll, FooterDescPreviewScroll),
 		),
 		RunServer: key.NewBinding(
 			key.WithKeys(FooterKeyRunSplit),

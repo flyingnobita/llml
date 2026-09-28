@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -215,28 +216,15 @@ func (m Model) moveProfile(delta int) Model {
 
 // persistParamPanel writes the current parameter profiles to disk without closing the panel.
 func (m Model) persistParamPanelState() (Model, tea.Cmd, bool) {
+	// A stored backend the row cannot use (an import made for another
+	// platform, say) is kept: rowRuntime ignores it here, and the profile
+	// still carries it to a machine where it applies.
 	ent := m.params.editor.Entry()
-	// A row with one Runtime has nothing to choose, so a stored override
-	// (from an import, say) is dropped rather than kept unused.
-	if f, ok := m.paramsRow(); !ok || !m.rowHasRuntimeChoice(f) {
-		hadBackend := false
-		for i := range ent.Profiles {
-			if ent.Profiles[i].Backend != "" {
-				hadBackend = true
-			}
-			ent.Profiles[i].Backend = ""
-		}
-		for i := range m.params.editor.profiles {
-			m.params.editor.profiles[i].Backend = ""
-		}
-		if hadBackend {
-			m = m.withLastRunError("Backend override cleared: this model has only one Runtime")
-		}
-	}
 	if err := profiles.SaveEntry(m.params.modelPath, ent); err != nil {
 		m = m.withLastRunError(err.Error())
 		return m, clearLastRunNoteAfterCmd(), true
 	}
+	m.params.saved = profiles.NormalizeEntry(ent)
 	m = m.withLastRunCleared()
 	m = m.loadEffectiveBackendForIdentity(m.params.modelPath)
 	// A full relayout, since a newly dimmed row can widen the Runtime column.
@@ -251,8 +239,20 @@ func (m Model) persistParamPanel() (Model, tea.Cmd) {
 	return m, cmd
 }
 
+// paramPanelChanged reports whether the editor differs from the entry as last
+// loaded or saved.
+func (m Model) paramPanelChanged() bool {
+	return !reflect.DeepEqual(profiles.NormalizeEntry(m.params.editor.Entry()), m.params.saved)
+}
+
 // closeParamPanelWithPersist saves first; on error the panel stays open and lastRunNote is set.
+// With nothing changed since the entry was loaded or last saved it writes
+// nothing, so opening the panel does not store a default entry.
 func (m Model) closeParamPanelWithPersist() (Model, tea.Cmd) {
+	if !m.paramPanelChanged() {
+		// Opening the panel cleared the footer; restore it as a save would.
+		return m.closeParamPanel().maybeSetMissingRuntimeFooterNote()
+	}
 	m, cmd, failed := m.persistParamPanelState()
 	if failed {
 		return m, cmd

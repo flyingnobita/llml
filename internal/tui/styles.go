@@ -85,7 +85,7 @@ type styles struct {
 	// runtimeCheckbox draws a Runtime's [✓] / [ ] in the list.
 	runtimeCheckbox lipgloss.Style
 	// runtimeMarkOff is the "off" a Disabled Runtime shows in place of its
-	// status mark; runtimeOffHeader is the "Off" in its detail header.
+	// status mark; runtimeOffHeader is the "off" in its detail header.
 	runtimeMarkOff    lipgloss.Style
 	runtimeOffHeader  lipgloss.Style
 	runtimeFieldLabel lipgloss.Style

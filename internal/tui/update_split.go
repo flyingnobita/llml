@@ -68,13 +68,22 @@ func (m Model) updateServerSplitKeys(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		m.alerts.viewport, cmd = m.alerts.viewport.Update(msg)
 		return m, cmd
 	}
+	// [ and ] scroll the preview from any pane, the log included.
+	if m2, ok := m.scrollLaunchPreviewKey(msg); ok {
+		return m2, nil
+	}
 	if m.server.exited {
 		switch {
 		case isTabKey(msg):
 			return m.cycleSplitPaneFocus(), nil
 		case key.Matches(msg, m.keys.ToggleWrap):
 			return m.toggleServerLogWrap(), nil
-		case m.server.splitFocused && (isEnterKey(msg) || key.Matches(msg, m.keys.Quit) || isEscapeKey(msg) || isCtrlC(msg)):
+		// Enter closes the pane from the table or the log, as its "Press
+		// Enter to close" line says; on the focused preview it still copies
+		// the command. q, esc, and ctrl+c close it only from the log, since
+		// the table and preview have their own meanings for them.
+		case isEnterKey(msg) && !m.preview.focused,
+			m.server.splitFocused && (key.Matches(msg, m.keys.Quit) || isEscapeKey(msg) || isCtrlC(msg)):
 			m = m.dismissSplitServer()
 			return m, nil
 		}

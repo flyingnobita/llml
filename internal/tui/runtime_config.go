@@ -261,12 +261,13 @@ var missingRuntimeNotes = []struct {
 
 // maybeSetMissingRuntimeFooterNote sets [Model.lastRunNote] when the scan found
 // models whose Runtime's program cannot be found, and clears it otherwise. A
-// GGUF row needs KoboldCpp too when its active profile launches with it. A
-// Disabled Runtime is never reported: the user turned it off.
+// row needs only the Runtime it launches with ([Model.rowRuntime]), so one
+// whose Active Profile moved it off its discovery Runtime does not count
+// toward that Runtime. A Disabled Runtime is never reported: the user turned
+// it off.
 func (m Model) maybeSetMissingRuntimeFooterNote() (Model, tea.Cmd) {
 	want := map[models.ModelBackend]bool{}
 	for _, f := range m.table.files {
-		want[f.Backend] = true
 		want[m.rowRuntime(f)] = true
 	}
 	var msgs []string

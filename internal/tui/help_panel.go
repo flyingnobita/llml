@@ -15,6 +15,7 @@ func helpSections() []struct {
 	title   string
 	entries []helpEntry
 } {
+	keys := DefaultKeyMap()
 	return []struct {
 		title   string
 		entries []helpEntry
@@ -35,7 +36,7 @@ func helpSections() []struct {
 				{"R", "Run server (split pane)"},
 				{"ctrl+R", "Run server (full terminal)"},
 				{"enter", "Copy launch command"},
-				{"[/]", "Scroll launch preview"},
+				{keys.ScrollPreviewUp.Help().Key, keys.ScrollPreviewUp.Help().Desc},
 			},
 		},
 		{
