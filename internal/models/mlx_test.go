@@ -206,6 +206,15 @@ func TestPlatformSupports(t *testing.T) {
 		{linux, BackendVLLM, true},
 		{Platform{}, BackendOMLX, true},
 		{Platform{}, BackendNInfer, true},
+		// mlx-lm runs on MLX's Metal backend on Apple Silicon and on its CUDA
+		// or CPU backend on Linux x86_64 and aarch64, nowhere else.
+		{mac, BackendMLXLM, true},
+		{linux, BackendMLXLM, true},
+		{Platform{GOOS: "linux", GOARCH: "arm64"}, BackendMLXLM, true},
+		{intelMac, BackendMLXLM, false},
+		{Platform{GOOS: "windows", GOARCH: "amd64"}, BackendMLXLM, false},
+		{Platform{GOOS: "windows", GOARCH: "arm64"}, BackendMLXLM, false},
+		{Platform{GOOS: "linux", GOARCH: "386"}, BackendMLXLM, false},
 	}
 	for _, tt := range tests {
 		if got := tt.p.Supports(tt.b); got != tt.want {

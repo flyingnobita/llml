@@ -21,6 +21,8 @@ type fakeServer struct {
 	health string
 	// models is the /v1/models body, or "" when the server has no such route.
 	models string
+	// emptyModelsBody answers /v1/models with 200 and no body.
+	emptyModelsBody bool
 }
 
 var (
@@ -68,6 +70,9 @@ func (f fakeServer) start(t *testing.T) (string, int) {
 		case "/health":
 			body = f.health
 		case "/v1/models":
+			if f.emptyModelsBody {
+				return
+			}
 			if f.models == "" {
 				http.NotFound(w, r)
 				return
