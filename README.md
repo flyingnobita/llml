@@ -104,6 +104,12 @@ brew install --cask llml
 
 Upgrade later with `brew upgrade --cask llml`.
 
+The macOS binary is not signed or notarized by Apple. The cask clears the quarantine flag Homebrew sets on downloads, so macOS opens it without asking. If you installed 0.8.0 or earlier and macOS says "llml" Not Opened, run `brew upgrade --cask llml`, or clear the flag yourself:
+
+```bash
+xattr -d com.apple.quarantine "$(brew --prefix)/Caskroom/llml/$(brew list --cask --versions llml | cut -d' ' -f2)/llml"
+```
+
 #### Scoop
 
 `llml` is published to the maintainer bucket, not the default Scoop main bucket.
@@ -138,6 +144,8 @@ For each [GitHub release](https://github.com/flyingnobita/llml/releases), archiv
 tar -xzf llml_1.2.3_Linux_x86_64.tar.gz
 chmod +x llml
 ```
+
+On macOS, an archive downloaded with a browser is quarantined, and macOS refuses to open the unsigned binary ("llml" Not Opened). Clear the flag after extracting with `xattr -d com.apple.quarantine llml`. Archives fetched with `curl`, including by the install script, are not quarantined.
 
 Install on your `PATH` if you like (Linux/macOS/WSL):
 
