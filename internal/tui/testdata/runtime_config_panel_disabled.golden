@@ -5,7 +5,7 @@
   ││                                                                                            │
   ││  Runtime Environment                                                                       │
   ││                                                                                            │
-  ││  GGUF                    KoboldCpp · Off                                                   │
+  ││  GGUF                    KoboldCpp · off                                                   │
   ││     [✓] Llama.cpp ○                                                                        │
   ││   › [ ] KoboldCpp off      Path  > koboldcpp binary or its dir                             │
   ││  Safetensors               in use: not found (default)                                     │

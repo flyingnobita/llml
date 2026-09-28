@@ -202,7 +202,7 @@ func (m Model) runtimeDetailPane(width int) string {
 	case !m.panelRuntimeEnabled(rt.backend):
 		// A Disabled Runtime's fields stay editable; the header says editing
 		// them does not turn it on.
-		header += m.ui.styles.runtimeOffHeader.Render("Off")
+		header += m.ui.styles.runtimeOffHeader.Render(runtimeMarkOff)
 	case m.runtimeStatusPending(rt.backend):
 		header += m.ui.styles.runtimeInUse.Render(runtimeStatusPendingWord)
 	default:

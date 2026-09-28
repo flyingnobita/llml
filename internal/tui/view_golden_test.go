@@ -232,7 +232,7 @@ func TestGolden_runtimeConfigPanelMLXVLM(t *testing.T) {
 }
 
 // A Disabled Runtime shows an empty checkbox and "off" in the list, and its
-// detail pane says "Off" while its fields stay in place for editing.
+// detail pane says "off" while its fields stay in place for editing.
 func TestGolden_runtimeConfigPanelDisabled(t *testing.T) {
 	m := goldenModel(t)
 	m.settings = goldenPanelSettings()
