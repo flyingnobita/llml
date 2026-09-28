@@ -218,7 +218,7 @@ func (m Model) persistParamPanelState() (Model, tea.Cmd, bool) {
 	ent := m.params.editor.Entry()
 	// A row with one Runtime has nothing to choose, so a stored override
 	// (from an import, say) is dropped rather than kept unused.
-	if len(m.paramBackendOptionsForModel()) == 0 {
+	if f, ok := m.paramsRow(); !ok || !m.rowHasRuntimeChoice(f) {
 		hadBackend := false
 		for i := range ent.Profiles {
 			if ent.Profiles[i].Backend != "" {
@@ -238,7 +238,7 @@ func (m Model) persistParamPanelState() (Model, tea.Cmd, bool) {
 		return m, clearLastRunNoteAfterCmd(), true
 	}
 	m = m.withLastRunCleared()
-	m = m.updateEffectiveBackendForPath(m.params.modelPath)
+	m = m.loadEffectiveBackendForIdentity(m.params.modelPath)
 	// A full relayout, since a newly dimmed row can widen the Runtime column.
 	m = m.layoutTable()
 	m = m.withLaunchPreviewSynced()

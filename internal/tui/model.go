@@ -403,21 +403,22 @@ func (m Model) resolveEffectiveBackend() models.ModelBackend {
 	if !ok {
 		return models.BackendLlama
 	}
-	if len(m.rowRuntimeChoices(f)) < 2 {
+	if !m.rowHasRuntimeChoice(f) {
 		return f.Backend
 	}
 	// With the param panel closed, a cached choice saves a disk read per
 	// cursor move. With it open, unsaved edits must reach the launch preview
 	// at once, so the profile is read from the panel; a cache miss (no
 	// override, or before the first scan) reads it from disk.
-	if _, cached := m.table.effectiveBackends[profiles.ModelParamsKey(f.Identity())]; cached && !m.params.open {
-		return m.rowRuntime(f)
+	if b, cached := m.cachedRowRuntime(f); cached && !m.params.open {
+		return b
 	}
 	return m.usableRuntime(f, m.activeProfileBackendForSelected())
 }
 
-// activeProfileBackendForSelected returns the backend stored in the active profile for
-// the selected model, or BackendLlama when no profile backend is set.
+// activeProfileBackendForSelected returns the backend the selected model's
+// Active Profile names: from the open p panel when it edits that model, and
+// otherwise from disk. It is BackendLlama when no profile names one.
 func (m Model) activeProfileBackendForSelected() models.ModelBackend {
 	sel := m.SelectedPath()
 	if sel == "" {
@@ -429,7 +430,13 @@ func (m Model) activeProfileBackendForSelected() models.ModelBackend {
 			return b
 		}
 	}
-	ent, err := profiles.LoadEntry(profiles.ModelParamsKey(sel))
+	return storedProfileBackend(profiles.ModelParamsKey(sel))
+}
+
+// storedProfileBackend returns the backend the Active Profile saved under key
+// names, or BackendLlama when there is none or it cannot be read.
+func storedProfileBackend(key string) models.ModelBackend {
+	ent, err := profiles.LoadEntry(key)
 	if err != nil || len(ent.Profiles) == 0 {
 		return models.BackendLlama
 	}
@@ -442,7 +449,7 @@ func (m Model) activeProfileBackendForSelected() models.ModelBackend {
 // its active-profile backend from disk into m.table.effectiveBackends.
 func (m Model) populateEffectiveBackends() Model {
 	for _, f := range m.table.files {
-		if len(m.rowRuntimeChoices(f)) < 2 {
+		if !m.rowHasRuntimeChoice(f) {
 			continue // one Runtime only: the profile cannot change it
 		}
 		m = m.loadEffectiveBackendForIdentity(f.Identity())
@@ -450,23 +457,15 @@ func (m Model) populateEffectiveBackends() Model {
 	return m
 }
 
-// updateEffectiveBackendForPath updates or removes the cached effective backend for
-// the given model identity after a profile save.
-func (m Model) updateEffectiveBackendForPath(modelPath string) Model {
-	return m.loadEffectiveBackendForIdentity(modelPath)
-}
-
 // loadEffectiveBackendForIdentity reads the active profile for identity and
 // sets or deletes the effectiveBackends map entry accordingly. It clones the
 // map first, so the returned Model is the only one that sees the change.
 func (m Model) loadEffectiveBackendForIdentity(identity string) Model {
 	key := profiles.ModelParamsKey(identity)
-	backend, keep := models.BackendLlama, false
-	if ent, err := profiles.LoadEntry(key); err == nil && len(ent.Profiles) > 0 {
-		idx := clampIndex(ent.ActiveIndex, len(ent.Profiles)-1)
-		b, _ := models.ParseBackend(ent.Profiles[idx].Backend)
-		backend, keep = b, b != models.BackendLlama
-	}
+	// BackendLlama doubles as "no override": for a GGUF row it is the
+	// default anyway, and no other row may use it, so none is cached.
+	backend := storedProfileBackend(key)
+	keep := backend != models.BackendLlama
 
 	_, had := m.table.effectiveBackends[key]
 	if !keep && !had {

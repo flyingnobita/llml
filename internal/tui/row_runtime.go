@@ -28,14 +28,27 @@ func (m Model) usableRuntime(f models.ModelFile, chosen models.ModelBackend) mod
 	return f.Backend
 }
 
+// rowHasRuntimeChoice reports whether row f can launch on more than one
+// Runtime, so that its Active Profile's backend matters.
+func (m Model) rowHasRuntimeChoice(f models.ModelFile) bool {
+	return len(m.rowRuntimeChoices(f)) > 1
+}
+
 // rowRuntime returns the Runtime row f launches on: its Active Profile's
 // choice, cached in effectiveBackends, when the row may use it, and otherwise
 // the Runtime discovery gave the row.
 func (m Model) rowRuntime(f models.ModelFile) models.ModelBackend {
+	b, _ := m.cachedRowRuntime(f)
+	return b
+}
+
+// cachedRowRuntime returns [Model.rowRuntime] for f and whether its Active
+// Profile's choice is cached. A row whose profile makes no choice is not.
+func (m Model) cachedRowRuntime(f models.ModelFile) (models.ModelBackend, bool) {
 	if b, ok := m.table.effectiveBackends[profiles.ModelParamsKey(f.Identity())]; ok {
-		return m.usableRuntime(f, b)
+		return m.usableRuntime(f, b), true
 	}
-	return f.Backend
+	return f.Backend, false
 }
 
 // rowDimmed reports whether row f is on a Disabled Runtime: listed, dimmed,

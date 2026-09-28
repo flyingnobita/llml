@@ -269,7 +269,7 @@ func (m Model) doImportAttempt() (tea.Model, tea.Cmd) {
 	// An imported profile can become the Active Profile and choose the row's
 	// Runtime, so reload those rows and redraw the table.
 	for _, key := range importedModels {
-		m = m.updateEffectiveBackendForPath(key)
+		m = m.loadEffectiveBackendForIdentity(key)
 	}
 	if len(importedModels) > 0 {
 		m = m.layoutTable()

@@ -70,23 +70,16 @@ var paramMetadataFieldLabels = [...]string{
 	"Notes",
 }
 
-// paramBackendOptionsAll is every backend, offered only when the panel's row
-// cannot be found.
-var paramBackendOptionsAll = []string{"", "llama", "vllm", "ollama", "koboldcpp", "ninfer", "omlx", "splash"}
-
 // paramBackendOptionsForModel returns the Backend choices for the panel's row:
 // "" (no override, the Runtime discovery gave the row) and each Runtime in
-// [Model.rowRuntimeChoices]. A row with only one Runtime gets none, and the
-// Backend row is hidden.
+// [Model.rowRuntimeChoices]. A row with only one Runtime, or none found, gets
+// none, and the Backend row is hidden.
 func (m Model) paramBackendOptionsForModel() []string {
 	f, ok := m.paramsRow()
-	if !ok {
-		return paramBackendOptionsAll // fallback (shouldn't happen)
-	}
-	choices := m.rowRuntimeChoices(f)
-	if len(choices) < 2 {
+	if !ok || !m.rowHasRuntimeChoice(f) {
 		return nil
 	}
+	choices := m.rowRuntimeChoices(f)
 	opts := make([]string, 0, len(choices)+1)
 	opts = append(opts, "")
 	for _, b := range choices {

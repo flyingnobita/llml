@@ -228,10 +228,10 @@ func runtimeFor(b models.ModelBackend) runtimeDef {
 	return runtimeTable[0]
 }
 
-// runtimeChoices returns the Runtimes a row that discovery gave Runtime
-// discovered may launch on, in table order: every Runtime for the same Model
-// Format that platform p supports, except one that serves only its own model
-// folders, which is offered only for the rows discovery gave it.
+// runtimeChoices returns, in table order, the Runtimes a row may launch on
+// when discovery gave it Runtime discovered: every Runtime of the same Model
+// Format that platform p supports. A Runtime that serves only its own model
+// folders is left out unless it is discovered itself.
 func runtimeChoices(discovered models.ModelBackend, p models.Platform) []models.ModelBackend {
 	format := runtimeFor(discovered).format
 	var out []models.ModelBackend
