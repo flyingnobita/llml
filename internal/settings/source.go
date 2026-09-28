@@ -30,6 +30,9 @@ const (
 	FieldMLXLMPath
 	FieldMLXLMHost
 	FieldMLXLMPort
+	FieldMLXVLMPath
+	FieldMLXVLMHost
+	FieldMLXVLMPort
 
 	fieldCount
 )
@@ -58,6 +61,9 @@ var fieldEnvVars = [fieldCount]string{
 	FieldMLXLMPath:        EnvMLXLMPath,
 	FieldMLXLMHost:        EnvMLXLMHost,
 	FieldMLXLMPort:        EnvMLXLMPort,
+	FieldMLXVLMPath:       EnvMLXVLMPath,
+	FieldMLXVLMHost:       EnvMLXVLMHost,
+	FieldMLXVLMPort:       EnvMLXVLMPort,
 }
 
 // EnvVar returns the environment variable that sets f.

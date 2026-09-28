@@ -29,6 +29,10 @@ const (
 	// mlx-lm's `mlx_lm.server --model`. Discovery never gives a row this
 	// Runtime; a Safetensors row's profile chooses it.
 	BackendMLXLM
+	// BackendMLXVLM is a Hugging Face-style model directory launched with
+	// mlx-vlm's `mlx_vlm.server --model`. Like mlx-lm, only a Safetensors
+	// row's profile chooses it.
+	BackendMLXVLM
 )
 
 // String returns the canonical lowercase name for the backend.
@@ -48,6 +52,8 @@ func (b ModelBackend) String() string {
 		return "splash"
 	case BackendMLXLM:
 		return "mlx-lm"
+	case BackendMLXVLM:
+		return "mlx-vlm"
 	default:
 		return "llama"
 	}
@@ -72,6 +78,8 @@ func ParseBackend(s string) (ModelBackend, error) {
 		return BackendSplash, nil
 	case "mlx-lm":
 		return BackendMLXLM, nil
+	case "mlx-vlm":
+		return BackendMLXVLM, nil
 	default:
 		return 0, fmt.Errorf("unknown backend %q", s)
 	}

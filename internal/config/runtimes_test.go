@@ -53,7 +53,8 @@ func TestRuntimeStates_roundTrip(t *testing.T) {
 		With(models.BackendLlama, true).
 		With(models.BackendOllama, false).
 		With(models.BackendKobold, false).
-		With(models.BackendMLXLM, false)
+		With(models.BackendMLXLM, false).
+		With(models.BackendMLXVLM, true)
 	if err := WriteRuntimeStates(want); err != nil {
 		t.Fatal(err)
 	}
@@ -69,6 +70,7 @@ func TestRuntimeStates_roundTrip(t *testing.T) {
 		{models.BackendOllama, false, true},
 		{models.BackendKobold, false, true},
 		{models.BackendMLXLM, false, true},
+		{models.BackendMLXVLM, true, true},
 		{models.BackendVLLM, true, false},
 	} {
 		on, seen := got.Lookup(tc.b)
@@ -77,7 +79,7 @@ func TestRuntimeStates_roundTrip(t *testing.T) {
 		}
 	}
 	off := got.Disabled()
-	if !off.Has(models.BackendOllama) || !off.Has(models.BackendKobold) || !off.Has(models.BackendMLXLM) || off.Has(models.BackendLlama) || len(off) != 3 {
+	if !off.Has(models.BackendOllama) || !off.Has(models.BackendKobold) || !off.Has(models.BackendMLXLM) || off.Has(models.BackendLlama) || off.Has(models.BackendMLXVLM) || len(off) != 3 {
 		t.Errorf("Disabled() = %v, want {ollama, koboldcpp, mlx-lm}", off)
 	}
 }
