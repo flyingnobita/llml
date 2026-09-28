@@ -58,7 +58,8 @@ Rules (from the spec's LLM extraction section):
 - Each `--flag value` pair becomes one string in `args` (e.g. `"--n-gpu-layers 80"`).
 - Standalone flags (e.g. `--flash-attn`) are single-element strings.
 - Environment variables become `[[profiles.env]]` entries.
-- Set `backend` to `llama`, `vllm`, `ollama`, or `koboldcpp` based on the source context.
+- Set `backend` to `llama`, `vllm`, `ollama`, `koboldcpp`, `ninfer`, `mlx-lm`, `mlx-vlm`,
+  `omlx`, or `splash` based on the source context.
 - Set `model_hint` to the model name or family from the source.
 - Derive `name` from the section heading or context (e.g. `"default"`, `"4-bit-gpu"`,
   `"cpu-only"`).
@@ -366,6 +367,26 @@ MODEL_LOCATION_PARAMS = {
             '--tokenizer-pool-extra-config',
         },
     },
+    'ninfer': {
+        'env': set(),
+        'args': {'--chat-template'},
+    },
+    'mlx-lm': {
+        'env': {'HF_TOKEN'},
+        'args': {'--model', '--adapter-path', '--draft-model'},
+    },
+    'mlx-vlm': {
+        'env': {'HF_TOKEN'},
+        'args': {'--model', '--adapter-path', '--draft-model', '--model-dir'},
+    },
+    'omlx': {
+        'env': set(),
+        'args': {'--model-dir'},
+    },
+    'splash': {
+        'env': {'HF_HOME', 'HF_TOKEN', 'HUGGINGFACE_HUB_CACHE'},
+        'args': {'--model', '--revision', '--draft-model'},
+    },
 }
 
 def expand_arg_line(line):
@@ -424,6 +445,8 @@ def normalize_backend(v):
         return 'ollama'
     if s in ('koboldcpp', 'kobold'):
         return 'koboldcpp'
+    if s in ('ninfer', 'mlx-lm', 'mlx-vlm', 'omlx', 'splash'):
+        return s
     return ''
 
 def normalize_use_case_primary(v):
@@ -668,7 +691,8 @@ Required fields:
 
 - `schema_version = 2`
 - `[[profiles]].name`
-- `[[profiles]].backend` (`llama`, `vllm`, `ollama`, or `koboldcpp`)
+- `[[profiles]].backend` (`llama`, `vllm`, `ollama`, `koboldcpp`, `ninfer`, `mlx-lm`,
+  `mlx-vlm`, `omlx`, or `splash`)
 
 Optional fields:
 
