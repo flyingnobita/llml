@@ -327,6 +327,7 @@ const (
 	FooterDiscoveryDiscardYN    = "y: discard changes · n/esc: stay"
 	discoveryPathsModalSubtitle = "These paths are saved to config.toml and scanned in addition to the defaults below."
 	FooterParamHintBack         = "esc: back"
+	FooterHintHelpScroll        = "↑↓: scroll"
 	FooterParamHintDelete       = "d: delete"
 	FooterParamHintEnterEdit    = "enter: edit"
 	FooterParamHintClone        = "c: clone"

@@ -10,8 +10,11 @@ import (
 
 // Run starts the full-screen TUI. Alt-screen rendering is enabled on the root [tea.View]
 // (see [Model.View]); do not use the removed [tea.WithAltScreen] program option.
-func Run() error {
-	p := tea.NewProgram(New(), tea.WithFilter(splitPaneInterruptFilter))
+// buildID names the running build in the keyboard shortcuts popup.
+func Run(buildID string) error {
+	m := New()
+	m.buildID = buildID
+	p := tea.NewProgram(m, tea.WithFilter(splitPaneInterruptFilter))
 	if _, err := p.Run(); err != nil {
 		return fmt.Errorf("tui: %w", err)
 	}

@@ -19,12 +19,12 @@
   ╰─────────────────────────│         c  Runtime Environment           │────────────────────────╯
     ░░░░░░░░░░░░░░░░░░░░░░░░│         p  Parameter Profiles            │░░░░░░░░░░░░░░░░░░░░░░░
                             │         E  Export profiles               │
-  Launch Command · default  │         m  Model Paths                   │
-  ╭─────────────────────────│         r  Reload runtime                │───────────────────────╮░
-  │ '/opt/llama/bin/llama-se│         S  Rescan models                 │                       │░
-  │   --model '/home/u/model│                                          │                       │░
-  │   --alias 'qwen3-8b-q4.g│  Table                                   │                       │░
-  │   --host 127.0.0.1 \    │         ,  Cycle sort column             │                       │░
-  ╰─────────────────────────│         .  Reverse sort order            │───────────────────────╯░
+  Launch Command · default  │         I  Import profiles               │
+  ╭─────────────────────────│         m  Model Paths                   │───────────────────────╮░
+  │ '/opt/llama/bin/llama-se│         r  Reload runtime                │                       │░
+  │   --model '/home/u/model│         S  Rescan models                 │                       │░
+  │   --alias 'qwen3-8b-q4.g│                                          │                       │░
+  │   --host 127.0.0.1 \    │  dev (16728e6, 2026-09-28, modified)     │                       │░
+  ╰─────────────────────────│  ↑↓: scroll · esc: back                  │───────────────────────╯░
                             │                                          │
-  tab: section · hjkl/↑↓←→: │  General                                 │ · I: import · a: alerts · ?
+  tab: section · hjkl/↑↓←→: ╰──────────────────────────────────────────╯ · I: import · a: alerts · ?

@@ -267,6 +267,10 @@ type Model struct {
 	loading            bool
 	loadErr            error
 	helpOpen           bool // keyboard shortcuts popup
+	helpOffset         int  // first shortcut line shown when the popup scrolls
+	// buildID names the running build ("0.7.1", or "dev (16728e6, …)") in the
+	// shortcuts popup; see internal/buildinfo.
+	buildID string
 }
 
 func newTableViewport(st styles, homeDir string) (btable.Model, viewport.Model) {
