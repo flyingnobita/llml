@@ -1,0 +1,30 @@
+  LLM Launcher
+  ╭─────────────────────────────────────────────────────────────────────────────────────────────╮
+  │ Model ID                     Runtime ▲   Size      Path                       File Name     │
+  │╭────────────────────────────────────────────────────────────────────────────────────────────╮
+  ││                                                                                            │
+  ││  Runtime Environment                                                                       │
+  ││                                                                                            │
+  ││  GGUF                    NInfer · found                                                    │
+  ││     [✓] Llama.cpp ○                                                                        │
+  ││     [✓] KoboldCpp ✗        Path  > checkout or ninfer-serve                                │
+  ││  Safetensors               in use: /opt/ninfer/build/apps/ninfer-serve (detected)          │
+  ││     [✓] vLLM      ○                                                                        │
+  ││  NInfer (.ninfer)          Port  > 8080                                                    │
+  ││   › [✓] NInfer    ○        in use: 8080 (default)                                          │
+  ││  Ollama library                                                                            │
+  ││     [✓] Ollama    ○        Host  > 127.0.0.1                                               │
+  ││                            in use: 127.0.0.1 (default)                                     │
+  ││                                                                                            │
+  ╰│                                                                                            │
+   │                                                                                            │
+   │                                                                                            │
+  L│                                                                                            │
+  ╭│  ● running  ○ found  ✗ not found                                                           │
+  ││  Saved to config.toml. Environment variables win over saved values.                        │
+  ││  ↑/↓: runtime · space: on/off · tab/→: fields · enter: save · esc: back                    │
+  ││                                                                                            │
+  │╰────────────────────────────────────────────────────────────────────────────────────────────╯
+  ╰────────────────────────────────────────────────────────────────────────────────────────────╯░
+
+  tab: section · hjkl/↑↓←→: nav · R: run (split) · p: Parameter Profiles · I: import · a: alerts · ?

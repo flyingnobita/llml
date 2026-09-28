@@ -60,8 +60,29 @@ func TestResolveDefaultsAlwaysProduceUsableHostsAndPorts(t *testing.T) {
 	if s.NInferServerPort != DefaultNInferServerPort || s.NInferServerHost != DefaultNInferHost {
 		t.Errorf("ninfer not defaulted: %+v", s)
 	}
-	if s.NInferServerPort == s.LlamaServerPort {
-		t.Errorf("ninfer default port %d collides with llama-server's", s.NInferServerPort)
+}
+
+// Every built-in default port matches the one the Runtime's own server
+// listens on, so clients pointed at the upstream port reach it. Runtimes that
+// share a port are told apart by detection.
+func TestDefaultPortsMatchUpstream(t *testing.T) {
+	t.Parallel()
+
+	s := Resolve(FromEnv(fakeEnv(nil)), Layer{}, Defaults())
+	for _, tc := range []struct {
+		server    string
+		got, want int
+	}{
+		{"llama-server", s.LlamaServerPort, 8080},
+		{"ninfer-serve", s.NInferServerPort, 8080},
+		{"vllm serve", s.VLLMServerPort, 8000},
+		{"koboldcpp", s.KoboldCppPort, 5001},
+		{"omlx serve", s.OMLXPort, 8000},
+		{"splash serve", s.SplashPort, 8000},
+	} {
+		if tc.got != tc.want {
+			t.Errorf("%s default port = %d, want %d", tc.server, tc.got, tc.want)
+		}
 	}
 }
 

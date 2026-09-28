@@ -95,7 +95,7 @@ func goldenModel(t *testing.T) Model {
 		KoboldCppPort:    5001,
 		NInferPath:       "/opt/ninfer/build/apps/ninfer-serve",
 		NInferServerHost: "127.0.0.1",
-		NInferPort:       18080,
+		NInferPort:       8080,
 		Platform:         models.Platform{GOOS: "linux", GOARCH: "amd64"},
 	}
 	m.table.files = []models.ModelFile{
@@ -184,6 +184,18 @@ func TestGolden_runtimeConfigPanelMacOS(t *testing.T) {
 		m, _ = m.updateRuntimeConfigKey(tea.KeyPressMsg{Code: tea.KeyDown})
 	}
 	assertGolden(t, "runtime_config_panel_macos", m.View().Content)
+}
+
+// NInfer is highlighted so its fields are pinned: its default port is 8080,
+// ninfer-serve's own, shared with llama.cpp.
+func TestGolden_runtimeConfigPanelNInfer(t *testing.T) {
+	m := goldenModel(t)
+	m.settings = goldenPanelSettings()
+	m, _ = m.openRuntimeConfig()
+	for range 3 {
+		m, _ = m.updateRuntimeConfigKey(tea.KeyPressMsg{Code: tea.KeyDown})
+	}
+	assertGolden(t, "runtime_config_panel_ninfer", m.View().Content)
 }
 
 // A Disabled Runtime shows an empty checkbox and "off" in the list, and its

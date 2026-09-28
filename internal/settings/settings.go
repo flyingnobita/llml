@@ -48,7 +48,7 @@ const (
 	// EnvNInferPath is an NInfer checkout root, a directory containing
 	// ninfer-serve, or the absolute ninfer-serve path.
 	EnvNInferPath = "NINFER_PATH"
-	// EnvNInferServerPort is the TCP port for ninfer-serve and its /health probe.
+	// EnvNInferServerPort is the TCP port for ninfer-serve and its detection probe.
 	EnvNInferServerPort = "NINFER_SERVER_PORT"
 	// EnvNInferServerHost is the listen host for ninfer-serve.
 	EnvNInferServerHost = "NINFER_SERVER_HOST"
@@ -87,9 +87,9 @@ const (
 	DefaultKoboldCppPort  = 5001
 	DefaultOllamaHost     = "127.0.0.1:11434"
 	DefaultNInferHost     = "127.0.0.1"
-	// DefaultNInferServerPort differs from ninfer-serve's own default (8080) so
-	// it does not collide with llama-server's default port.
-	DefaultNInferServerPort = 18080
+	// DefaultNInferServerPort matches ninfer-serve's own default, which
+	// llama-server shares; detection tells the two apart by who answers.
+	DefaultNInferServerPort = 8080
 	// DefaultOMLXHost and DefaultOMLXPort match oMLX's own defaults.
 	DefaultOMLXHost = "127.0.0.1"
 	DefaultOMLXPort = 8000

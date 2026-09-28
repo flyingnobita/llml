@@ -44,11 +44,12 @@ func newProbeTarget(t *testing.T) probeTarget {
 func probeTargets(t *testing.T) (settings.Settings, map[ModelBackend]probeTarget) {
 	t.Helper()
 	targets := map[ModelBackend]probeTarget{}
-	for _, b := range []ModelBackend{BackendLlama, BackendKobold, BackendOllama, BackendNInfer, BackendOMLX, BackendSplash} {
+	for _, b := range allBackends {
 		targets[b] = newProbeTarget(t)
 	}
 	s := settings.Resolve(settings.Defaults())
 	s.LlamaServerHost, s.LlamaServerPort = targets[BackendLlama].host, targets[BackendLlama].port
+	s.VLLMServerHost, s.VLLMServerPort = targets[BackendVLLM].host, targets[BackendVLLM].port
 	// KoboldCpp has no host setting; it is probed on loopback, as the test server is.
 	s.KoboldCppPort = targets[BackendKobold].port
 	s.OllamaHost = net.JoinHostPort(targets[BackendOllama].host, strconv.Itoa(targets[BackendOllama].port))
@@ -65,7 +66,7 @@ func TestProbeRuntimes_skipsDisabledRuntimes(t *testing.T) {
 	t.Parallel()
 
 	for _, p := range []Platform{{GOOS: "linux", GOARCH: "amd64"}, {GOOS: "darwin", GOARCH: "arm64"}} {
-		for _, b := range []ModelBackend{BackendLlama, BackendKobold, BackendOllama, BackendNInfer, BackendOMLX, BackendSplash} {
+		for _, b := range allBackends {
 			if !p.Supports(b) {
 				continue
 			}
