@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 Format: `- MMM-DD, YYYY - HH:MM AM/PM TIMEZONE - [Concise summary]`
 
+- Sep-29, 2026 - 01:13 AM +0800 - [Winget fork sync: the docs, setup script, and workflow now say `WINGET_GITHUB_TOKEN` is a classic PAT with `repo` and `workflow`, and a sync that lacks `workflow` fails with an annotation naming the fix. A failing sync opens one `ready-for-human` tracking issue (later failures comment on it) that the next green sync closes; a manual run with `force_failure` tests it (#49, #50)]
 - Sep-28, 2026 - 11:23 PM +0800 - [v0.8.1 release: the Homebrew cask clears the macOS quarantine flag, so the unsigned binary opens without a Gatekeeper prompt; updated package descriptions]
 - Sep-28, 2026 - 11:14 PM +0800 - [Homebrew: the cask now clears the quarantine flag after install, so macOS no longer refuses to open the unsigned `llml` binary ("llml" Not Opened). Package descriptions now name llama.cpp, vLLM, Ollama, and MLX. The README explains the flag for direct archive downloads]
 - Sep-28, 2026 - 11:00 PM +0800 - [v0.8.0 release: NInfer, oMLX, Splash, mlx-lm, and mlx-vlm runtimes; a redesigned runtime panel with per-runtime on/off; per-profile runtime choice for safetensors models; port-sharing detection; build identity in `--version` and the `?` panel]
