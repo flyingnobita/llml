@@ -110,3 +110,29 @@ func TestUpdateServerSplitKeys_TabAppliesBorderStyles(t *testing.T) {
 		t.Fatalf("expected table to regain focus after second Tab")
 	}
 }
+
+// Once the split-pane server has stopped, Enter closes the pane, as its
+// "Press Enter to close" line says, from the table as well as the log. On the
+// focused preview Enter copies the command instead (see
+// TestUpdateServerSplitKeys_ExitedPreviewEnterDoesNotDismissLog).
+func TestUpdateServerSplitKeys_enterClosesStoppedServerFromAnyFocus(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		preview, split bool
+	}{
+		{"table", false, false},
+		{"log", false, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := newTestModel()
+			m.table.files = []models.ModelFile{{Path: "/tmp/foo.gguf", Backend: models.BackendLlama}}
+			m.server.running, m.server.exited = true, true
+			m.preview.focused, m.server.splitFocused = tc.preview, tc.split
+
+			got, _ := m.updateServerSplitKeys(tea.KeyPressMsg{Code: tea.KeyEnter})
+			if got.server.running || got.server.exited {
+				t.Errorf("Enter with focus on the %s should close the stopped server pane", tc.name)
+			}
+		})
+	}
+}
