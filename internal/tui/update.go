@@ -479,6 +479,16 @@ func (m Model) tableNavKeys(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	case key.Matches(msg, m.keys.ToggleTheme):
 		m2, cmd := m.cycleTheme()
 		return m2, cmd, true
+	case key.Matches(msg, m.keys.ScrollPreviewUp), key.Matches(msg, m.keys.ScrollPreviewDown):
+		if !m.launchPreviewVisible() {
+			return m, nil, false
+		}
+		if key.Matches(msg, m.keys.ScrollPreviewUp) {
+			m.preview.viewport.ScrollUp(1)
+		} else {
+			m.preview.viewport.ScrollDown(1)
+		}
+		return m, nil, true
 	case key.Matches(msg, m.keys.ScrollLeft):
 		m.table.hscroll.ScrollLeft(hScrollStep)
 		return m, nil, true

@@ -235,6 +235,13 @@ const (
 	FooterDescCopyPath = "copy cmd"
 	FooterHintCopyPath = FooterKeyCopyPath + ": " + FooterDescCopyPath
 
+	// FooterKeyPreviewUp / FooterKeyPreviewDown scroll the launch preview
+	// without focusing it; FooterKeyPreviewScroll is their shared help label.
+	FooterKeyPreviewUp      = "["
+	FooterKeyPreviewDown    = "]"
+	FooterKeyPreviewScroll  = FooterKeyPreviewUp + "/" + FooterKeyPreviewDown
+	FooterDescPreviewScroll = "Scroll launch preview"
+
 	// CopyCommandFeedback* are shown below the footer after Enter copies the launch command.
 	CopyCommandFeedbackSuccess = "Command copied to clipboard"
 	CopyCommandFeedbackFailure = "Command failed to copy to clipboard"
