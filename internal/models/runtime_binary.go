@@ -338,9 +338,11 @@ func (h healthAnswer) fromMLXLM() bool {
 	return h.ok && h.status == "ok" && strings.HasPrefix(h.server, "BaseHTTP/")
 }
 
-// fromMLXVLM reports whether the answer came from mlx_vlm.server, the only
-// Runtime whose /health status is "healthy". Its Server header changed from
-// "uvicorn" to "mlx_vlm/<version>" in 0.5.0, so the header is not checked.
+// fromMLXVLM reports whether the answer came from mlx_vlm.server, which
+// answers /health with status "healthy" where llama-server, ninfer-serve, and
+// mlx_lm.server, the other servers on its default port, say "ok". Its Server
+// header changed from "uvicorn" to "mlx_vlm/<version>" in 0.5.0, so the header
+// is not checked.
 func (h healthAnswer) fromMLXVLM() bool {
 	return h.ok && h.status == "healthy"
 }
