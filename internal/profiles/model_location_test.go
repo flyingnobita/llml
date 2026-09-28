@@ -152,3 +152,56 @@ func TestStripModelLocationParams_ninfer(t *testing.T) {
 		t.Errorf("NormalizeBackendInput = %q", got)
 	}
 }
+
+// mlx_lm.server takes the model, a LoRA adapter, and a draft model by local
+// path or Hugging Face repo id, and HF_TOKEN reaches the Hub. llml supplies
+// the model, so all of them are stripped; server tuning flags are kept.
+func TestStripModelLocationParams_mlxLM(t *testing.T) {
+	t.Parallel()
+
+	env := []PortableEnvVar{{Key: "HF_TOKEN", Value: "hf_x"}, {Key: "MLX_METAL_DEBUG", Value: "1"}}
+	args := []string{
+		"--model mlx-community/Qwen3-8B-4bit",
+		"--adapter-path /home/u/adapters/a",
+		"--draft-model mlx-community/Qwen3-0.6B-4bit",
+		"--max-tokens 4096",
+		"--chat-template-args {\"enable_thinking\":false}",
+		"--num-draft-tokens 3",
+	}
+	keptEnv, keptArgs, droppedEnv, droppedArgs := StripModelLocationParams("mlx-lm", env, args)
+
+	if len(keptEnv) != 1 || keptEnv[0].Key != "MLX_METAL_DEBUG" || len(droppedEnv) != 1 {
+		t.Errorf("env: kept %v, dropped %v, want HF_TOKEN dropped", keptEnv, droppedEnv)
+	}
+	if want := args[3:]; !slices.Equal(keptArgs, want) {
+		t.Errorf("kept args = %v, want %v", keptArgs, want)
+	}
+	if len(droppedArgs) != 3 {
+		t.Errorf("dropped args = %v, want the model, adapter, and draft", droppedArgs)
+	}
+	if !ShouldExcludeEnv("HF_TOKEN") {
+		t.Error("export should exclude HF_TOKEN")
+	}
+}
+
+// A portable profile for mlx-lm keeps its backend through parsing and
+// conversion to a local profile.
+func TestPortableProfile_mlxLMBackend(t *testing.T) {
+	t.Parallel()
+
+	body := []byte("schema_version = 3\n\n[[profiles]]\nname = \"long\"\nbackend = \"mlx-lm\"\nargs = [\"--max-tokens 8192\"]\n")
+	f, err := parsePortable(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := PortableToProfile(f.Profiles[0])
+	if p.Backend != "mlx-lm" {
+		t.Errorf("backend = %q, want mlx-lm", p.Backend)
+	}
+	if got := NormalizeBackendInput(" MLX-LM "); got != "mlx-lm" {
+		t.Errorf("NormalizeBackendInput = %q, want mlx-lm", got)
+	}
+	if got := ProfileToPortable(p, "/m/qwen").Backend; got != "mlx-lm" {
+		t.Errorf("exported backend = %q, want mlx-lm", got)
+	}
+}

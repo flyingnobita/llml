@@ -98,7 +98,13 @@ type runtimeDef struct {
 	// own model folders. Discovery gives it exactly those rows, so it is a
 	// Runtime choice only for rows discovery gave it.
 	ownFolders bool
-	fields     []runtimeFieldDef
+	// loadsRequestedModel is set for a Runtime whose server loads whatever
+	// model its --model flag or a request names, as a local path or a Hugging
+	// Face repo id, and downloads a repo id it lacks. llml never launches it
+	// on a model folder that no longer exists, and the launch preview names
+	// the model id clients must send.
+	loadsRequestedModel bool
+	fields              []runtimeFieldDef
 }
 
 // status returns what detection learned about the Runtime. It reads
@@ -179,6 +185,17 @@ var runtimeTable = []runtimeDef{
 				func(s *settings.Settings) *int { return &s.OMLXPort }, settings.DefaultOMLXPort),
 			hostFieldDef(runtimeFieldOMLXHost, settings.FieldOMLXHost,
 				func(s *settings.Settings) *string { return &s.OMLXHost }, settings.DefaultOMLXHost),
+		},
+	},
+	{
+		backend: models.BackendMLXLM, name: "mlx-lm", format: formatSafetensors, loadsRequestedModel: true,
+		fields: []runtimeFieldDef{
+			pathFieldDef(runtimeFieldMLXLMPath, settings.FieldMLXLMPath, "Path", "mlx_lm.server or its dir",
+				detectedProgram(models.BackendMLXLM), func(s *settings.Settings) *string { return &s.MLXLMPath }),
+			portFieldDef(runtimeFieldMLXLMPort, settings.FieldMLXLMPort,
+				func(s *settings.Settings) *int { return &s.MLXLMPort }, settings.DefaultMLXLMPort),
+			hostFieldDef(runtimeFieldMLXLMHost, settings.FieldMLXLMHost,
+				func(s *settings.Settings) *string { return &s.MLXLMHost }, settings.DefaultMLXLMHost),
 		},
 	},
 	{

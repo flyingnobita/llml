@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -111,6 +112,49 @@ func TestDiscoveryConfigForWrite_merge(t *testing.T) {
 	d := DiscoveryConfigForWrite(prev, s)
 	if len(d.ExtraModelPaths) != 2 {
 		t.Fatalf("paths %v", d.ExtraModelPaths)
+	}
+}
+
+// mlx-lm's [runtime] keys survive a write and read of config.toml, under the
+// same default_* names as the other Runtimes.
+func TestConfigRoundTrip_mlxLM(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("HOME", dir)
+	t.Setenv("AppData", dir)
+
+	port := 8181
+	c := Config{
+		SchemaVersion: SchemaVersion,
+		Runtime: RuntimeConfig{
+			DefaultMLXLMPath: "/opt/venv/bin",
+			DefaultMLXLMHost: "127.0.0.2",
+			DefaultMLXLMPort: &port,
+		},
+	}
+	if err := WriteFile(c); err != nil {
+		t.Fatal(err)
+	}
+	path, err := ConfigPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"default_mlx_lm_path", "default_mlx_lm_host", "default_mlx_lm_port"} {
+		if !strings.Contains(string(raw), key) {
+			t.Errorf("config.toml lacks %s:\n%s", key, raw)
+		}
+	}
+	got, err := ReadFile()
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := settings.Resolve(got.Layer(), settings.Defaults())
+	if s.MLXLMPath != "/opt/venv/bin" || s.MLXLMHost != "127.0.0.2" || s.MLXLMPort != 8181 {
+		t.Errorf("round trip: %q %q %d", s.MLXLMPath, s.MLXLMHost, s.MLXLMPort)
 	}
 }
 
@@ -281,6 +325,9 @@ func TestRuntimeConfigFromSettings_roundTrips(t *testing.T) {
 		settings.EnvOMLXPort:         "8100",
 		settings.EnvSplashPath:       "/opt/homebrew/bin/splash",
 		settings.EnvSplashHost:       "0.0.0.0",
+		settings.EnvMLXLMPath:        "/Users/u/.venv/bin",
+		settings.EnvMLXLMHost:        "0.0.0.0",
+		settings.EnvMLXLMPort:        "8181",
 	})), settings.Defaults())
 
 	rc := RuntimeConfigFromSettings(want)

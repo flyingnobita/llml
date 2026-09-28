@@ -395,6 +395,7 @@ func (m Model) SelectedModel() (target string, backend models.ModelBackend) {
 //
 //	GGUF row          + profile=koboldcpp -> koboldcpp, otherwise llama-server
 //	Safetensors row   + profile=vllm      -> vllm
+//	                  + profile=mlx-lm    -> mlx-lm
 //	                  + profile=omlx      -> omlx, only for a row in oMLX's model folders
 //	                  + none or unusable  -> omlx in oMLX's model folders, vllm elsewhere
 //	ollama/ninfer/splash row              -> its own Runtime
@@ -720,7 +721,8 @@ func (m Model) syncLaunchPreviewViewport(innerW int) Model {
 		m.preview.lastCmd = ""
 		return m
 	}
-	cmd, note := launchPreviewCmdAndNote(m)
+	pv := launchPreviewFor(m)
+	cmd := pv.cmd
 	if cmd != m.preview.lastCmd {
 		m.preview.viewport.GotoTop()
 		m.preview.lastCmd = cmd
@@ -735,8 +737,11 @@ func (m Model) syncLaunchPreviewViewport(innerW int) Model {
 	outerH := launchPreviewVisibleLines + pvFrV
 	buildRendered := func(textWidth int) string {
 		r := m.ui.styles.launchPreviewContent.Width(textWidth).Render(cmd)
-		if note != "" {
-			r = r + "\n" + m.ui.styles.warnLine.Render(note)
+		if pv.info != "" {
+			r = r + "\n" + m.ui.styles.infoLine.Width(textWidth).Render(pv.info)
+		}
+		if pv.note != "" {
+			r = r + "\n" + m.ui.styles.warnLine.Render(pv.note)
 		}
 		return r
 	}

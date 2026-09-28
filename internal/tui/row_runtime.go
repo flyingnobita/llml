@@ -85,3 +85,12 @@ func (m Model) blockLaunchOnDisabledRuntime(b models.ModelBackend) (Model, tea.C
 	m = m.addAlert(alertSeverityWarn, "Runtimes", msg)
 	return m.flashError(msg)
 }
+
+// blockLaunchOnMissingModel refuses to launch Runtime b on modelPath, a model
+// folder that no longer exists. b loads whatever model it is given, so it
+// would take the path for a Hugging Face repo id and download it.
+func (m Model) blockLaunchOnMissingModel(b models.ModelBackend, modelPath string) (Model, tea.Cmd) {
+	msg := fmt.Sprintf(missingModelFolderAlert, modelPath, runtimeFor(b).name)
+	m = m.addAlert(alertSeverityWarn, "Launch", msg)
+	return m.flashError(msg)
+}

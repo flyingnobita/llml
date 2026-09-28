@@ -25,6 +25,10 @@ const (
 	BackendOMLX
 	// BackendSplash is a Splash packed-weight bundle launched with `splash serve`.
 	BackendSplash
+	// BackendMLXLM is a Hugging Face-style model directory launched with
+	// mlx-lm's `mlx_lm.server --model`. Discovery never gives a row this
+	// Runtime; a Safetensors row's profile chooses it.
+	BackendMLXLM
 )
 
 // String returns the canonical lowercase name for the backend.
@@ -42,6 +46,8 @@ func (b ModelBackend) String() string {
 		return "omlx"
 	case BackendSplash:
 		return "splash"
+	case BackendMLXLM:
+		return "mlx-lm"
 	default:
 		return "llama"
 	}
@@ -64,6 +70,8 @@ func ParseBackend(s string) (ModelBackend, error) {
 		return BackendOMLX, nil
 	case "splash":
 		return BackendSplash, nil
+	case "mlx-lm":
+		return BackendMLXLM, nil
 	default:
 		return 0, fmt.Errorf("unknown backend %q", s)
 	}

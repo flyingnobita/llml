@@ -11,11 +11,11 @@
   ││  Safetensors               in use: /Users/u/.omlx/bin/omlx (detected)                      │
   ││     [✓] vLLM      ○                                                                        │
   ││   › [✓] oMLX      ●        Port  > 8000                                                    │
-  ││  Splash bundle             in use: 8000 (default)                                          │
-  ││     [✓] Splash    ○                                                                        │
-  ││  Ollama library            Host  > 127.0.0.1                                               │
-  ││     [✓] Ollama    ○        in use: 127.0.0.1 (default)                                     │
-  ││                                                                                            │
+  ││     [✓] mlx-lm    ○        in use: 8000 (default)                                          │
+  ││  Splash bundle                                                                             │
+  ││     [✓] Splash    ○        Host  > 127.0.0.1                                               │
+  ││  Ollama library            in use: 127.0.0.1 (default)                                     │
+  ││     [✓] Ollama    ○                                                                        │
   ╰│                                                                                            │
    │                                                                                            │
    │                                                                                            │

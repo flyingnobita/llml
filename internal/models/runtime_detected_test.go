@@ -32,6 +32,9 @@ func TestRuntimeInfoDetected(t *testing.T) {
 		{"splash found", RuntimeInfo{SplashPath: "/bin/splash"}, BackendSplash, true},
 		{"splash answers", RuntimeInfo{SplashRunning: true}, BackendSplash, true},
 		{"another Runtime's server", RuntimeInfo{OllamaRunning: true}, BackendSplash, false},
+		{"mlx-lm found", RuntimeInfo{MLXLMPath: "/venv/bin/mlx_lm.server"}, BackendMLXLM, true},
+		{"mlx-lm answers", RuntimeInfo{MLXLMRunning: true}, BackendMLXLM, true},
+		{"mlx-lm missing", RuntimeInfo{ServerRunning: true}, BackendMLXLM, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -54,12 +57,15 @@ func TestRuntimeInfoStatusDrivesSummary(t *testing.T) {
 		BackendNInfer: "ninfer",
 		BackendOMLX:   "omlx",
 		BackendSplash: "splash",
+		BackendMLXLM:  "mlx-lm",
 		BackendOllama: "ollama",
 	}
 	infos := []RuntimeInfo{
 		{},
 		{KoboldCppPath: "/bin/koboldcpp", NInferRunning: true, OMLXPath: "/bin/omlx", OMLXRunning: true},
 		{SplashRunning: true, OllamaPath: "/bin/ollama"},
+		{MLXLMPath: "/venv/bin/mlx_lm.server"},
+		{MLXLMRunning: true},
 	}
 	for i, info := range infos {
 		sum := info.Summary()

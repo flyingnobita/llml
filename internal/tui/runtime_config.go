@@ -38,6 +38,9 @@ const (
 	runtimeFieldOMLXPath
 	runtimeFieldOMLXPort
 	runtimeFieldOMLXHost
+	runtimeFieldMLXLMPath
+	runtimeFieldMLXLMPort
+	runtimeFieldMLXLMHost
 	runtimeFieldCount
 )
 
@@ -249,6 +252,7 @@ var missingRuntimeNotes = []struct {
 	{models.BackendNInfer, MissingNInferFooterNote},
 	{models.BackendOMLX, MissingOMLXFooterNote},
 	{models.BackendSplash, MissingSplashFooterNote},
+	{models.BackendMLXLM, MissingMLXLMFooterNote},
 }
 
 // maybeSetMissingRuntimeFooterNote sets [Model.lastRunNote] when the scan found

@@ -144,6 +144,18 @@ var splashRules = locationRules{
 	},
 }
 
+// mlxLMRules covers mlx-lm. mlx_lm.server takes the model, a LoRA adapter,
+// and a speculative draft model as a local path or a Hugging Face repo id, and
+// downloads a repo id it does not have; HF_TOKEN authenticates that download.
+var mlxLMRules = locationRules{
+	envKeys: map[string]bool{
+		"HF_TOKEN": true,
+	},
+	argTokens: map[string]bool{
+		"--model": true, "--adapter-path": true, "--draft-model": true,
+	},
+}
+
 // rulesByBackend maps a backend name to its rules. llama and koboldcpp share
 // ggufRules by value, so they cannot drift apart.
 var rulesByBackend = map[string]locationRules{
@@ -153,6 +165,7 @@ var rulesByBackend = map[string]locationRules{
 	"ninfer":    ninferRules,
 	"omlx":      omlxRules,
 	"splash":    splashRules,
+	"mlx-lm":    mlxLMRules,
 }
 
 // isAnyBackendLocationEnv reports whether key is a model-location variable for

@@ -79,6 +79,7 @@ func TestDefaultPortsMatchUpstream(t *testing.T) {
 		{"koboldcpp", s.KoboldCppPort, 5001},
 		{"omlx serve", s.OMLXPort, 8000},
 		{"splash serve", s.SplashPort, 8000},
+		{"mlx_lm.server", s.MLXLMPort, 8080},
 	} {
 		if tc.got != tc.want {
 			t.Errorf("%s default port = %d, want %d", tc.server, tc.got, tc.want)
@@ -120,6 +121,53 @@ func TestFromEnvReadsOMLXAndSplash(t *testing.T) {
 	// The env list replaces the app's dirs rather than adding to them.
 	if !slices.Equal(s.OMLXModelDirs, []string{"/a", "/b"}) {
 		t.Errorf("OMLXModelDirs = %v", s.OMLXModelDirs)
+	}
+}
+
+// mlx-lm's path, host, and port each come from the environment, then
+// config.toml, then the built-in defaults, which match mlx_lm.server's own.
+func TestResolveMLXLMPrecedence(t *testing.T) {
+	t.Parallel()
+
+	cfg := Layer{
+		Origin:    OriginConfig,
+		MLXLMPath: ptr("/from/config/bin"),
+		MLXLMHost: ptr("10.0.0.1"),
+		MLXLMPort: ptr(8181),
+	}
+	env := FromEnv(fakeEnv(map[string]string{
+		EnvMLXLMPath: " /venv/bin/mlx_lm.server ",
+		EnvMLXLMHost: "0.0.0.0",
+		EnvMLXLMPort: "9191",
+	}))
+
+	s := Resolve(env, cfg, Defaults())
+	if s.MLXLMPath != "/venv/bin/mlx_lm.server" || s.MLXLMHost != "0.0.0.0" || s.MLXLMPort != 9191 {
+		t.Errorf("env should win: %q %q %d", s.MLXLMPath, s.MLXLMHost, s.MLXLMPort)
+	}
+	for f, want := range map[Field]string{FieldMLXLMPath: EnvMLXLMPath, FieldMLXLMHost: EnvMLXLMHost, FieldMLXLMPort: EnvMLXLMPort} {
+		if got := s.Source(f).String(); got != want {
+			t.Errorf("Source(%s) = %q, want %q", f.EnvVar(), got, want)
+		}
+	}
+
+	s = Resolve(FromEnv(fakeEnv(nil)), cfg, Defaults())
+	if s.MLXLMPath != "/from/config/bin" || s.MLXLMHost != "10.0.0.1" || s.MLXLMPort != 8181 {
+		t.Errorf("config should win over defaults: %q %q %d", s.MLXLMPath, s.MLXLMHost, s.MLXLMPort)
+	}
+	if got := s.Source(FieldMLXLMPort).String(); got != "config" {
+		t.Errorf("Source(MLX_LM_PORT) = %q, want config", got)
+	}
+
+	s = Resolve(FromEnv(fakeEnv(map[string]string{EnvMLXLMPort: "not-a-port"})), Layer{Origin: OriginConfig}, Defaults())
+	if s.MLXLMPath != "" || s.MLXLMHost != DefaultMLXLMHost || s.MLXLMPort != DefaultMLXLMPort {
+		t.Errorf("defaults should apply: %q %q %d", s.MLXLMPath, s.MLXLMHost, s.MLXLMPort)
+	}
+	if DefaultMLXLMHost != "127.0.0.1" {
+		t.Errorf("DefaultMLXLMHost = %q, want mlx_lm.server's 127.0.0.1", DefaultMLXLMHost)
+	}
+	if got := s.Source(FieldMLXLMPort).String(); got != "default" {
+		t.Errorf("an invalid port should fall through to the default, source %q", got)
 	}
 }
 

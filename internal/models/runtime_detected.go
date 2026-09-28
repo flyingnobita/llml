@@ -40,6 +40,8 @@ func (r RuntimeInfo) Status(b ModelBackend) RuntimeStatus {
 		return RuntimeStatus{Path: r.OMLXPath, Running: r.OMLXRunning}
 	case BackendSplash:
 		return RuntimeStatus{Path: r.SplashPath, Running: r.SplashRunning}
+	case BackendMLXLM:
+		return RuntimeStatus{Path: r.MLXLMPath, Running: r.MLXLMRunning}
 	default:
 		return RuntimeStatus{}
 	}

@@ -275,25 +275,79 @@ func findSplashBinary(splashPath string) string {
 	return findBinaryInEnvAndCommonDirs(name, "", commonBinaryDirs)
 }
 
+// mlxLMServerName is mlx-lm's console script. `python -m mlx_lm.server` is
+// deprecated upstream, and the script's shebang names its own interpreter, so
+// it runs from a venv without activating it.
+const mlxLMServerName = "mlx_lm.server"
+
+// findMLXLMScript resolves mlx_lm.server; see [findConsoleScript].
+func findMLXLMScript(configured string) string {
+	return findConsoleScript(mlxLMServerName, configured)
+}
+
+// findConsoleScript resolves the Python console script name from configured
+// (the script itself, or a directory containing it such as a venv's bin/),
+// then PATH. It does not search common install directories or look for
+// venvs: a script installed with pip, uv, or mise is on PATH, and one in a
+// venv is found through the configured path.
+func findConsoleScript(name, configured string) string {
+	if configured != "" {
+		clean := filepath.Clean(configured)
+		if filepath.Base(clean) == name && isExecutableFile(clean) {
+			return clean
+		}
+		if p := filepath.Join(clean, name); isExecutableFile(p) {
+			return p
+		}
+	}
+	if p, err := exec.LookPath(name); err == nil {
+		return p
+	}
+	return ""
+}
+
 // probeHealthEndpoint reports whether the server on host:port answers GET
 // /health with 200, bounded by ctx. KoboldCpp is detected by this alone.
 func probeHealthEndpoint(ctx context.Context, host string, port int) bool {
-	ok, _ := getHealth(ctx, host, port)
-	return ok
+	return getHealth(ctx, host, port).ok
 }
 
-// getHealth GETs /health on host:port, bounded by ctx, and reports whether it
-// answered 200 and the Server header it sent. It shares the package HTTP
-// client so repeated probes reuse connections.
-func getHealth(ctx context.Context, host string, port int) (ok bool, server string) {
+// healthAnswer is what a server said to GET /health.
+type healthAnswer struct {
+	// ok is true when it answered 200.
+	ok bool
+	// server is the Server response header.
+	server string
+	// status is the "status" field of a JSON body, or "" without one.
+	status string
+}
+
+// fromMLXLM reports whether the answer came from mlx_lm.server: status "ok",
+// as llama-server also sends, from Python's stdlib HTTP server, which names
+// itself "BaseHTTP/<version> Python/<version>".
+func (h healthAnswer) fromMLXLM() bool {
+	return h.ok && h.status == "ok" && strings.HasPrefix(h.server, "BaseHTTP/")
+}
+
+// getHealth GETs /health on host:port, bounded by ctx. It shares the package
+// HTTP client so repeated probes reuse connections.
+func getHealth(ctx context.Context, host string, port int) healthAnswer {
 	resp, err := probeGet(ctx, host, port, "/health")
 	if err != nil {
-		return false, ""
+		return healthAnswer{}
 	}
 	defer func() { _ = resp.Body.Close() }()
+	h := healthAnswer{ok: resp.StatusCode == http.StatusOK, server: resp.Header.Get("Server")}
+	body := io.LimitReader(resp.Body, 4<<10)
+	var parsed struct {
+		Status string `json:"status"`
+	}
+	if json.NewDecoder(body).Decode(&parsed) == nil {
+		h.status = parsed.Status
+	}
 	// Drain so the connection returns to the pool.
-	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4<<10))
-	return resp.StatusCode == http.StatusOK, resp.Header.Get("Server")
+	_, _ = io.Copy(io.Discard, body)
+	return h
 }
 
 // probeGet sends a detection GET for path to host:port.
@@ -345,25 +399,32 @@ func probeModelsOwner(ctx context.Context, host string, port int, owners ...stri
 }
 
 // probeLlamaServer reports whether llama-server answers on host:port.
-// llama-server and ninfer-serve both default to port 8080 and both answer
-// /health with {"status":"ok"}, so a 200 there is llama-server unless the
-// model list names NInfer as the owner. Current llama-server builds send
-// "Server: llama.cpp", which settles it without the second request; older
-// builds may not, so the header is not required.
+// llama-server, ninfer-serve, and mlx_lm.server all default to port 8080 and
+// all answer /health with {"status":"ok"}, so a 200 there is llama-server
+// unless the answer is mlx-lm's or the model list names NInfer as the owner.
+// Current llama-server builds send "Server: llama.cpp", which settles it
+// without the second request; older builds may not, so the header is not
+// required.
 func probeLlamaServer(ctx context.Context, host string, port int) bool {
-	ok, server := getHealth(ctx, host, port)
-	if !ok {
+	h := getHealth(ctx, host, port)
+	if !h.ok || h.fromMLXLM() {
 		return false
 	}
-	return strings.HasPrefix(server, "llama.cpp") || !probeModelsOwner(ctx, host, port, ownerNInfer)
+	return strings.HasPrefix(h.server, "llama.cpp") || !probeModelsOwner(ctx, host, port, ownerNInfer)
+}
+
+// probeMLXLM reports whether mlx_lm.server answers on host:port. Its model
+// list names no owner and is often empty, so the /health answer alone tells
+// it apart from llama-server and ninfer-serve on their shared port.
+func probeMLXLM(ctx context.Context, host string, port int) bool {
+	return getHealth(ctx, host, port).fromMLXLM()
 }
 
 // probeVLLM reports whether vLLM answers on host:port. vLLM shares port 8000
 // with oMLX and Splash, which both answer /health too, so a 200 counts as vLLM
 // unless the model list names one of them as the owner.
 func probeVLLM(ctx context.Context, host string, port int) bool {
-	ok, _ := getHealth(ctx, host, port)
-	return ok && !probeModelsOwner(ctx, host, port, ownerOMLX, ownerSplash)
+	return getHealth(ctx, host, port).ok && !probeModelsOwner(ctx, host, port, ownerOMLX, ownerSplash)
 }
 
 // defaultProbeHost is the loopback address used for health probes that have no
@@ -421,6 +482,11 @@ func ResolveOMLXPath(r RuntimeInfo) string {
 // ResolveSplashPath returns the detected splash path, or the first match on PATH.
 func ResolveSplashPath(r RuntimeInfo) string {
 	return resolvePath(r.SplashPath, "splash")
+}
+
+// ResolveMLXLMPath returns the detected mlx_lm.server path, or the first match on PATH.
+func ResolveMLXLMPath(r RuntimeInfo) string {
+	return resolvePath(r.MLXLMPath, mlxLMServerName)
 }
 
 // ResolveKoboldCppPath returns the detected koboldcpp binary path, or the first match on PATH.

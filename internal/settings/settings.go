@@ -69,6 +69,13 @@ const (
 	EnvSplashHost = "SPLASH_HOST"
 	// EnvSplashPort is the TCP port for splash serve; Splash itself reads it too.
 	EnvSplashPort = "SPLASH_PORT"
+	// EnvMLXLMPath is the mlx_lm.server script, or a directory containing it
+	// such as a venv's bin/.
+	EnvMLXLMPath = "MLX_LM_PATH"
+	// EnvMLXLMHost is the listen host for mlx_lm.server.
+	EnvMLXLMHost = "MLX_LM_HOST"
+	// EnvMLXLMPort is the TCP port for mlx_lm.server and its /health probe.
+	EnvMLXLMPort = "MLX_LM_PORT"
 	// EnvModelPaths lists extra model search roots, comma-separated.
 	EnvModelPaths = "LLML_MODEL_PATHS"
 	// EnvHFHubCache overrides the Hugging Face hub cache directory.
@@ -96,6 +103,10 @@ const (
 	// DefaultSplashHost and DefaultSplashPort match Splash's own defaults.
 	DefaultSplashHost = "127.0.0.1"
 	DefaultSplashPort = 8000
+	// DefaultMLXLMHost and DefaultMLXLMPort match mlx_lm.server's own
+	// defaults. The port is llama-server's too; detection tells them apart.
+	DefaultMLXLMHost = "127.0.0.1"
+	DefaultMLXLMPort = 8080
 )
 
 // Settings holds every runtime value in fully resolved form. Path fields are
@@ -131,6 +142,10 @@ type Settings struct {
 	SplashPath string
 	SplashHost string
 	SplashPort int
+
+	MLXLMPath string
+	MLXLMHost string
+	MLXLMPort int
 
 	// ExtraModelPaths are additional filesystem roots to scan for models.
 	ExtraModelPaths []string
@@ -181,6 +196,10 @@ type Layer struct {
 	SplashHost *string
 	SplashPort *int
 
+	MLXLMPath *string
+	MLXLMHost *string
+	MLXLMPort *int
+
 	ExtraModelPaths []string
 	HFHubCache      *string
 	HFHome          *string
@@ -206,6 +225,8 @@ func Defaults() Layer {
 		OMLXPort:   ptr(DefaultOMLXPort),
 		SplashHost: ptr(DefaultSplashHost),
 		SplashPort: ptr(DefaultSplashPort),
+		MLXLMHost:  ptr(DefaultMLXLMHost),
+		MLXLMPort:  ptr(DefaultMLXLMPort),
 	}
 }
 
@@ -245,6 +266,9 @@ func Resolve(layers ...Layer) Settings {
 		take(&s, l.Origin, FieldSplashPath, &s.SplashPath, l.SplashPath)
 		take(&s, l.Origin, FieldSplashHost, &s.SplashHost, l.SplashHost)
 		take(&s, l.Origin, FieldSplashPort, &s.SplashPort, l.SplashPort)
+		take(&s, l.Origin, FieldMLXLMPath, &s.MLXLMPath, l.MLXLMPath)
+		take(&s, l.Origin, FieldMLXLMHost, &s.MLXLMHost, l.MLXLMHost)
+		take(&s, l.Origin, FieldMLXLMPort, &s.MLXLMPort, l.MLXLMPort)
 		claim(&s.HFHubCache, l.HFHubCache)
 		claim(&s.HFHome, l.HFHome)
 		roots.Add(l.ExtraModelPaths...)
