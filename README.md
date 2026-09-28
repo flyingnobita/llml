@@ -445,6 +445,11 @@ llml adds nothing else, and passes the profile's env vars as for any runtime.
   `pip install mlx-lm "mlx[cuda12]"` for CUDA 12, `"mlx[cuda13]"` for CUDA 13, or
   `"mlx[cpu]"` without a GPU. The CUDA build needs an NVIDIA GPU of compute capability 7.5 or
   newer and a recent driver. The CPU build works but is far too slow for real models.
+  MLX compiles its CUDA kernels at run time against the toolkit that `CUDA_PATH` (or
+  `CUDA_HOME`) points to, so that toolkit must match the extra: with `mlx[cuda12]` and a CUDA
+  13 toolkit on `CUDA_PATH`, the server starts and answers `/health`, but the first request
+  hangs while kernels fail to compile. Install the matching extra, or set `CUDA_PATH` to a
+  CUDA 12 toolkit in the profile's env (for example `CUDA_PATH=/opt/cuda-12.9.1`).
 
 Things to know:
 
