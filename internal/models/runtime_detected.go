@@ -31,8 +31,7 @@ func (r RuntimeInfo) Status(b ModelBackend) RuntimeStatus {
 	case BackendKobold:
 		return RuntimeStatus{Path: r.KoboldCppPath, Running: r.KoboldCppRunning}
 	case BackendVLLM:
-		// vLLM has no server probe.
-		return RuntimeStatus{Path: r.VLLMPath}
+		return RuntimeStatus{Path: r.VLLMPath, Running: r.VLLMRunning}
 	case BackendOllama:
 		return RuntimeStatus{Path: r.OllamaPath, Running: r.OllamaRunning}
 	case BackendNInfer:

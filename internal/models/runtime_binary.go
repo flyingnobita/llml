@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -273,43 +275,39 @@ func findSplashBinary(splashPath string) string {
 	return findBinaryInEnvAndCommonDirs(name, "", commonBinaryDirs)
 }
 
-// probeHealthEndpoint GETs /health on host:port, bounded by ctx. Used by
-// llama-server, KoboldCpp, and ninfer-serve. It shares the package HTTP client
-// so repeated probes reuse connections.
+// probeHealthEndpoint reports whether the server on host:port answers GET
+// /health with 200, bounded by ctx. KoboldCpp is detected by this alone.
 func probeHealthEndpoint(ctx context.Context, host string, port int) bool {
-	url := fmt.Sprintf("http://%s:%d/health", host, port)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	ok, _ := getHealth(ctx, host, port)
+	return ok
+}
+
+// getHealth GETs /health on host:port, bounded by ctx, and reports whether it
+// answered 200 and the Server header it sent. It shares the package HTTP
+// client so repeated probes reuse connections.
+func getHealth(ctx context.Context, host string, port int) (ok bool, server string) {
+	resp, err := probeGet(ctx, host, port, "/health")
 	if err != nil {
-		return false
-	}
-	resp, err := sharedHTTPClient.Do(req)
-	if err != nil {
-		return false
+		return false, ""
 	}
 	defer func() { _ = resp.Body.Close() }()
 	// Drain so the connection returns to the pool.
 	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4<<10))
-	return resp.StatusCode == http.StatusOK
+	return resp.StatusCode == http.StatusOK, resp.Header.Get("Server")
 }
 
-// probeModelsOwner reports whether the OpenAI-compatible server on host:port
-// lists a model owned by owner. oMLX and Splash both answer /health and both
-// default to port 8000, so a health check alone cannot tell which one is up;
-// each reports itself as the owner in /v1/models.
-func probeModelsOwner(ctx context.Context, host string, port int, owner string) bool {
-	url := fmt.Sprintf("http://%s:%d/v1/models", host, port)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+// modelOwners GETs /v1/models on host:port, bounded by ctx, and returns the
+// owned_by of each model the server lists. It returns nil when the server does
+// not answer 200 with a model list.
+func modelOwners(ctx context.Context, host string, port int) []string {
+	resp, err := probeGet(ctx, host, port, "/v1/models")
 	if err != nil {
-		return false
-	}
-	resp, err := sharedHTTPClient.Do(req)
-	if err != nil {
-		return false
+		return nil
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4<<10))
-		return false
+		return nil
 	}
 	var list struct {
 		Data []struct {
@@ -317,14 +315,66 @@ func probeModelsOwner(ctx context.Context, host string, port int, owner string) 
 		} `json:"data"`
 	}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&list); err != nil {
+		return nil
+	}
+	owners := make([]string, 0, len(list.Data))
+	for _, m := range list.Data {
+		owners = append(owners, m.OwnedBy)
+	}
+	return owners
+}
+
+// probeGet sends a detection GET for path to host:port.
+func probeGet(ctx context.Context, host string, port int, path string) (*http.Response, error) {
+	url := fmt.Sprintf("http://%s%s", net.JoinHostPort(host, strconv.Itoa(port)), path)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	return sharedHTTPClient.Do(req)
+}
+
+// Model owners that name a Runtime in /v1/models.
+const (
+	ownerNInfer = "ninfer"
+	ownerOMLX   = "omlx"
+	ownerSplash = "splash"
+)
+
+// probeModelsOwner reports whether the OpenAI-compatible server on host:port
+// lists a model owned by owner. oMLX and Splash both answer /health and both
+// default to port 8000, so a health check alone cannot tell which one is up;
+// each reports itself as the owner in /v1/models. NInfer does the same.
+func probeModelsOwner(ctx context.Context, host string, port int, owner string) bool {
+	return slices.Contains(modelOwners(ctx, host, port), owner)
+}
+
+// probeLlamaServer reports whether llama-server answers on host:port.
+// llama-server and ninfer-serve both default to port 8080 and both answer
+// /health with {"status":"ok"}, so a 200 there is llama-server unless the
+// model list names NInfer as the owner. Current llama-server builds send
+// "Server: llama.cpp", which settles it without the second request; older
+// builds may not, so the header is not required.
+func probeLlamaServer(ctx context.Context, host string, port int) bool {
+	ok, server := getHealth(ctx, host, port)
+	if !ok {
 		return false
 	}
-	for _, m := range list.Data {
-		if m.OwnedBy == owner {
-			return true
-		}
+	if strings.HasPrefix(server, "llama.cpp") {
+		return true
 	}
-	return false
+	return !slices.Contains(modelOwners(ctx, host, port), ownerNInfer)
+}
+
+// probeVLLM reports whether vLLM answers on host:port. vLLM shares port 8000
+// with oMLX and Splash, which both answer /health too, so a 200 counts as vLLM
+// unless the model list names one of them as the owner.
+func probeVLLM(ctx context.Context, host string, port int) bool {
+	if ok, _ := getHealth(ctx, host, port); !ok {
+		return false
+	}
+	owners := modelOwners(ctx, host, port)
+	return !slices.Contains(owners, ownerOMLX) && !slices.Contains(owners, ownerSplash)
 }
 
 // defaultProbeHost is the loopback address used for health probes that have no
