@@ -138,7 +138,7 @@ func (m Model) tableRows(cols []btable.Column) []btable.Row {
 	}
 	rows := make([]btable.Row, len(m.table.files))
 	for i, f := range m.table.files {
-		be := rowRuntime(f, m.table.effectiveBackends)
+		be := m.rowRuntime(f)
 		dimmed := !m.runtimeEnabled(be)
 		label := models.FormatRuntimeLabel(be)
 		if dimmed {

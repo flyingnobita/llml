@@ -94,7 +94,11 @@ type runtimeDef struct {
 	backend models.ModelBackend
 	name    string
 	format  modelFormat
-	fields  []runtimeFieldDef
+	// ownFolders is set for a Runtime that serves only the models inside its
+	// own model folders. Discovery gives it exactly those rows, so it is a
+	// Runtime choice only for rows discovery gave it.
+	ownFolders bool
+	fields     []runtimeFieldDef
 }
 
 // status returns what detection learned about the Runtime. It reads
@@ -167,7 +171,7 @@ var runtimeTable = []runtimeDef{
 		},
 	},
 	{
-		backend: models.BackendOMLX, name: "oMLX", format: formatSafetensors,
+		backend: models.BackendOMLX, name: "oMLX", format: formatSafetensors, ownFolders: true,
 		fields: []runtimeFieldDef{
 			pathFieldDef(runtimeFieldOMLXPath, settings.FieldOMLXPath, "Path", "omlx CLI or ~/.omlx",
 				detectedProgram(models.BackendOMLX), func(s *settings.Settings) *string { return &s.OMLXPath }),
@@ -224,14 +228,21 @@ func runtimeFor(b models.ModelBackend) runtimeDef {
 	return runtimeTable[0]
 }
 
-// runtimeBackendsIn returns the profile backend names of the Runtimes that run
-// format, in table order.
-func runtimeBackendsIn(format modelFormat) []string {
-	var out []string
+// runtimeChoices returns, in table order, the Runtimes a row may launch on
+// when discovery gave it Runtime discovered: every Runtime of the same Model
+// Format that platform p supports. A Runtime that serves only its own model
+// folders is left out unless it is discovered itself.
+func runtimeChoices(discovered models.ModelBackend, p models.Platform) []models.ModelBackend {
+	format := runtimeFor(discovered).format
+	var out []models.ModelBackend
 	for _, rt := range runtimeTable {
-		if rt.format == format {
-			out = append(out, rt.backend.String())
+		if rt.format != format || !rt.supported(p) {
+			continue
 		}
+		if rt.ownFolders && rt.backend != discovered {
+			continue
+		}
+		out = append(out, rt.backend)
 	}
 	return out
 }

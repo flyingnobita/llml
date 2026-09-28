@@ -365,6 +365,9 @@ func TestParamPanelMetadataTracksActiveProfile(t *testing.T) {
 	m.layout.height = 40
 	m.params.open = true
 	m.params.modelDisplayName = "test/model"
+	// A model in oMLX's folder, which can choose between vLLM and oMLX.
+	m.params.modelPath = "/Users/u/.omlx/models/model"
+	m.table.files = []models.ModelFile{{Backend: models.BackendOMLX, Path: m.params.modelPath, Name: "model", Size: 1}}
 	setTestParamEditor(&m, profiles.Entry{Profiles: []profiles.Profile{
 		{
 			Name:    "general",

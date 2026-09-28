@@ -259,7 +259,7 @@ func (m Model) maybeSetMissingRuntimeFooterNote() (Model, tea.Cmd) {
 	want := map[models.ModelBackend]bool{}
 	for _, f := range m.table.files {
 		want[f.Backend] = true
-		want[rowRuntime(f, m.table.effectiveBackends)] = true
+		want[m.rowRuntime(f)] = true
 	}
 	var msgs []string
 	for _, r := range missingRuntimeNotes {

@@ -226,8 +226,12 @@ Each model path can have **multiple named profiles**. Each profile stores:
 
 **`R`** / **ctrl+`R`** use the **active** profile (the highlighted row in the `p` profile list is prefixed with **`(active)`** in the name column). Changes persist automatically. **tab** cycles: profile list → env → extra args. On the profile list: **`a`** add profile, **`c`** clone (duplicate) the highlighted profile, **`d`** delete (not the last), **`r`** rename. **`esc`** closes the panel (and **`n`** cancels a delete confirmation).
 
-For GGUF models, a profile's **Backend** chooses llama.cpp or KoboldCpp. A runtime that is turned
-off in `c` is still offered, labelled `(off)`, so you can set a profile up before turning it on.
+A profile's **Backend** chooses the runtime a model launches on. GGUF models choose llama.cpp or
+KoboldCpp. Safetensors models choose vLLM, or oMLX for models inside one of oMLX's model directories.
+**`(none)`** keeps the default: llama.cpp for GGUF, oMLX inside oMLX's model directories, vLLM
+elsewhere. The table's Runtime column shows the choice. llml does not check that the weights suit
+the runtime: MLX weights launched on vLLM fail when the server starts. A runtime that is turned off
+in `c` is still offered, labelled `(off)`, so you can set a profile up before turning it on.
 
 Profiles are stored in `model-params.json` (see [Storage & Locations](#storage--locations)).
 
@@ -393,7 +397,8 @@ may be out of date until you turn Ollama back on and scan again.
    the app's model directories from its `settings.json`, so models placed there appear as
    oMLX rows. `R` runs `omlx serve --model-dir <dir>`; oMLX serves every model in that
    directory and applies the per-model settings (draft model, sampling) saved in the app.
-   Stop the app's own background server first if it is using the same port.
+   Stop the app's own background server first if it is using the same port. A profile can
+   launch such a model on vLLM instead (see [Parameter profiles](#parameter-profiles-p)).
 9. (Splash only) Splash bundles are found in the Hugging Face cache and launched with
    `splash serve --model <org/repo>`.
 

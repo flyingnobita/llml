@@ -60,6 +60,7 @@ var (
 	keyDown     = tea.KeyPressMsg{Code: tea.KeyDown}
 	keyUp       = tea.KeyPressMsg{Code: tea.KeyUp}
 	keyRight    = tea.KeyPressMsg{Code: tea.KeyRight}
+	keyLeft     = tea.KeyPressMsg{Code: tea.KeyLeft}
 	keyTab      = tea.KeyPressMsg{Code: tea.KeyTab}
 	keyShiftTab = tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift}
 	keyEnter    = tea.KeyPressMsg{Code: tea.KeyEnter}
