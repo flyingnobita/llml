@@ -100,7 +100,7 @@ func TestMLXVLM_alwaysPassesHost(t *testing.T) {
 }
 
 // The launch preview names the model id clients must send, the same absolute
-// path, and the copied command carries no such line.
+// path, above the command, and the copied command carries no such line.
 func TestMLXVLM_previewShowsModelID(t *testing.T) {
 	dir := useTempConfigDir(t)
 	row := mlxVLMRow(t, dir)
@@ -110,10 +110,11 @@ func TestMLXVLM_previewShowsModelID(t *testing.T) {
 	m := dimModel(t, f.services, linuxPlatform, config.RuntimeStates{}, row)
 	m.layout.width = 240 // no wrapping
 	m = m.layoutTable()
-	scrolled := plainView(press(t, m, keyTab, keyDown, keyDown, keyDown, keyDown))
-	if want := launchPreviewModelIDLabel + row.Path; !strings.Contains(scrolled, want) {
-		t.Errorf("preview should show %q:\n%s", want, scrolled)
+	// The model id shows without scrolling; the rest of the command after it.
+	if want := launchPreviewModelIDLabel + row.Path; !strings.Contains(plainView(m), want) {
+		t.Errorf("preview should show %q without scrolling:\n%s", want, plainView(m))
 	}
+	scrolled := plainView(press(t, m, keyTab, keyDown, keyDown, keyDown, keyDown))
 	if !strings.Contains(scrolled, "--host 127.0.0.1") {
 		t.Errorf("the preview command should pass --host:\n%s", scrolled)
 	}

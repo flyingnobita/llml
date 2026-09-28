@@ -104,8 +104,9 @@ func TestMLXLM_modelPathIsAbsolute(t *testing.T) {
 }
 
 // The launch preview names the model id clients must send, the same absolute
-// path, on a line of its own under the command. The copied command matches
-// the command in the preview and carries no such line.
+// path, on a line of its own above the command, so it shows without
+// scrolling the preview. The copied command matches the command in the
+// preview and carries no such line.
 func TestMLXLM_previewShowsModelIDAndCopiesCommand(t *testing.T) {
 	dir := useTempConfigDir(t)
 	row := mlxLMRow(t, dir)
@@ -113,14 +114,18 @@ func TestMLXLM_previewShowsModelIDAndCopiesCommand(t *testing.T) {
 
 	f := newLaunchFakes()
 	m := dimModel(t, f.services, linuxPlatform, config.RuntimeStates{}, row)
-	m.layout.width = 240 // no wrapping
+	m.layout.width = 120
 	m = m.layoutTable()
 	top := plainView(m)
-	// Focus the launch preview and scroll to its end.
+	if !strings.Contains(top, strings.TrimSpace(launchPreviewModelIDLabel)) || !strings.Contains(top, row.Name) {
+		t.Errorf("the model id line should show without scrolling:\n%s", top)
+	}
+	m.layout.width = 240 // no wrapping, so the whole id is on one line
+	m = m.layoutTable()
 	scrolled := plainView(press(t, m, keyTab, keyDown, keyDown, keyDown, keyDown))
 	want := launchPreviewModelIDLabel + row.Path
-	if !strings.Contains(scrolled, want) {
-		t.Errorf("preview should show %q:\n%s", want, scrolled)
+	if !strings.Contains(plainView(m), want) {
+		t.Errorf("preview should show %q:\n%s", want, plainView(m))
 	}
 	view := top + scrolled
 

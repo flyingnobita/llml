@@ -622,7 +622,7 @@ func launchPreviewCommandLine(m Model) string {
 type launchPreview struct {
 	// cmd is the command, as copied to the clipboard.
 	cmd string
-	// info is a line of information under the command: the model id clients
+	// info is a line of information above the command: the model id clients
 	// must send, for a Runtime that needs one. It is not part of the command.
 	info string
 	// note warns about the launch: the Runtime being off, a missing model

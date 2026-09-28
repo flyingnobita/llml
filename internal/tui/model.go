@@ -738,8 +738,10 @@ func (m Model) syncLaunchPreviewViewport(innerW int) Model {
 	outerH := launchPreviewVisibleLines + pvFrV
 	buildRendered := func(textWidth int) string {
 		r := m.ui.styles.launchPreviewContent.Width(textWidth).Render(cmd)
+		// The info line goes first: a long command fills the preview's
+		// visible lines, and what clients must send should not need scrolling.
 		if pv.info != "" {
-			r = r + "\n" + m.ui.styles.infoLine.Width(textWidth).Render(pv.info)
+			r = m.ui.styles.infoLine.Width(textWidth).Render(pv.info) + "\n" + r
 		}
 		if pv.note != "" {
 			r = r + "\n" + m.ui.styles.warnLine.Render(pv.note)
