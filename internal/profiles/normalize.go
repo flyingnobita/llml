@@ -239,6 +239,8 @@ func normalizeBackend(v string) string {
 		return "splash"
 	case "mlx-lm":
 		return "mlx-lm"
+	case "mlx-vlm":
+		return "mlx-vlm"
 	default:
 		return ""
 	}
