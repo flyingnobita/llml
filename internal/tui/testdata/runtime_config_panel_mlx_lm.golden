@@ -5,16 +5,16 @@
   ││                                                                                            │
   ││  Runtime Environment                                                                       │
   ││                                                                                            │
-  ││  GGUF                    KoboldCpp · Off                                                   │
+  ││  GGUF                    mlx-lm · running                                                  │
   ││     [✓] Llama.cpp ○                                                                        │
-  ││   › [ ] KoboldCpp off      Path  > koboldcpp binary or its dir                             │
-  ││  Safetensors               in use: not found (default)                                     │
+  ││     [✓] KoboldCpp ✗        Path  > mlx_lm.server or its dir                                │
+  ││  Safetensors               in use: ~/.venv/bin/mlx_lm.server (detected)                    │
   ││     [✓] vLLM      ○                                                                        │
-  ││     [✓] mlx-lm    ✗        Port  > 5001                                                    │
-  ││  NInfer (.ninfer)          in use: 5001 (default)                                          │
+  ││   › [✓] mlx-lm    ●        Port  > 8080                                                    │
+  ││  NInfer (.ninfer)          in use: 8080 (default)                                          │
   ││     [✓] NInfer    ○                                                                        │
-  ││  Ollama library                                                                            │
-  ││     [✓] Ollama    ○                                                                        │
+  ││  Ollama library            Host  > 127.0.0.1                                               │
+  ││     [✓] Ollama    ○        in use: 127.0.0.1 (default)                                     │
   ││                                                                                            │
   ╰│                                                                                            │
    │                                                                                            │

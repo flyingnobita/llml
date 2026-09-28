@@ -247,6 +247,16 @@ const (
 	MissingNInferFooterNote      = "ninfer-serve not found - press " + FooterKeyConfigPort + " to set path manually"
 	MissingOMLXFooterNote        = "omlx not found - install oMLX.app or press " + FooterKeyConfigPort + " to set path manually"
 	MissingSplashFooterNote      = "splash not found - press " + FooterKeyConfigPort + " to set path manually"
+	MissingMLXLMFooterNote       = "mlx_lm.server not found - press " + FooterKeyConfigPort + " to set path manually"
+
+	// launchPreviewModelIDLabel starts the launch preview's line naming the
+	// model id clients must send to a Runtime that loads whatever model a
+	// request names (see runtimeDef.loadsRequestedModel).
+	launchPreviewModelIDLabel = "model id for requests: "
+	// missingModelFolderAlert is the warning when such a Runtime is asked to
+	// launch a model folder that no longer exists. It names the folder and
+	// the Runtime.
+	missingModelFolderAlert = "Model folder not found: %s. %s would take the path for a Hugging Face repo id and download it, so it was not launched. Press S to rescan."
 
 	FooterKeySortColumn   = ","
 	FooterDescSortColumn  = "sort"

@@ -67,6 +67,7 @@ type ollamaLaunchBackend struct{}
 type ninferLaunchBackend struct{}
 type omlxLaunchBackend struct{}
 type splashLaunchBackend struct{}
+type mlxLaunchBackend struct{}
 
 func (llamaLaunchBackend) args(s serverSpec) []launchArg {
 	args := []launchArg{
@@ -134,6 +135,17 @@ func (splashLaunchBackend) args(s serverSpec) []launchArg {
 	}
 }
 
+// args for an MLX server (mlx_lm.server), which loads --model from a local
+// directory. llml passes the host and port and nothing else, so the server
+// behaves as its own documentation says.
+func (mlxLaunchBackend) args(s serverSpec) []launchArg {
+	return []launchArg{
+		rawLaunchArg("--model"), quotedLaunchArg(s.modelPath),
+		rawLaunchArg("--host"), rawLaunchArg(s.host),
+		rawLaunchArg("--port"), rawLaunchArg(fmt.Sprintf("%d", s.port)),
+	}
+}
+
 func (ollamaLaunchBackend) args(serverSpec) []launchArg {
 	return []launchArg{rawLaunchArg("serve")}
 }
@@ -152,6 +164,8 @@ func (s serverSpec) launchBackend() launchBackend {
 		return omlxLaunchBackend{}
 	case models.BackendSplash:
 		return splashLaunchBackend{}
+	case models.BackendMLXLM:
+		return mlxLaunchBackend{}
 	default:
 		return llamaLaunchBackend{}
 	}
@@ -265,6 +279,8 @@ func buildServerSpec(backend models.ModelBackend, modelPath string, params profi
 		return omlxServerSpec(modelPath, params, rt, strict)
 	case models.BackendSplash:
 		return splashServerSpec(modelPath, params, rt, strict)
+	case models.BackendMLXLM:
+		return mlxLMServerSpec(modelPath, params, rt, strict)
 	case models.BackendKobold:
 		bin := models.ResolveKoboldCppPath(rt)
 		if strict && bin == "" {
@@ -395,6 +411,48 @@ func splashServerSpec(modelPath string, params profiles.ModelParams, rt models.R
 		modelPath: modelPath,
 		params:    params,
 	}, nil
+}
+
+// mlxLMServerSpec is the mlx-lm case of [buildServerSpec].
+func mlxLMServerSpec(modelPath string, params profiles.ModelParams, rt models.RuntimeInfo, strict bool) (serverSpec, error) {
+	bin := models.ResolveMLXLMPath(rt)
+	if strict && bin == "" {
+		return serverSpec{}, errors.New(MissingMLXLMFooterNote)
+	}
+	if bin == "" {
+		bin = "mlx_lm.server"
+	}
+	return serverSpec{
+		backend:   models.BackendMLXLM,
+		bin:       bin,
+		host:      hostOr(rt.MLXLMHost, settings.DefaultMLXLMHost),
+		port:      portOr(rt.MLXLMPort, settings.DefaultMLXLMPort),
+		modelPath: absModelPath(modelPath),
+		params:    params,
+	}, nil
+}
+
+// absModelPath returns modelPath made absolute. An MLX server reads any
+// --model that is not an existing path as a Hugging Face repo id, and clients
+// name the model by the same string, so it must not depend on the working
+// directory. A path that cannot be made absolute is returned unchanged.
+func absModelPath(modelPath string) string {
+	if abs, err := filepath.Abs(modelPath); err == nil {
+		return abs
+	}
+	return modelPath
+}
+
+// requestModelID returns the model id clients must send in requests to the
+// server spec launches, or "" when its Runtime serves the launched model
+// whatever a request names. A Runtime that loads the model a request names
+// loads it by the same string as --model, so any other id swaps the model
+// out, or downloads one.
+func (s serverSpec) requestModelID() string {
+	if !runtimeFor(s.backend).loadsRequestedModel {
+		return ""
+	}
+	return s.modelPath
 }
 
 // mmprojNote returns a one-line warning string when mmproj state is abnormal for this spec.
@@ -537,18 +595,28 @@ func launchPreviewCommandLine(m Model) string {
 	return spec.previewLine()
 }
 
-// launchPreviewCmdAndNote returns both the preview command line and its notes (the Runtime being
-// off, then the mmproj warning) from a single
-// buildServerSpec call, avoiding the double os.ReadDir that occurs when the two are fetched
-// independently via launchPreviewCommandLine + launchPreviewMMProjNote.
-func launchPreviewCmdAndNote(m Model) (string, string) {
+// launchPreview is what the launch preview shows for the selected row.
+type launchPreview struct {
+	// cmd is the command, as copied to the clipboard.
+	cmd string
+	// info is a line of information under the command: the model id clients
+	// must send, for a Runtime that needs one. It is not part of the command.
+	info string
+	// note warns about the launch: the Runtime being off, then the mmproj state.
+	note string
+}
+
+// launchPreviewFor returns the preview for the selected row from a single
+// buildServerSpec call, avoiding the double os.ReadDir that occurs when the
+// command and its notes are fetched independently.
+func launchPreviewFor(m Model) launchPreview {
 	modelPath, _ := m.SelectedModel()
 	if modelPath == "" {
-		return "", ""
+		return launchPreview{}
 	}
 	params, ok := modelParamsForLaunchPreview(m)
 	if !ok {
-		return "", ""
+		return launchPreview{}
 	}
 	be := m.resolveEffectiveBackend()
 	spec, _ := buildServerSpec(be, modelPath, params, m.runtime, false)
@@ -559,7 +627,11 @@ func launchPreviewCmdAndNote(m Model) (string, string) {
 	if note := spec.mmprojNote(); note != "" {
 		notes = append(notes, note)
 	}
-	return spec.previewLine(), strings.Join(notes, "\n")
+	pv := launchPreview{cmd: spec.previewLine(), note: strings.Join(notes, "\n")}
+	if id := spec.requestModelID(); id != "" {
+		pv.info = launchPreviewModelIDLabel + id
+	}
+	return pv
 }
 
 func scanReaderLines(r io.Reader, ch chan<- tea.Msg, wg *sync.WaitGroup) {
