@@ -12,11 +12,11 @@
   ││     [✓] vLLM      ○                                                                        │
   ││   › [✓] oMLX      ●        Port  > 8000                                                    │
   ││     [✓] mlx-lm    ○        in use: 8000 (default)                                          │
-  ││  Splash bundle                                                                             │
-  ││     [✓] Splash    ○        Host  > 127.0.0.1                                               │
-  ││  Ollama library            in use: 127.0.0.1 (default)                                     │
-  ││     [✓] Ollama    ○                                                                        │
-  ╰│                                                                                            │
+  ││     [✓] mlx-vlm   ○                                                                        │
+  ││  Splash bundle             Host  > 127.0.0.1                                               │
+  ││     [✓] Splash    ○        in use: 127.0.0.1 (default)                                     │
+  ││  Ollama library                                                                            │
+  ╰│     [✓] Ollama    ○                                                                        │
    │                                                                                            │
    │                                                                                            │
   L│                                                                                            │

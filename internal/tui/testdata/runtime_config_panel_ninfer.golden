@@ -11,11 +11,11 @@
   ││  Safetensors               in use: /opt/ninfer/build/apps/ninfer-serve (detected)          │
   ││     [✓] vLLM      ○                                                                        │
   ││     [✓] mlx-lm    ✗        Port  > 8080                                                    │
-  ││  NInfer (.ninfer)          in use: 8080 (default)                                          │
-  ││   › [✓] NInfer    ○                                                                        │
-  ││  Ollama library            Host  > 127.0.0.1                                               │
-  ││     [✓] Ollama    ○        in use: 127.0.0.1 (default)                                     │
-  ││                                                                                            │
+  ││     [✓] mlx-vlm   ✗        in use: 8080 (default)                                          │
+  ││  NInfer (.ninfer)                                                                          │
+  ││   › [✓] NInfer    ○        Host  > 127.0.0.1                                               │
+  ││  Ollama library            in use: 127.0.0.1 (default)                                     │
+  ││     [✓] Ollama    ○                                                                        │
   ╰│                                                                                            │
    │                                                                                            │
    │                                                                                            │

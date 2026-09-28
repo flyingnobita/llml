@@ -135,9 +135,10 @@ func (splashLaunchBackend) args(s serverSpec) []launchArg {
 	}
 }
 
-// args for an MLX server (mlx_lm.server), which loads --model from a local
-// directory. llml passes the host and port and nothing else, so the server
-// behaves as its own documentation says.
+// args for an MLX server (mlx_lm.server or mlx_vlm.server), which loads
+// --model from a local directory. llml passes the host and port and nothing
+// else, so the server behaves as its own documentation says. --host is always
+// passed: mlx_vlm.server would otherwise listen on all interfaces.
 func (mlxLaunchBackend) args(s serverSpec) []launchArg {
 	return []launchArg{
 		rawLaunchArg("--model"), quotedLaunchArg(s.modelPath),
@@ -164,7 +165,7 @@ func (s serverSpec) launchBackend() launchBackend {
 		return omlxLaunchBackend{}
 	case models.BackendSplash:
 		return splashLaunchBackend{}
-	case models.BackendMLXLM:
+	case models.BackendMLXLM, models.BackendMLXVLM:
 		return mlxLaunchBackend{}
 	default:
 		return llamaLaunchBackend{}
@@ -281,6 +282,8 @@ func buildServerSpec(backend models.ModelBackend, modelPath string, params profi
 		return splashServerSpec(modelPath, params, rt, strict)
 	case models.BackendMLXLM:
 		return mlxLMServerSpec(modelPath, params, rt, strict)
+	case models.BackendMLXVLM:
+		return mlxVLMServerSpec(modelPath, params, rt, strict)
 	case models.BackendKobold:
 		bin := models.ResolveKoboldCppPath(rt)
 		if strict && bin == "" {
@@ -427,6 +430,26 @@ func mlxLMServerSpec(modelPath string, params profiles.ModelParams, rt models.Ru
 		bin:       bin,
 		host:      hostOr(rt.MLXLMHost, settings.DefaultMLXLMHost),
 		port:      portOr(rt.MLXLMPort, settings.DefaultMLXLMPort),
+		modelPath: absModelPath(modelPath),
+		params:    params,
+	}, nil
+}
+
+// mlxVLMServerSpec is the mlx-vlm case of [buildServerSpec]. The host falls
+// back to loopback, never to mlx_vlm.server's own 0.0.0.0.
+func mlxVLMServerSpec(modelPath string, params profiles.ModelParams, rt models.RuntimeInfo, strict bool) (serverSpec, error) {
+	bin := models.ResolveMLXVLMPath(rt)
+	if strict && bin == "" {
+		return serverSpec{}, errors.New(MissingMLXVLMFooterNote)
+	}
+	if bin == "" {
+		bin = "mlx_vlm.server"
+	}
+	return serverSpec{
+		backend:   models.BackendMLXVLM,
+		bin:       bin,
+		host:      hostOr(rt.MLXVLMHost, settings.DefaultMLXVLMHost),
+		port:      portOr(rt.MLXVLMPort, settings.DefaultMLXVLMPort),
 		modelPath: absModelPath(modelPath),
 		params:    params,
 	}, nil

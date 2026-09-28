@@ -199,6 +199,17 @@ var runtimeTable = []runtimeDef{
 		},
 	},
 	{
+		backend: models.BackendMLXVLM, name: "mlx-vlm", format: formatSafetensors, loadsRequestedModel: true,
+		fields: []runtimeFieldDef{
+			pathFieldDef(runtimeFieldMLXVLMPath, settings.FieldMLXVLMPath, "Path", "mlx_vlm.server or its dir",
+				detectedProgram(models.BackendMLXVLM), func(s *settings.Settings) *string { return &s.MLXVLMPath }),
+			portFieldDef(runtimeFieldMLXVLMPort, settings.FieldMLXVLMPort,
+				func(s *settings.Settings) *int { return &s.MLXVLMPort }, settings.DefaultMLXVLMPort),
+			hostFieldDef(runtimeFieldMLXVLMHost, settings.FieldMLXVLMHost,
+				func(s *settings.Settings) *string { return &s.MLXVLMHost }, settings.DefaultMLXVLMHost),
+		},
+	},
+	{
 		backend: models.BackendNInfer, name: "NInfer", format: formatNInfer,
 		fields: []runtimeFieldDef{
 			pathFieldDef(runtimeFieldNInferPath, settings.FieldNInferPath, "Path", "checkout or ninfer-serve",

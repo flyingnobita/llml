@@ -11,11 +11,11 @@
   ││  Safetensors               in use: not found (default)                                     │
   ││     [✓] vLLM      ○                                                                        │
   ││     [✓] mlx-lm    ✗        Port  > 5001                                                    │
-  ││  NInfer (.ninfer)          in use: 5001 (default)                                          │
+  ││     [✓] mlx-vlm   ✗        in use: 5001 (default)                                          │
+  ││  NInfer (.ninfer)                                                                          │
   ││     [✓] NInfer    ○                                                                        │
   ││  Ollama library                                                                            │
   ││     [✓] Ollama    ○                                                                        │
-  ││                                                                                            │
   ╰│                                                                                            │
    │                                                                                            │
    │                                                                                            │
