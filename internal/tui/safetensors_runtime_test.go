@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -253,3 +254,32 @@ func selectRow(t *testing.T, m Model, row models.ModelFile) Model {
 	return m
 }
 
+// Importing a profile that picks vLLM for a model in oMLX's folder switches
+// the row at once: the Runtime column and R follow it without a rescan.
+func TestSafetensorsRuntime_importedProfileChoosesRuntime(t *testing.T) {
+	dir := useTempConfigDir(t)
+	row := omlxRow(dir)
+	file := filepath.Join(dir, "qwen.toml")
+	toml := "schema_version = 3\n\n[[profiles]]\nname = \"on-vllm\"\nbackend = \"vllm\"\nmodel_hint = \"qwen-mlx\"\n"
+	if err := os.WriteFile(file, []byte(toml), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	f := newLaunchFakes()
+	m := dimModel(t, f.services, macPlatform, config.RuntimeStates{}, row)
+	m = press(t, m, keyText("I"), keyTab) // from the file picker to the path input
+	for _, r := range file {
+		m = press(t, m, keyText(string(r)))
+	}
+	m = press(t, m, keyEnter, keyEnter) // parse, then import
+	if m.importView.open {
+		t.Fatalf("the import should have finished:\n%s", plainView(m))
+	}
+	if got := runtimeCell(t, m, "qwen-mlx"); got != "vllm" {
+		t.Fatalf("the imported vLLM profile should switch the row, got %q:\n%s", got, plainView(m))
+	}
+	press(t, m, keyText("R"))
+	if got := lastSpec(t, f); got.backend != models.BackendVLLM {
+		t.Errorf("launched on %v, want vLLM", got.backend)
+	}
+}
