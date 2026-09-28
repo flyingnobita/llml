@@ -205,3 +205,64 @@ func TestPortableProfile_mlxLMBackend(t *testing.T) {
 		t.Errorf("exported backend = %q, want mlx-lm", got)
 	}
 }
+
+// mlx_vlm.server takes the model, a LoRA adapter, a draft model, extra model
+// folders (--model-dir, 0.7.x), and the image, speech, embedding, and reranker
+// models it can also serve (0.7.x) by local path or Hugging Face repo id,
+// and HF_TOKEN reaches the Hub. llml supplies the model, so all of them are
+// stripped; server tuning flags are kept.
+func TestStripModelLocationParams_mlxVLM(t *testing.T) {
+	t.Parallel()
+
+	env := []PortableEnvVar{{Key: "HF_TOKEN", Value: "hf_x"}, {Key: "MLX_METAL_DEBUG", Value: "1"}}
+	args := []string{
+		"--model mlx-community/Qwen2.5-VL-7B-Instruct-4bit",
+		"--adapter-path /home/u/adapters/a",
+		"--draft-model mlx-community/Qwen3-0.6B-4bit",
+		"--model-dir /home/u/models",
+		"--image-model mlx-community/FLUX.1-schnell-4bit",
+		"--tts-model mlx-community/Kokoro-82M-bf16",
+		"--stt-model mlx-community/whisper-large-v3-turbo",
+		"--embedding-model mlx-community/bge-small-en-v1.5",
+		"--reranker-model mlx-community/bge-reranker-base",
+		"--max-tokens 4096",
+		"--kv-bits 4",
+		"--trust-remote-code",
+	}
+	keptEnv, keptArgs, droppedEnv, droppedArgs := StripModelLocationParams("mlx-vlm", env, args)
+
+	if len(keptEnv) != 1 || keptEnv[0].Key != "MLX_METAL_DEBUG" || len(droppedEnv) != 1 {
+		t.Errorf("env: kept %v, dropped %v, want HF_TOKEN dropped", keptEnv, droppedEnv)
+	}
+	if want := args[9:]; !slices.Equal(keptArgs, want) {
+		t.Errorf("kept args = %v, want %v", keptArgs, want)
+	}
+	if len(droppedArgs) != 9 {
+		t.Errorf("dropped args = %v, want every model-location flag", droppedArgs)
+	}
+}
+
+// A portable profile for mlx-vlm keeps its backend through parsing and
+// conversion to a local profile, and is not mistaken for mlx-lm.
+func TestPortableProfile_mlxVLMBackend(t *testing.T) {
+	t.Parallel()
+
+	body := []byte("schema_version = 3\n\n[[profiles]]\nname = \"vision\"\nbackend = \"mlx-vlm\"\nargs = [\"--max-tokens 8192\"]\n")
+	f, err := parsePortable(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := PortableToProfile(f.Profiles[0])
+	if p.Backend != "mlx-vlm" {
+		t.Errorf("backend = %q, want mlx-vlm", p.Backend)
+	}
+	if got := NormalizeBackendInput(" MLX-VLM "); got != "mlx-vlm" {
+		t.Errorf("NormalizeBackendInput = %q, want mlx-vlm", got)
+	}
+	if got := NormalizeBackendInput("mlx_vlm"); got != "" {
+		t.Errorf("NormalizeBackendInput(mlx_vlm) = %q, want no backend", got)
+	}
+	if got := ProfileToPortable(p, "/m/qwen-vl").Backend; got != "mlx-vlm" {
+		t.Errorf("exported backend = %q, want mlx-vlm", got)
+	}
+}

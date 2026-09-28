@@ -156,6 +156,22 @@ var mlxLMRules = locationRules{
 	},
 }
 
+// mlxVLMRules covers mlx-vlm. mlx_vlm.server takes the same model, adapter,
+// and draft model flags as mlx-lm, and from 0.7 also --model-dir, a folder
+// of models it lists and loads on request. It downloads a repo id it does
+// not have, and HF_TOKEN authenticates that download.
+var mlxVLMRules = locationRules{
+	envKeys: map[string]bool{
+		"HF_TOKEN": true,
+	},
+	argTokens: map[string]bool{
+		"--model": true, "--adapter-path": true, "--draft-model": true, "--model-dir": true,
+		// The other models mlx-vlm 0.7.x can serve beside the language model.
+		"--image-model": true, "--tts-model": true, "--stt-model": true,
+		"--embedding-model": true, "--reranker-model": true,
+	},
+}
+
 // rulesByBackend maps a backend name to its rules. llama and koboldcpp share
 // ggufRules by value, so they cannot drift apart.
 var rulesByBackend = map[string]locationRules{
@@ -166,6 +182,7 @@ var rulesByBackend = map[string]locationRules{
 	"omlx":      omlxRules,
 	"splash":    splashRules,
 	"mlx-lm":    mlxLMRules,
+	"mlx-vlm":   mlxVLMRules,
 }
 
 // isAnyBackendLocationEnv reports whether key is a model-location variable for

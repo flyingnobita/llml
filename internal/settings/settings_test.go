@@ -80,6 +80,7 @@ func TestDefaultPortsMatchUpstream(t *testing.T) {
 		{"omlx serve", s.OMLXPort, 8000},
 		{"splash serve", s.SplashPort, 8000},
 		{"mlx_lm.server", s.MLXLMPort, 8080},
+		{"mlx_vlm.server", s.MLXVLMPort, 8080},
 	} {
 		if tc.got != tc.want {
 			t.Errorf("%s default port = %d, want %d", tc.server, tc.got, tc.want)
@@ -167,6 +168,59 @@ func TestResolveMLXLMPrecedence(t *testing.T) {
 		t.Errorf("DefaultMLXLMHost = %q, want mlx_lm.server's 127.0.0.1", DefaultMLXLMHost)
 	}
 	if got := s.Source(FieldMLXLMPort).String(); got != "default" {
+		t.Errorf("an invalid port should fall through to the default, source %q", got)
+	}
+}
+
+// mlx-vlm's path, host, and port each come from the environment, then
+// config.toml, then the built-in defaults. The default host is loopback,
+// although mlx_vlm.server's own is 0.0.0.0: llml always passes --host.
+func TestResolveMLXVLMPrecedence(t *testing.T) {
+	t.Parallel()
+
+	cfg := Layer{
+		Origin:     OriginConfig,
+		MLXVLMPath: ptr("/from/config/bin"),
+		MLXVLMHost: ptr("10.0.0.1"),
+		MLXVLMPort: ptr(8181),
+	}
+	env := FromEnv(fakeEnv(map[string]string{
+		EnvMLXVLMPath: " /venv/bin/mlx_vlm.server ",
+		EnvMLXVLMHost: "0.0.0.0",
+		EnvMLXVLMPort: "9191",
+	}))
+
+	s := Resolve(env, cfg, Defaults())
+	if s.MLXVLMPath != "/venv/bin/mlx_vlm.server" || s.MLXVLMHost != "0.0.0.0" || s.MLXVLMPort != 9191 {
+		t.Errorf("env should win: %q %q %d", s.MLXVLMPath, s.MLXVLMHost, s.MLXVLMPort)
+	}
+	for f, want := range map[Field]string{FieldMLXVLMPath: EnvMLXVLMPath, FieldMLXVLMHost: EnvMLXVLMHost, FieldMLXVLMPort: EnvMLXVLMPort} {
+		if got := s.Source(f).String(); got != want {
+			t.Errorf("Source(%s) = %q, want %q", f.EnvVar(), got, want)
+		}
+	}
+	for want, got := range map[string]string{"MLX_VLM_PATH": EnvMLXVLMPath, "MLX_VLM_HOST": EnvMLXVLMHost, "MLX_VLM_PORT": EnvMLXVLMPort} {
+		if got != want {
+			t.Errorf("environment variable %q, want %q", got, want)
+		}
+	}
+
+	s = Resolve(FromEnv(fakeEnv(nil)), cfg, Defaults())
+	if s.MLXVLMPath != "/from/config/bin" || s.MLXVLMHost != "10.0.0.1" || s.MLXVLMPort != 8181 {
+		t.Errorf("config should win over defaults: %q %q %d", s.MLXVLMPath, s.MLXVLMHost, s.MLXVLMPort)
+	}
+	if got := s.Source(FieldMLXVLMPort).String(); got != "config" {
+		t.Errorf("Source(MLX_VLM_PORT) = %q, want config", got)
+	}
+
+	s = Resolve(FromEnv(fakeEnv(map[string]string{EnvMLXVLMPort: "not-a-port"})), Layer{Origin: OriginConfig}, Defaults())
+	if s.MLXVLMPath != "" || s.MLXVLMHost != DefaultMLXVLMHost || s.MLXVLMPort != DefaultMLXVLMPort {
+		t.Errorf("defaults should apply: %q %q %d", s.MLXVLMPath, s.MLXVLMHost, s.MLXVLMPort)
+	}
+	if DefaultMLXVLMHost != "127.0.0.1" {
+		t.Errorf("DefaultMLXVLMHost = %q, want loopback, not mlx_vlm.server's 0.0.0.0", DefaultMLXVLMHost)
+	}
+	if got := s.Source(FieldMLXVLMPort).String(); got != "default" {
 		t.Errorf("an invalid port should fall through to the default, source %q", got)
 	}
 }

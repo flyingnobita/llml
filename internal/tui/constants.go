@@ -248,6 +248,7 @@ const (
 	MissingOMLXFooterNote        = "omlx not found - install oMLX.app or press " + FooterKeyConfigPort + " to set path manually"
 	MissingSplashFooterNote      = "splash not found - press " + FooterKeyConfigPort + " to set path manually"
 	MissingMLXLMFooterNote       = "mlx_lm.server not found - press " + FooterKeyConfigPort + " to set path manually"
+	MissingMLXVLMFooterNote      = "mlx_vlm.server not found - press " + FooterKeyConfigPort + " to set path manually"
 
 	// launchPreviewModelIDLabel starts the launch preview's line naming the
 	// model id clients must send to a Runtime that loads whatever model a

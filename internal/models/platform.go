@@ -17,8 +17,8 @@ func CurrentPlatform() Platform {
 
 // Supports reports whether backend b can run on p. oMLX and Splash are built
 // on Apple's MLX and Metal and exist only for Apple Silicon macOS; NInfer
-// targets CUDA on Linux. mlx-lm runs wherever MLX ships a backend: see
-// [Platform.runsMLX]. Every other backend is portable.
+// targets CUDA on Linux. mlx-lm and mlx-vlm run wherever MLX ships a
+// backend: see [Platform.runsMLX]. Every other backend is portable.
 //
 // The zero Platform supports everything, so a RuntimeInfo that has not been
 // probed yet hides nothing.
@@ -31,7 +31,7 @@ func (p Platform) Supports(b ModelBackend) bool {
 		return p.GOOS == "darwin" && p.GOARCH == "arm64"
 	case BackendNInfer:
 		return p.GOOS == "linux"
-	case BackendMLXLM:
+	case BackendMLXLM, BackendMLXVLM:
 		return p.runsMLX()
 	default:
 		return true

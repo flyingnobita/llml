@@ -65,6 +65,9 @@ type RuntimeConfig struct {
 	DefaultMLXLMPath        string `toml:"default_mlx_lm_path"`
 	DefaultMLXLMHost        string `toml:"default_mlx_lm_host"`
 	DefaultMLXLMPort        *int   `toml:"default_mlx_lm_port,omitempty"`
+	DefaultMLXVLMPath       string `toml:"default_mlx_vlm_path"`
+	DefaultMLXVLMHost       string `toml:"default_mlx_vlm_host"`
+	DefaultMLXVLMPort       *int   `toml:"default_mlx_vlm_port,omitempty"`
 }
 
 // DiscoveryConfig holds the user's extra search roots. The last scan time is
@@ -175,12 +178,14 @@ func (r RuntimeConfig) Layer() settings.Layer {
 	setLayerPath(&l.OMLXPath, r.DefaultOMLXPath)
 	setLayerPath(&l.SplashPath, r.DefaultSplashPath)
 	setLayerPath(&l.MLXLMPath, r.DefaultMLXLMPath)
+	setLayerPath(&l.MLXVLMPath, r.DefaultMLXVLMPath)
 	setLayerString(&l.LlamaServerHost, r.DefaultLlamaServerHost)
 	setLayerString(&l.VLLMServerHost, r.DefaultVLLMServerHost)
 	setLayerString(&l.NInferServerHost, r.DefaultNInferServerHost)
 	setLayerString(&l.OMLXHost, r.DefaultOMLXHost)
 	setLayerString(&l.SplashHost, r.DefaultSplashHost)
 	setLayerString(&l.MLXLMHost, r.DefaultMLXLMHost)
+	setLayerString(&l.MLXVLMHost, r.DefaultMLXVLMHost)
 	setLayerString(&l.OllamaHost, settings.NormalizeOllamaHost(r.DefaultOllamaHost))
 	setLayerPort(&l.LlamaServerPort, r.DefaultLlamaServerPort)
 	setLayerPort(&l.VLLMServerPort, r.DefaultVLLMServerPort)
@@ -189,6 +194,7 @@ func (r RuntimeConfig) Layer() settings.Layer {
 	setLayerPort(&l.OMLXPort, r.DefaultOMLXPort)
 	setLayerPort(&l.SplashPort, r.DefaultSplashPort)
 	setLayerPort(&l.MLXLMPort, r.DefaultMLXLMPort)
+	setLayerPort(&l.MLXVLMPort, r.DefaultMLXVLMPort)
 	return l
 }
 
@@ -247,6 +253,7 @@ func RuntimeConfigFromSettings(s settings.Settings) RuntimeConfig {
 	omlxPort := s.OMLXPort
 	splashPort := s.SplashPort
 	mlxLMPort := s.MLXLMPort
+	mlxVLMPort := s.MLXVLMPort
 	return RuntimeConfig{
 		DefaultLlamaCppPath:    s.LlamaCppPath,
 		DefaultLlamaServerHost: s.LlamaServerHost,
@@ -274,6 +281,10 @@ func RuntimeConfigFromSettings(s settings.Settings) RuntimeConfig {
 		DefaultMLXLMPath: s.MLXLMPath,
 		DefaultMLXLMHost: s.MLXLMHost,
 		DefaultMLXLMPort: &mlxLMPort,
+
+		DefaultMLXVLMPath: s.MLXVLMPath,
+		DefaultMLXVLMHost: s.MLXVLMHost,
+		DefaultMLXVLMPort: &mlxVLMPort,
 	}
 }
 

@@ -17,4 +17,4 @@ func makeFakeExecutable(t *testing.T, dir, name string) string {
 }
 
 // allBackends lists every Runtime detection knows.
-var allBackends = []ModelBackend{BackendLlama, BackendVLLM, BackendOllama, BackendKobold, BackendNInfer, BackendOMLX, BackendSplash, BackendMLXLM}
+var allBackends = []ModelBackend{BackendLlama, BackendVLLM, BackendOllama, BackendKobold, BackendNInfer, BackendOMLX, BackendSplash, BackendMLXLM, BackendMLXVLM}

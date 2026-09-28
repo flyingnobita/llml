@@ -215,6 +215,14 @@ func TestPlatformSupports(t *testing.T) {
 		{Platform{GOOS: "windows", GOARCH: "amd64"}, BackendMLXLM, false},
 		{Platform{GOOS: "windows", GOARCH: "arm64"}, BackendMLXLM, false},
 		{Platform{GOOS: "linux", GOARCH: "386"}, BackendMLXLM, false},
+		// mlx-vlm runs wherever mlx-lm does.
+		{mac, BackendMLXVLM, true},
+		{linux, BackendMLXVLM, true},
+		{Platform{GOOS: "linux", GOARCH: "arm64"}, BackendMLXVLM, true},
+		{intelMac, BackendMLXVLM, false},
+		{Platform{GOOS: "windows", GOARCH: "amd64"}, BackendMLXVLM, false},
+		{Platform{GOOS: "windows", GOARCH: "arm64"}, BackendMLXVLM, false},
+		{Platform{GOOS: "linux", GOARCH: "386"}, BackendMLXVLM, false},
 	}
 	for _, tt := range tests {
 		if got := tt.p.Supports(tt.b); got != tt.want {

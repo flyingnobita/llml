@@ -396,6 +396,7 @@ func (m Model) SelectedModel() (target string, backend models.ModelBackend) {
 //	GGUF row          + profile=koboldcpp -> koboldcpp, otherwise llama-server
 //	Safetensors row   + profile=vllm      -> vllm
 //	                  + profile=mlx-lm    -> mlx-lm
+//	                  + profile=mlx-vlm   -> mlx-vlm
 //	                  + profile=omlx      -> omlx, only for a row in oMLX's model folders
 //	                  + none or unusable  -> omlx in oMLX's model folders, vllm elsewhere
 //	ollama/ninfer/splash row              -> its own Runtime

@@ -153,7 +153,8 @@ func TestDiscoverRuntime_llamaAndNInferOnOnePort(t *testing.T) {
 }
 
 // vLLM, oMLX, and Splash share port 8000 by default. vLLM counts as running
-// for any server there that does not name oMLX or Splash as the model owner.
+// for any server there that does not name oMLX or Splash as the model owner
+// and is not an MLX server.
 func TestDiscoverRuntime_vLLMOMLXAndSplashOnOnePort(t *testing.T) {
 	t.Parallel()
 
@@ -167,6 +168,9 @@ func TestDiscoverRuntime_vLLMOMLXAndSplashOnOnePort(t *testing.T) {
 		{"vllm serve", fakeVLLMServe, true, false, false},
 		{"omlx serve", fakeOMLXServe, false, wantRunning(BackendOMLX), false},
 		{"splash serve", fakeSplashServe, false, false, wantRunning(BackendSplash)},
+		// An MLX server moved onto vLLM's port is not vLLM.
+		{"mlx_lm.server", fakeMLXLMServer, false, false, false},
+		{"mlx_vlm.server 0.7.3", fakeMLXVLMServer073, false, false, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

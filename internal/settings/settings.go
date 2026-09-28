@@ -76,6 +76,13 @@ const (
 	EnvMLXLMHost = "MLX_LM_HOST"
 	// EnvMLXLMPort is the TCP port for mlx_lm.server and its /health probe.
 	EnvMLXLMPort = "MLX_LM_PORT"
+	// EnvMLXVLMPath is the mlx_vlm.server script, or a directory containing
+	// it such as a venv's bin/.
+	EnvMLXVLMPath = "MLX_VLM_PATH"
+	// EnvMLXVLMHost is the listen host for mlx_vlm.server.
+	EnvMLXVLMHost = "MLX_VLM_HOST"
+	// EnvMLXVLMPort is the TCP port for mlx_vlm.server and its /health probe.
+	EnvMLXVLMPort = "MLX_VLM_PORT"
 	// EnvModelPaths lists extra model search roots, comma-separated.
 	EnvModelPaths = "LLML_MODEL_PATHS"
 	// EnvHFHubCache overrides the Hugging Face hub cache directory.
@@ -107,6 +114,12 @@ const (
 	// defaults. The port is llama-server's too; detection tells them apart.
 	DefaultMLXLMHost = "127.0.0.1"
 	DefaultMLXLMPort = 8080
+	// DefaultMLXVLMHost is loopback, not mlx_vlm.server's own 0.0.0.0: llml
+	// always passes --host, so the server is not exposed unless asked.
+	// DefaultMLXVLMPort matches mlx_vlm.server's own, which it shares with
+	// llama-server and mlx_lm.server; detection tells them apart.
+	DefaultMLXVLMHost = "127.0.0.1"
+	DefaultMLXVLMPort = 8080
 )
 
 // Settings holds every runtime value in fully resolved form. Path fields are
@@ -146,6 +159,10 @@ type Settings struct {
 	MLXLMPath string
 	MLXLMHost string
 	MLXLMPort int
+
+	MLXVLMPath string
+	MLXVLMHost string
+	MLXVLMPort int
 
 	// ExtraModelPaths are additional filesystem roots to scan for models.
 	ExtraModelPaths []string
@@ -200,6 +217,10 @@ type Layer struct {
 	MLXLMHost *string
 	MLXLMPort *int
 
+	MLXVLMPath *string
+	MLXVLMHost *string
+	MLXVLMPort *int
+
 	ExtraModelPaths []string
 	HFHubCache      *string
 	HFHome          *string
@@ -227,6 +248,8 @@ func Defaults() Layer {
 		SplashPort: ptr(DefaultSplashPort),
 		MLXLMHost:  ptr(DefaultMLXLMHost),
 		MLXLMPort:  ptr(DefaultMLXLMPort),
+		MLXVLMHost: ptr(DefaultMLXVLMHost),
+		MLXVLMPort: ptr(DefaultMLXVLMPort),
 	}
 }
 
@@ -269,6 +292,9 @@ func Resolve(layers ...Layer) Settings {
 		take(&s, l.Origin, FieldMLXLMPath, &s.MLXLMPath, l.MLXLMPath)
 		take(&s, l.Origin, FieldMLXLMHost, &s.MLXLMHost, l.MLXLMHost)
 		take(&s, l.Origin, FieldMLXLMPort, &s.MLXLMPort, l.MLXLMPort)
+		take(&s, l.Origin, FieldMLXVLMPath, &s.MLXVLMPath, l.MLXVLMPath)
+		take(&s, l.Origin, FieldMLXVLMHost, &s.MLXVLMHost, l.MLXVLMHost)
+		take(&s, l.Origin, FieldMLXVLMPort, &s.MLXVLMPort, l.MLXVLMPort)
 		claim(&s.HFHubCache, l.HFHubCache)
 		claim(&s.HFHome, l.HFHome)
 		roots.Add(l.ExtraModelPaths...)

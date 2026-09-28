@@ -158,6 +158,52 @@ func TestConfigRoundTrip_mlxLM(t *testing.T) {
 	}
 }
 
+// mlx-vlm's [runtime] keys survive a write and read of config.toml, under the
+// same default_* names as the other Runtimes.
+func TestConfigRoundTrip_mlxVLM(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("HOME", dir)
+	t.Setenv("AppData", dir)
+
+	port := 8282
+	c := Config{
+		SchemaVersion: SchemaVersion,
+		Runtime: RuntimeConfig{
+			DefaultMLXVLMPath: "/opt/vlm/bin",
+			DefaultMLXVLMHost: "127.0.0.3",
+			DefaultMLXVLMPort: &port,
+		},
+	}
+	if err := WriteFile(c); err != nil {
+		t.Fatal(err)
+	}
+	path, err := ConfigPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"default_mlx_vlm_path", "default_mlx_vlm_host", "default_mlx_vlm_port"} {
+		if !strings.Contains(string(raw), key) {
+			t.Errorf("config.toml lacks %s:\n%s", key, raw)
+		}
+	}
+	got, err := ReadFile()
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := settings.Resolve(got.Layer(), settings.Defaults())
+	if s.MLXVLMPath != "/opt/vlm/bin" || s.MLXVLMHost != "127.0.0.3" || s.MLXVLMPort != 8282 {
+		t.Errorf("round trip: %q %q %d", s.MLXVLMPath, s.MLXVLMHost, s.MLXVLMPort)
+	}
+	if s.MLXLMPath != "" || s.MLXLMPort != settings.DefaultMLXLMPort {
+		t.Errorf("mlx-vlm's keys leaked into mlx-lm's: %q %d", s.MLXLMPath, s.MLXLMPort)
+	}
+}
+
 func TestConfigRoundTrip_koboldCpp(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
@@ -328,6 +374,9 @@ func TestRuntimeConfigFromSettings_roundTrips(t *testing.T) {
 		settings.EnvMLXLMPath:        "/Users/u/.venv/bin",
 		settings.EnvMLXLMHost:        "0.0.0.0",
 		settings.EnvMLXLMPort:        "8181",
+		settings.EnvMLXVLMPath:       "/Users/u/.vlm/bin/mlx_vlm.server",
+		settings.EnvMLXVLMHost:       "0.0.0.0",
+		settings.EnvMLXVLMPort:       "8282",
 	})), settings.Defaults())
 
 	rc := RuntimeConfigFromSettings(want)
