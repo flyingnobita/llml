@@ -92,9 +92,6 @@ func (f fakeServer) start(t *testing.T) (string, int) {
 	return host, port
 }
 
-// allBackends lists every Runtime detection knows.
-var allBackends = []ModelBackend{BackendLlama, BackendVLLM, BackendOllama, BackendKobold, BackendNInfer, BackendOMLX, BackendSplash}
-
 // skipAllBut is the skip set that leaves only keep probed, so a test cannot
 // reach a real server on another Runtime's default port.
 func skipAllBut(keep ...ModelBackend) BackendSet {

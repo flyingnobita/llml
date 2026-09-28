@@ -23,7 +23,7 @@ type RuntimeInfo struct {
 	KoboldCppPath      string
 	OllamaRunning      bool
 	ServerRunning      bool
-	ProbePort          int // port used when ServerRunning is true (0 if not probed)
+	ProbePort          int // port the llama-server probe used
 	KoboldCppRunning   bool
 	KoboldCppProbePort int // port used when KoboldCppRunning is true
 	NInferPath         string
@@ -64,7 +64,7 @@ type RuntimeInfo struct {
 	VLLMConfiguredPath string
 }
 
-// Available is true if any backend binary was found, or a llama-server responded on the health probe.
+// Available is true if any Runtime's program was found or its server answered its probe.
 func (r RuntimeInfo) Available() bool {
 	return r.LlamaCLIPath != "" || r.LlamaServerPath != "" || r.VLLMPath != "" || r.OllamaPath != "" || r.KoboldCppPath != "" || r.NInferPath != "" || r.OMLXPath != "" || r.SplashPath != "" || r.OllamaRunning || r.ServerRunning || r.VLLMRunning || r.KoboldCppRunning || r.NInferRunning || r.OMLXRunning || r.SplashRunning
 }
@@ -116,8 +116,14 @@ func (r RuntimeInfo) Summary() string {
 		parts = append(parts, r.llamaSummary())
 	}
 	if !r.Skipped.Has(BackendVLLM) {
-		v := "vllm: —"
-		if r.Status(BackendVLLM).Found() {
+		// vLLM keeps a mark when it is neither found nor running, unlike the
+		// Runtimes below, and shows "running" only when its server answers.
+		st := r.Status(BackendVLLM)
+		v, ok := binaryStatus("vllm", st)
+		switch {
+		case !ok:
+			v = "vllm: —"
+		case !st.Running:
 			v = "vllm: ✓"
 		}
 		parts = append(parts, v)
@@ -217,7 +223,7 @@ func probeRuntimes(ctx context.Context, s settings.Settings, info *RuntimeInfo, 
 	}
 
 	probe(BackendLlama, &info.ServerRunning, func() bool {
-		return probeLlamaServer(ctx, s.LlamaServerHost, s.LlamaServerPort)
+		return probeLlamaServer(ctx, probeHost(s.LlamaServerHost), s.LlamaServerPort)
 	})
 	probe(BackendVLLM, &info.VLLMRunning, func() bool {
 		return probeVLLM(ctx, probeHost(s.VLLMServerHost), s.VLLMServerPort)
