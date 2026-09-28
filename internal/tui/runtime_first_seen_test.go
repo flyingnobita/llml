@@ -92,6 +92,8 @@ func TestFirstSeen_startupDecidesUnseenRuntimes(t *testing.T) {
 		models.BackendKobold: true,
 		models.BackendOllama: true,
 		models.BackendVLLM:   false,
+		models.BackendMLXLM:  false,
+		models.BackendMLXVLM: false,
 		models.BackendNInfer: false,
 	}
 	for b, on := range want {
@@ -107,7 +109,7 @@ func TestFirstSeen_startupDecidesUnseenRuntimes(t *testing.T) {
 	}
 
 	alerts := runtimeAlerts(m)
-	wantAlert := "Runtimes not found are now off: vLLM, NInfer. Turn them on in c."
+	wantAlert := "Runtimes not found are now off: vLLM, mlx-lm, mlx-vlm, NInfer. Turn them on in c."
 	if len(alerts) != 1 || alerts[0] != wantAlert {
 		t.Fatalf("want one alert %q, got %q", wantAlert, alerts)
 	}
@@ -161,7 +163,7 @@ func TestFirstSeen_fullyRecordedFileIsLeftAlone(t *testing.T) {
 	t.Parallel()
 
 	f := newFirstSeenFakes(models.RuntimeInfo{Platform: linuxPlatform})
-	for _, b := range []models.ModelBackend{models.BackendLlama, models.BackendKobold, models.BackendVLLM, models.BackendNInfer, models.BackendOllama} {
+	for _, b := range []models.ModelBackend{models.BackendLlama, models.BackendKobold, models.BackendVLLM, models.BackendMLXLM, models.BackendMLXVLM, models.BackendNInfer, models.BackendOllama} {
 		f.stored = f.stored.With(b, true)
 	}
 	m := NewWithServices(f.services)
@@ -183,6 +185,8 @@ func TestFirstSeen_noAlertWhenNothingTurnedOff(t *testing.T) {
 	rt := linuxDetection()
 	rt.VLLMPath = "/opt/vllm/bin/vllm"
 	rt.NInferRunning = true
+	rt.MLXLMPath = "/opt/venv/bin/mlx_lm.server"
+	rt.MLXVLMRunning = true
 	f := newFirstSeenFakes(rt)
 	m := NewWithServices(f.services)
 	m = deliver(t, m, f.services.reloadRuntimeCmd())
@@ -190,7 +194,7 @@ func TestFirstSeen_noAlertWhenNothingTurnedOff(t *testing.T) {
 	if len(f.writes) != 1 {
 		t.Fatalf("want the state file written once, got %d writes", len(f.writes))
 	}
-	for _, b := range []models.ModelBackend{models.BackendLlama, models.BackendKobold, models.BackendVLLM, models.BackendNInfer, models.BackendOllama} {
+	for _, b := range []models.ModelBackend{models.BackendLlama, models.BackendKobold, models.BackendVLLM, models.BackendMLXLM, models.BackendMLXVLM, models.BackendNInfer, models.BackendOllama} {
 		if on, seen := f.stored.Lookup(b); !seen || !on {
 			t.Errorf("%v: stored (on=%t, seen=%t), want on", b, on, seen)
 		}
@@ -206,7 +210,7 @@ func TestFirstSeen_onlyMissingEntriesAreAdded(t *testing.T) {
 	t.Parallel()
 
 	f := newFirstSeenFakes(linuxDetection())
-	f.stored = config.RuntimeStates{}.With(models.BackendLlama, false).With(models.BackendVLLM, true)
+	f.stored = config.RuntimeStates{}.With(models.BackendLlama, false).With(models.BackendVLLM, true).With(models.BackendMLXLM, true).With(models.BackendMLXVLM, true)
 	m := NewWithServices(f.services)
 	m = deliver(t, m, f.services.reloadRuntimeCmd())
 
@@ -259,7 +263,7 @@ func TestFirstSeen_failedWriteIsReported(t *testing.T) {
 		t.Error("the decisions should apply to this session even when the write fails")
 	}
 	alerts := strings.Join(runtimeAlerts(m), "\n")
-	if !strings.Contains(alerts, "disk full") || !strings.Contains(alerts, "now off: vLLM, NInfer") {
+	if !strings.Contains(alerts, "disk full") || !strings.Contains(alerts, "now off: vLLM, mlx-lm, mlx-vlm, NInfer") {
 		t.Errorf("want the write failure and the upgrade alert, got %q", alerts)
 	}
 }

@@ -17,23 +17,30 @@ type RuntimeInfo struct {
 	LlamaServerHost    string
 	VLLMPath           string
 	VLLMServerHost     string
+	VLLMRunning        bool // a server other than oMLX or Splash answered on VLLMServerPort
 	OllamaPath         string
 	OllamaHost         string
 	KoboldCppPath      string
 	OllamaRunning      bool
 	ServerRunning      bool
-	ProbePort          int // port used when ServerRunning is true (0 if not probed)
+	ProbePort          int // port the llama-server probe used
 	KoboldCppRunning   bool
 	KoboldCppProbePort int // port used when KoboldCppRunning is true
 	NInferPath         string
 	NInferServerHost   string
-	NInferRunning      bool // ninfer-serve answered /health on NInferServerPort
+	NInferRunning      bool // a server listing models owned by ninfer answered on NInferPort
 	OMLXPath           string
 	OMLXHost           string
 	OMLXRunning        bool // an oMLX server is listing models on OMLXPort
 	SplashPath         string
 	SplashHost         string
 	SplashRunning      bool // a Splash server is listing models on SplashPort
+	MLXLMPath          string
+	MLXLMHost          string
+	MLXLMRunning       bool // an mlx_lm.server answered /health on MLXLMPort
+	MLXVLMPath         string
+	MLXVLMHost         string
+	MLXVLMRunning      bool // an mlx_vlm.server answered /health on MLXVLMPort
 
 	// OMLXModelDirs are the directories oMLX serves models from; launch
 	// passes the one holding the selected model as --model-dir.
@@ -56,6 +63,8 @@ type RuntimeInfo struct {
 	NInferPort      int
 	OMLXPort        int
 	SplashPort      int
+	MLXLMPort       int
+	MLXVLMPort      int
 
 	// VLLMVenv and VLLMConfiguredPath are the configured (not detected) vLLM
 	// locations, carried so venv activation can be resolved from a RuntimeInfo alone.
@@ -63,9 +72,9 @@ type RuntimeInfo struct {
 	VLLMConfiguredPath string
 }
 
-// Available is true if any backend binary was found, or a llama-server responded on the health probe.
+// Available is true if any Runtime's program was found or its server answered its probe.
 func (r RuntimeInfo) Available() bool {
-	return r.LlamaCLIPath != "" || r.LlamaServerPath != "" || r.VLLMPath != "" || r.OllamaPath != "" || r.KoboldCppPath != "" || r.NInferPath != "" || r.OMLXPath != "" || r.SplashPath != "" || r.OllamaRunning || r.ServerRunning || r.KoboldCppRunning || r.NInferRunning || r.OMLXRunning || r.SplashRunning
+	return r.LlamaCLIPath != "" || r.LlamaServerPath != "" || r.VLLMPath != "" || r.OllamaPath != "" || r.KoboldCppPath != "" || r.NInferPath != "" || r.OMLXPath != "" || r.SplashPath != "" || r.MLXLMPath != "" || r.MLXVLMPath != "" || r.OllamaRunning || r.ServerRunning || r.VLLMRunning || r.KoboldCppRunning || r.NInferRunning || r.OMLXRunning || r.SplashRunning || r.MLXLMRunning || r.MLXVLMRunning
 }
 
 // binaryStatus renders "name: ✓ running" / "name: ✓ stopped" / "name: running"
@@ -115,8 +124,14 @@ func (r RuntimeInfo) Summary() string {
 		parts = append(parts, r.llamaSummary())
 	}
 	if !r.Skipped.Has(BackendVLLM) {
-		v := "vllm: —"
-		if r.Status(BackendVLLM).Found() {
+		// vLLM keeps a mark when it is neither found nor running, unlike the
+		// Runtimes below, and shows "running" only when its server answers.
+		st := r.Status(BackendVLLM)
+		v, ok := binaryStatus("vllm", st)
+		switch {
+		case !ok:
+			v = "vllm: —"
+		case !st.Running:
 			v = "vllm: ✓"
 		}
 		parts = append(parts, v)
@@ -128,6 +143,8 @@ func (r RuntimeInfo) Summary() string {
 		{BackendKobold, "koboldcpp"},
 		{BackendNInfer, "ninfer"},
 		{BackendOMLX, "omlx"},
+		{BackendMLXLM, "mlx-lm"},
+		{BackendMLXVLM, "mlx-vlm"},
 		{BackendSplash, "splash"},
 		{BackendOllama, "ollama"},
 	} {
@@ -174,6 +191,10 @@ func locateRuntimes(s settings.Settings) RuntimeInfo {
 		OMLXModelDirs:    s.OMLXModelRoots(fsutil.HomeDir()),
 		SplashPath:       findSplashBinary(s.SplashPath),
 		SplashHost:       s.SplashHost,
+		MLXLMPath:        findMLXLMScript(s.MLXLMPath),
+		MLXLMHost:        s.MLXLMHost,
+		MLXVLMPath:       findMLXVLMScript(s.MLXVLMPath),
+		MLXVLMHost:       s.MLXVLMHost,
 		Platform:         CurrentPlatform(),
 		ProbePort:        s.LlamaServerPort,
 		LlamaServerPort:  s.LlamaServerPort,
@@ -182,6 +203,8 @@ func locateRuntimes(s settings.Settings) RuntimeInfo {
 		NInferPort:       s.NInferServerPort,
 		OMLXPort:         s.OMLXPort,
 		SplashPort:       s.SplashPort,
+		MLXLMPort:        s.MLXLMPort,
+		MLXVLMPort:       s.MLXVLMPort,
 
 		VLLMVenv:           s.VLLMVenv,
 		VLLMConfiguredPath: s.VLLMPath,
@@ -190,7 +213,12 @@ func locateRuntimes(s settings.Settings) RuntimeInfo {
 
 // probeRuntimes asks each Runtime's server whether it is up and records the
 // answers on info. A Runtime in skip, or one info.Platform cannot run, gets no
-// request. vLLM has no probe.
+// request.
+//
+// Several Runtimes share a default port (llama.cpp, NInfer, mlx-lm, and
+// mlx-vlm on 8080; vLLM, oMLX, and Splash on 8000), so each probe checks who
+// answers, not only that something does: see [probeLlamaServer], [probeVLLM],
+// [probeModelsOwner], [probeMLXLM], and [probeMLXVLM].
 //
 // The probes run concurrently, so an unreachable host costs one timeout rather
 // than one per Runtime in sequence, and all of them observe ctx: a cancelled or
@@ -211,23 +239,29 @@ func probeRuntimes(ctx context.Context, s settings.Settings, info *RuntimeInfo, 
 		}()
 	}
 
-	// Probing llama-server is only informative when neither binary was found.
-	if info.LlamaCLIPath == "" && info.LlamaServerPath == "" {
-		probe(BackendLlama, &info.ServerRunning, func() bool {
-			return probeHealthEndpoint(ctx, s.LlamaServerHost, s.LlamaServerPort)
-		})
-	}
+	probe(BackendLlama, &info.ServerRunning, func() bool {
+		return probeLlamaServer(ctx, probeHost(s.LlamaServerHost), s.LlamaServerPort)
+	})
+	probe(BackendVLLM, &info.VLLMRunning, func() bool {
+		return probeVLLM(ctx, probeHost(s.VLLMServerHost), s.VLLMServerPort)
+	})
 	probe(BackendOllama, &info.OllamaRunning, func() bool { return NewOllamaClient(s.OllamaHost).Probe(ctx) })
 	var koboldRunning bool
 	probe(BackendKobold, &koboldRunning, func() bool { return probeHealthEndpoint(ctx, defaultProbeHost, s.KoboldCppPort) })
 	probe(BackendNInfer, &info.NInferRunning, func() bool {
-		return probeHealthEndpoint(ctx, probeHost(s.NInferServerHost), s.NInferServerPort)
+		return probeModelsOwner(ctx, probeHost(s.NInferServerHost), s.NInferServerPort, ownerNInfer)
 	})
 	probe(BackendOMLX, &info.OMLXRunning, func() bool {
-		return probeModelsOwner(ctx, probeHost(s.OMLXHost), s.OMLXPort, "omlx")
+		return probeModelsOwner(ctx, probeHost(s.OMLXHost), s.OMLXPort, ownerOMLX)
 	})
 	probe(BackendSplash, &info.SplashRunning, func() bool {
-		return probeModelsOwner(ctx, probeHost(s.SplashHost), s.SplashPort, "splash")
+		return probeModelsOwner(ctx, probeHost(s.SplashHost), s.SplashPort, ownerSplash)
+	})
+	probe(BackendMLXLM, &info.MLXLMRunning, func() bool {
+		return probeMLXLM(ctx, probeHost(s.MLXLMHost), s.MLXLMPort)
+	})
+	probe(BackendMLXVLM, &info.MLXVLMRunning, func() bool {
+		return probeMLXVLM(ctx, probeHost(s.MLXVLMHost), s.MLXVLMPort)
 	})
 	wg.Wait()
 

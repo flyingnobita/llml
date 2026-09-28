@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -273,36 +275,123 @@ func findSplashBinary(splashPath string) string {
 	return findBinaryInEnvAndCommonDirs(name, "", commonBinaryDirs)
 }
 
-// probeHealthEndpoint GETs /health on host:port, bounded by ctx. Used by
-// llama-server, KoboldCpp, and ninfer-serve. It shares the package HTTP client
-// so repeated probes reuse connections.
-func probeHealthEndpoint(ctx context.Context, host string, port int) bool {
-	url := fmt.Sprintf("http://%s:%d/health", host, port)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return false
-	}
-	resp, err := sharedHTTPClient.Do(req)
-	if err != nil {
-		return false
-	}
-	defer func() { _ = resp.Body.Close() }()
-	// Drain so the connection returns to the pool.
-	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4<<10))
-	return resp.StatusCode == http.StatusOK
+// mlxLMServerName is mlx-lm's console script. `python -m mlx_lm.server` is
+// deprecated upstream, and the script's shebang names its own interpreter, so
+// it runs from a venv without activating it.
+const mlxLMServerName = "mlx_lm.server"
+
+// findMLXLMScript resolves mlx_lm.server; see [findConsoleScript].
+func findMLXLMScript(configured string) string {
+	return findConsoleScript(mlxLMServerName, configured)
 }
 
-// probeModelsOwner reports whether the OpenAI-compatible server on host:port
-// lists a model owned by owner. oMLX and Splash both answer /health and both
-// default to port 8000, so a health check alone cannot tell which one is up;
-// each reports itself as the owner in /v1/models.
-func probeModelsOwner(ctx context.Context, host string, port int, owner string) bool {
-	url := fmt.Sprintf("http://%s:%d/v1/models", host, port)
+// mlxVLMServerName is mlx-vlm's console script, run directly like
+// [mlxLMServerName].
+const mlxVLMServerName = "mlx_vlm.server"
+
+// findMLXVLMScript resolves mlx_vlm.server; see [findConsoleScript].
+func findMLXVLMScript(configured string) string {
+	return findConsoleScript(mlxVLMServerName, configured)
+}
+
+// findConsoleScript resolves the Python console script name from configured
+// (the script itself, or a directory containing it such as a venv's bin/),
+// then PATH. It does not search common install directories or look for
+// venvs: a script installed with pip, uv, or mise is on PATH, and one in a
+// venv is found through the configured path.
+func findConsoleScript(name, configured string) string {
+	if configured != "" {
+		clean := filepath.Clean(configured)
+		if filepath.Base(clean) == name && isExecutableFile(clean) {
+			return clean
+		}
+		if p := filepath.Join(clean, name); isExecutableFile(p) {
+			return p
+		}
+	}
+	if p, err := exec.LookPath(name); err == nil {
+		return p
+	}
+	return ""
+}
+
+// probeHealthEndpoint reports whether the server on host:port answers GET
+// /health with 200, bounded by ctx. KoboldCpp is detected by this alone.
+func probeHealthEndpoint(ctx context.Context, host string, port int) bool {
+	return getHealth(ctx, host, port).ok
+}
+
+// healthAnswer is what a server said to GET /health.
+type healthAnswer struct {
+	// ok is true when it answered 200.
+	ok bool
+	// server is the Server response header.
+	server string
+	// status is the "status" field of a JSON body, or "" without one.
+	status string
+}
+
+// fromMLXLM reports whether the answer came from mlx_lm.server: status "ok",
+// as llama-server also sends, from Python's stdlib HTTP server, which names
+// itself "BaseHTTP/<version> Python/<version>".
+func (h healthAnswer) fromMLXLM() bool {
+	return h.ok && h.status == "ok" && strings.HasPrefix(h.server, "BaseHTTP/")
+}
+
+// fromMLXVLM reports whether the answer came from mlx_vlm.server, which
+// answers /health with status "healthy" where llama-server, ninfer-serve, and
+// mlx_lm.server, the other servers on its default port, say "ok". Its Server
+// header changed from "uvicorn" to "mlx_vlm/<version>" in 0.5.0, so the header
+// is not checked.
+func (h healthAnswer) fromMLXVLM() bool {
+	return h.ok && h.status == "healthy"
+}
+
+// getHealth GETs /health on host:port, bounded by ctx. It shares the package
+// HTTP client so repeated probes reuse connections.
+func getHealth(ctx context.Context, host string, port int) healthAnswer {
+	resp, err := probeGet(ctx, host, port, "/health")
+	if err != nil {
+		return healthAnswer{}
+	}
+	defer func() { _ = resp.Body.Close() }()
+	h := healthAnswer{ok: resp.StatusCode == http.StatusOK, server: resp.Header.Get("Server")}
+	body := io.LimitReader(resp.Body, 4<<10)
+	var parsed struct {
+		Status string `json:"status"`
+	}
+	if json.NewDecoder(body).Decode(&parsed) == nil {
+		h.status = parsed.Status
+	}
+	// Drain so the connection returns to the pool.
+	_, _ = io.Copy(io.Discard, body)
+	return h
+}
+
+// probeGet sends a detection GET for path to host:port.
+func probeGet(ctx context.Context, host string, port int, path string) (*http.Response, error) {
+	url := fmt.Sprintf("http://%s%s", net.JoinHostPort(host, strconv.Itoa(port)), path)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return false
+		return nil, err
 	}
-	resp, err := sharedHTTPClient.Do(req)
+	return sharedHTTPClient.Do(req)
+}
+
+// Model owners that name a Runtime in /v1/models.
+const (
+	ownerNInfer = "ninfer"
+	ownerOMLX   = "omlx"
+	ownerSplash = "splash"
+)
+
+// probeModelsOwner reports whether the OpenAI-compatible server on host:port
+// lists a model owned by any of owners. Servers that share a port and answer
+// /health alike (oMLX and Splash on 8000, ninfer-serve and llama-server on
+// 8080) each report themselves as the owner in /v1/models. A server that does
+// not answer 200 with a model list owns nothing.
+func probeModelsOwner(ctx context.Context, host string, port int, owners ...string) bool {
+	resp, err := probeGet(ctx, host, port, "/v1/models")
 	if err != nil {
 		return false
 	}
@@ -320,11 +409,53 @@ func probeModelsOwner(ctx context.Context, host string, port int, owner string) 
 		return false
 	}
 	for _, m := range list.Data {
-		if m.OwnedBy == owner {
+		if slices.Contains(owners, m.OwnedBy) {
 			return true
 		}
 	}
 	return false
+}
+
+// probeLlamaServer reports whether llama-server answers on host:port.
+// llama-server, ninfer-serve, mlx_lm.server, and mlx_vlm.server all default
+// to port 8080 and all answer /health with 200, so a 200 there is
+// llama-server unless the answer is mlx-lm's or mlx-vlm's, or the model list
+// names NInfer as the owner.
+// Current llama-server builds send "Server: llama.cpp", which settles it
+// without the second request; older builds may not, so the header is not
+// required.
+func probeLlamaServer(ctx context.Context, host string, port int) bool {
+	h := getHealth(ctx, host, port)
+	if !h.ok || h.fromMLXLM() || h.fromMLXVLM() {
+		return false
+	}
+	return strings.HasPrefix(h.server, "llama.cpp") || !probeModelsOwner(ctx, host, port, ownerNInfer)
+}
+
+// probeMLXLM reports whether mlx_lm.server answers on host:port. Its model
+// list names no owner and is often empty, so the /health answer alone tells
+// it apart from llama-server and ninfer-serve on their shared port.
+func probeMLXLM(ctx context.Context, host string, port int) bool {
+	return getHealth(ctx, host, port).fromMLXLM()
+}
+
+// probeMLXVLM reports whether mlx_vlm.server answers on host:port. Its model
+// list names no owner, so the /health status tells it apart from the other
+// servers on port 8080.
+func probeMLXVLM(ctx context.Context, host string, port int) bool {
+	return getHealth(ctx, host, port).fromMLXVLM()
+}
+
+// probeVLLM reports whether vLLM answers on host:port. vLLM shares port 8000
+// with oMLX and Splash, which both answer /health too, so a 200 counts as vLLM
+// unless the model list names one of them as the owner. An MLX server moved
+// onto the port is not vLLM either.
+func probeVLLM(ctx context.Context, host string, port int) bool {
+	h := getHealth(ctx, host, port)
+	if !h.ok || h.fromMLXLM() || h.fromMLXVLM() {
+		return false
+	}
+	return !probeModelsOwner(ctx, host, port, ownerOMLX, ownerSplash)
 }
 
 // defaultProbeHost is the loopback address used for health probes that have no
@@ -382,6 +513,16 @@ func ResolveOMLXPath(r RuntimeInfo) string {
 // ResolveSplashPath returns the detected splash path, or the first match on PATH.
 func ResolveSplashPath(r RuntimeInfo) string {
 	return resolvePath(r.SplashPath, "splash")
+}
+
+// ResolveMLXLMPath returns the detected mlx_lm.server path, or the first match on PATH.
+func ResolveMLXLMPath(r RuntimeInfo) string {
+	return resolvePath(r.MLXLMPath, mlxLMServerName)
+}
+
+// ResolveMLXVLMPath returns the detected mlx_vlm.server path, or the first match on PATH.
+func ResolveMLXVLMPath(r RuntimeInfo) string {
+	return resolvePath(r.MLXVLMPath, mlxVLMServerName)
 }
 
 // ResolveKoboldCppPath returns the detected koboldcpp binary path, or the first match on PATH.

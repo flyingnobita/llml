@@ -392,14 +392,25 @@ func (m Model) renderBackendRow(p profiles.Profile, focused bool, maxSec int) []
 	for i, o := range opts {
 		labels[i] = radioOptionLabel(o)
 		// A Disabled Runtime stays selectable, so a profile set up for it
-		// keeps its choice; the label says it is off. No override means
-		// llama.cpp.
-		if b, err := models.ParseBackend(o); err == nil && !m.runtimeEnabled(b) {
+		// keeps its choice; the label says it is off. No override means the
+		// Runtime discovery gave the row.
+		if b, ok := m.backendOptionRuntime(o); ok && !m.runtimeEnabled(b) {
 			labels[i] += runtimeOffSuffix
 		}
 	}
 	return m.renderRadioRow("Backend", labels, slices.Index(opts, p.Backend),
 		m.params.backendCursor, focused, maxSec)
+}
+
+// backendOptionRuntime returns the Runtime Backend option o launches the
+// panel's row on: "" is the Runtime discovery gave the row.
+func (m Model) backendOptionRuntime(o string) (models.ModelBackend, bool) {
+	if o == "" {
+		f, ok := m.paramsRow()
+		return f.Backend, ok
+	}
+	b, err := models.ParseBackend(o)
+	return b, err == nil
 }
 
 func (m Model) renderHardwareClassRow(p profiles.Profile, focused bool, maxSec int) []string {

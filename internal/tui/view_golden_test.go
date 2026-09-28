@@ -95,7 +95,7 @@ func goldenModel(t *testing.T) Model {
 		KoboldCppPort:    5001,
 		NInferPath:       "/opt/ninfer/build/apps/ninfer-serve",
 		NInferServerHost: "127.0.0.1",
-		NInferPort:       18080,
+		NInferPort:       8080,
 		Platform:         models.Platform{GOOS: "linux", GOARCH: "amd64"},
 	}
 	m.table.files = []models.ModelFile{
@@ -171,7 +171,7 @@ func TestGolden_runtimeConfigPanel(t *testing.T) {
 }
 
 // On Apple Silicon the list gains oMLX and the Splash bundle group and loses
-// NInfer; oMLX is highlighted so its fields are pinned too.
+// NInfer, and keeps mlx-lm and mlx-vlm; oMLX is highlighted so its fields are pinned too.
 func TestGolden_runtimeConfigPanelMacOS(t *testing.T) {
 	m := goldenModel(t)
 	m.settings = goldenPanelSettings()
@@ -179,11 +179,56 @@ func TestGolden_runtimeConfigPanelMacOS(t *testing.T) {
 	m.runtime.OMLXPath = "/Users/u/.omlx/bin/omlx"
 	m.runtime.OMLXRunning = true
 	m.runtime.SplashPath = "/opt/homebrew/bin/splash"
+	m.runtime.MLXLMPath = "/Users/u/.venv/bin/mlx_lm.server"
+	m.runtime.MLXVLMPath = "/Users/u/.venv/bin/mlx_vlm.server"
 	m, _ = m.openRuntimeConfig()
 	for range 3 {
 		m, _ = m.updateRuntimeConfigKey(tea.KeyPressMsg{Code: tea.KeyDown})
 	}
 	assertGolden(t, "runtime_config_panel_macos", m.View().Content)
+}
+
+// NInfer is highlighted so its fields are pinned: its default port is 8080,
+// ninfer-serve's own, shared with llama.cpp.
+func TestGolden_runtimeConfigPanelNInfer(t *testing.T) {
+	m := goldenModel(t)
+	m.settings = goldenPanelSettings()
+	m, _ = m.openRuntimeConfig()
+	for range 5 {
+		m, _ = m.updateRuntimeConfigKey(tea.KeyPressMsg{Code: tea.KeyDown})
+	}
+	assertGolden(t, "runtime_config_panel_ninfer", m.View().Content)
+}
+
+// mlx-lm is listed under Safetensors on Linux too. It is highlighted so its
+// fields are pinned: the script or its folder, and mlx_lm.server's own
+// default port 8080, shared with llama.cpp and NInfer.
+func TestGolden_runtimeConfigPanelMLXLM(t *testing.T) {
+	m := goldenModel(t)
+	m.settings = goldenPanelSettings()
+	m.runtime.MLXLMPath = "/home/u/.venv/bin/mlx_lm.server"
+	m.runtime.MLXLMRunning = true
+	m, _ = m.openRuntimeConfig()
+	for range 3 {
+		m, _ = m.updateRuntimeConfigKey(tea.KeyPressMsg{Code: tea.KeyDown})
+	}
+	assertGolden(t, "runtime_config_panel_mlx_lm", m.View().Content)
+}
+
+// mlx-vlm is listed under Safetensors after mlx-lm. It is highlighted so its
+// fields are pinned: the script or its folder, the loopback host llml always
+// passes (mlx_vlm.server's own default is 0.0.0.0), and port 8080, shared
+// with llama.cpp, NInfer, and mlx-lm.
+func TestGolden_runtimeConfigPanelMLXVLM(t *testing.T) {
+	m := goldenModel(t)
+	m.settings = goldenPanelSettings()
+	m.runtime.MLXVLMPath = "/home/u/.venv/bin/mlx_vlm.server"
+	m.runtime.MLXVLMRunning = true
+	m, _ = m.openRuntimeConfig()
+	for range 4 {
+		m, _ = m.updateRuntimeConfigKey(tea.KeyPressMsg{Code: tea.KeyDown})
+	}
+	assertGolden(t, "runtime_config_panel_mlx_vlm", m.View().Content)
 }
 
 // A Disabled Runtime shows an empty checkbox and "off" in the list, and its

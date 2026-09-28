@@ -19,6 +19,8 @@ func TestRuntimeTableGroupOrder(t *testing.T) {
 		{"GGUF", "KoboldCpp"},
 		{"Safetensors", "vLLM"},
 		{"Safetensors", "oMLX"},
+		{"Safetensors", "mlx-lm"},
+		{"Safetensors", "mlx-vlm"},
 		{"NInfer (.ninfer)", "NInfer"},
 		{"Splash bundle", "Splash"},
 		{"Ollama library", "Ollama"},
@@ -42,6 +44,8 @@ func TestRuntimeTableFields(t *testing.T) {
 		models.BackendKobold: {"KOBOLDCPP_PATH", "KOBOLDCPP_PORT"},
 		models.BackendVLLM:   {"VLLM_PATH", "VLLM_VENV", "VLLM_SERVER_PORT", "VLLM_SERVER_HOST"},
 		models.BackendOMLX:   {"OMLX_PATH", "OMLX_PORT", "OMLX_HOST"},
+		models.BackendMLXLM:  {"MLX_LM_PATH", "MLX_LM_PORT", "MLX_LM_HOST"},
+		models.BackendMLXVLM: {"MLX_VLM_PATH", "MLX_VLM_PORT", "MLX_VLM_HOST"},
 		models.BackendNInfer: {"NINFER_PATH", "NINFER_SERVER_PORT", "NINFER_SERVER_HOST"},
 		models.BackendSplash: {"SPLASH_PATH", "SPLASH_PORT", "SPLASH_HOST"},
 		models.BackendOllama: {"OLLAMA_PATH", "OLLAMA_HOST"},
@@ -79,6 +83,8 @@ func TestRuntimeTableStatus(t *testing.T) {
 		OMLXRunning:      true,
 		NInferRunning:    true,
 		OllamaRunning:    true,
+		MLXLMPath:        "/opt/venv/bin/mlx_lm.server",
+		MLXVLMRunning:    true,
 	}
 	want := map[models.ModelBackend]runtimeStatus{
 		models.BackendLlama:  {found: true},
@@ -87,6 +93,8 @@ func TestRuntimeTableStatus(t *testing.T) {
 		models.BackendOMLX:   {found: true, running: true},
 		models.BackendNInfer: {running: true},
 		models.BackendSplash: {},
+		models.BackendMLXLM:  {found: true},
+		models.BackendMLXVLM: {running: true},
 		models.BackendOllama: {running: true},
 	}
 	for _, rt := range runtimeTable {

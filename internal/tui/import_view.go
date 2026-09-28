@@ -266,6 +266,15 @@ func (m Model) doImportAttempt() (tea.Model, tea.Cmd) {
 		}
 	}
 
+	// An imported profile can become the Active Profile and choose the row's
+	// Runtime, so reload those rows and redraw the table.
+	for _, key := range importedModels {
+		m = m.loadEffectiveBackendForIdentity(key)
+	}
+	if len(importedModels) > 0 {
+		m = m.layoutTable()
+	}
+
 	summary := fmt.Sprintf("Imported %d profiles across %d models", totalAdded+totalReplaced, len(importedModels))
 	if totalSkipped > 0 {
 		summary += fmt.Sprintf(" (%d skipped)", totalSkipped)

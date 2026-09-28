@@ -5,15 +5,15 @@
   ││                                                                                            │
   ││  Runtime Environment                                                                       │
   ││                                                                                            │
-  ││  GGUF                    Llama.cpp · found                                                 │
-  ││   › [✓] Llama.cpp ○                                                                        │
-  ││     [✓] KoboldCpp ✗        Path  > /opt/llama/bin                                          │
-  ││  Safetensors               in use: /opt/llama/bin/llama-server (config)                    │
+  ││  GGUF                    NInfer · found                                                    │
+  ││     [✓] Llama.cpp ○                                                                        │
+  ││     [✓] KoboldCpp ✗        Path  > checkout or ninfer-serve                                │
+  ││  Safetensors               in use: /opt/ninfer/build/apps/ninfer-serve (detected)          │
   ││     [✓] vLLM      ○                                                                        │
   ││     [✓] mlx-lm    ✗        Port  > 8080                                                    │
-  ││     [✓] mlx-vlm   ✗        in use: 8081 (LLAMA_SERVER_PORT)                                │
+  ││     [✓] mlx-vlm   ✗        in use: 8080 (default)                                          │
   ││  NInfer (.ninfer)                                                                          │
-  ││     [✓] NInfer    ○        Host  > 127.0.0.1                                               │
+  ││   › [✓] NInfer    ○        Host  > 127.0.0.1                                               │
   ││  Ollama library            in use: 127.0.0.1 (default)                                     │
   ││     [✓] Ollama    ○                                                                        │
   ╰│                                                                                            │

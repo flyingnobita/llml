@@ -147,7 +147,7 @@ func TestRuntimePanel_enterPersistsToggles(t *testing.T) {
 
 	f := newStateFakes()
 	m := openPanel(t, f.services, linuxPlatform, defaultSettings(), 100, 30)
-	m = press(t, m, keyDown, keySpace, keyDown, keyDown, keyDown, keySpace) // KoboldCpp and Ollama off
+	m = press(t, m, keyDown, keySpace, keyDown, keyDown, keyDown, keyDown, keyDown, keySpace) // KoboldCpp and Ollama off
 	m = press(t, m, keyEnter)
 
 	if m.rc.open {

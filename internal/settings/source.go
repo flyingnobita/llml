@@ -27,6 +27,12 @@ const (
 	FieldSplashPath
 	FieldSplashHost
 	FieldSplashPort
+	FieldMLXLMPath
+	FieldMLXLMHost
+	FieldMLXLMPort
+	FieldMLXVLMPath
+	FieldMLXVLMHost
+	FieldMLXVLMPort
 
 	fieldCount
 )
@@ -52,6 +58,12 @@ var fieldEnvVars = [fieldCount]string{
 	FieldSplashPath:       EnvSplashPath,
 	FieldSplashHost:       EnvSplashHost,
 	FieldSplashPort:       EnvSplashPort,
+	FieldMLXLMPath:        EnvMLXLMPath,
+	FieldMLXLMHost:        EnvMLXLMHost,
+	FieldMLXLMPort:        EnvMLXLMPort,
+	FieldMLXVLMPath:       EnvMLXVLMPath,
+	FieldMLXVLMHost:       EnvMLXVLMHost,
+	FieldMLXVLMPort:       EnvMLXVLMPort,
 }
 
 // EnvVar returns the environment variable that sets f.

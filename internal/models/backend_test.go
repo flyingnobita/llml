@@ -14,6 +14,8 @@ func TestBackendString(t *testing.T) {
 		{BackendNInfer, "ninfer"},
 		{BackendOMLX, "omlx"},
 		{BackendSplash, "splash"},
+		{BackendMLXLM, "mlx-lm"},
+		{BackendMLXVLM, "mlx-vlm"},
 		{ModelBackend(99), "llama"}, // unknown → llama
 	}
 	for _, tt := range tests {
@@ -42,6 +44,12 @@ func TestParseBackend(t *testing.T) {
 		{"NInfer", BackendNInfer, false},
 		{"omlx", BackendOMLX, false},
 		{"Splash", BackendSplash, false},
+		{"mlx-lm", BackendMLXLM, false},
+		{" MLX-LM ", BackendMLXLM, false},
+		{"mlx_lm", 0, true},
+		{"mlx-vlm", BackendMLXVLM, false},
+		{" MLX-VLM ", BackendMLXVLM, false},
+		{"mlx_vlm", 0, true},
 		{"unknown", 0, true},
 		{" llama ", BackendLlama, false},
 	}

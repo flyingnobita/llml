@@ -64,5 +64,6 @@ _Avoid_: hidden runtime, unsupported runtime, inactive runtime.
 
 **Detected Runtime**:
 A Runtime whose program llml can find, or whose server answers on its configured
-address. A Runtime seen for the first time starts on only if it is detected.
+address as that Runtime (another Runtime's server on a shared port does not
+count). A Runtime seen for the first time starts on only if it is detected.
 _Avoid_: installed runtime, available runtime.

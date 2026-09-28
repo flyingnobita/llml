@@ -60,8 +60,31 @@ func TestResolveDefaultsAlwaysProduceUsableHostsAndPorts(t *testing.T) {
 	if s.NInferServerPort != DefaultNInferServerPort || s.NInferServerHost != DefaultNInferHost {
 		t.Errorf("ninfer not defaulted: %+v", s)
 	}
-	if s.NInferServerPort == s.LlamaServerPort {
-		t.Errorf("ninfer default port %d collides with llama-server's", s.NInferServerPort)
+}
+
+// Every built-in default port matches the one the Runtime's own server
+// listens on, so clients pointed at the upstream port reach it. Runtimes that
+// share a port are told apart by detection.
+func TestDefaultPortsMatchUpstream(t *testing.T) {
+	t.Parallel()
+
+	s := Resolve(FromEnv(fakeEnv(nil)), Layer{}, Defaults())
+	for _, tc := range []struct {
+		server    string
+		got, want int
+	}{
+		{"llama-server", s.LlamaServerPort, 8080},
+		{"ninfer-serve", s.NInferServerPort, 8080},
+		{"vllm serve", s.VLLMServerPort, 8000},
+		{"koboldcpp", s.KoboldCppPort, 5001},
+		{"omlx serve", s.OMLXPort, 8000},
+		{"splash serve", s.SplashPort, 8000},
+		{"mlx_lm.server", s.MLXLMPort, 8080},
+		{"mlx_vlm.server", s.MLXVLMPort, 8080},
+	} {
+		if tc.got != tc.want {
+			t.Errorf("%s default port = %d, want %d", tc.server, tc.got, tc.want)
+		}
 	}
 }
 
@@ -99,6 +122,106 @@ func TestFromEnvReadsOMLXAndSplash(t *testing.T) {
 	// The env list replaces the app's dirs rather than adding to them.
 	if !slices.Equal(s.OMLXModelDirs, []string{"/a", "/b"}) {
 		t.Errorf("OMLXModelDirs = %v", s.OMLXModelDirs)
+	}
+}
+
+// mlx-lm's path, host, and port each come from the environment, then
+// config.toml, then the built-in defaults, which match mlx_lm.server's own.
+func TestResolveMLXLMPrecedence(t *testing.T) {
+	t.Parallel()
+
+	cfg := Layer{
+		Origin:    OriginConfig,
+		MLXLMPath: ptr("/from/config/bin"),
+		MLXLMHost: ptr("10.0.0.1"),
+		MLXLMPort: ptr(8181),
+	}
+	env := FromEnv(fakeEnv(map[string]string{
+		EnvMLXLMPath: " /venv/bin/mlx_lm.server ",
+		EnvMLXLMHost: "0.0.0.0",
+		EnvMLXLMPort: "9191",
+	}))
+
+	s := Resolve(env, cfg, Defaults())
+	if s.MLXLMPath != "/venv/bin/mlx_lm.server" || s.MLXLMHost != "0.0.0.0" || s.MLXLMPort != 9191 {
+		t.Errorf("env should win: %q %q %d", s.MLXLMPath, s.MLXLMHost, s.MLXLMPort)
+	}
+	for f, want := range map[Field]string{FieldMLXLMPath: EnvMLXLMPath, FieldMLXLMHost: EnvMLXLMHost, FieldMLXLMPort: EnvMLXLMPort} {
+		if got := s.Source(f).String(); got != want {
+			t.Errorf("Source(%s) = %q, want %q", f.EnvVar(), got, want)
+		}
+	}
+
+	s = Resolve(FromEnv(fakeEnv(nil)), cfg, Defaults())
+	if s.MLXLMPath != "/from/config/bin" || s.MLXLMHost != "10.0.0.1" || s.MLXLMPort != 8181 {
+		t.Errorf("config should win over defaults: %q %q %d", s.MLXLMPath, s.MLXLMHost, s.MLXLMPort)
+	}
+	if got := s.Source(FieldMLXLMPort).String(); got != "config" {
+		t.Errorf("Source(MLX_LM_PORT) = %q, want config", got)
+	}
+
+	s = Resolve(FromEnv(fakeEnv(map[string]string{EnvMLXLMPort: "not-a-port"})), Layer{Origin: OriginConfig}, Defaults())
+	if s.MLXLMPath != "" || s.MLXLMHost != DefaultMLXLMHost || s.MLXLMPort != DefaultMLXLMPort {
+		t.Errorf("defaults should apply: %q %q %d", s.MLXLMPath, s.MLXLMHost, s.MLXLMPort)
+	}
+	if DefaultMLXLMHost != "127.0.0.1" {
+		t.Errorf("DefaultMLXLMHost = %q, want mlx_lm.server's 127.0.0.1", DefaultMLXLMHost)
+	}
+	if got := s.Source(FieldMLXLMPort).String(); got != "default" {
+		t.Errorf("an invalid port should fall through to the default, source %q", got)
+	}
+}
+
+// mlx-vlm's path, host, and port each come from the environment, then
+// config.toml, then the built-in defaults. The default host is loopback,
+// although mlx_vlm.server's own is 0.0.0.0: llml always passes --host.
+func TestResolveMLXVLMPrecedence(t *testing.T) {
+	t.Parallel()
+
+	cfg := Layer{
+		Origin:     OriginConfig,
+		MLXVLMPath: ptr("/from/config/bin"),
+		MLXVLMHost: ptr("10.0.0.1"),
+		MLXVLMPort: ptr(8181),
+	}
+	env := FromEnv(fakeEnv(map[string]string{
+		EnvMLXVLMPath: " /venv/bin/mlx_vlm.server ",
+		EnvMLXVLMHost: "0.0.0.0",
+		EnvMLXVLMPort: "9191",
+	}))
+
+	s := Resolve(env, cfg, Defaults())
+	if s.MLXVLMPath != "/venv/bin/mlx_vlm.server" || s.MLXVLMHost != "0.0.0.0" || s.MLXVLMPort != 9191 {
+		t.Errorf("env should win: %q %q %d", s.MLXVLMPath, s.MLXVLMHost, s.MLXVLMPort)
+	}
+	for f, want := range map[Field]string{FieldMLXVLMPath: EnvMLXVLMPath, FieldMLXVLMHost: EnvMLXVLMHost, FieldMLXVLMPort: EnvMLXVLMPort} {
+		if got := s.Source(f).String(); got != want {
+			t.Errorf("Source(%s) = %q, want %q", f.EnvVar(), got, want)
+		}
+	}
+	for want, got := range map[string]string{"MLX_VLM_PATH": EnvMLXVLMPath, "MLX_VLM_HOST": EnvMLXVLMHost, "MLX_VLM_PORT": EnvMLXVLMPort} {
+		if got != want {
+			t.Errorf("environment variable %q, want %q", got, want)
+		}
+	}
+
+	s = Resolve(FromEnv(fakeEnv(nil)), cfg, Defaults())
+	if s.MLXVLMPath != "/from/config/bin" || s.MLXVLMHost != "10.0.0.1" || s.MLXVLMPort != 8181 {
+		t.Errorf("config should win over defaults: %q %q %d", s.MLXVLMPath, s.MLXVLMHost, s.MLXVLMPort)
+	}
+	if got := s.Source(FieldMLXVLMPort).String(); got != "config" {
+		t.Errorf("Source(MLX_VLM_PORT) = %q, want config", got)
+	}
+
+	s = Resolve(FromEnv(fakeEnv(map[string]string{EnvMLXVLMPort: "not-a-port"})), Layer{Origin: OriginConfig}, Defaults())
+	if s.MLXVLMPath != "" || s.MLXVLMHost != DefaultMLXVLMHost || s.MLXVLMPort != DefaultMLXVLMPort {
+		t.Errorf("defaults should apply: %q %q %d", s.MLXVLMPath, s.MLXVLMHost, s.MLXVLMPort)
+	}
+	if DefaultMLXVLMHost != "127.0.0.1" {
+		t.Errorf("DefaultMLXVLMHost = %q, want loopback, not mlx_vlm.server's 0.0.0.0", DefaultMLXVLMHost)
+	}
+	if got := s.Source(FieldMLXVLMPort).String(); got != "default" {
+		t.Errorf("an invalid port should fall through to the default, source %q", got)
 	}
 }
 

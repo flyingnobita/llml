@@ -10,12 +10,12 @@
   ││   › [ ] KoboldCpp off      Path  > koboldcpp binary or its dir                             │
   ││  Safetensors               in use: not found (default)                                     │
   ││     [✓] vLLM      ○                                                                        │
-  ││  NInfer (.ninfer)          Port  > 5001                                                    │
-  ││     [✓] NInfer    ○        in use: 5001 (default)                                          │
+  ││     [✓] mlx-lm    ✗        Port  > 5001                                                    │
+  ││     [✓] mlx-vlm   ✗        in use: 5001 (default)                                          │
+  ││  NInfer (.ninfer)                                                                          │
+  ││     [✓] NInfer    ○                                                                        │
   ││  Ollama library                                                                            │
   ││     [✓] Ollama    ○                                                                        │
-  ││                                                                                            │
-  ││                                                                                            │
   ╰│                                                                                            │
    │                                                                                            │
    │                                                                                            │

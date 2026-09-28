@@ -14,8 +14,10 @@ detects installed runtimes
 (**[llama.cpp](https://github.com/ggerganov/llama.cpp)**,
 **[vLLM](https://github.com/vllm-project/vllm)**,
 **[Ollama](https://ollama.com/)**,
-**[KoboldCpp](https://github.com/LostRuins/koboldcpp)**, and
+**[KoboldCpp](https://github.com/LostRuins/koboldcpp)**,
 **[NInfer](https://github.com/Neroued/ninfer)**,
+**[mlx-lm](https://github.com/ml-explore/mlx-lm)**,
+**[mlx-vlm](https://github.com/Blaizzy/mlx-vlm)**,
 **[oMLX](https://omlx.ai/)**, and
 **[Splash](https://github.com/incoai/splash)**),
 and lets you save named parameter profiles per model — so the command that worked
@@ -23,7 +25,7 @@ last time is always one keystroke away.
 
 Browse local models. Detect the right runtime. Launch with one key.
 
-Works alongside llama.cpp, vLLM, Ollama, KoboldCpp, NInfer, oMLX, and Splash — not a replacement for them.
+Works alongside llama.cpp, vLLM, Ollama, KoboldCpp, NInfer, mlx-lm, mlx-vlm, oMLX, and Splash — not a replacement for them.
 llml is the profile manager for whatever backend you already run.
 
 > [!NOTE]
@@ -39,9 +41,10 @@ llml is the profile manager for whatever backend you already run.
   Face cache; add extra roots via `LLML_MODEL_PATHS` and/or `config.toml`. Results are
   cached under **`{UserConfigDir}/llml/cache/models.toml`** so the next launch can skip the
   filesystem walk when the cache is still valid.
-- **Runtime detection** — finds installed `llama-server`, `vllm`, `koboldcpp`, `ninfer-serve`, `omlx`, and `splash` binaries and maps
+- **Runtime detection** — finds installed `llama-server`, `vllm`, `koboldcpp`, `ninfer-serve`, `mlx_lm.server`, `mlx_vlm.server`, `omlx`, and `splash` binaries and maps
   installed `ollama` plus the configured Ollama host, then maps each model to its
-  compatible runtime. GGUF models can use llama.cpp or KoboldCpp via profile selection.
+  compatible runtime. GGUF models can use llama.cpp or KoboldCpp, and safetensors models vLLM,
+  mlx-lm, or mlx-vlm, via profile selection.
 - **Named parameter profiles** — save multiple profiles per model (e.g. `fast-laptop`,
   `quality`, `api-8080`), each storing runtime args, env vars, port, and context
   settings. The active profile is always one key away.
@@ -68,7 +71,7 @@ llml is the profile manager for whatever backend you already run.
 ### Runtime Requirements
 
 - **Runtime engine (at least one)**: **llama.cpp** (`llama-server`) or **KoboldCpp** (`koboldcpp`) for GGUF models,
-  **vLLM** (`vllm`) for safetensors models, **NInfer** (`ninfer-serve`) for `.ninfer`
+  **vLLM** (`vllm`), **mlx-lm** (`mlx_lm.server`), or **mlx-vlm** (`mlx_vlm.server`) for safetensors models (the MLX runtimes on Apple Silicon and Linux), **NInfer** (`ninfer-serve`) for `.ninfer`
   artifacts on Linux, **oMLX** (`omlx`) or **Splash** (`splash`) on Apple Silicon, and/or **Ollama** (`ollama`) for Ollama models are installed (see [Runtime Engines](#runtime-engines)).
 - **Models** in default scan locations, or configure custom roots with `LLML_MODEL_PATHS` (see [Model Discovery](#model-discovery)).
 
@@ -226,8 +229,13 @@ Each model path can have **multiple named profiles**. Each profile stores:
 
 **`R`** / **ctrl+`R`** use the **active** profile (the highlighted row in the `p` profile list is prefixed with **`(active)`** in the name column). Changes persist automatically. **tab** cycles: profile list → env → extra args. On the profile list: **`a`** add profile, **`c`** clone (duplicate) the highlighted profile, **`d`** delete (not the last), **`r`** rename. **`esc`** closes the panel (and **`n`** cancels a delete confirmation).
 
-For GGUF models, a profile's **Backend** chooses llama.cpp or KoboldCpp. A runtime that is turned
-off in `c` is still offered, labelled `(off)`, so you can set a profile up before turning it on.
+A profile's **Backend** chooses the runtime a model launches on. GGUF models choose llama.cpp or
+KoboldCpp. Safetensors models choose vLLM, mlx-lm, or mlx-vlm, and also oMLX for models inside one
+of oMLX's model directories.
+**`(none)`** keeps the default: llama.cpp for GGUF, oMLX inside oMLX's model directories, vLLM
+elsewhere. The table's Runtime column shows the choice. llml does not check that the weights suit
+the runtime: MLX weights launched on vLLM fail when the server starts. A runtime that is turned off
+in `c` is still offered, labelled `(off)`, so you can set a profile up before turning it on.
 
 Profiles are stored in `model-params.json` (see [Storage & Locations](#storage--locations)).
 
@@ -361,7 +369,7 @@ may be out of date until you turn Ollama back on and scan again.
 | **KoboldCpp path**  | `KOBOLDCPP_PATH`     | `default_koboldcpp_path`              | _(auto)_          |
 | **KoboldCpp port**  | `KOBOLDCPP_PORT`     | `default_koboldcpp_port`              | `5001`            |
 | **NInfer path**     | `NINFER_PATH`        | `default_ninfer_path`                 | _(auto)_          |
-| **NInfer port**     | `NINFER_SERVER_PORT` | `default_ninfer_server_port`          | `18080`           |
+| **NInfer port**     | `NINFER_SERVER_PORT` | `default_ninfer_server_port`          | `8080`            |
 | **NInfer host**     | `NINFER_SERVER_HOST` | `default_ninfer_server_host`          | `127.0.0.1`       |
 | **oMLX path**       | `OMLX_PATH`          | `default_omlx_path`                   | _(auto)_          |
 | **oMLX port**       | `OMLX_PORT`          | `default_omlx_port`                   | `8000`            |
@@ -370,6 +378,12 @@ may be out of date until you turn Ollama back on and scan again.
 | **Splash path**     | `SPLASH_PATH`        | `default_splash_path`                 | _(auto)_          |
 | **Splash port**     | `SPLASH_PORT`        | `default_splash_port`                 | `8000`            |
 | **Splash host**     | `SPLASH_HOST`        | `default_splash_host`                 | `127.0.0.1`       |
+| **mlx-lm path**     | `MLX_LM_PATH`        | `default_mlx_lm_path`                 | _(auto)_          |
+| **mlx-lm port**     | `MLX_LM_PORT`        | `default_mlx_lm_port`                 | `8080`            |
+| **mlx-lm host**     | `MLX_LM_HOST`        | `default_mlx_lm_host`                 | `127.0.0.1`       |
+| **mlx-vlm path**    | `MLX_VLM_PATH`       | `default_mlx_vlm_path`                | _(auto)_          |
+| **mlx-vlm port**    | `MLX_VLM_PORT`       | `default_mlx_vlm_port`                | `8080`            |
+| **mlx-vlm host**    | `MLX_VLM_HOST`       | `default_mlx_vlm_host`                | `127.0.0.1`       |
 | **TUI Theme**       | `LLML_THEME`         | -                                     | `auto`            |
 
 **Detection Logic:**
@@ -377,24 +391,118 @@ may be out of date until you turn Ollama back on and scan again.
 1. Explicitly configured paths (Env/TOML).
 2. Common system directories (e.g., `/usr/local/bin`, `/opt/homebrew/bin`, `~/.local/bin`).
 3. Binary names available on your system `PATH`.
-4. (llama.cpp) Probing for an already-running server on the configured port.
+4. Probing each runtime's port for an already-running server. Several runtimes share a
+   default port (llama.cpp, NInfer, mlx-lm, and mlx-vlm on `8080`; vLLM, oMLX, and Splash on
+   `8000`), so llml checks which server answers: NInfer, oMLX, and Splash by the owner they
+   report in `/v1/models`, mlx-lm by a `/health` status of `ok` from Python's HTTP server (a
+   `Server` header starting `BaseHTTP/`), mlx-vlm by a `/health` status of `healthy`,
+   llama.cpp by a `/health` answer from a server that is not NInfer, mlx-lm, or mlx-vlm, and
+   vLLM by an answer from a server that is not oMLX, Splash, mlx-lm, or mlx-vlm.
 5. (vLLM only) Common venv locations (e.g., `~/.venv-vllm-metal/bin` on macOS).
-6. (KoboldCpp only) Platform-specific name variants with CUDA preference on Linux; probes port for already-running instances.
+6. (KoboldCpp only) Platform-specific name variants with CUDA preference on Linux.
 7. (NInfer only) NInfer has no install target, so `NINFER_PATH` may point at the checkout
    root (llml looks in `build/apps/`), the build directory, or `ninfer-serve` itself. The
-   checkout's `models/` directory is added to the scan roots. The default port is `18080`
-   rather than ninfer-serve's own `8080`, which would collide with llama-server.
+   checkout's `models/` directory is added to the scan roots. The default port is `8080`,
+   ninfer-serve's own default, which llama-server shares; only one of them can listen on it
+   at a time.
 8. (oMLX only) llml uses the CLI shim the oMLX app installs (`~/.omlx/bin/omlx`) and reads
    the app's model directories from its `settings.json`, so models placed there appear as
    oMLX rows. `R` runs `omlx serve --model-dir <dir>`; oMLX serves every model in that
    directory and applies the per-model settings (draft model, sampling) saved in the app.
-   Stop the app's own background server first if it is using the same port.
+   Stop the app's own background server first if it is using the same port. A profile can
+   launch such a model on vLLM instead (see [Parameter profiles](#parameter-profiles-p)).
 9. (Splash only) Splash bundles are found in the Hugging Face cache and launched with
    `splash serve --model <org/repo>`.
+10. (mlx-lm only) llml looks for the `mlx_lm.server` script at `MLX_LM_PATH` (the script, or
+    the folder holding it) and then on `PATH`. It does not search for venvs, and there is no
+    common-directory step. See [Setting up mlx-lm](#setting-up-mlx-lm).
+11. (mlx-vlm only) The same for the `mlx_vlm.server` script and `MLX_VLM_PATH`. See
+    [Setting up mlx-vlm](#setting-up-mlx-vlm).
 
-NInfer is shown only on Linux, and oMLX and Splash only on Apple Silicon macOS; the `c`
-panel hides runtimes the platform cannot run. A runtime turned off in `c` gets no server probe, but
+NInfer is shown only on Linux, oMLX and Splash only on Apple Silicon macOS, and mlx-lm and mlx-vlm
+only on Apple Silicon macOS and Linux (x86_64 and aarch64); the `c` panel hides runtimes the platform
+cannot run. A runtime turned off in `c` gets no server probe, but
 llml still looks for its program on disk so the panel can show whether it is installed.
+
+#### Setting up mlx-lm
+
+mlx-lm runs a safetensors model directory with Apple's MLX. To use it, choose `mlx-lm` as the
+**Backend** of a safetensors model's profile in `p`. **R** then runs:
+
+```sh
+mlx_lm.server --model <absolute model path> --host <host> --port <port> <profile args>
+```
+
+llml adds nothing else, and passes the profile's env vars as for any runtime.
+
+- **macOS (Apple Silicon):** install `mlx-lm` with pip, uv, or mise into any Python
+  environment, for example `pip install mlx-lm` or `uv tool install mlx-lm`. If
+  `mlx_lm.server` is not on your `PATH`, set `MLX_LM_PATH` (or the Path field in `c`) to the
+  script or the folder that holds it, such as a venv's `bin/`. The venv does not need to be
+  activated: the script starts its own Python.
+- **Linux (x86_64 and aarch64):** a plain `pip install mlx-lm` installs no MLX backend on
+  Linux, so the server cannot start. Install a backend next to it:
+  `pip install mlx-lm "mlx[cuda12]"` for CUDA 12, `"mlx[cuda13]"` for CUDA 13, or
+  `"mlx[cpu]"` without a GPU. The CUDA build needs an NVIDIA GPU of compute capability 7.5 or
+  newer and a recent driver. The CPU build works but is far too slow for real models.
+  MLX compiles its CUDA kernels at run time against the toolkit that `CUDA_PATH` (or
+  `CUDA_HOME`) points to, so that toolkit must match the extra: with `mlx[cuda12]` and a CUDA
+  13 toolkit on `CUDA_PATH`, the server starts and answers `/health`, but the first request
+  hangs while kernels fail to compile. Install the matching extra, or set `CUDA_PATH` to a
+  CUDA 12 toolkit in the profile's env (for example `CUDA_PATH=/opt/cuda-12.9.1`).
+
+Things to know:
+
+- **Answer length:** mlx-lm stops each answer at 512 tokens unless the profile passes
+  `--max-tokens` (for example `--max-tokens 8192`) or the client sends `max_tokens`.
+- **Model id:** the launch preview shows the model id clients must send, which is the model's
+  absolute path. mlx-lm loads whatever model a request names, and downloads it from Hugging
+  Face if it is not a local folder, so a client that sends another id makes it switch models.
+  Leaving `model` out of the request also uses the launched model.
+- **Missing folders:** llml will not launch mlx-lm on a model folder that no longer exists,
+  since the server would take the path for a Hugging Face repo id. Press **S** to rescan.
+- **Port:** mlx-lm's default port is `8080`, the same as llama.cpp's and NInfer's. Only one
+  server can listen on it at a time; set `MLX_LM_PORT` to run them side by side.
+
+#### Setting up mlx-vlm
+
+mlx-vlm runs a safetensors model directory with Apple's MLX, including vision and audio
+models. To use it, choose `mlx-vlm` as the **Backend** of a safetensors model's profile in
+`p`. **R** then runs:
+
+```sh
+mlx_vlm.server --model <absolute model path> --host <host> --port <port> <profile args>
+```
+
+llml adds nothing else, and passes the profile's env vars as for any runtime. It always
+passes `--host` (`127.0.0.1` unless you set `MLX_VLM_HOST`), because mlx-vlm otherwise
+listens on all interfaces.
+
+- **Version:** mlx-vlm 0.6.5 or later is needed to serve text-only models. Older releases
+  serve only the vision model families they know.
+- **macOS (Apple Silicon):** install `mlx-vlm` with pip, uv, or mise into any Python
+  environment, for example `pip install mlx-vlm` or `uv tool install mlx-vlm`. If
+  `mlx_vlm.server` is not on your `PATH`, set `MLX_VLM_PATH` (or the Path field in `c`) to
+  the script or the folder that holds it, such as a venv's `bin/`. The venv does not need to
+  be activated.
+- **Linux (x86_64 and aarch64):** a plain `pip install mlx-vlm` installs MLX without a
+  backend, so `import mlx.core` fails and the server cannot start. Install a backend next to
+  it: `pip install mlx-vlm "mlx[cuda12]"` for CUDA 12, `"mlx[cuda13]"` for CUDA 13, or
+  `"mlx[cpu]"` without a GPU. Do **not** use `pip install "mlx-vlm[cuda]"`: it pulls an
+  outdated `mlx-cuda` (0.30.0) beside a newer `mlx`. The CUDA and CPU notes for mlx-lm apply
+  here too.
+
+Things to know:
+
+- **Model id:** the launch preview shows the model id clients must send, which is the model's
+  absolute path. Clients must send exactly that id: mlx-vlm loads whatever model a request
+  names, and downloads it from Hugging Face if it is not a local folder, so any other id makes
+  it swap or download a model. Unlike mlx-lm, leaving `model` out of the request does not use
+  the launched model.
+- **Missing folders:** llml will not launch mlx-vlm on a model folder that no longer exists,
+  since the server would take the path for a Hugging Face repo id. Press **S** to rescan.
+- **Port:** mlx-vlm's default port is `8080`, the same as llama.cpp's, NInfer's, and
+  mlx-lm's. Set `MLX_VLM_PORT` to run them side by side.
 
 ---
 

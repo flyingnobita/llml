@@ -94,7 +94,17 @@ type runtimeDef struct {
 	backend models.ModelBackend
 	name    string
 	format  modelFormat
-	fields  []runtimeFieldDef
+	// ownFolders is set for a Runtime that serves only the models inside its
+	// own model folders. Discovery gives it exactly those rows, so it is a
+	// Runtime choice only for rows discovery gave it.
+	ownFolders bool
+	// loadsRequestedModel is set for a Runtime whose server loads whatever
+	// model its --model flag or a request names, as a local path or a Hugging
+	// Face repo id, and downloads a repo id it lacks. llml never launches it
+	// on a model folder that no longer exists, and the launch preview names
+	// the model id clients must send.
+	loadsRequestedModel bool
+	fields              []runtimeFieldDef
 }
 
 // status returns what detection learned about the Runtime. It reads
@@ -167,7 +177,7 @@ var runtimeTable = []runtimeDef{
 		},
 	},
 	{
-		backend: models.BackendOMLX, name: "oMLX", format: formatSafetensors,
+		backend: models.BackendOMLX, name: "oMLX", format: formatSafetensors, ownFolders: true,
 		fields: []runtimeFieldDef{
 			pathFieldDef(runtimeFieldOMLXPath, settings.FieldOMLXPath, "Path", "omlx CLI or ~/.omlx",
 				detectedProgram(models.BackendOMLX), func(s *settings.Settings) *string { return &s.OMLXPath }),
@@ -175,6 +185,28 @@ var runtimeTable = []runtimeDef{
 				func(s *settings.Settings) *int { return &s.OMLXPort }, settings.DefaultOMLXPort),
 			hostFieldDef(runtimeFieldOMLXHost, settings.FieldOMLXHost,
 				func(s *settings.Settings) *string { return &s.OMLXHost }, settings.DefaultOMLXHost),
+		},
+	},
+	{
+		backend: models.BackendMLXLM, name: "mlx-lm", format: formatSafetensors, loadsRequestedModel: true,
+		fields: []runtimeFieldDef{
+			pathFieldDef(runtimeFieldMLXLMPath, settings.FieldMLXLMPath, "Path", "mlx_lm.server or its dir",
+				detectedProgram(models.BackendMLXLM), func(s *settings.Settings) *string { return &s.MLXLMPath }),
+			portFieldDef(runtimeFieldMLXLMPort, settings.FieldMLXLMPort,
+				func(s *settings.Settings) *int { return &s.MLXLMPort }, settings.DefaultMLXLMPort),
+			hostFieldDef(runtimeFieldMLXLMHost, settings.FieldMLXLMHost,
+				func(s *settings.Settings) *string { return &s.MLXLMHost }, settings.DefaultMLXLMHost),
+		},
+	},
+	{
+		backend: models.BackendMLXVLM, name: "mlx-vlm", format: formatSafetensors, loadsRequestedModel: true,
+		fields: []runtimeFieldDef{
+			pathFieldDef(runtimeFieldMLXVLMPath, settings.FieldMLXVLMPath, "Path", "mlx_vlm.server or its dir",
+				detectedProgram(models.BackendMLXVLM), func(s *settings.Settings) *string { return &s.MLXVLMPath }),
+			portFieldDef(runtimeFieldMLXVLMPort, settings.FieldMLXVLMPort,
+				func(s *settings.Settings) *int { return &s.MLXVLMPort }, settings.DefaultMLXVLMPort),
+			hostFieldDef(runtimeFieldMLXVLMHost, settings.FieldMLXVLMHost,
+				func(s *settings.Settings) *string { return &s.MLXVLMHost }, settings.DefaultMLXVLMHost),
 		},
 	},
 	{
@@ -224,14 +256,21 @@ func runtimeFor(b models.ModelBackend) runtimeDef {
 	return runtimeTable[0]
 }
 
-// runtimeBackendsIn returns the profile backend names of the Runtimes that run
-// format, in table order.
-func runtimeBackendsIn(format modelFormat) []string {
-	var out []string
+// runtimeChoices returns, in table order, the Runtimes a row may launch on
+// when discovery gave it Runtime discovered: every Runtime of the same Model
+// Format that platform p supports. A Runtime that serves only its own model
+// folders is left out unless it is discovered itself.
+func runtimeChoices(discovered models.ModelBackend, p models.Platform) []models.ModelBackend {
+	format := runtimeFor(discovered).format
+	var out []models.ModelBackend
 	for _, rt := range runtimeTable {
-		if rt.format == format {
-			out = append(out, rt.backend.String())
+		if rt.format != format || !rt.supported(p) {
+			continue
 		}
+		if rt.ownFolders && rt.backend != discovered {
+			continue
+		}
+		out = append(out, rt.backend)
 	}
 	return out
 }

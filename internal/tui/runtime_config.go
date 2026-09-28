@@ -38,6 +38,12 @@ const (
 	runtimeFieldOMLXPath
 	runtimeFieldOMLXPort
 	runtimeFieldOMLXHost
+	runtimeFieldMLXLMPath
+	runtimeFieldMLXLMPort
+	runtimeFieldMLXLMHost
+	runtimeFieldMLXVLMPath
+	runtimeFieldMLXVLMPort
+	runtimeFieldMLXVLMHost
 	runtimeFieldCount
 )
 
@@ -249,6 +255,8 @@ var missingRuntimeNotes = []struct {
 	{models.BackendNInfer, MissingNInferFooterNote},
 	{models.BackendOMLX, MissingOMLXFooterNote},
 	{models.BackendSplash, MissingSplashFooterNote},
+	{models.BackendMLXLM, MissingMLXLMFooterNote},
+	{models.BackendMLXVLM, MissingMLXVLMFooterNote},
 }
 
 // maybeSetMissingRuntimeFooterNote sets [Model.lastRunNote] when the scan found
@@ -259,7 +267,7 @@ func (m Model) maybeSetMissingRuntimeFooterNote() (Model, tea.Cmd) {
 	want := map[models.ModelBackend]bool{}
 	for _, f := range m.table.files {
 		want[f.Backend] = true
-		want[rowRuntime(f, m.table.effectiveBackends)] = true
+		want[m.rowRuntime(f)] = true
 	}
 	var msgs []string
 	for _, r := range missingRuntimeNotes {

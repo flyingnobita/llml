@@ -329,6 +329,9 @@ func (m Model) handleRunServerKey(mode runServerMode) (tea.Model, tea.Cmd) {
 	if !m.runtimeEnabled(be) {
 		return m.blockLaunchOnDisabledRuntime(be)
 	}
+	if runtimeFor(be).loadsRequestedModel && !isDir(p) {
+		return m.blockLaunchOnMissingModel(be, p)
+	}
 	params, _ := profiles.LoadParamsForRun(p)
 	spec, err := buildServerSpec(be, p, params, m.runtime, true)
 	if err != nil {

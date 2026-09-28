@@ -179,7 +179,7 @@ func TestOllamaOff_turningOnResumesOnNextScan(t *testing.T) {
 
 	f := newOllamaFakes(ollamaOffStates, testRow(models.BackendLlama, "/m/gemma.gguf"), testOllamaRow("cached:latest"))
 	m := startUp(t, f.services)
-	m = press(t, m, keyText("c"), keyDown, keyDown, keyDown, keyDown)
+	m = press(t, m, keyText("c"), keyDown, keyDown, keyDown, keyDown, keyDown, keyDown)
 	if !strings.Contains(listRow(t, m, "Ollama"), "[ ] Ollama") {
 		t.Fatalf("fixture: Ollama should be highlighted and off:\n%s", plainView(m))
 	}

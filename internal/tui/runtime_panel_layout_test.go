@@ -31,6 +31,8 @@ func panelRuntime(p models.Platform) models.RuntimeInfo {
 		NInferPath:      "/opt/ninfer/build/apps/ninfer-serve",
 		OMLXPath:        "/opt/omlx/bin/omlx",
 		SplashPath:      "/opt/splash/bin/splash",
+		MLXLMPath:       "/opt/mlx/bin/mlx_lm.server",
+		MLXVLMPath:      "/opt/mlx/bin/mlx_vlm.server",
 		ServerRunning:   true,
 		Platform:        p,
 	}
@@ -60,6 +62,7 @@ var (
 	keyDown     = tea.KeyPressMsg{Code: tea.KeyDown}
 	keyUp       = tea.KeyPressMsg{Code: tea.KeyUp}
 	keyRight    = tea.KeyPressMsg{Code: tea.KeyRight}
+	keyLeft     = tea.KeyPressMsg{Code: tea.KeyLeft}
 	keyTab      = tea.KeyPressMsg{Code: tea.KeyTab}
 	keyShiftTab = tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift}
 	keyEnter    = tea.KeyPressMsg{Code: tea.KeyEnter}
@@ -95,7 +98,7 @@ func TestRuntimePanel_listGroupsSupportedRuntimes(t *testing.T) {
 	t.Parallel()
 
 	linux := plainView(openPanel(t, testServices(), linuxPlatform, defaultSettings(), 100, 30))
-	for _, want := range []string{"GGUF", "Llama.cpp", "KoboldCpp", "Safetensors", "vLLM", "NInfer (.ninfer)", "Ollama library", "Ollama"} {
+	for _, want := range []string{"GGUF", "Llama.cpp", "KoboldCpp", "Safetensors", "vLLM", "mlx-lm", "mlx-vlm", "NInfer (.ninfer)", "Ollama library", "Ollama"} {
 		if !strings.Contains(linux, want) {
 			t.Errorf("linux panel missing %q:\n%s", want, linux)
 		}
@@ -107,7 +110,7 @@ func TestRuntimePanel_listGroupsSupportedRuntimes(t *testing.T) {
 	}
 
 	mac := plainView(openPanel(t, testServices(), macPlatform, defaultSettings(), 100, 30))
-	for _, want := range []string{"oMLX", "Splash bundle", "Splash"} {
+	for _, want := range []string{"oMLX", "mlx-lm", "mlx-vlm", "Splash bundle", "Splash"} {
 		if !strings.Contains(mac, want) {
 			t.Errorf("macOS panel missing %q:\n%s", want, mac)
 		}
@@ -153,10 +156,14 @@ func TestRuntimePanel_cursorSkipsGroupLabels(t *testing.T) {
 	}{
 		{keyDown, "KoboldCpp"},
 		{keyText("j"), "vLLM"}, // past the Safetensors label
+		{keyDown, "mlx-lm"},
+		{keyDown, "mlx-vlm"},
 		{keyDown, "NInfer"},
 		{keyDown, "Ollama"},
 		{keyDown, "Ollama"}, // the end of the list
 		{keyText("k"), "NInfer"},
+		{keyUp, "mlx-vlm"},
+		{keyUp, "mlx-lm"},
 		{keyUp, "vLLM"},
 	}
 	for _, s := range steps {

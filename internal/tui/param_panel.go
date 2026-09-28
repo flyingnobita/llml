@@ -70,26 +70,32 @@ var paramMetadataFieldLabels = [...]string{
 	"Notes",
 }
 
-var (
-	paramBackendOptionsAll = []string{"", "llama", "vllm", "ollama", "koboldcpp", "ninfer", "omlx", "splash"}
-	// paramBackendOptionsGGUF offers "" (no override) and each Runtime that runs GGUF.
-	paramBackendOptionsGGUF = append([]string{""}, runtimeBackendsIn(formatGGUF)...)
-)
-
-// paramBackendOptionsForModel returns the valid backend options for the given
-// model path. GGUF rows can choose llama or koboldcpp; non-GGUF rows are
-// locked to their discovery backend (the profile override is ignored at
-// launch time).
+// paramBackendOptionsForModel returns the Backend choices for the panel's row:
+// "" (no override, the Runtime discovery gave the row) and each Runtime in
+// [Model.rowRuntimeChoices]. A row with only one Runtime, or none found, gets
+// none, and the Backend row is hidden.
 func (m Model) paramBackendOptionsForModel() []string {
+	f, ok := m.paramsRow()
+	if !ok || !m.rowHasRuntimeChoice(f) {
+		return nil
+	}
+	choices := m.rowRuntimeChoices(f)
+	opts := make([]string, 0, len(choices)+1)
+	opts = append(opts, "")
+	for _, b := range choices {
+		opts = append(opts, b.String())
+	}
+	return opts
+}
+
+// paramsRow returns the table row the param panel is editing.
+func (m Model) paramsRow() (models.ModelFile, bool) {
 	for _, f := range m.table.files {
 		if f.Identity() == m.params.modelPath {
-			if f.Backend == models.BackendLlama {
-				return paramBackendOptionsGGUF
-			}
-			return nil // non-GGUF: no cycling
+			return f, true
 		}
 	}
-	return paramBackendOptionsAll // fallback (shouldn't happen)
+	return models.ModelFile{}, false
 }
 
 var paramHardwareClassOptions = []profiles.HardwareClass{

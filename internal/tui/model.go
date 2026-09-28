@@ -389,47 +389,38 @@ func (m Model) SelectedModel() (target string, backend models.ModelBackend) {
 	return f.LaunchTarget(), f.Backend
 }
 
-// resolveEffectiveBackend returns the launch backend for the selected row, factoring in
-// the active profile's backend override for GGUF rows.
+// resolveEffectiveBackend returns the Runtime the selected row launches on:
+// its Active Profile's choice when the row may use it (see [Model.rowRuntime]),
+// and otherwise the Runtime discovery gave the row.
 //
-//	GGUF row
-//	  + profile=koboldcpp -> koboldcpp
-//	  + profile=llama/""  -> llama-server
-//
-//	vllm row   -> vllm
-//	ollama row -> ollama
-//	ninfer row -> ninfer
-//	omlx row   -> omlx
-//	splash row -> splash
+//	GGUF row          + profile=koboldcpp -> koboldcpp, otherwise llama-server
+//	Safetensors row   + profile=vllm      -> vllm
+//	                  + profile=mlx-lm    -> mlx-lm
+//	                  + profile=mlx-vlm   -> mlx-vlm
+//	                  + profile=omlx      -> omlx, only for a row in oMLX's model folders
+//	                  + none or unusable  -> omlx in oMLX's model folders, vllm elsewhere
+//	ollama/ninfer/splash row              -> its own Runtime
 func (m Model) resolveEffectiveBackend() models.ModelBackend {
-	_, rowBackend := m.SelectedModel()
-	if rowBackend != models.BackendLlama {
-		return rowBackend
-	}
-	// When the param panel is open, read from in-memory state so unsaved
-	// edits affect the launch preview immediately.
-	if m.params.open {
-		profileBackend := m.activeProfileBackendForSelected()
-		if profileBackend == models.BackendKobold {
-			return models.BackendKobold
-		}
+	f, ok := m.SelectedModelFile()
+	if !ok {
 		return models.BackendLlama
 	}
-	// Otherwise use the cached effective-backend map (no disk I/O per cursor move).
-	key := profiles.ModelParamsKey(m.SelectedPath())
-	if b, ok := m.table.effectiveBackends[key]; ok {
+	if !m.rowHasRuntimeChoice(f) {
+		return f.Backend
+	}
+	// With the param panel closed, a cached choice saves a disk read per
+	// cursor move. With it open, unsaved edits must reach the launch preview
+	// at once, so the profile is read from the panel; a cache miss (no
+	// override, or before the first scan) reads it from disk.
+	if b, cached := m.cachedRowRuntime(f); cached && !m.params.open {
 		return b
 	}
-	// Cache miss (e.g. before first scan): fall back to disk read.
-	profileBackend := m.activeProfileBackendForSelected()
-	if profileBackend == models.BackendKobold {
-		return models.BackendKobold
-	}
-	return models.BackendLlama
+	return m.usableRuntime(f, m.activeProfileBackendForSelected())
 }
 
-// activeProfileBackendForSelected returns the backend stored in the active profile for
-// the selected model, or BackendLlama when no profile backend is set.
+// activeProfileBackendForSelected returns the backend the selected model's
+// Active Profile names: from the open p panel when it edits that model, and
+// otherwise from disk. It is BackendLlama when no profile names one.
 func (m Model) activeProfileBackendForSelected() models.ModelBackend {
 	sel := m.SelectedPath()
 	if sel == "" {
@@ -441,7 +432,13 @@ func (m Model) activeProfileBackendForSelected() models.ModelBackend {
 			return b
 		}
 	}
-	ent, err := profiles.LoadEntry(profiles.ModelParamsKey(sel))
+	return storedProfileBackend(profiles.ModelParamsKey(sel))
+}
+
+// storedProfileBackend returns the backend the Active Profile saved under key
+// names, or BackendLlama when there is none or it cannot be read.
+func storedProfileBackend(key string) models.ModelBackend {
+	ent, err := profiles.LoadEntry(key)
 	if err != nil || len(ent.Profiles) == 0 {
 		return models.BackendLlama
 	}
@@ -450,22 +447,16 @@ func (m Model) activeProfileBackendForSelected() models.ModelBackend {
 	return b
 }
 
-// populateEffectiveBackends reloads every model's active-profile backend from disk
-// into m.table.effectiveBackends.
+// populateEffectiveBackends reloads, for every row with a choice of Runtime,
+// its active-profile backend from disk into m.table.effectiveBackends.
 func (m Model) populateEffectiveBackends() Model {
 	for _, f := range m.table.files {
-		if f.Backend != models.BackendLlama {
-			continue
+		if !m.rowHasRuntimeChoice(f) {
+			continue // one Runtime only: the profile cannot change it
 		}
 		m = m.loadEffectiveBackendForIdentity(f.Identity())
 	}
 	return m
-}
-
-// updateEffectiveBackendForPath updates or removes the cached effective backend for
-// the given model identity after a profile save.
-func (m Model) updateEffectiveBackendForPath(modelPath string) Model {
-	return m.loadEffectiveBackendForIdentity(modelPath)
 }
 
 // loadEffectiveBackendForIdentity reads the active profile for identity and
@@ -473,12 +464,10 @@ func (m Model) updateEffectiveBackendForPath(modelPath string) Model {
 // map first, so the returned Model is the only one that sees the change.
 func (m Model) loadEffectiveBackendForIdentity(identity string) Model {
 	key := profiles.ModelParamsKey(identity)
-	backend, keep := models.BackendLlama, false
-	if ent, err := profiles.LoadEntry(key); err == nil && len(ent.Profiles) > 0 {
-		idx := clampIndex(ent.ActiveIndex, len(ent.Profiles)-1)
-		b, _ := models.ParseBackend(ent.Profiles[idx].Backend)
-		backend, keep = b, b != models.BackendLlama
-	}
+	// BackendLlama doubles as "no override": for a GGUF row it is the
+	// default anyway, and no other row may use it, so none is cached.
+	backend := storedProfileBackend(key)
+	keep := backend != models.BackendLlama
 
 	_, had := m.table.effectiveBackends[key]
 	if !keep && !had {
@@ -733,7 +722,8 @@ func (m Model) syncLaunchPreviewViewport(innerW int) Model {
 		m.preview.lastCmd = ""
 		return m
 	}
-	cmd, note := launchPreviewCmdAndNote(m)
+	pv := launchPreviewFor(m)
+	cmd := pv.cmd
 	if cmd != m.preview.lastCmd {
 		m.preview.viewport.GotoTop()
 		m.preview.lastCmd = cmd
@@ -748,8 +738,13 @@ func (m Model) syncLaunchPreviewViewport(innerW int) Model {
 	outerH := launchPreviewVisibleLines + pvFrV
 	buildRendered := func(textWidth int) string {
 		r := m.ui.styles.launchPreviewContent.Width(textWidth).Render(cmd)
-		if note != "" {
-			r = r + "\n" + m.ui.styles.warnLine.Render(note)
+		// The info line goes first: a long command fills the preview's
+		// visible lines, and what clients must send should not need scrolling.
+		if pv.info != "" {
+			r = m.ui.styles.infoLine.Width(textWidth).Render(pv.info) + "\n" + r
+		}
+		if pv.note != "" {
+			r = r + "\n" + m.ui.styles.warnLine.Render(pv.note)
 		}
 		return r
 	}
