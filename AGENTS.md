@@ -44,6 +44,7 @@ archives it to `BOARD.md`.
 cmd/llml/            # Binary entrypoint (main.go). The only binary GoReleaser ships.
 cmd/gguf-dump/       # Developer-only tool: dumps a GGUF file's metadata (mise run gguf-dump -- path.gguf). Deliberately NOT in .goreleaser.yaml or the README; it is a debugging aid, not a user-facing command. Its output logic lives in internal/models/gguf_dump.go and is tested there.
 internal/
+  buildinfo/         # The running build's identity for --version and the ? panel: the bare version for a release, else "dev (<commit>, <date>[, modified])" from debug.ReadBuildInfo
   settings/          # Resolved runtime configuration: Settings, Layer, Resolve, FromEnv, Defaults. Owns the env var names and built-in defaults; imports nothing from config/models/tui
   config/            # TOML persistence ({UserConfigDir}/llml/config.toml): runtime, discovery cache, [[models]]. Converts to and from settings via RuntimeConfig.Layer / RuntimeConfigFromSettings
   models/            # GGUF + safetensors + NInfer discovery, metadata, runtime detection, formatting; also Ollama API discovery and HF-hub support. Filesystem discovery uses the `modelSource` interface (`ggufSource`, `safetensorsSource`, `ninferSource`, `splashSource`); safetensors rows under oMLX's model dirs are relabeled oMLX by `claimOMLXRows`, and Ollama rows are merged from the daemon API.
@@ -167,6 +168,7 @@ Set machine-specific env (for example `LLAMA_CPP_PATH`) in `mise.local.toml` (gi
 | ---------------------------------------------- | ------------------------- |
 | Run                                            | `mise run run`            |
 | Build                                          | `mise run build`          |
+| Install dev build (`~/.local/bin/llml-dev`)    | `mise run install-dev`    |
 | Format (all)                                   | `mise run format`         |
 | Lint (all)                                     | `mise run lint`           |
 | Test                                           | `mise run test`           |

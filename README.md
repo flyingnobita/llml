@@ -168,7 +168,9 @@ cd llml
 go build -o llml ./cmd/llml
 ```
 
-To install a development build from your clone, use `go install ./cmd/llml` from the repo root, or copy the `llml` binary onto your `PATH`.
+To install a development build from your clone, run `mise run install-dev`. It builds to `~/.local/bin/llml-dev`, so it never shadows a released `llml` installed with Homebrew or the install script.
+
+`llml --version` (and the footer of the `?` shortcuts panel) names the running build. A release prints its version, such as `0.7.1`. Any other build prints its commit, the commit's date, and `modified` if the tree had uncommitted changes, such as `dev (16728e6, 2026-09-28, modified)`, so a stale build is easy to spot.
 
 ### Start
 
@@ -566,6 +568,7 @@ pre-commit install   # optional: enable git pre-commit / pre-push hooks (see .pr
 ```bash
 mise run run      # go run ./cmd/llml
 mise run build    # build to bin/llml
+mise run install-dev  # build to ~/.local/bin/llml-dev
 mise run format   # auto-fix: gofmt + prettier + markdownlint
 mise run lint     # check only: gofmt + vet + prettier + markdownlint
 mise run test     # go test -race ./...
