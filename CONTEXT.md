@@ -40,19 +40,20 @@ _Avoid_: sync, commit, save (those mean other things here).
 
 **Model Format**:
 The on-disk form of a model, which decides the Runtimes that can run it: GGUF
-(llama.cpp, KoboldCpp), Safetensors (vLLM, oMLX), NInfer (`.ninfer`), Splash bundle,
-and Ollama library.
+(llama.cpp, KoboldCpp), Safetensors (vLLM, oMLX, mlx-lm, mlx-vlm), NInfer (`.ninfer`),
+Splash bundle, and Ollama library.
 _Avoid_: model type, file type.
 
 **Runtime**:
 An inference server program llml launches or talks to for a model: llama.cpp,
-KoboldCpp, vLLM, Ollama, NInfer, oMLX, or Splash. A profile's `backend` field names
-the Runtime it launches with; everywhere else, say Runtime.
+KoboldCpp, vLLM, Ollama, NInfer, oMLX, Splash, mlx-lm, or mlx-vlm. A profile's
+`backend` field names the Runtime it launches with; everywhere else, say Runtime.
 _Avoid_: backend (outside the profile field), engine, server type.
 
 **Unsupported Runtime**:
 A Runtime that cannot run on the current platform (oMLX and Splash off Apple Silicon,
-NInfer off Linux). It is absent from the UI entirely.
+NInfer off Linux, mlx-lm and mlx-vlm on Windows and Intel Macs). It is absent from the
+UI entirely.
 _Avoid_: disabled runtime, unavailable runtime.
 
 **Disabled Runtime**:
