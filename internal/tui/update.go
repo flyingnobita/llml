@@ -453,6 +453,23 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 // tableNavKeys handles bindings that are identical in both the idle and split-pane table focus state:
 // config, params, theme, scroll, copy, sort. Returns (model, cmd, handled).
+// scrollLaunchPreviewKey scrolls the visible launch preview for [ or ]
+// without moving focus, and reports whether msg was one of them.
+func (m Model) scrollLaunchPreviewKey(msg tea.KeyPressMsg) (Model, bool) {
+	if !m.launchPreviewVisible() {
+		return m, false
+	}
+	switch {
+	case key.Matches(msg, m.keys.ScrollPreviewUp):
+		m.preview.viewport.ScrollUp(previewScrollStep)
+	case key.Matches(msg, m.keys.ScrollPreviewDown):
+		m.preview.viewport.ScrollDown(previewScrollStep)
+	default:
+		return m, false
+	}
+	return m, true
+}
+
 func (m Model) tableNavKeys(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	switch {
 	case key.Matches(msg, m.keys.ConfigPort):
@@ -480,15 +497,8 @@ func (m Model) tableNavKeys(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 		m2, cmd := m.cycleTheme()
 		return m2, cmd, true
 	case key.Matches(msg, m.keys.ScrollPreviewUp), key.Matches(msg, m.keys.ScrollPreviewDown):
-		if !m.launchPreviewVisible() {
-			return m, nil, false
-		}
-		if key.Matches(msg, m.keys.ScrollPreviewUp) {
-			m.preview.viewport.ScrollUp(1)
-		} else {
-			m.preview.viewport.ScrollDown(1)
-		}
-		return m, nil, true
+		m2, handled := m.scrollLaunchPreviewKey(msg)
+		return m2, nil, handled
 	case key.Matches(msg, m.keys.ScrollLeft):
 		m.table.hscroll.ScrollLeft(hScrollStep)
 		return m, nil, true

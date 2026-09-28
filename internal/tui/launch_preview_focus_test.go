@@ -93,30 +93,37 @@ func TestLaunchPreviewFocus_TabFocusesWhenVisible(t *testing.T) {
 }
 
 // [ and ] scroll a launch preview too long to show at once, without moving
-// focus off the table: in the idle view and beside a running split-pane
-// server. The help panel lists them from the same binding.
+// focus: from the table in the idle view, and from the table or the log
+// beside a split-pane server. The help panel lists them from the same binding.
 func TestLaunchPreview_bracketsScrollWithoutFocus(t *testing.T) {
 	dir := useTempConfigDir(t)
 	row := testRow(models.BackendLlama, filepath.Join(dir, "gemma.gguf"))
 	args := []string{"--ctx-size", "32768", "--temp", "0.7", "--top-p", "0.9", "--top-k", "40", "--min-p", "0.05", "--flash-attn", "on"}
 	saveProfiles(t, row.Path, profiles.Entry{Profiles: []profiles.Profile{{Name: "long", Args: args}}})
 
-	for _, split := range []bool{false, true} {
+	for _, tc := range []struct {
+		name       string
+		split, log bool
+	}{
+		{"idle", false, false},
+		{"split table", true, false},
+		{"split log", true, true},
+	} {
 		m := dimModel(t, newLaunchFakes().services, linuxPlatform, config.RuntimeStates{}, row)
-		m.server.running = split
+		m.server.running, m.server.splitFocused = tc.split, tc.log
 		if m.preview.viewport.TotalLineCount() <= m.preview.viewport.VisibleLineCount() {
 			t.Fatalf("the preview should overflow for this test:\n%s", plainView(m))
 		}
 		m = press(t, m, keyText("]"), keyText("]"))
 		if got := m.preview.viewport.YOffset(); got != 2 {
-			t.Errorf("split=%t: ] twice should scroll the preview down 2 lines, offset %d", split, got)
+			t.Errorf("%s: ] twice should scroll the preview down 2 lines, offset %d", tc.name, got)
 		}
-		if m.preview.focused || m.server.splitFocused {
-			t.Errorf("split=%t: ] should not move focus", split)
+		if m.preview.focused || m.server.splitFocused != tc.log {
+			t.Errorf("%s: ] should not move focus", tc.name)
 		}
 		m = press(t, m, keyText("["))
 		if got := m.preview.viewport.YOffset(); got != 1 {
-			t.Errorf("split=%t: [ should scroll the preview up a line, offset %d", split, got)
+			t.Errorf("%s: [ should scroll the preview up a line, offset %d", tc.name, got)
 		}
 	}
 

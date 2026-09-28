@@ -21,6 +21,9 @@ const (
 	// hScrollStep is the number of columns scrolled per arrow/key press.
 	hScrollStep = 4
 
+	// previewScrollStep is the number of lines [ and ] scroll the launch preview.
+	previewScrollStep = 1
+
 	// appTitle is the primary application name rendered in the title bar.
 	appTitle = "LLM Launcher"
 

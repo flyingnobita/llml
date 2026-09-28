@@ -68,6 +68,10 @@ func (m Model) updateServerSplitKeys(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		m.alerts.viewport, cmd = m.alerts.viewport.Update(msg)
 		return m, cmd
 	}
+	// [ and ] scroll the preview from any pane, the log included.
+	if m2, ok := m.scrollLaunchPreviewKey(msg); ok {
+		return m2, nil
+	}
 	if m.server.exited {
 		switch {
 		case isTabKey(msg):
