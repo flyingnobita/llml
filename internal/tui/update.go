@@ -98,7 +98,8 @@ func (m Model) handleScanMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.settings = msg.settings
 		m.runtime = msg.runtime
 		m.runtimeScanned = true
-		return m.adoptRuntimeStates(msg.states, msg.runtime), nil
+		// r cleared the footer before re-detecting; report what is missing now.
+		return m.adoptRuntimeStates(msg.states, msg.runtime).maybeSetMissingRuntimeFooterNote()
 
 	case startupCacheHitMsg:
 		m = m.cancelInFlightScan()
