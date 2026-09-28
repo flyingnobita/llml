@@ -67,6 +67,10 @@ func assertGolden(t *testing.T, name, got string) {
 
 // goldenModel builds a model with fixed content and size, so the rendering is
 // reproducible: no real discovery, no clock, no terminal detection.
+// goldenBuildID is a fixed build identity, so golden files do not churn with
+// every commit.
+const goldenBuildID = "dev (16728e6, 2026-09-28, modified)"
+
 func goldenModel(t *testing.T) Model {
 	t.Helper()
 
@@ -83,6 +87,7 @@ func goldenModel(t *testing.T) Model {
 	m.layout.height = 30
 	m.layout.homeDir = "/home/u"
 	m.loading = false
+	m.buildID = goldenBuildID
 	m.runtime = models.RuntimeInfo{
 		LlamaServerPath:  "/opt/llama/bin/llama-server",
 		LlamaServerHost:  "127.0.0.1",
@@ -244,8 +249,18 @@ func TestGolden_runtimeConfigPanelDisabled(t *testing.T) {
 
 func TestGolden_helpPanel(t *testing.T) {
 	m := goldenModel(t)
-	m.helpOpen = true
+	m = m.openHelp()
 	assertGolden(t, "help_panel", m.View().Content)
+}
+
+// TestGolden_helpPanelTall pins the popup when every shortcut fits, so the
+// scroll hint is absent.
+func TestGolden_helpPanelTall(t *testing.T) {
+	m := goldenModel(t)
+	m.layout.height = 60
+	m = m.layoutTable()
+	m = m.openHelp()
+	assertGolden(t, "help_panel_tall", m.View().Content)
 }
 
 func TestGolden_alertHistoryPane(t *testing.T) {

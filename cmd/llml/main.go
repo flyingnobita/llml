@@ -114,7 +114,7 @@ func (c cli) runTUI() int {
 	if err := userdata.MaybeBackupOnVersionChange(version); err != nil {
 		fmt.Fprintf(c.stderr, "llml: warning: config backup: %v\n", err)
 	}
-	if err := tui.Run(); err != nil {
+	if err := tui.Run(buildinfo.Identity(version)); err != nil {
 		fmt.Fprintf(c.stderr, "%v\n", err)
 		return 1
 	}

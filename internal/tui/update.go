@@ -283,11 +283,7 @@ func (m Model) routeTextInputMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) routeModalKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 	switch {
 	case m.helpOpen:
-		if isEscapeKey(msg) || key.Matches(msg, m.keys.Help) {
-			m.helpOpen = false
-		}
-		// The help overlay swallows every other key.
-		return m, nil, true
+		return m.updateHelpKey(msg), nil, true
 	case m.importView.open:
 		m2, cmd := m.updateImportKey(msg)
 		return m2, cmd, true
@@ -391,8 +387,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if key.Matches(msg, m.keys.Help) {
-			m.helpOpen = true
-			return m, nil
+			return m.openHelp(), nil
 		}
 		return m.updateServerSplitKeys(msg)
 	}
@@ -400,8 +395,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.cancelInFlightScan(), tea.Quit
 	}
 	if key.Matches(msg, m.keys.Help) {
-		m.helpOpen = true
-		return m, nil
+		return m.openHelp(), nil
 	}
 	if key.Matches(msg, m.keys.Alerts) {
 		m = m.toggleAlerts()
