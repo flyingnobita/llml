@@ -383,9 +383,11 @@ follow these rules:
 
    **`mlx-vlm`**
    - Env: `HF_TOKEN`.
-   - Args: `--model`, `--adapter-path`, `--draft-model`, `--model-dir`. The first three are
-     as for `mlx-lm`; `--model-dir` (mlx-vlm 0.7 and later) names a local folder of models
-     the server lists and loads on request.
+   - Args: `--model`, `--adapter-path`, `--draft-model`, `--model-dir`, `--image-model`,
+     `--tts-model`, `--stt-model`, `--embedding-model`, `--reranker-model`. The first three
+     are as for `mlx-lm`; `--model-dir` (mlx-vlm 0.7 and later) names a local folder of
+     models the server lists and loads on request, and the last five (also 0.7 and later)
+     name the other models it can serve beside the language model.
 
    **`omlx`**
    - Args: `--model-dir`. oMLX's per-model settings live in the oMLX app, so an

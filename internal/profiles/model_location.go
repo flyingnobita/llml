@@ -166,6 +166,9 @@ var mlxVLMRules = locationRules{
 	},
 	argTokens: map[string]bool{
 		"--model": true, "--adapter-path": true, "--draft-model": true, "--model-dir": true,
+		// The other models mlx-vlm 0.7.x can serve beside the language model.
+		"--image-model": true, "--tts-model": true, "--stt-model": true,
+		"--embedding-model": true, "--reranker-model": true,
 	},
 }
 

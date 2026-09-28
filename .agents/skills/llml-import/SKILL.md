@@ -377,7 +377,7 @@ MODEL_LOCATION_PARAMS = {
     },
     'mlx-vlm': {
         'env': {'HF_TOKEN'},
-        'args': {'--model', '--adapter-path', '--draft-model', '--model-dir'},
+        'args': {'--model', '--adapter-path', '--draft-model', '--model-dir', '--image-model', '--tts-model', '--stt-model', '--embedding-model', '--reranker-model'},
     },
     'omlx': {
         'env': set(),

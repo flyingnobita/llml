@@ -206,8 +206,9 @@ func TestPortableProfile_mlxLMBackend(t *testing.T) {
 	}
 }
 
-// mlx_vlm.server takes the model, a LoRA adapter, a draft model, and extra
-// model folders (--model-dir, 0.7.x) by local path or Hugging Face repo id,
+// mlx_vlm.server takes the model, a LoRA adapter, a draft model, extra model
+// folders (--model-dir, 0.7.x), and the image, speech, embedding, and reranker
+// models it can also serve (0.7.x) by local path or Hugging Face repo id,
 // and HF_TOKEN reaches the Hub. llml supplies the model, so all of them are
 // stripped; server tuning flags are kept.
 func TestStripModelLocationParams_mlxVLM(t *testing.T) {
@@ -219,6 +220,11 @@ func TestStripModelLocationParams_mlxVLM(t *testing.T) {
 		"--adapter-path /home/u/adapters/a",
 		"--draft-model mlx-community/Qwen3-0.6B-4bit",
 		"--model-dir /home/u/models",
+		"--image-model mlx-community/FLUX.1-schnell-4bit",
+		"--tts-model mlx-community/Kokoro-82M-bf16",
+		"--stt-model mlx-community/whisper-large-v3-turbo",
+		"--embedding-model mlx-community/bge-small-en-v1.5",
+		"--reranker-model mlx-community/bge-reranker-base",
 		"--max-tokens 4096",
 		"--kv-bits 4",
 		"--trust-remote-code",
@@ -228,11 +234,11 @@ func TestStripModelLocationParams_mlxVLM(t *testing.T) {
 	if len(keptEnv) != 1 || keptEnv[0].Key != "MLX_METAL_DEBUG" || len(droppedEnv) != 1 {
 		t.Errorf("env: kept %v, dropped %v, want HF_TOKEN dropped", keptEnv, droppedEnv)
 	}
-	if want := args[4:]; !slices.Equal(keptArgs, want) {
+	if want := args[9:]; !slices.Equal(keptArgs, want) {
 		t.Errorf("kept args = %v, want %v", keptArgs, want)
 	}
-	if len(droppedArgs) != 4 {
-		t.Errorf("dropped args = %v, want the model, adapter, draft, and model dir", droppedArgs)
+	if len(droppedArgs) != 9 {
+		t.Errorf("dropped args = %v, want every model-location flag", droppedArgs)
 	}
 }
 
