@@ -283,3 +283,28 @@ func TestSafetensorsRuntime_importedProfileChoosesRuntime(t *testing.T) {
 		t.Errorf("launched on %v, want vLLM", got.backend)
 	}
 }
+
+// The missing-Runtime footer follows the Runtime each row launches with: a
+// row switched off its discovery Runtime no longer counts toward it, and a
+// row with no override still does.
+func TestMissingRuntimeFooter_followsChosenRuntime(t *testing.T) {
+	dir := useTempConfigDir(t)
+	omlx := omlxRow(dir)
+	gguf := testRow(models.BackendLlama, filepath.Join(dir, "gemma.gguf"))
+	saveProfiles(t, omlx.Path, profiles.Entry{Profiles: []profiles.Profile{{Name: "vllm", Backend: "vllm"}}})
+	saveProfiles(t, gguf.Path, profiles.Entry{Profiles: []profiles.Profile{{Name: "kobold", Backend: "koboldcpp"}}})
+
+	m := dimModel(t, newLaunchFakes().services, macPlatform, config.RuntimeStates{}, omlx, gguf)
+	m.runtime.OMLXPath, m.runtime.LlamaServerPath, m.runtime.ServerRunning = "", "", false
+	m, _ = m.maybeSetMissingRuntimeFooterNote()
+	if m.lastRunNote != "" {
+		t.Errorf("no row launches with oMLX or llama.cpp, yet the footer says %q", m.lastRunNote)
+	}
+
+	m = dimModel(t, newLaunchFakes().services, macPlatform, config.RuntimeStates{}, omlxRow(dir), hfRow(dir))
+	m.runtime.VLLMPath = ""
+	m, _ = m.maybeSetMissingRuntimeFooterNote()
+	if !strings.Contains(m.lastRunNote, MissingVLLMFooterNote) {
+		t.Errorf("a row with no override on the missing vLLM should be reported, note %q", m.lastRunNote)
+	}
+}
