@@ -110,8 +110,10 @@ func TestSafetensorsRuntime_omlxOfferedOnlyInItsFolders(t *testing.T) {
 			if opts := m.paramBackendOptionsForModel(); slices.Contains(opts, "omlx") {
 				t.Errorf("oMLX offered outside its folders: %q", opts)
 			}
-			if strings.Contains(plainView(m), "omlx") {
-				t.Errorf("the p panel should not mention oMLX:\n%s", plainView(m))
+			// Only the panel: the screen behind it shows the row's temp path,
+			// which contains this test's name and so the word "omlx".
+			if panel := ansi.Strip(m.paramPanelModalBlock()); strings.Contains(panel, "omlx") {
+				t.Errorf("the p panel should not mention oMLX:\n%s", panel)
 			}
 		})
 	}

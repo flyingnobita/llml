@@ -49,6 +49,12 @@ func findBinaryInEnvAndCommonDirs(name, envDir string, commonDirs []string) stri
 // findVLLMBinary resolves the vllm executable from vllmPath, then venvRoot, then
 // common install directories, then PATH. Both parameters may be empty.
 func findVLLMBinary(vllmPath, venvRoot string) string {
+	return findVLLMBinaryIn(vllmPath, venvRoot, commonBinaryDirs)
+}
+
+// findVLLMBinaryIn is [findVLLMBinary] with the system install directories
+// passed in, so a test can leave out a vllm the host has installed there.
+func findVLLMBinaryIn(vllmPath, venvRoot string, systemDirs []string) string {
 	if dir := vllmPath; dir != "" {
 		clean := filepath.Clean(dir)
 		if isRegularFile(clean) && filepath.Base(clean) == "vllm" {
@@ -68,7 +74,7 @@ func findVLLMBinary(vllmPath, venvRoot string) string {
 			return p
 		}
 	}
-	common := slices.Clone(commonBinaryDirs)
+	common := slices.Clone(systemDirs)
 	if home, err := os.UserHomeDir(); err == nil {
 		common = append(common, filepath.Join(home, ".local", "bin"))
 		if runtime.GOOS == "darwin" {

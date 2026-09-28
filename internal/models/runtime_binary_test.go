@@ -175,7 +175,8 @@ func TestFindVLLMBinary_DarwinVenvVllmMetal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got := findVLLMBinary("", "")
+	// No system dirs: a vllm the host has in /opt/homebrew/bin must not win.
+	got := findVLLMBinaryIn("", "", nil)
 	if got != vllm {
 		t.Fatalf("got %q want %q", got, vllm)
 	}
