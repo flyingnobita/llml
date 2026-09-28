@@ -1,15 +1,32 @@
 # Sync the winget-pkgs fork before or after releases so GoReleaser PRs merge cleanly.
-# Requires: repository secret WINGET_GITHUB_TOKEN.
-# For fork sync, a fine-grained PAT scoped to the fork is enough, but the release workflow's
-# PR creation into microsoft/winget-pkgs requires a classic PAT. Keep one classic PAT here
-# so both sync and release use the same credential model.
+# Requires: repository secret WINGET_GITHUB_TOKEN, a personal access token (classic) with:
+#   - repo: push to the fork, and open the release job's PR into microsoft/winget-pkgs.
+#   - workflow: merge upstream commits that change files under .github/workflows,
+#     which microsoft/winget-pkgs does from time to time.
+# It must be classic: a fine-grained PAT cannot open the PR into microsoft/winget-pkgs,
+# and the release workflow shares this secret.
+# A failed sync opens one "Weekly Winget fork sync is failing" issue (or comments on
+# the open one), and the next successful sync closes it. To test that without breaking
+# the token, run the workflow by hand with force_failure ticked.
+# Step scripts take every value from env, never from ${{ }} inside `run:`, so
+# scripts/winget_fork_sync_test.go can run them with a fake gh.
 
 name: Sync winget-pkgs fork
 
 on:
   workflow_dispatch:
+    inputs:
+      force_failure:
+        description: Fail on purpose, to test the tracking issue without breaking the token
+        type: boolean
+        default: false
   schedule:
     - cron: "0 6 * * 1"
+
+# Overlapping runs (a manual run during the Monday cron) could each open an issue.
+concurrency:
+  group: winget-fork-sync
+  cancel-in-progress: false
 
 jobs:
   sync:
@@ -17,23 +34,84 @@ jobs:
     # when the secret is missing; scheduled runs exit 0 if unset so weekly cron does not spam.
     runs-on: ubuntu-latest
     permissions: {}
+    outputs:
+      skipped: ${{ steps.sync.outputs.skipped }}
     steps:
       - name: Sync fork with microsoft/winget-pkgs
+        id: sync
         env:
           GH_TOKEN: ${{ secrets.WINGET_GITHUB_TOKEN }}
+          FORK: ${{ github.repository_owner }}/winget-pkgs
+          # Empty on scheduled runs, which have no inputs.
+          FORCE_FAILURE: ${{ inputs.force_failure }}
         run: |
           set -euo pipefail
+          if [ "${FORCE_FAILURE:-}" = "true" ]; then
+            echo "::error::Failing on purpose: the run was started with force_failure."
+            exit 1
+          fi
           if [ -z "${GH_TOKEN}" ]; then
             if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
-              echo "::error::WINGET_GITHUB_TOKEN is not set. Add a PAT in Repo → Settings → Secrets and variables → Actions (needs push access to ${{ github.repository_owner }}/winget-pkgs)."
+              echo "::error::WINGET_GITHUB_TOKEN is not set. Add a classic PAT with the repo and workflow scopes in Repo → Settings → Secrets and variables → Actions (it needs push access to ${FORK})."
               exit 1
             fi
             echo "Skipping scheduled sync: WINGET_GITHUB_TOKEN is not set."
+            echo "skipped=true" >>"${GITHUB_OUTPUT}"
             exit 0
           fi
-          FORK="${{ github.repository_owner }}/winget-pkgs"
           if ! gh repo view "${FORK}" >/dev/null 2>&1; then
             echo "::error::Fork ${FORK} not found. Fork https://github.com/microsoft/winget-pkgs on GitHub, or run scripts/setup-winget-fork.sh locally with gh auth."
             exit 1
           fi
-          gh repo sync "${FORK}" -b master
+          status=0
+          out="$(gh repo sync "${FORK}" -b master 2>&1)" || status=$?
+          echo "${out}"
+          if [ "${status}" -ne 0 ]; then
+            # gh's message quotes the scope in literal backticks.
+            # shellcheck disable=SC2016
+            if grep -q 'the `workflow` scope' <<<"${out}"; then
+              echo "::error::WINGET_GITHUB_TOKEN lacks the workflow scope, which syncing needs because upstream commits change workflow files. Edit the classic PAT at https://github.com/settings/tokens and tick workflow (the secret keeps working), or create a classic PAT with repo and workflow and replace the secret."
+            fi
+            exit "${status}"
+          fi
+
+  track:
+    # A failing sync keeps one open issue on this repo's tracker until a sync
+    # succeeds again. This job holds the only permission beyond the sync's, and
+    # uses GITHUB_TOKEN, never the PAT.
+    needs: sync
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Open, update, or close the tracking issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SYNC_RESULT: ${{ needs.sync.result }}
+          SYNC_SKIPPED: ${{ needs.sync.outputs.skipped }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          # A sync skipped for want of a token proves nothing either way.
+          if [ "${SYNC_SKIPPED:-}" = "true" ]; then
+            echo "The sync was skipped; leaving any tracking issue as it is."
+            exit 0
+          fi
+          # The tracking issue is found by its exact title alone, so relabelling
+          # it during triage does not orphan it; issue listing, unlike search,
+          # has no indexing lag.
+          export TITLE="Weekly Winget fork sync is failing"
+          label="ready-for-human"
+          issue="$(gh issue list --state open --limit 500 --json number,title \
+            --jq 'map(select(.title == env.TITLE)) | first | .number // empty')"
+          if [ "${SYNC_RESULT}" = "failure" ]; then
+            if [ -n "${issue}" ]; then
+              gh issue comment "${issue}" --body "Failed again: ${RUN_URL}"
+            else
+              gh issue create --title "${TITLE}" --label "${label}" --body "The Sync winget-pkgs fork workflow failed: ${RUN_URL}"
+            fi
+          elif [ "${SYNC_RESULT}" = "success" ] && [ -n "${issue}" ]; then
+            gh issue close "${issue}" --comment "The sync succeeded again: ${RUN_URL}"
+          fi
