@@ -20,12 +20,13 @@ detects installed runtimes
 **[mlx-vlm](https://github.com/Blaizzy/mlx-vlm)**,
 **[oMLX](https://omlx.ai/)**, and
 **[Splash](https://github.com/incoai/splash)**),
+plus the **[Strata](https://github.com/Niko1221/Strata)** engine packs it finds in a Strata install,
 and lets you save named parameter profiles per model — so the command that worked
 last time is always one keystroke away.
 
 Browse local models. Detect the right runtime. Launch with one key.
 
-Works alongside llama.cpp, vLLM, Ollama, KoboldCpp, NInfer, mlx-lm, mlx-vlm, oMLX, and Splash — not a replacement for them.
+Works alongside llama.cpp, vLLM, Ollama, KoboldCpp, NInfer, mlx-lm, mlx-vlm, oMLX, Splash, and Strata — not a replacement for them.
 llml is the profile manager for whatever backend you already run.
 
 > [!NOTE]
@@ -37,14 +38,15 @@ llml is the profile manager for whatever backend you already run.
 
 - **Model discovery** — auto-scans common paths for GGUF files, safetensors model
   directories, and NInfer artifacts (including the `models/` directory of a configured
-  NInfer checkout), models in oMLX's model directories, and Splash bundles in the Hugging
-  Face cache; add extra roots via `LLML_MODEL_PATHS` and/or `config.toml`. Results are
+  NInfer checkout), models in oMLX's model directories, Splash bundles in the Hugging
+  Face cache, and Strata engine configs (`strata-<model>.json`) in a Strata install;
+  add extra roots via `LLML_MODEL_PATHS` and/or `config.toml`. Results are
   cached under **`{UserConfigDir}/llml/cache/models.toml`** so the next launch can skip the
   filesystem walk when the cache is still valid.
-- **Runtime detection** — finds installed `llama-server`, `vllm`, `koboldcpp`, `ninfer-serve`, `mlx_lm.server`, `mlx_vlm.server`, `omlx`, and `splash` binaries and maps
+- **Runtime detection** — finds installed `llama-server`, `vllm`, `koboldcpp`, `ninfer-serve`, `mlx_lm.server`, `mlx_vlm.server`, `omlx`, and `splash` binaries, a Strata install's `serve/server.py`, and
   installed `ollama` plus the configured Ollama host, then maps each model to its
-  compatible runtime. GGUF models can use llama.cpp or KoboldCpp, and safetensors models vLLM,
-  mlx-lm, or mlx-vlm, via profile selection.
+  compatible runtime. GGUF models can use llama.cpp or KoboldCpp, safetensors models vLLM,
+  mlx-lm, or mlx-vlm, via profile selection, and Strata engine packs run on Strata.
 - **Named parameter profiles** — save multiple profiles per model (e.g. `fast-laptop`,
   `quality`, `api-8080`), each storing runtime args, env vars, port, and context
   settings. The active profile is always one key away.
@@ -72,7 +74,8 @@ llml is the profile manager for whatever backend you already run.
 
 - **Runtime engine (at least one)**: **llama.cpp** (`llama-server`) or **KoboldCpp** (`koboldcpp`) for GGUF models,
   **vLLM** (`vllm`), **mlx-lm** (`mlx_lm.server`), or **mlx-vlm** (`mlx_vlm.server`) for safetensors models (the MLX runtimes on Apple Silicon and Linux), **NInfer** (`ninfer-serve`) for `.ninfer`
-  artifacts on Linux, **oMLX** (`omlx`) or **Splash** (`splash`) on Apple Silicon, and/or **Ollama** (`ollama`) for Ollama models are installed (see [Runtime Engines](#runtime-engines)).
+  artifacts on Linux, **oMLX** (`omlx`) or **Splash** (`splash`) on Apple Silicon, **Strata** for its installed engine packs on Windows and Linux (NVIDIA / AMD),
+  and/or **Ollama** (`ollama`) for Ollama models are installed (see [Runtime Engines](#runtime-engines)).
 - **Models** in default scan locations, or configure custom roots with `LLML_MODEL_PATHS` (see [Model Discovery](#model-discovery)).
 
 ### Install
@@ -294,7 +297,7 @@ Typical flow:
 
 What it imports:
 
-- portable runtime args and env vars for `llama.cpp`, `vLLM`, Ollama, or KoboldCpp
+- portable runtime args and env vars for `llama.cpp`, `vLLM`, Ollama, KoboldCpp, NInfer, mlx-lm, mlx-vlm, oMLX, Splash, or Strata
 - profile names, model hints, and optional one-line descriptions
 
 What it does not keep:
@@ -394,6 +397,9 @@ may be out of date until you turn Ollama back on and scan again.
 | **mlx-vlm path**    | `MLX_VLM_PATH`       | `default_mlx_vlm_path`                | _(auto)_          |
 | **mlx-vlm port**    | `MLX_VLM_PORT`       | `default_mlx_vlm_port`                | `8080`            |
 | **mlx-vlm host**    | `MLX_VLM_HOST`       | `default_mlx_vlm_host`                | `127.0.0.1`       |
+| **Strata path**     | `STRATA_PATH`        | `default_strata_path`                 | _(auto)_          |
+| **Strata port**     | `STRATA_PORT`        | `default_strata_port`                 | `8080`            |
+| **Strata host**     | `STRATA_HOST`        | `default_strata_host`                 | `127.0.0.1`       |
 | **TUI Theme**       | `LLML_THEME`         | -                                     | `auto`            |
 
 **Detection Logic:**
@@ -407,7 +413,8 @@ may be out of date until you turn Ollama back on and scan again.
    report in `/v1/models`, mlx-lm by a `/health` status of `ok` from Python's HTTP server (a
    `Server` header starting `BaseHTTP/`), mlx-vlm by a `/health` status of `healthy`,
    llama.cpp by a `/health` answer from a server that is not NInfer, mlx-lm, or mlx-vlm, and
-   vLLM by an answer from a server that is not oMLX, Splash, mlx-lm, or mlx-vlm.
+   vLLM by an answer from a server that is not oMLX, Splash, mlx-lm, or mlx-vlm. Strata
+   shares 8080 too and names itself in its `/health` body (`"service": "strata"`).
 5. (vLLM only) Common venv locations (e.g., `~/.venv-vllm-metal/bin` on macOS).
 6. (KoboldCpp only) Platform-specific name variants with CUDA preference on Linux.
 7. (NInfer only) NInfer has no install target, so `NINFER_PATH` may point at the checkout
@@ -428,9 +435,15 @@ may be out of date until you turn Ollama back on and scan again.
     common-directory step. See [Setting up mlx-lm](#setting-up-mlx-lm).
 11. (mlx-vlm only) The same for the `mlx_vlm.server` script and `MLX_VLM_PATH`. See
     [Setting up mlx-vlm](#setting-up-mlx-vlm).
+12. (Strata only) `STRATA_PATH` may be the Strata install directory, its `serve/server.py`,
+    its `engine/strata`, or one of its engine config files. When unset, llml reads the
+    installs from Strata's own `settings.json` and also checks `~/Applications/strata` and
+    `~/Strata`. Each `strata-<model>.json` engine config becomes a row; **R** runs the
+    install's venv Python with `serve/server.py --engine strata --config <config>`.
 
-NInfer is shown only on Linux, oMLX and Splash only on Apple Silicon macOS, and mlx-lm and mlx-vlm
-only on Apple Silicon macOS and Linux (x86_64 and aarch64); the `c` panel hides runtimes the platform
+NInfer is shown only on Linux, oMLX and Splash only on Apple Silicon macOS, mlx-lm and mlx-vlm
+only on Apple Silicon macOS and Linux (x86_64 and aarch64), and Strata only on Linux and Windows
+(the platforms its NVIDIA / AMD engines ship for); the `c` panel hides runtimes the platform
 cannot run. A runtime turned off in `c` gets no server probe, but
 llml still looks for its program on disk so the panel can show whether it is installed.
 
@@ -514,6 +527,31 @@ Things to know:
 - **Port:** mlx-vlm's default port is `8080`, the same as llama.cpp's, NInfer's, and
   mlx-lm's. Set `MLX_VLM_PORT` to run them side by side.
 
+#### Setting up Strata
+
+[Strata](https://github.com/Niko1221/Strata) runs its own large Qwen3.8-Flash-Next model on an
+NVIDIA or AMD card, on Windows or Linux. Install it with its `START-HERE.bat` / `./setup.sh`;
+setup writes one engine config per model (`strata-<model>.json`) in the Strata folder. llml
+discovers each config as a row and **R** runs:
+
+```sh
+<install>/.venv/bin/python <install>/serve/server.py \
+  --engine strata --config <install>/strata-<model>.json \
+  --host <host> --port <port> <profile args>
+```
+
+- **Path:** when `STRATA_PATH` (or the `c` panel's Path field) is unset, llml reads the
+  installs from Strata's own `settings.json` and also checks `~/Applications/strata` and
+  `~/Strata`. Set it to the install directory (or its `serve/server.py`, its `engine/strata`,
+  or an engine config) when your install lives elsewhere.
+- **Port:** Strata's setup default is `8080`, which its own `/health` body distinguishes (it
+  names `"service": "strata"`). Set `STRATA_PORT` to move it.
+- **Platform:** shown on Windows and Linux only, the platforms Strata ships NVIDIA / AMD
+  engines for.
+- **Profiles:** the engine config already carries the model, engine args, tokenizer, and data
+  paths, so a profile for a Strata row usually just adds server flags. Model-location flags
+  (`--config`, `--engine`, `--pack`, `--native`, `--mtp`, …) are stripped on import.
+
 ---
 
 ### Model Discovery
@@ -543,6 +581,9 @@ The app recognizes the following model types:
 
 - **GGUF**: Files ending in `.gguf`.
 - **Safetensors**: Directories containing `config.json` and `*.safetensors` files (Hugging Face style).
+- **NInfer**: Files ending in `.ninfer`.
+- **Splash**: Bundles in the Hugging Face cache.
+- **Strata**: `strata-<model>.json` engine configs in a Strata install (read directly, not walked).
 
 ---
 
