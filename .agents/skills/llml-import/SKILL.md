@@ -59,7 +59,7 @@ Rules (from the spec's LLM extraction section):
 - Standalone flags (e.g. `--flash-attn`) are single-element strings.
 - Environment variables become `[[profiles.env]]` entries.
 - Set `backend` to `llama`, `vllm`, `ollama`, `koboldcpp`, `ninfer`, `mlx-lm`, `mlx-vlm`,
-  `omlx`, or `splash` based on the source context.
+  `omlx`, `splash`, or `strata` based on the source context.
 - Set `model_hint` to the model name or family from the source.
 - Derive `name` from the section heading or context (e.g. `"default"`, `"4-bit-gpu"`,
   `"cpu-only"`).
@@ -387,6 +387,15 @@ MODEL_LOCATION_PARAMS = {
         'env': {'HF_HOME', 'HF_TOKEN', 'HUGGINGFACE_HUB_CACHE'},
         'args': {'--model', '--revision', '--draft-model'},
     },
+    'strata': {
+        'env': {'STRATA_DATA', 'STRATA_PATH'},
+        'args': {
+            '--config', '--engine', '--pack', '--native', '--ple-gguf',
+            '--expert-profile', '--expert-cache', '--mtp', '--tokenizer',
+            '--data-dir', '--lib-dirs', '--root', '--gpu', '--gpus',
+            '--host', '--port', '--open',
+        },
+    },
 }
 
 def expand_arg_line(line):
@@ -445,7 +454,7 @@ def normalize_backend(v):
         return 'ollama'
     if s in ('koboldcpp', 'kobold'):
         return 'koboldcpp'
-    if s in ('ninfer', 'mlx-lm', 'mlx-vlm', 'omlx', 'splash'):
+    if s in ('ninfer', 'mlx-lm', 'mlx-vlm', 'omlx', 'splash', 'strata'):
         return s
     return ''
 
@@ -692,7 +701,7 @@ Required fields:
 - `schema_version = 2`
 - `[[profiles]].name`
 - `[[profiles]].backend` (`llama`, `vllm`, `ollama`, `koboldcpp`, `ninfer`, `mlx-lm`,
-  `mlx-vlm`, `omlx`, or `splash`)
+  `mlx-vlm`, `omlx`, `splash`, or `strata`)
 
 Optional fields:
 
