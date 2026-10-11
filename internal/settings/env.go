@@ -30,6 +30,7 @@ func FromEnv(getenv Getenv) Layer {
 	setPath(&l.SplashPath, getenv(EnvSplashPath))
 	setPath(&l.MLXLMPath, getenv(EnvMLXLMPath))
 	setPath(&l.MLXVLMPath, getenv(EnvMLXVLMPath))
+	setPath(&l.StrataPath, getenv(EnvStrataPath))
 	setPath(&l.HFHubCache, getenv(EnvHFHubCache))
 	setPath(&l.HFHome, getenv(EnvHFHome))
 
@@ -40,6 +41,7 @@ func FromEnv(getenv Getenv) Layer {
 	setHost(&l.SplashHost, getenv(EnvSplashHost))
 	setHost(&l.MLXLMHost, getenv(EnvMLXLMHost))
 	setHost(&l.MLXVLMHost, getenv(EnvMLXVLMHost))
+	setHost(&l.StrataHost, getenv(EnvStrataHost))
 	setOllamaHost(&l.OllamaHost, getenv(EnvOllamaHost))
 
 	setPort(&l.LlamaServerPort, getenv(EnvLlamaServerPort))
@@ -50,6 +52,7 @@ func FromEnv(getenv Getenv) Layer {
 	setPort(&l.SplashPort, getenv(EnvSplashPort))
 	setPort(&l.MLXLMPort, getenv(EnvMLXLMPort))
 	setPort(&l.MLXVLMPort, getenv(EnvMLXVLMPort))
+	setPort(&l.StrataPort, getenv(EnvStrataPort))
 
 	l.ExtraModelPaths = SplitPathList(getenv(EnvModelPaths))
 	l.OMLXModelDirs = SplitPathList(getenv(EnvOMLXModelDirs))

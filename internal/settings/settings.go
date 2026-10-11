@@ -83,6 +83,13 @@ const (
 	EnvMLXVLMHost = "MLX_VLM_HOST"
 	// EnvMLXVLMPort is the TCP port for mlx_vlm.server and its /health probe.
 	EnvMLXVLMPort = "MLX_VLM_PORT"
+	// EnvStrataPath is a Strata install directory, its serve/server.py, its
+	// engine/strata, or an engine config file inside it.
+	EnvStrataPath = "STRATA_PATH"
+	// EnvStrataHost is the listen host for the Strata server.
+	EnvStrataHost = "STRATA_HOST"
+	// EnvStrataPort is the TCP port for the Strata server and its /health probe.
+	EnvStrataPort = "STRATA_PORT"
 	// EnvModelPaths lists extra model search roots, comma-separated.
 	EnvModelPaths = "LLML_MODEL_PATHS"
 	// EnvHFHubCache overrides the Hugging Face hub cache directory.
@@ -120,6 +127,11 @@ const (
 	// llama-server and mlx_lm.server; detection tells them apart.
 	DefaultMLXVLMHost = "127.0.0.1"
 	DefaultMLXVLMPort = 8080
+	// DefaultStrataHost is loopback. DefaultStrataPort matches the port
+	// Strata's own setup picks for a new install (8080); its /health service
+	// field tells it apart from the other runtimes on that port.
+	DefaultStrataHost = "127.0.0.1"
+	DefaultStrataPort = 8080
 )
 
 // Settings holds every runtime value in fully resolved form. Path fields are
@@ -163,6 +175,16 @@ type Settings struct {
 	MLXVLMPath string
 	MLXVLMHost string
 	MLXVLMPort int
+
+	// StrataPath is a Strata install directory (or its serve/server.py, its
+	// engine/strata, or an engine config file inside it).
+	StrataPath string
+	StrataHost string
+	StrataPort int
+	// StrataInstalls are Strata install directories read from Strata's own
+	// settings.json. They are searched together with StrataPath; see
+	// [Settings.StrataRoots].
+	StrataInstalls []string
 
 	// ExtraModelPaths are additional filesystem roots to scan for models.
 	ExtraModelPaths []string
@@ -221,6 +243,13 @@ type Layer struct {
 	MLXVLMHost *string
 	MLXVLMPort *int
 
+	StrataPath *string
+	StrataHost *string
+	StrataPort *int
+	// StrataInstalls is taken whole from the first layer that sets it, like
+	// OMLXModelDirs: it names Strata's own installs, not extra places to look.
+	StrataInstalls []string
+
 	ExtraModelPaths []string
 	HFHubCache      *string
 	HFHome          *string
@@ -250,6 +279,9 @@ func Defaults() Layer {
 		MLXLMPort:  ptr(DefaultMLXLMPort),
 		MLXVLMHost: ptr(DefaultMLXVLMHost),
 		MLXVLMPort: ptr(DefaultMLXVLMPort),
+
+		StrataHost: ptr(DefaultStrataHost),
+		StrataPort: ptr(DefaultStrataPort),
 	}
 }
 
@@ -295,6 +327,14 @@ func Resolve(layers ...Layer) Settings {
 		take(&s, l.Origin, FieldMLXVLMPath, &s.MLXVLMPath, l.MLXVLMPath)
 		take(&s, l.Origin, FieldMLXVLMHost, &s.MLXVLMHost, l.MLXVLMHost)
 		take(&s, l.Origin, FieldMLXVLMPort, &s.MLXVLMPort, l.MLXVLMPort)
+		take(&s, l.Origin, FieldStrataPath, &s.StrataPath, l.StrataPath)
+		take(&s, l.Origin, FieldStrataHost, &s.StrataHost, l.StrataHost)
+		take(&s, l.Origin, FieldStrataPort, &s.StrataPort, l.StrataPort)
+		if len(s.StrataInstalls) == 0 && len(l.StrataInstalls) > 0 {
+			var dirs fsutil.PathSet
+			dirs.Add(l.StrataInstalls...)
+			s.StrataInstalls = dirs.Slice()
+		}
 		claim(&s.HFHubCache, l.HFHubCache)
 		claim(&s.HFHome, l.HFHome)
 		roots.Add(l.ExtraModelPaths...)

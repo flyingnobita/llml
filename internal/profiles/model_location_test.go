@@ -266,3 +266,35 @@ func TestPortableProfile_mlxVLMBackend(t *testing.T) {
 		t.Errorf("exported backend = %q, want mlx-vlm", got)
 	}
 }
+
+// Strata's engine config is supplied by llml, so the flags naming it, the
+// engine, its pack, and the listen address are all machine-specific. Server
+// tuning that lives in the profile (vision, prefill) is kept.
+func TestStripModelLocationParams_strata(t *testing.T) {
+	t.Parallel()
+
+	env := []PortableEnvVar{{Key: "STRATA_DATA", Value: "/data"}, {Key: "STRATA_API_KEY", Value: "k"}}
+	args := []string{
+		"--config /opt/strata/strata-iq3_s.json",
+		"--engine strata",
+		"--port 9003",
+		"--vision gpu",
+		"--prefill auto",
+	}
+	keptEnv, keptArgs, droppedEnv, droppedArgs := StripModelLocationParams("strata", env, args)
+	if want := []PortableEnvVar{{Key: "STRATA_API_KEY", Value: "k"}}; !slices.Equal(keptEnv, want) {
+		t.Errorf("keptEnv = %v, want %v", keptEnv, want)
+	}
+	if want := []string{"--vision gpu", "--prefill auto"}; !slices.Equal(keptArgs, want) {
+		t.Errorf("keptArgs = %v, want %v", keptArgs, want)
+	}
+	if want := []string{"STRATA_DATA=/data"}; !slices.Equal(droppedEnv, want) {
+		t.Errorf("droppedEnv = %v, want %v", droppedEnv, want)
+	}
+	if len(droppedArgs) != 3 {
+		t.Errorf("droppedArgs = %v, want the config, engine, and port", droppedArgs)
+	}
+	if got := NormalizeBackendInput(" Strata "); got != "strata" {
+		t.Errorf("NormalizeBackendInput = %q, want strata", got)
+	}
+}

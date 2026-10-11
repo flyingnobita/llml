@@ -452,3 +452,45 @@ func TestOMLXAppLayer(t *testing.T) {
 		t.Errorf("bootstrap base path = %v", got)
 	}
 }
+
+func TestStrataAppLayer(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	if l := readStrataAppLayer(dir); l.StrataInstalls != nil {
+		t.Fatalf("no Strata settings should give an empty layer, got %v", l.StrataInstalls)
+	}
+	write := func(sub, body string) {
+		t.Helper()
+		p := filepath.Join(dir, sub)
+		if err := os.MkdirAll(p, 0o750); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(p, "settings.json"), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	write("strata", `{"data_dir":"/data","installs":["/opt/strata"]}`)
+	if got := readStrataAppLayer(dir).StrataInstalls; !reflect.DeepEqual(got, []string{"/opt/strata"}) {
+		t.Errorf("installs = %v", got)
+	}
+	// A settings file with no installs says nothing llml can use.
+	write("strata", `{"data_dir":"/data"}`)
+	if got := readStrataAppLayer(dir).StrataInstalls; got != nil {
+		t.Errorf("no installs should give an empty layer, got %v", got)
+	}
+
+	// Windows spells the directory with a capital S.
+	dir2 := t.TempDir()
+	p := filepath.Join(dir2, "Strata")
+	if err := os.MkdirAll(p, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(p, "settings.json"), []byte(`{"installs":["/win/strata"]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := readStrataAppLayer(dir2).StrataInstalls; !reflect.DeepEqual(got, []string{"/win/strata"}) {
+		t.Errorf("capitalized settings dir: installs = %v", got)
+	}
+}

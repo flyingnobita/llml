@@ -37,6 +37,9 @@ func TestRuntimeInfoDetected(t *testing.T) {
 		{"mlx-vlm found", RuntimeInfo{MLXVLMPath: "/venv/bin/mlx_vlm.server"}, BackendMLXVLM, true},
 		{"mlx-vlm answers", RuntimeInfo{MLXVLMRunning: true}, BackendMLXVLM, true},
 		{"mlx-vlm missing", RuntimeInfo{MLXLMRunning: true, MLXLMPath: "/venv/bin/mlx_lm.server"}, BackendMLXVLM, false},
+		{"strata found", RuntimeInfo{StrataPath: "/opt/strata/serve/server.py"}, BackendStrata, true},
+		{"strata answers", RuntimeInfo{StrataRunning: true}, BackendStrata, true},
+		{"strata missing", RuntimeInfo{OllamaRunning: true}, BackendStrata, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -62,6 +65,7 @@ func TestRuntimeInfoStatusDrivesDetected(t *testing.T) {
 		BackendMLXLM:  "mlx-lm",
 		BackendMLXVLM: "mlx-vlm",
 		BackendOllama: "ollama",
+		BackendStrata: "strata",
 	}
 	infos := []RuntimeInfo{
 		{},

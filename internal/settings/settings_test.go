@@ -81,6 +81,7 @@ func TestDefaultPortsMatchUpstream(t *testing.T) {
 		{"splash serve", s.SplashPort, 8000},
 		{"mlx_lm.server", s.MLXLMPort, 8080},
 		{"mlx_vlm.server", s.MLXVLMPort, 8080},
+		{"strata", s.StrataPort, 8080},
 	} {
 		if tc.got != tc.want {
 			t.Errorf("%s default port = %d, want %d", tc.server, tc.got, tc.want)
@@ -237,6 +238,54 @@ func TestOMLXModelRoots(t *testing.T) {
 	s := Settings{OMLXModelDirs: []string{"/x"}}
 	if got := s.OMLXModelRoots("/Users/u"); !slices.Equal(got, []string{"/x"}) {
 		t.Errorf("configured roots = %v", got)
+	}
+}
+
+func TestStrataInstallDir(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct{ path, want string }{
+		{"", ""},
+		{"/opt/strata", "/opt/strata"},
+		{"/opt/strata/serve/server.py", "/opt/strata"},
+		{"/opt/strata/engine/strata", "/opt/strata"},
+		{"/opt/strata/strata-iq3_s.json", "/opt/strata"},
+		{"/opt/strata/run-iq3_s.sh", "/opt/strata"},
+	}
+	for _, tt := range tests {
+		if got := StrataInstallDir(tt.path); got != tt.want {
+			t.Errorf("StrataInstallDir(%q) = %q, want %q", tt.path, got, tt.want)
+		}
+	}
+}
+
+func TestStrataRoots(t *testing.T) {
+	t.Parallel()
+
+	s := Settings{StrataPath: "/opt/strata/serve/server.py", StrataInstalls: []string{"/opt/other"}}
+	if got, want := s.StrataRoots(""), []string{"/opt/strata", "/opt/other"}; !slices.Equal(got, want) {
+		t.Errorf("StrataRoots = %v, want %v", got, want)
+	}
+	// The default locations are added only with a home directory.
+	if got := (Settings{}).StrataRoots(""); got != nil {
+		t.Errorf("no home should mean no defaults, got %v", got)
+	}
+	if got := (Settings{}).StrataRoots("/Users/u"); !slices.Contains(got, "/Users/u/Applications/strata") {
+		t.Errorf("default roots %v missing ~/Applications/strata", got)
+	}
+}
+
+func TestFromEnvReadsStrata(t *testing.T) {
+	t.Parallel()
+
+	s := Resolve(FromEnv(fakeEnv(map[string]string{
+		EnvStrataPath: "/opt/strata/",
+		EnvStrataHost: "0.0.0.0",
+		EnvStrataPort: "9003",
+	})), Defaults())
+
+	if s.StrataPath != "/opt/strata" || s.StrataHost != "0.0.0.0" || s.StrataPort != 9003 {
+		t.Errorf("strata env not applied: %+v", s)
 	}
 }
 

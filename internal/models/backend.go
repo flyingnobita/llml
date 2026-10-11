@@ -33,6 +33,10 @@ const (
 	// mlx-vlm's `mlx_vlm.server --model`. Like mlx-lm, only a Safetensors
 	// row's profile chooses it.
 	BackendMLXVLM
+	// BackendStrata is a Strata engine config (strata-<model>.json) inside a
+	// Strata install, launched with the install's own serve/server.py. Strata
+	// is a Windows/Linux runtime for NVIDIA and AMD cards.
+	BackendStrata
 )
 
 // String returns the canonical lowercase name for the backend.
@@ -54,6 +58,8 @@ func (b ModelBackend) String() string {
 		return "mlx-lm"
 	case BackendMLXVLM:
 		return "mlx-vlm"
+	case BackendStrata:
+		return "strata"
 	default:
 		return "llama"
 	}
@@ -80,6 +86,8 @@ func ParseBackend(s string) (ModelBackend, error) {
 		return BackendMLXLM, nil
 	case "mlx-vlm":
 		return BackendMLXVLM, nil
+	case "strata":
+		return BackendStrata, nil
 	default:
 		return 0, fmt.Errorf("unknown backend %q", s)
 	}

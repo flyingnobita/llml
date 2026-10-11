@@ -19,6 +19,8 @@ func (f modelFormat) String() string {
 		return "Splash bundle"
 	case formatOllama:
 		return "Ollama library"
+	case formatStrata:
+		return "Strata"
 	default:
 		return "GGUF"
 	}
@@ -229,6 +231,17 @@ var runtimeTable = []runtimeDef{
 				func(s *settings.Settings) *int { return &s.SplashPort }, settings.DefaultSplashPort),
 			hostFieldDef(runtimeFieldSplashHost, settings.FieldSplashHost,
 				func(s *settings.Settings) *string { return &s.SplashHost }, settings.DefaultSplashHost),
+		},
+	},
+	{
+		backend: models.BackendStrata, name: "Strata", format: formatStrata,
+		fields: []runtimeFieldDef{
+			pathFieldDef(runtimeFieldStrataPath, settings.FieldStrataPath, "Path", "Strata install dir",
+				detectedProgram(models.BackendStrata), func(s *settings.Settings) *string { return &s.StrataPath }),
+			portFieldDef(runtimeFieldStrataPort, settings.FieldStrataPort,
+				func(s *settings.Settings) *int { return &s.StrataPort }, settings.DefaultStrataPort),
+			hostFieldDef(runtimeFieldStrataHost, settings.FieldStrataHost,
+				func(s *settings.Settings) *string { return &s.StrataHost }, settings.DefaultStrataHost),
 		},
 	},
 	{

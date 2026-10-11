@@ -68,6 +68,7 @@ type ninferLaunchBackend struct{}
 type omlxLaunchBackend struct{}
 type splashLaunchBackend struct{}
 type mlxLaunchBackend struct{}
+type strataLaunchBackend struct{}
 
 func (llamaLaunchBackend) args(s serverSpec) []launchArg {
 	args := []launchArg{
@@ -151,6 +152,26 @@ func (ollamaLaunchBackend) args(serverSpec) []launchArg {
 	return []launchArg{rawLaunchArg("serve")}
 }
 
+// args for a Strata install's server, run with the install's venv Python. The
+// engine config is the launch unit: it carries the model name, engine args,
+// tokenizer, and data paths. llml passes the server script, the engine, the
+// config, and the listen address; --host/--port override the config.
+func (strataLaunchBackend) args(s serverSpec) []launchArg {
+	return []launchArg{
+		quotedLaunchArg(strataServerScript(s.modelPath)),
+		rawLaunchArg("--engine"), rawLaunchArg("strata"),
+		rawLaunchArg("--config"), quotedLaunchArg(s.modelPath),
+		rawLaunchArg("--host"), rawLaunchArg(s.host),
+		rawLaunchArg("--port"), rawLaunchArg(fmt.Sprintf("%d", s.port)),
+	}
+}
+
+// strataServerScript is the serve/server.py inside the install that holds the
+// engine config at configPath.
+func strataServerScript(configPath string) string {
+	return filepath.Join(settings.StrataInstallDir(configPath), "serve", "server.py")
+}
+
 func (s serverSpec) launchBackend() launchBackend {
 	switch s.backend {
 	case models.BackendOllama:
@@ -167,6 +188,8 @@ func (s serverSpec) launchBackend() launchBackend {
 		return splashLaunchBackend{}
 	case models.BackendMLXLM, models.BackendMLXVLM:
 		return mlxLaunchBackend{}
+	case models.BackendStrata:
+		return strataLaunchBackend{}
 	default:
 		return llamaLaunchBackend{}
 	}
@@ -284,6 +307,8 @@ func buildServerSpec(backend models.ModelBackend, modelPath string, params profi
 		return mlxLMServerSpec(modelPath, params, rt, strict)
 	case models.BackendMLXVLM:
 		return mlxVLMServerSpec(modelPath, params, rt, strict)
+	case models.BackendStrata:
+		return strataServerSpec(modelPath, params, rt, strict)
 	case models.BackendKobold:
 		bin := models.ResolveKoboldCppPath(rt)
 		if strict && bin == "" {
@@ -453,6 +478,38 @@ func mlxVLMServerSpec(modelPath string, params profiles.ModelParams, rt models.R
 		modelPath: absModelPath(modelPath),
 		params:    params,
 	}, nil
+}
+
+// strataServerSpec is the Strata case of [buildServerSpec]. The install is
+// derived from the engine config (the row's launch target): the server script
+// is <install>/serve/server.py and the interpreter is the install's venv
+// Python. Running a row's own install keeps discovery and launch in step.
+func strataServerSpec(modelPath string, params profiles.ModelParams, rt models.RuntimeInfo, strict bool) (serverSpec, error) {
+	install := settings.StrataInstallDir(modelPath)
+	server := strataServerScript(modelPath)
+	python := models.StrataPython(server)
+	if strict {
+		if install == "" || !fileExists(server) {
+			return serverSpec{}, errors.New(MissingStrataFooterNote)
+		}
+		if !fileExists(python) {
+			return serverSpec{}, fmt.Errorf("strata venv Python not found at %s; rerun Strata's setup", python)
+		}
+	}
+	return serverSpec{
+		backend:   models.BackendStrata,
+		bin:       python,
+		host:      hostOr(rt.StrataHost, settings.DefaultStrataHost),
+		port:      portOr(rt.StrataPort, settings.DefaultStrataPort),
+		modelPath: modelPath,
+		params:    params,
+	}, nil
+}
+
+// fileExists reports whether path names an existing regular file.
+func fileExists(path string) bool {
+	fi, err := os.Stat(path)
+	return err == nil && fi.Mode().IsRegular()
 }
 
 // absModelPath returns modelPath made absolute. An MLX server reads any

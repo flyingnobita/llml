@@ -159,9 +159,11 @@ func TestRuntimePanel_cursorSkipsGroupLabels(t *testing.T) {
 		{keyDown, "mlx-lm"},
 		{keyDown, "mlx-vlm"},
 		{keyDown, "NInfer"},
+		{keyDown, "Strata"},
 		{keyDown, "Ollama"},
 		{keyDown, "Ollama"}, // the end of the list
-		{keyText("k"), "NInfer"},
+		{keyText("k"), "Strata"},
+		{keyUp, "NInfer"},
 		{keyUp, "mlx-vlm"},
 		{keyUp, "mlx-lm"},
 		{keyUp, "vLLM"},

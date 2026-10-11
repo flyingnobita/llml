@@ -44,6 +44,8 @@ func FormatRuntimeLabel(b ModelBackend) string {
 		return "mlx-lm"
 	case BackendMLXVLM:
 		return "mlx-vlm"
+	case BackendStrata:
+		return "strata"
 	default:
 		return "llama.cpp"
 	}

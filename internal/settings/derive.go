@@ -1,7 +1,9 @@
 package settings
 
 import (
+	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/flyingnobita/llml/internal/fsutil"
 )
@@ -53,6 +55,56 @@ func (s Settings) OMLXModelRoots(home string) []string {
 		return nil
 	}
 	return []string{filepath.Join(home, ".omlx", "models")}
+}
+
+// StrataInstallDir maps a Strata path to the install directory that holds
+// serve/ and .venv/. It accepts the install directory itself, its
+// serve/server.py, its engine/strata, or an engine config file
+// (strata-<model>.json) inside it. An empty input returns "".
+func StrataInstallDir(p string) string {
+	p = strings.TrimSpace(p)
+	if p == "" {
+		return ""
+	}
+	p = filepath.Clean(p)
+	base := filepath.Base(p)
+	if (base == "server.py" && filepath.Base(filepath.Dir(p)) == "serve") ||
+		(base == "strata" && filepath.Base(filepath.Dir(p)) == "engine") {
+		return filepath.Dir(filepath.Dir(p))
+	}
+	if fi, err := os.Stat(p); err == nil {
+		if fi.IsDir() {
+			return p
+		}
+		return filepath.Dir(p)
+	}
+	// The path does not exist, so a name with an extension is a file (an
+	// engine config, a launcher) inside the install; anything else is the
+	// install directory itself.
+	if filepath.Ext(base) != "" {
+		return filepath.Dir(p)
+	}
+	return p
+}
+
+// StrataRoots returns the Strata install directories to look for engine config
+// packs in: the configured StrataPath, the installs Strata's own settings.json
+// lists, and the common ~/Applications/strata and ~/Strata locations. Roots
+// that do not exist are skipped when they are read.
+func (s Settings) StrataRoots(home string) []string {
+	var ps fsutil.PathSet
+	if d := StrataInstallDir(s.StrataPath); d != "" {
+		ps.Add(d)
+	}
+	for _, p := range s.StrataInstalls {
+		if d := StrataInstallDir(p); d != "" {
+			ps.Add(d)
+		}
+	}
+	if home != "" {
+		ps.Add(filepath.Join(home, "Applications", "strata"), filepath.Join(home, "Strata"))
+	}
+	return ps.Slice()
 }
 
 // NInferModelsDir returns the models/ directory of the configured NInfer

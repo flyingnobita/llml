@@ -172,6 +172,24 @@ var mlxVLMRules = locationRules{
 	},
 }
 
+// strataRules covers Strata. The engine config (supplied by llml) is the
+// launch unit, so the flags that name it, the engine, its pack paths, and the
+// listen address are all machine-specific and stripped on import.
+var strataRules = locationRules{
+	envKeys: map[string]bool{
+		"STRATA_DATA": true,
+		"STRATA_PATH": true,
+	},
+	argTokens: map[string]bool{
+		"--config": true, "--engine": true,
+		"--pack": true, "--native": true, "--ple-gguf": true,
+		"--expert-profile": true, "--expert-cache": true, "--mtp": true,
+		"--tokenizer": true, "--data-dir": true, "--lib-dirs": true,
+		"--root": true, "--gpu": true, "--gpus": true,
+		"--host": true, "--port": true, "--open": true,
+	},
+}
+
 // rulesByBackend maps a backend name to its rules. llama and koboldcpp share
 // ggufRules by value, so they cannot drift apart.
 var rulesByBackend = map[string]locationRules{
@@ -183,6 +201,7 @@ var rulesByBackend = map[string]locationRules{
 	"splash":    splashRules,
 	"mlx-lm":    mlxLMRules,
 	"mlx-vlm":   mlxVLMRules,
+	"strata":    strataRules,
 }
 
 // isAnyBackendLocationEnv reports whether key is a model-location variable for

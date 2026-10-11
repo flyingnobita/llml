@@ -14,10 +14,10 @@
   ││     [✓] mlx-vlm   ✗        in use: 5001 (default)                                          │
   ││  NInfer (.ninfer)                                                                          │
   ││     [✓] NInfer    ○                                                                        │
-  ││  Ollama library                                                                            │
-  ││     [✓] Ollama    ○                                                                        │
-  ╰│                                                                                            │
-   │                                                                                            │
+  ││  Strata                                                                                    │
+  ││     [✓] Strata    ✗                                                                        │
+  ╰│  Ollama library                                                                            │
+   │     [✓] Ollama    ○                                                                        │
    │                                                                                            │
   L│                                                                                            │
   ╭│  ● running  ○ found  ✗ not found                                                           │

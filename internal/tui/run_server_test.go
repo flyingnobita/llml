@@ -939,3 +939,67 @@ func TestSplashLaunchArgs(t *testing.T) {
 		t.Fatalf("unprobed runtime should use defaults, got %+v", spec)
 	}
 }
+
+// makeStrataInstall builds a minimal Strata install: a serve/server.py and the
+// venv Python llml runs it with. It returns the install directory.
+func makeStrataInstall(t *testing.T) string {
+	t.Helper()
+	install := t.TempDir()
+	for _, p := range []string{
+		filepath.Join(install, "serve", "server.py"),
+		filepath.Join(install, ".venv", "bin", "python"),
+		filepath.Join(install, ".venv", "Scripts", "python.exe"),
+	} {
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte{}, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return install
+}
+
+func TestBuildServerSpec_strata(t *testing.T) {
+	t.Parallel()
+
+	install := makeStrataInstall(t)
+	config := filepath.Join(install, "strata-iq3_s.json")
+
+	if _, err := buildServerSpec(models.BackendStrata, filepath.Join(t.TempDir(), "strata-x.json"), profiles.ModelParams{}, models.RuntimeInfo{}, true); err == nil ||
+		!strings.Contains(err.Error(), MissingStrataFooterNote) {
+		t.Fatalf("strict launch without an install: err = %v", err)
+	}
+
+	rt := models.RuntimeInfo{StrataPath: filepath.Join(install, "serve", "server.py"), StrataHost: "0.0.0.0", StrataPort: 9003}
+	spec, err := buildServerSpec(models.BackendStrata, config, profiles.ModelParams{Args: []string{"--vision", "gpu"}}, rt, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := spec.bin, models.StrataPython(filepath.Join(install, "serve", "server.py")); got != want {
+		t.Fatalf("bin = %q, want the install's venv Python %q", got, want)
+	}
+	want := []string{
+		filepath.Join(install, "serve", "server.py"),
+		"--engine", "strata",
+		"--config", config,
+		"--host", "0.0.0.0",
+		"--port", "9003",
+		"--vision", "gpu",
+	}
+	if got := spec.directArgs(); !slices.Equal(got, want) {
+		t.Fatalf("directArgs = %v, want %v", got, want)
+	}
+
+	// Unprobed, the preview still shows a runnable command with the defaults.
+	spec, err = buildServerSpec(models.BackendStrata, config, profiles.ModelParams{}, models.RuntimeInfo{}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.port != settings.DefaultStrataPort || spec.host != settings.DefaultStrataHost {
+		t.Fatalf("unprobed runtime should use defaults, got %+v", spec)
+	}
+	if !strings.Contains(spec.previewLine(), filepath.Join(install, "serve", "server.py")) {
+		t.Fatalf("preview should name the server script:\n%s", spec.previewLine())
+	}
+}

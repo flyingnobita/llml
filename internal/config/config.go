@@ -68,6 +68,9 @@ type RuntimeConfig struct {
 	DefaultMLXVLMPath       string `toml:"default_mlx_vlm_path"`
 	DefaultMLXVLMHost       string `toml:"default_mlx_vlm_host"`
 	DefaultMLXVLMPort       *int   `toml:"default_mlx_vlm_port,omitempty"`
+	DefaultStrataPath       string `toml:"default_strata_path"`
+	DefaultStrataHost       string `toml:"default_strata_host"`
+	DefaultStrataPort       *int   `toml:"default_strata_port,omitempty"`
 }
 
 // DiscoveryConfig holds the user's extra search roots. The last scan time is
@@ -179,6 +182,7 @@ func (r RuntimeConfig) Layer() settings.Layer {
 	setLayerPath(&l.SplashPath, r.DefaultSplashPath)
 	setLayerPath(&l.MLXLMPath, r.DefaultMLXLMPath)
 	setLayerPath(&l.MLXVLMPath, r.DefaultMLXVLMPath)
+	setLayerPath(&l.StrataPath, r.DefaultStrataPath)
 	setLayerString(&l.LlamaServerHost, r.DefaultLlamaServerHost)
 	setLayerString(&l.VLLMServerHost, r.DefaultVLLMServerHost)
 	setLayerString(&l.NInferServerHost, r.DefaultNInferServerHost)
@@ -186,6 +190,7 @@ func (r RuntimeConfig) Layer() settings.Layer {
 	setLayerString(&l.SplashHost, r.DefaultSplashHost)
 	setLayerString(&l.MLXLMHost, r.DefaultMLXLMHost)
 	setLayerString(&l.MLXVLMHost, r.DefaultMLXVLMHost)
+	setLayerString(&l.StrataHost, r.DefaultStrataHost)
 	setLayerString(&l.OllamaHost, settings.NormalizeOllamaHost(r.DefaultOllamaHost))
 	setLayerPort(&l.LlamaServerPort, r.DefaultLlamaServerPort)
 	setLayerPort(&l.VLLMServerPort, r.DefaultVLLMServerPort)
@@ -195,6 +200,7 @@ func (r RuntimeConfig) Layer() settings.Layer {
 	setLayerPort(&l.SplashPort, r.DefaultSplashPort)
 	setLayerPort(&l.MLXLMPort, r.DefaultMLXLMPort)
 	setLayerPort(&l.MLXVLMPort, r.DefaultMLXVLMPort)
+	setLayerPort(&l.StrataPort, r.DefaultStrataPort)
 	return l
 }
 
@@ -216,11 +222,12 @@ func (c Config) Layer() settings.Layer {
 // environment over the remaining layers.
 func Resolve(getenv settings.Getenv) settings.Settings {
 	app := OMLXAppLayer(fsutil.HomeDir())
+	strata := StrataAppLayer()
 	c, err := ReadFile()
 	if err != nil {
-		return settings.Resolve(settings.FromEnv(getenv), app, settings.Defaults())
+		return settings.Resolve(settings.FromEnv(getenv), app, strata, settings.Defaults())
 	}
-	return settings.Resolve(settings.FromEnv(getenv), c.Layer(), app, settings.Defaults())
+	return settings.Resolve(settings.FromEnv(getenv), c.Layer(), app, strata, settings.Defaults())
 }
 
 func setLayerPath(dst **string, value string) {
@@ -254,6 +261,7 @@ func RuntimeConfigFromSettings(s settings.Settings) RuntimeConfig {
 	splashPort := s.SplashPort
 	mlxLMPort := s.MLXLMPort
 	mlxVLMPort := s.MLXVLMPort
+	strataPort := s.StrataPort
 	return RuntimeConfig{
 		DefaultLlamaCppPath:    s.LlamaCppPath,
 		DefaultLlamaServerHost: s.LlamaServerHost,
@@ -285,6 +293,10 @@ func RuntimeConfigFromSettings(s settings.Settings) RuntimeConfig {
 		DefaultMLXVLMPath: s.MLXVLMPath,
 		DefaultMLXVLMHost: s.MLXVLMHost,
 		DefaultMLXVLMPort: &mlxVLMPort,
+
+		DefaultStrataPath: s.StrataPath,
+		DefaultStrataHost: s.StrataHost,
+		DefaultStrataPort: &strataPort,
 	}
 }
 

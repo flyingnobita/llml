@@ -14,10 +14,10 @@
   ││     [✓] mlx-vlm   ✗        in use: 8080 (default)                                          │
   ││  NInfer (.ninfer)                                                                          │
   ││     [✓] NInfer    ○        Host  > 127.0.0.1                                               │
-  ││  Ollama library            in use: 127.0.0.1 (default)                                     │
-  ││     [✓] Ollama    ○                                                                        │
-  ╰│                                                                                            │
-   │                                                                                            │
+  ││  Strata                    in use: 127.0.0.1 (default)                                     │
+  ││     [✓] Strata    ✗                                                                        │
+  ╰│  Ollama library                                                                            │
+   │     [✓] Ollama    ○                                                                        │
    │                                                                                            │
   L│                                                                                            │
   ╭│  ● running  ○ found  ✗ not found                                                           │

@@ -58,6 +58,7 @@ func probeTargets(t *testing.T) (settings.Settings, map[ModelBackend]probeTarget
 	s.SplashHost, s.SplashPort = targets[BackendSplash].host, targets[BackendSplash].port
 	s.MLXLMHost, s.MLXLMPort = targets[BackendMLXLM].host, targets[BackendMLXLM].port
 	s.MLXVLMHost, s.MLXVLMPort = targets[BackendMLXVLM].host, targets[BackendMLXVLM].port
+	s.StrataHost, s.StrataPort = targets[BackendStrata].host, targets[BackendStrata].port
 	return s, targets
 }
 

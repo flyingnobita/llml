@@ -241,6 +241,8 @@ func normalizeBackend(v string) string {
 		return "mlx-lm"
 	case "mlx-vlm":
 		return "mlx-vlm"
+	case "strata":
+		return "strata"
 	default:
 		return ""
 	}

@@ -165,6 +165,14 @@ func Discover(ctx context.Context, opts Options) ([]ModelFile, error) {
 
 	out := buildModelFiles(candidates, sources)
 	claimOMLXRows(out, opts.Settings.OMLXModelRoots(fsutil.HomeDir()))
+	// Strata rows are not part of the walk: its engine configs are read
+	// directly from the install directories, so the model pack is never
+	// traversed and its GSQ-RCO .gguf shards never become llama.cpp rows.
+	strataHome := fsutil.HomeDir()
+	if opts.SkipDefaultRoots {
+		strataHome = ""
+	}
+	out = append(out, discoverStrata(opts.Settings.StrataRoots(strataHome))...)
 	slices.SortFunc(out, compareForDefaultOrder)
 	return out, nil
 }

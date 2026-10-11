@@ -23,6 +23,7 @@ func TestRuntimeTableGroupOrder(t *testing.T) {
 		{"Safetensors", "mlx-vlm"},
 		{"NInfer (.ninfer)", "NInfer"},
 		{"Splash bundle", "Splash"},
+		{"Strata", "Strata"},
 		{"Ollama library", "Ollama"},
 	}
 	var got []entry
@@ -48,6 +49,7 @@ func TestRuntimeTableFields(t *testing.T) {
 		models.BackendMLXVLM: {"MLX_VLM_PATH", "MLX_VLM_PORT", "MLX_VLM_HOST"},
 		models.BackendNInfer: {"NINFER_PATH", "NINFER_SERVER_PORT", "NINFER_SERVER_HOST"},
 		models.BackendSplash: {"SPLASH_PATH", "SPLASH_PORT", "SPLASH_HOST"},
+		models.BackendStrata: {"STRATA_PATH", "STRATA_PORT", "STRATA_HOST"},
 		models.BackendOllama: {"OLLAMA_PATH", "OLLAMA_HOST"},
 	}
 	seen := map[runtimeField]bool{}
@@ -85,6 +87,7 @@ func TestRuntimeTableStatus(t *testing.T) {
 		OllamaRunning:    true,
 		MLXLMPath:        "/opt/venv/bin/mlx_lm.server",
 		MLXVLMRunning:    true,
+		StrataPath:       "/opt/strata/serve/server.py",
 	}
 	want := map[models.ModelBackend]runtimeStatus{
 		models.BackendLlama:  {found: true},
@@ -95,6 +98,7 @@ func TestRuntimeTableStatus(t *testing.T) {
 		models.BackendSplash: {},
 		models.BackendMLXLM:  {found: true},
 		models.BackendMLXVLM: {running: true},
+		models.BackendStrata: {found: true},
 		models.BackendOllama: {running: true},
 	}
 	for _, rt := range runtimeTable {

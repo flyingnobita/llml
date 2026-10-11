@@ -38,6 +38,9 @@ type RuntimeInfo struct {
 	MLXVLMPath         string
 	MLXVLMHost         string
 	MLXVLMRunning      bool // an mlx_vlm.server answered /health on MLXVLMPort
+	StrataPath         string
+	StrataHost         string
+	StrataRunning      bool // a Strata server (service=strata) answered /health on StrataPort
 
 	// OMLXModelDirs are the directories oMLX serves models from; launch
 	// passes the one holding the selected model as --model-dir.
@@ -62,6 +65,7 @@ type RuntimeInfo struct {
 	SplashPort      int
 	MLXLMPort       int
 	MLXVLMPort      int
+	StrataPort      int
 
 	// VLLMVenv and VLLMConfiguredPath are the configured (not detected) vLLM
 	// locations, carried so venv activation can be resolved from a RuntimeInfo alone.
@@ -71,7 +75,7 @@ type RuntimeInfo struct {
 
 // Available is true if any Runtime's program was found or its server answered its probe.
 func (r RuntimeInfo) Available() bool {
-	return r.LlamaCLIPath != "" || r.LlamaServerPath != "" || r.VLLMPath != "" || r.OllamaPath != "" || r.KoboldCppPath != "" || r.NInferPath != "" || r.OMLXPath != "" || r.SplashPath != "" || r.MLXLMPath != "" || r.MLXVLMPath != "" || r.OllamaRunning || r.ServerRunning || r.VLLMRunning || r.KoboldCppRunning || r.NInferRunning || r.OMLXRunning || r.SplashRunning || r.MLXLMRunning || r.MLXVLMRunning
+	return r.LlamaCLIPath != "" || r.LlamaServerPath != "" || r.VLLMPath != "" || r.OllamaPath != "" || r.KoboldCppPath != "" || r.NInferPath != "" || r.OMLXPath != "" || r.SplashPath != "" || r.MLXLMPath != "" || r.MLXVLMPath != "" || r.StrataPath != "" || r.OllamaRunning || r.ServerRunning || r.VLLMRunning || r.KoboldCppRunning || r.NInferRunning || r.OMLXRunning || r.SplashRunning || r.MLXLMRunning || r.MLXVLMRunning || r.StrataRunning
 }
 
 // DiscoverRuntime locates each Runtime's program and probes its server.
@@ -111,6 +115,8 @@ func locateRuntimes(s settings.Settings) RuntimeInfo {
 		MLXLMHost:        s.MLXLMHost,
 		MLXVLMPath:       findMLXVLMScript(s.MLXVLMPath),
 		MLXVLMHost:       s.MLXVLMHost,
+		StrataPath:       findStrataServer(s.StrataRoots(fsutil.HomeDir())),
+		StrataHost:       s.StrataHost,
 		Platform:         CurrentPlatform(),
 		LlamaServerPort:  s.LlamaServerPort,
 		VLLMServerPort:   s.VLLMServerPort,
@@ -120,6 +126,7 @@ func locateRuntimes(s settings.Settings) RuntimeInfo {
 		SplashPort:       s.SplashPort,
 		MLXLMPort:        s.MLXLMPort,
 		MLXVLMPort:       s.MLXVLMPort,
+		StrataPort:       s.StrataPort,
 
 		VLLMVenv:           s.VLLMVenv,
 		VLLMConfiguredPath: s.VLLMPath,
@@ -177,6 +184,9 @@ func probeRuntimes(ctx context.Context, s settings.Settings, info *RuntimeInfo, 
 	})
 	probe(BackendMLXVLM, &info.MLXVLMRunning, func() bool {
 		return probeMLXVLM(ctx, probeHost(s.MLXVLMHost), s.MLXVLMPort)
+	})
+	probe(BackendStrata, &info.StrataRunning, func() bool {
+		return probeStrata(ctx, probeHost(s.StrataHost), s.StrataPort)
 	})
 	wg.Wait()
 

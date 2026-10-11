@@ -14,6 +14,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/flyingnobita/llml/internal/settings"
 )
 
 var commonBinaryDirs = []string{
@@ -328,6 +330,48 @@ func findConsoleScript(name, configured string) string {
 	return ""
 }
 
+// strataServerRelative is the server script inside a Strata install.
+var strataServerRelative = filepath.Join("serve", "server.py")
+
+// findStrataServer resolves the serve/server.py of the first Strata install
+// directory in roots that holds one. The arguments are StrataRoots, which
+// already normalizes a configured path and deduplicates the installs. It
+// returns "" when no install has a server script.
+func findStrataServer(roots []string) string {
+	for _, dir := range roots {
+		if dir == "" {
+			continue
+		}
+		if p := filepath.Join(dir, strataServerRelative); isRegularFile(p) {
+			return p
+		}
+	}
+	return ""
+}
+
+// StrataPython returns the Python interpreter an install runs its server with:
+// <install>/.venv/bin/python on Unix, <install>/.venv/Scripts/python.exe on
+// Windows. It prefers an existing file and falls back to the platform's path
+// whether or not it exists, so a launch on an install whose venv was removed
+// still shows the command it would run. It returns "" when serverPath is not
+// a Strata server script.
+func StrataPython(serverPath string) string {
+	dir := settings.StrataInstallDir(serverPath)
+	if dir == "" {
+		return ""
+	}
+	candidates := []string{filepath.Join(dir, ".venv", "bin", "python")}
+	if runtime.GOOS == "windows" {
+		candidates = []string{filepath.Join(dir, ".venv", "Scripts", "python.exe"), filepath.Join(dir, ".venv", "Scripts", "python")}
+	}
+	for _, p := range candidates {
+		if isRegularFile(p) {
+			return p
+		}
+	}
+	return candidates[0]
+}
+
 // probeHealthEndpoint reports whether the server on host:port answers GET
 // /health with 200, bounded by ctx. KoboldCpp is detected by this alone.
 func probeHealthEndpoint(ctx context.Context, host string, port int) bool {
@@ -342,6 +386,9 @@ type healthAnswer struct {
 	server string
 	// status is the "status" field of a JSON body, or "" without one.
 	status string
+	// service is the "service" field of a JSON body, or "" without one. A
+	// server that names itself (Strata) is identified by it.
+	service string
 }
 
 // fromMLXLM reports whether the answer came from mlx_lm.server: status "ok",
@@ -380,10 +427,12 @@ func getHealth(ctx context.Context, host string, port int) healthAnswer {
 	h := healthAnswer{ok: resp.StatusCode == http.StatusOK, server: resp.Header.Get("Server")}
 	body := io.LimitReader(resp.Body, 4<<10)
 	var parsed struct {
-		Status string `json:"status"`
+		Status  string `json:"status"`
+		Service string `json:"service"`
 	}
 	if json.NewDecoder(body).Decode(&parsed) == nil {
 		h.status = parsed.Status
+		h.service = parsed.Service
 	}
 	// Drain so the connection returns to the pool.
 	_, _ = io.Copy(io.Discard, body)
@@ -471,6 +520,14 @@ func probeMLXVLM(ctx context.Context, host string, port int) bool {
 	return getHealth(ctx, host, port).fromMLXVLM()
 }
 
+// probeStrata reports whether a Strata server answers on host:port. Strata's
+// /health body names it with "service": "strata", which is unambiguous, so
+// the probe does not depend on the port. Strata shares its setup default port
+// (8080) with llama.cpp, NInfer, and mlx.
+func probeStrata(ctx context.Context, host string, port int) bool {
+	return getHealth(ctx, host, port).service == "strata"
+}
+
 // probeVLLM reports whether vLLM answers on host:port. vLLM shares port 8000
 // with oMLX and Splash, which both answer /health too, so a 200 counts as vLLM
 // unless the model list names one of them as the owner. An MLX server or a
@@ -555,3 +612,7 @@ func ResolveMLXVLMPath(r RuntimeInfo) string {
 func ResolveKoboldCppPath(r RuntimeInfo) string {
 	return resolvePath(r.KoboldCppPath, "koboldcpp")
 }
+
+// ResolveStrataPath returns the detected Strata serve/server.py path, or "".
+// Strata is not installed on PATH, so there is no fallback lookup.
+func ResolveStrataPath(r RuntimeInfo) string { return r.StrataPath }
